@@ -13,6 +13,14 @@
 >
 > ![纯色图像生成器](imgs/纯色图像生成器.png)
 >
+> ==输入==
+>
+> > reference_image（参考图像）
+> >
+> > > 从其他图像节点获取尺寸
+> > >
+> > > > 使用时，preset_size 和 flip_dimensions 将失效
+>
 > ==主要参数==
 >
 > > **preset_size**（预设尺寸）
