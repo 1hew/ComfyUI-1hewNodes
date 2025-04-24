@@ -15,5 +15,5 @@
 1. 将此仓库克隆到 ComfyUI 的 `custom_nodes` 目录中：
    ```bash
    cd ComfyUI/custom_nodes
-   git clone https://github.com/yourusername/ComfyUI-1hewNodes.git
+   git clone https://github.com/1hew/ComfyUI-1hewNodes
    ```
