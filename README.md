@@ -133,7 +133,7 @@
 
 #### 1.4 Image Crop With BBox （图片裁剪_带裁剪边界框）
 
-> ![Image Crop With BBox](imgs/Image Crop With BBox.png)
+> <img src="imgs/Image Crop With BBox.png" alt="Image Crop With BBox" style="zoom:67%;" />
 >
 > ==输入==
 >
