@@ -26,11 +26,11 @@ class CoordinateExtractor:
     RETURN_TYPES = ("FLOAT", "FLOAT")
     RETURN_NAMES = ("x", "y")
     OUTPUT_IS_LIST = (True, True)
-    FUNCTION = "extract"
+    FUNCTION = "coordinate_extract"
     
-    CATEGORY = "1hewNodes/coordinate"  # 更改类别以包含子类别
+    CATEGORY = "1hewNodes/util"
 
-    def extract(self, coordinates_json):
+    def coordinate_extract(self, coordinates_json):
         try:
             # 解析 JSON 字符串为 Python 对象
             if isinstance(coordinates_json, str):
@@ -53,5 +53,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "CoordinateExtractor": "坐标提取器"  # 使用中文名称更友好
+    "CoordinateExtractor": "Coordinat Extractor"
 }

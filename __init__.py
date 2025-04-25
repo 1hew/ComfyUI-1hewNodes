@@ -6,29 +6,13 @@ import sys
 # 初始化映射字典
 NODE_CLASS_MAPPINGS = {}
 NODE_DISPLAY_NAME_MAPPINGS = {}
+# 添加自定义类型
+CUSTOM_TYPES = {
+    "CROP_BBOX": {"display_name": "crop_bbox", "color": (107, 176, 255)}  # 蓝色
+}
 
 # 获取当前目录
 current_dir = os.path.dirname(os.path.realpath(__file__))
-
-# 处理旧版节点文件 (如果存在)
-old_node_files = [
-    "coordinate_extractor.py"
-]
-
-for file in old_node_files:
-    if os.path.exists(os.path.join(current_dir, file)):
-        module_name = file[:-3]  # 去掉 .py 后缀
-        try:
-            # 导入模块
-            module = importlib.import_module(f".{module_name}", package=__name__)
-            
-            # 如果模块有节点映射，则添加到全局映射中
-            if hasattr(module, "NODE_CLASS_MAPPINGS"):
-                NODE_CLASS_MAPPINGS.update(module.NODE_CLASS_MAPPINGS)
-            if hasattr(module, "NODE_DISPLAY_NAME_MAPPINGS"):
-                NODE_DISPLAY_NAME_MAPPINGS.update(module.NODE_DISPLAY_NAME_MAPPINGS)
-        except Exception as e:
-            print(f"导入旧节点文件 {file} 时出错: {e}")
 
 # 自动发现和导入 nodes 目录下的所有节点模块
 nodes_dir = os.path.join(current_dir, "nodes")
