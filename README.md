@@ -6,7 +6,7 @@
 
 ## 01 | 节点功能
 
-### 1. image
+### 1. adobe
 #### 1.1 Solid（纯色）
 
 > 通过拾色器面板生成纯色图像
@@ -83,9 +83,15 @@
 > > >
 > > > 控制透明区域的颜色，从0到1表示从黑色到白色
 
-#### 1.3 Image Concatenate（图片拼接）
+#### 1.3 Blend Modes（混合模式）
 
-> <img src="imgs/Image Concatenate.png" alt="Image Concatenate" style="zoom:50%;" />
+> ![image-20250511211412858](imgs/image-20250511211412858.png)
+
+### 2. image
+
+#### 2.1 Image Edit Stitch（图片编辑缝合）
+
+> ![Image Concatenate](imgs/Image Concatenate.png)
 >
 > ==输入==
 >
@@ -131,7 +137,7 @@
 > > >
 > > > 控制匹配尺寸后，填充区域的颜色，从0到1表示从黑色到白色
 
-#### 1.4 Image Crop With BBox （图片裁剪_带裁剪边界框）
+#### 2.2 Image Crop With BBox （图片裁剪_带裁剪边界框）
 
 > <img src="imgs/Image Crop With BBox.png" alt="Image Crop With BBox" style="zoom: 50%;" />
 >
@@ -155,7 +161,7 @@
 > >
 > > crop_bbox
 > >
-> > > 输出 裁剪框的信息，用于 `Image Paste` 节点
+> > > 输出 裁剪框的信息，用于 `Cropped Image Paste` 节点
 >
 > ==参数==
 >
@@ -171,7 +177,7 @@
 >
 > > ① 将拼接后的图像裁剪输出
 > >
-> > > 结合 `Image Concatenate` 节点效果更佳
+> > > 结合 `Image Edit Stitch` 节点效果更佳
 > > >
 > > > <img src="imgs/Image Crop With BBox_1.png" alt="Image Crop With BBox_1" style="zoom:50%;" />
 > >
@@ -179,11 +185,11 @@
 > >
 > > > <img src="imgs/Image Crop With BBox_2.png" alt="Image Crop With BBox_2" style="zoom:50%;" />
 
-#### 1.5 Image Paste（图片拼贴）
+#### 2.3 Cropped Image Paste（裁剪图片拼贴）
 
 > 将 `Image Crop With BBox` 裁剪后的图像，拼接回源图
 >
-> <img src="imgs/Image Paste.png" alt="Image Paste" style="zoom:50%;" />
+> ![Cropped Image Paste](imgs/Cropped Image Paste.png)
 >
 > ==输入==
 >
@@ -213,12 +219,82 @@
 > >
 > > > 拼贴块的透明度
 
-### 2. util
-#### 2.1 CoordinateExtractor（坐标提取器）
+#### 2.4 Image Blend Modes By CSS （图片混合模式 CSS）
+
+> ![Image Blend Modes By CSS](imgs/Image Blend Modes By CSS.png)
+
+#### 2.5 Image Add Label（图像添加标签）
+
+> 为图像添加文本标签，支持上下左右四个方向
+>
+> ![Image Add Label](imgs/Image Add Label.png)
+>
+> ==输入==
+>
+> > image（图像）【必选】
+>
+> ==输出==
+>
+> > image
+> >
+> > > 添加标签后的图像
+>
+> ==参数==
+>
+> > height（高度）
+> >
+> > > 标签区域的高度，默认60像素
+> >
+> > font_size（字体大小）
+> >
+> > > 文本字体大小，默认42
+> >
+> > invert_colors（反转颜色）
+> >
+> > > 【默认】False，白色文本黑色背景
+> > >
+> > > 设置为 True 时，黑色文本白色背景
+> >
+> > font（字体）
+> >
+> > > 选择字体文件，默认使用 arial.ttf
+> >
+> > text（文本）
+> >
+> > > 要显示的文本内容
+> >
+> > direction（方向）
+> >
+> > > 标签位置，可选 ["top", "bottom", "left", "right"]
+> > >
+> > > 默认【top】，表示标签在图像顶部
+
+### 3. mask
+
+#### 3.1 Mask Math Ops（遮罩数学运算）
+
+> ![Mask Math Ops](imgs/Mask Math Ops.png)
+
+#### 3.2 Batch Mask Math Ops（批量遮罩数学运算）
+
+> ![Batch Mask Math Ops](imgs/Batch Mask Math Ops.png)
+
+#### 3.3 Mask Blend（遮罩混合）
+
+> ![Mask Blend](imgs/Mask Blend.png)
+
+### 4. util
+#### 4.1 Coordinate Extractor（坐标提取器）
 
 > 从 JSON 格式的坐标数据中提取 x 和 y 坐标列表，用于后续处理。
 >
 > ![CoordinateExtractor](imgs/CoordinateExtractor.png)
+
+#### 4.2 Slider Value Range Mapping（滑块数值范围映射）
+
+> ![Slider Value Range Mapping](imgs/Slider Value Range Mapping.png)
+
+
 
 
 

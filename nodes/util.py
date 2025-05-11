@@ -47,11 +47,71 @@ class CoordinateExtractor:
             print(f"Error extracting coordinates: {e}")
             return ([], [])
 
-# 注册节点
+
+class SliderValueRangeMapping:
+    """滑动条数值范围映射
+    滑动条的数值会根据min和max_value的修改实时变化
+    rounding参数控制小数位数精度
+    """
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+                    "value": ("FLOAT", {
+                        "default": 1.0, 
+                        "min": 0.0,
+                        "max": 1.0,
+                        "step": 0.001,
+                        "display": "slider"
+                    }),
+                    "min": ("FLOAT", {
+                        "default": 0.0, 
+                        "min": -0xffffffffffffffff, 
+                        "max": 0xffffffffffffffff,
+                        "step": 0.001, 
+                        "display": "number"  
+                    }),
+                    "max": ("FLOAT", {
+                        "default": 1.0, 
+                        "min": -0xffffffffffffffff,
+                        "max": 0xffffffffffffffff,
+                        "step": 0.001, 
+                        "display": "number"  
+                    }),
+                    "rounding": ("INT", {
+                        "default": 3, 
+                        "min": 0,
+                        "max": 10,
+                        "step": 1, 
+                        "display": "number"  
+                    }),
+                },
+            }
+    
+    RETURN_TYPES = ("FLOAT","INT") 
+    RETURN_NAMES = ('float','int')
+    FUNCTION = "slider_value_range_mapping"
+
+    CATEGORY = "1hewNodes/util"
+
+    def slider_value_range_mapping(self, value, min, max, rounding):
+        # 将0-1范围的滑动条值映射到 min 和 max 之间
+        actual_value = min + value * (max - min)
+        
+        # 根据rounding参数设置小数位数精度
+        if rounding > 0:
+            actual_value = round(actual_value, rounding)
+        else:
+            actual_value = int(actual_value)
+            
+        return (actual_value, int(actual_value))
+
+# 在NODE_CLASS_MAPPINGS中添加新节点
 NODE_CLASS_MAPPINGS = {
-    "CoordinateExtractor": CoordinateExtractor
+    "CoordinateExtractor": CoordinateExtractor,
+    "SliderValueRangeMapping": SliderValueRangeMapping
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "CoordinateExtractor": "Coordinat Extractor"
+    "CoordinateExtractor": "Coordinat Extractor",
+    "SliderValueRangeMapping": "Slider Value Range Mapping"
 }
