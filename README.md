@@ -11,7 +11,7 @@
 
 > 通过拾色器面板生成纯色图像
 >
-> ![Solid](imgs/Solid.png)
+> <img src="imgs/Solid.png" alt="Solid" style="zoom:80%;" />
 >
 > ==输入==
 >
@@ -85,13 +85,13 @@
 
 #### 1.3 Blend Modes（混合模式）
 
-> ![image-20250511211412858](imgs/image-20250511211412858.png)
+> <img src="imgs/Blend Modes.png" alt="Blend Modes" style="zoom:80%;" />
 
 ### 2. image
 
 #### 2.1 Image Edit Stitch（图片编辑缝合）
 
-> ![Image Concatenate](imgs/Image Concatenate.png)
+> <img src="imgs/Image Concatenate.png" alt="Image Concatenate" style="zoom:80%;" />
 >
 > ==输入==
 >
@@ -189,7 +189,7 @@
 
 > 将 `Image Crop With BBox` 裁剪后的图像，拼接回源图
 >
-> ![Cropped Image Paste](imgs/Cropped Image Paste.png)
+> <img src="imgs/Cropped Image Paste.png" alt="Cropped Image Paste" style="zoom: 80%;" />
 >
 > ==输入==
 >
@@ -221,13 +221,13 @@
 
 #### 2.4 Image Blend Modes By CSS （图片混合模式 CSS）
 
-> ![Image Blend Modes By CSS](imgs/Image Blend Modes By CSS.png)
+> <img src="imgs/Image Blend Modes By CSS.png" alt="Image Blend Modes By CSS" style="zoom:80%;" />
 
 #### 2.5 Image Add Label（图像添加标签）
 
 > 为图像添加文本标签，支持上下左右四个方向
 >
-> ![Image Add Label](imgs/Image Add Label.png)
+> <img src="imgs/Image Add Label.png" alt="Image Add Label" style="zoom:80%;" />
 >
 > ==输入==
 >
@@ -273,26 +273,26 @@
 
 #### 3.1 Mask Math Ops（遮罩数学运算）
 
-> ![Mask Math Ops](imgs/Mask Math Ops.png)
+> <img src="imgs/Mask Math Ops.png" alt="Mask Math Ops" style="zoom:80%;" />
 
 #### 3.2 Batch Mask Math Ops（批量遮罩数学运算）
 
-> ![Batch Mask Math Ops](imgs/Batch Mask Math Ops.png)
+> <img src="imgs/Batch Mask Math Ops.png" alt="Batch Mask Math Ops" style="zoom:80%;" />
 
 #### 3.3 Mask Blend（遮罩混合）
 
-> ![Mask Blend](imgs/Mask Blend.png)
+> <img src="imgs/Mask Blend.png" alt="Mask Blend" style="zoom:80%;" />
 
 ### 4. util
 #### 4.1 Coordinate Extractor（坐标提取器）
 
 > 从 JSON 格式的坐标数据中提取 x 和 y 坐标列表，用于后续处理。
 >
-> ![CoordinateExtractor](imgs/CoordinateExtractor.png)
+> <img src="imgs/CoordinateExtractor.png" alt="CoordinateExtractor" style="zoom:80%;" />
 
 #### 4.2 Slider Value Range Mapping（滑块数值范围映射）
 
-> ![Slider Value Range Mapping](imgs/Slider Value Range Mapping.png)
+> <img src="imgs/Slider Value Range Mapping.png" alt="Slider Value Range Mapping" style="zoom:80%;" />
 
 
 
