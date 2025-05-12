@@ -1,7 +1,9 @@
 import torch
 import numpy as np
-from PIL import Image, ImageOps, ImageDraw, ImageFont
+from PIL import Image, ImageOps, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 import os
+import math
+
 
 class ImageEditStitch:
     """
@@ -299,7 +301,7 @@ class CroppedImagePaste:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "original_image": ("IMAGE",),
+                "detail_image": ("IMAGE",),
                 "processed_image": ("IMAGE",),
                 "crop_bbox": ("CROP_BBOX",),
                 "blend_mode": (
@@ -316,11 +318,11 @@ class CroppedImagePaste:
     FUNCTION = "cropped_image_paste"
     CATEGORY = "1hewNodes/image"
 
-    def cropped_image_paste(self, original_image, processed_image, crop_bbox, blend_mode="normal", opacity=1.0,
+    def cropped_image_paste(self, detail_image, processed_image, crop_bbox, blend_mode="normal", opacity=1.0,
                             mask=None):
         try:
             # 获取图像尺寸
-            batch_size, height, width, channels = original_image.shape
+            batch_size, height, width, channels = detail_image.shape
             proc_batch_size = processed_image.shape[0]
 
             # 创建输出图像列表
@@ -328,7 +330,7 @@ class CroppedImagePaste:
 
             for b in range(batch_size):
                 # 获取当前批次的图像
-                orig_img = original_image[b]
+                orig_img = detail_image[b]
                 proc_img = processed_image[b % proc_batch_size]
 
                 # 将字符串转换为边界框坐标
@@ -336,7 +338,7 @@ class CroppedImagePaste:
                 bbox = list(map(int, bbox_str.split(",")))
 
                 # 将图像转换为PIL格式
-                if original_image.is_cuda:
+                if detail_image.is_cuda:
                     orig_np = (orig_img.cpu().numpy() * 255).astype(np.uint8)
                     proc_np = (proc_img.cpu().numpy() * 255).astype(np.uint8)
                 else:
@@ -404,7 +406,7 @@ class CroppedImagePaste:
         except Exception as e:
             print(f"图像粘贴器错误: {str(e)}")
             # 出错时返回原始图像
-            return (original_image,)
+            return (detail_image,)
 
     def blend_images(self, img1, img2, mode):
         """应用不同的混合模式"""
@@ -651,9 +653,243 @@ class ImageBlendModesByCSS:
             return base_pil
 
 
+class ImageDetailHLFreqSeparation:
+    """
+    图像细节保留-高低频分离技术
+    执行流程：
+    1. 图像A和B分别进行反转和高斯模糊处理
+    2. 将反转和模糊后的图像混合（使用CSS混合模式）
+    3. 将混合结果再次反转
+    4. 使用遮罩C混合两组混合结果
+    5. 进行最终混合和色阶调整
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "generate_image": ("IMAGE",),
+                "detail_image": ("IMAGE",),
+                "detail_mask": ("MASK",),
+                "gaussian_blur": ("FLOAT", {"default": 10.00, "min": 0.00, "max": 1000.00, "step": 0.01})
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "process_images"
+    CATEGORY = "1hewNodes/image"
+
+    def process_images(self, detail_image, generate_image, detail_mask, gaussian_blur=10.00):
+        # 获取批次大小
+        batch_size_a = detail_image.shape[0]
+        batch_size_b = generate_image.shape[0]
+        batch_size_c = detail_mask.shape[0]
+        
+        # 使用最大批次大小
+        max_batch_size = max(batch_size_a, batch_size_b, batch_size_c)
+        
+        # 创建输出图像列表
+        output_images = []
+        
+        for b in range(max_batch_size):
+            # 获取当前批次的图像和遮罩
+            current_image_a = detail_image[b % batch_size_a]
+            current_image_b = generate_image[b % batch_size_b]
+            current_mask_c = detail_mask[b % batch_size_c]
+            
+            # 将图像转换为PIL格式
+            pil_image_a = self._tensor_to_pil(current_image_a)
+            pil_image_b = self._tensor_to_pil(current_image_b)
+            
+            # 步骤1: 图像A处理 - 反转得到a1
+            a1 = ImageOps.invert(pil_image_a)
+            
+            # 步骤2: 图像A处理 - 高斯模糊得到a2
+            a2 = self._gaussian_blur(pil_image_a, gaussian_blur)
+            
+            # 步骤3: 混合a1和a2得到c1 - 使用CSS混合模式normal
+            c1 = self._blend_images_css(a1, a2, "normal", 0.5)
+            
+            # 新增步骤: 反转c1得到c1-1
+            c1_1 = ImageOps.invert(c1)
+            
+            # 步骤4: 图像B处理 - 反转得到b1
+            b1 = ImageOps.invert(pil_image_b)
+            
+            # 步骤5: 图像B处理 - 高斯模糊得到b2
+            b2 = self._gaussian_blur(pil_image_b, gaussian_blur)
+            
+            # 步骤6: 混合b1和b2得到c2 - 使用CSS混合模式normal
+            c2 = self._blend_images_css(b1, b2, "normal", 0.5)
+            
+            # 新增步骤: 反转c2得到c2-1
+            c2_1 = ImageOps.invert(c2)
+            
+            # 步骤7: 使用遮罩C混合c1-1和c2-1得到d
+            # 将遮罩转换为PIL格式
+            if detail_mask.is_cuda:
+                mask_np = (current_mask_c.cpu().numpy() * 255).astype(np.uint8)
+            else:
+                mask_np = (current_mask_c.numpy() * 255).astype(np.uint8)
+            mask_pil = Image.fromarray(mask_np)
+            
+            # 调整遮罩大小以匹配图像
+            if mask_pil.size != pil_image_a.size:
+                mask_pil = mask_pil.resize(pil_image_a.size, Image.Resampling.LANCZOS)
+            
+            # 使用遮罩混合c1-1和c2-1
+            # 注意：这里c2-1是base_img，c1-1是overlay_img
+            d = Image.composite(c1_1, c2_1, mask_pil)
+            
+            # 步骤8: 混合d和b2得到e - 使用CSS混合模式normal
+            # 注意：这里d是overlay_img，b2是base_img
+            e = self._blend_images_css(d, b2, "normal", 0.65)
+            
+            # 步骤9: 应用色阶调整得到f
+            f = self._adjust_levels(e, 83, 172, 1.0, 0, 255)
+            
+            # 转换回tensor
+            result_tensor = self._pil_to_tensor(f)
+            output_images.append(result_tensor)
+        
+        # 合并批次
+        output_tensor = torch.stack(output_images)
+        
+        return (output_tensor,)
+    
+    def _tensor_to_pil(self, tensor):
+        """将张量转换为PIL图像"""
+        # 确保张量在CPU上
+        if tensor.is_cuda:
+            tensor = tensor.cpu()
+        
+        # 转换为numpy数组
+        np_array = (tensor.numpy() * 255).astype(np.uint8)
+        
+        # 创建PIL图像
+        if np_array.shape[2] == 3:
+            return Image.fromarray(np_array, 'RGB')
+        elif np_array.shape[2] == 4:
+            return Image.fromarray(np_array, 'RGBA')
+        else:
+            raise ValueError(f"不支持的通道数: {np_array.shape[2]}")
+    
+    def _pil_to_tensor(self, pil_image):
+        """将PIL图像转换为张量"""
+        # 确保图像是RGB模式
+        if pil_image.mode != 'RGB':
+            pil_image = pil_image.convert('RGB')
+        
+        # 转换为numpy数组
+        np_array = np.array(pil_image).astype(np.float32) / 255.0
+        
+        # 转换为张量
+        return torch.from_numpy(np_array)
+    
+    def _gaussian_blur(self, image, blur):
+        """应用高斯模糊"""
+        if blur <= 0:
+            return image
+        
+        # 参考 LS_GaussianBlurV2 节点的实现
+        return image.filter(ImageFilter.GaussianBlur(radius=blur))
+    
+    def _blend_images_css(self, overlay_img, base_img, blend_mode, blend_percentage):
+        """使用CSS混合模式混合两个图像"""
+        # 确保两个图像具有相同的尺寸和模式
+        if overlay_img.size != base_img.size:
+            overlay_img = overlay_img.resize(base_img.size, Image.Resampling.LANCZOS)
+        
+        if overlay_img.mode != base_img.mode:
+            if 'A' in overlay_img.mode:
+                base_img = base_img.convert(overlay_img.mode)
+            else:
+                overlay_img = overlay_img.convert(base_img.mode)
+        
+        # 转换为numpy数组
+        overlay_array = np.array(overlay_img).astype(float)
+        base_array = np.array(base_img).astype(float)
+        
+        # 应用CSS混合模式
+        if blend_mode == "normal":
+            # 普通混合模式
+            blended_array = overlay_array * blend_percentage + base_array * (1 - blend_percentage)
+        elif blend_mode == "multiply":
+            # 正片叠底
+            blended_array = (overlay_array * base_array) / 255.0
+            blended_array = blended_array * blend_percentage + base_array * (1 - blend_percentage)
+        elif blend_mode == "screen":
+            # 滤色
+            blended_array = 255.0 - ((255.0 - overlay_array) * (255.0 - base_array) / 255.0)
+            blended_array = blended_array * blend_percentage + base_array * (1 - blend_percentage)
+        elif blend_mode == "overlay":
+            # 叠加
+            mask = base_array <= 127.5
+            blended_array = np.zeros_like(base_array)
+            blended_array[mask] = (2 * overlay_array[mask] * base_array[mask]) / 255.0
+            blended_array[~mask] = 255.0 - (2 * (255.0 - overlay_array[~mask]) * (255.0 - base_array[~mask]) / 255.0)
+            blended_array = blended_array * blend_percentage + base_array * (1 - blend_percentage)
+        elif blend_mode == "soft_light":
+            # 柔光
+            blended_array = np.zeros_like(base_array)
+            mask = overlay_array <= 127.5
+            blended_array[mask] = ((2 * overlay_array[mask] - 255.0) * (base_array[mask] - base_array[mask] * base_array[mask] / 255.0) / 255.0) + base_array[mask]
+            blended_array[~mask] = ((2 * overlay_array[~mask] - 255.0) * (np.sqrt(base_array[~mask] / 255.0) * 255.0 - base_array[~mask]) / 255.0) + base_array[~mask]
+            blended_array = blended_array * blend_percentage + base_array * (1 - blend_percentage)
+        else:
+            # 默认为普通混合
+            blended_array = overlay_array * blend_percentage + base_array * (1 - blend_percentage)
+        
+        # 确保值在有效范围内
+        blended_array = np.clip(blended_array, 0, 255).astype(np.uint8)
+        
+        # 转换回PIL图像
+        if overlay_img.mode == 'RGB':
+            return Image.fromarray(blended_array, 'RGB')
+        elif overlay_img.mode == 'RGBA':
+            return Image.fromarray(blended_array, 'RGBA')
+        else:
+            return Image.fromarray(blended_array)
+    
+    def _adjust_levels(self, image, black_point, white_point, gray_point=1.0, output_black_point=0, output_white_point=255):
+        """应用色阶调整，参考 ColorCorrectLevels 节点"""
+        # 确保值在0-255范围内
+        black_point = max(0, min(255, black_point))
+        white_point = max(0, min(255, white_point))
+        output_black_point = max(0, min(255, output_black_point))
+        output_white_point = max(0, min(255, output_white_point))
+        
+        # 转换为numpy数组
+        img_array = np.array(image)
+        
+        # 分别处理每个通道
+        result_array = np.zeros_like(img_array)
+        
+        for i in range(img_array.shape[2]):
+            channel = img_array[:, :, i].astype(float)
+            
+            # 应用黑白点调整
+            channel = np.clip(channel, black_point, white_point)
+            channel = (channel - black_point) / (white_point - black_point) * 255.0
+            
+            # 应用灰度点调整（gamma校正）
+            if gray_point != 1.0:
+                channel = 255.0 * (channel / 255.0) ** (1.0 / gray_point)
+            
+            # 应用输出黑白点调整
+            channel = (channel / 255.0) * (output_white_point - output_black_point) + output_black_point
+            
+            # 确保值在有效范围内
+            result_array[:, :, i] = np.clip(channel, 0, 255).astype(np.uint8)
+        
+        # 转换回PIL图像
+        return Image.fromarray(result_array)
+
+
 class ImageAddLabel:
     """
-    为图像添加标签文本
+    为图像添加标签文本 - 支持批量图像和批量标签
     """
 
     @classmethod
@@ -674,9 +910,9 @@ class ImageAddLabel:
                 "image": ("IMAGE",),
                 "height": ("INT", {"default": 60, "min": 1, "max": 1024}),
                 "font_size": ("INT", {"default": 36, "min": 1, "max": 256}),
-                "invert_colors": ("BOOLEAN", {"default": False}),
+                "invert_colors": ("BOOLEAN", {"default": True}),
                 "font": (font_files, {"default": "arial.ttf", "label": "字体文件"}),
-                "text": ("STRING", {"default": ""}),
+                "text": ("STRING", {"default": "", "multiline": True, "label": "标签文本(多行时每行对应一张图像)"}),
                 "direction": (["top", "bottom", "left", "right"], {"default": "top", "label": "标签位置"})
             }
         }
@@ -697,7 +933,14 @@ class ImageAddLabel:
 
         # 获取图像尺寸
         result = []
-        for img in image:
+        
+        # 处理多行文本，分割成标签列表
+        text_lines = text.strip().split('\n')
+        
+        for i, img in enumerate(image):
+            # 选择对应的标签文本，如果标签数量少于图像数量，则循环使用
+            current_text = text_lines[i % len(text_lines)] if text_lines else ""
+            
             # 将图像转换为PIL格式
             i = 255. * img.cpu().numpy()
             img_pil = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
@@ -733,19 +976,19 @@ class ImageAddLabel:
                 # 计算文本尺寸
                 try:
                     # 对于较新版本的PIL
-                    text_bbox = draw.textbbox((0, 0), text, font=font_obj)
+                    text_bbox = draw.textbbox((0, 0), current_text, font=font_obj)
                     text_width = text_bbox[2] - text_bbox[0]
                     text_height = text_bbox[3] - text_bbox[1]
                 except AttributeError:
                     # 对于较旧版本的PIL
-                    text_width, text_height = draw.textsize(text, font=font_obj)
+                    text_width, text_height = draw.textsize(current_text, font=font_obj)
 
                 # 计算文本位置 - 左对齐，空出10像素，垂直居中
                 text_x = 10  # 左边距10像素
                 text_y = (height - text_height) // 2  # 垂直居中
 
                 # 绘制文本
-                draw.text((text_x, text_y), text, fill=font_color, font=font_obj)
+                draw.text((text_x, text_y), current_text, fill=font_color, font=font_obj)
 
                 # 合并图像和标签
                 if direction == "top":
@@ -757,36 +1000,6 @@ class ImageAddLabel:
                     new_img.paste(img_pil, (0, 0))
                     new_img.paste(label_img, (0, orig_height))
             else:  # left or right
-                # 对于左右方向，创建垂直标签
-                label_img = Image.new("RGB", (height, orig_height), label_color)
-                draw = ImageDraw.Draw(label_img)
-
-                try:
-                    font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", font)
-                    if not os.path.exists(font_path):
-                        system_font_dirs = [
-                            "C:/Windows/Fonts",
-                            "/usr/share/fonts",
-                            "/System/Library/Fonts"
-                        ]
-                        for font_dir in system_font_dirs:
-                            if os.path.exists(os.path.join(font_dir, font)):
-                                font_path = os.path.join(font_dir, font)
-                                break
-
-                    font_obj = ImageFont.truetype(font_path, font_size)
-                except Exception as e:
-                    print(f"无法加载字体 {font}: {e}，使用默认字体")
-                    font_obj = ImageFont.load_default()
-
-                # 计算文本尺寸
-                try:
-                    text_bbox = draw.textbbox((0, 0), text, font=font_obj)
-                    text_width = text_bbox[2] - text_bbox[0]
-                    text_height = text_bbox[3] - text_bbox[1]
-                except AttributeError:
-                    text_width, text_height = draw.textsize(text, font=font_obj)
-
                 # 对于左右方向，我们需要创建一个临时的水平标签，然后旋转它
                 if direction == "left":
                     # 创建一个水平标签（类似于top标签）
@@ -813,18 +1026,18 @@ class ImageAddLabel:
 
                     # 计算文本尺寸
                     try:
-                        text_bbox = draw.textbbox((0, 0), text, font=font_obj)
+                        text_bbox = draw.textbbox((0, 0), current_text, font=font_obj)
                         text_width = text_bbox[2] - text_bbox[0]
                         text_height = text_bbox[3] - text_bbox[1]
                     except AttributeError:
-                        text_width, text_height = draw.textsize(text, font=font_obj)
+                        text_width, text_height = draw.textsize(current_text, font=font_obj)
 
                     # 计算文本位置 - 左对齐，空出10像素，垂直居中
                     text_x = 10  # 左边距10像素
                     text_y = (height - text_height) // 2  # 垂直居中
 
                     # 绘制文本
-                    draw.text((text_x, text_y), text, fill=font_color, font=font_obj)
+                    draw.text((text_x, text_y), current_text, fill=font_color, font=font_obj)
 
                     # 旋转标签图像逆时针90度
                     label_img = temp_label_img.rotate(90, expand=True)
@@ -859,18 +1072,18 @@ class ImageAddLabel:
 
                     # 计算文本尺寸
                     try:
-                        text_bbox = draw.textbbox((0, 0), text, font=font_obj)
+                        text_bbox = draw.textbbox((0, 0), current_text, font=font_obj)
                         text_width = text_bbox[2] - text_bbox[0]
                         text_height = text_bbox[3] - text_bbox[1]
                     except AttributeError:
-                        text_width, text_height = draw.textsize(text, font=font_obj)
+                        text_width, text_height = draw.textsize(current_text, font=font_obj)
 
                     # 计算文本位置 - 左对齐，空出10像素，垂直居中
                     text_x = 10  # 左边距10像素
                     text_y = (height - text_height) // 2  # 垂直居中
 
                     # 绘制文本
-                    draw.text((text_x, text_y), text, fill=font_color, font=font_obj)
+                    draw.text((text_x, text_y), current_text, fill=font_color, font=font_obj)
 
                     # 旋转标签图像顺时针90度（即逆时针270度）
                     label_img = temp_label_img.rotate(270, expand=True)
@@ -888,12 +1101,168 @@ class ImageAddLabel:
         return (torch.cat(result, dim=0),)
 
 
+class ImagePlot:
+    """
+    将多张图像拼合成一张大图
+    """
+    
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "images": ("IMAGE",),
+                "layout": (["horizontal", "vertical", "grid"], {"default": "horizontal", "label": "排列方式"}),
+                "gap": ("INT", {"default": 10, "min": 0, "max": 100, "label": "图像间隙"}),
+                "columns": ("INT", {"default": 2, "min": 1, "max": 10, "label": "每行图像数量(网格模式)"}),
+                "background_color": ("STRING", {"default": "1.0", "label": "背景颜色 (灰度/HEX/RGB)"})
+            }
+        }
+    
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "plot_image"
+    CATEGORY = "1hewNodes/image"
+    
+    def plot_image(self, images, layout, gap, columns, background_color):
+        # 解析背景颜色
+        bg_color = self._parse_color(background_color)
+        
+        # 获取图像数量
+        num_images = images.shape[0]
+        
+        # 将所有图像转换为PIL格式
+        pil_images = []
+        for i in range(num_images):
+            img = 255. * images[i].cpu().numpy()
+            pil_img = Image.fromarray(np.clip(img, 0, 255).astype(np.uint8))
+            pil_images.append(pil_img)
+        
+        # 获取所有图像的尺寸
+        widths = [img.width for img in pil_images]
+        heights = [img.height for img in pil_images]
+        
+        # 根据布局计算最终图像的尺寸
+        if layout == "horizontal":
+            # 水平排列
+            total_width = sum(widths) + gap * (num_images - 1)
+            max_height = max(heights)
+            result_img = Image.new("RGB", (total_width, max_height), bg_color)
+            
+            x_offset = 0
+            for img in pil_images:
+                # 垂直居中
+                y_offset = (max_height - img.height) // 2
+                result_img.paste(img, (x_offset, y_offset))
+                x_offset += img.width + gap
+                
+        elif layout == "vertical":
+            # 垂直排列
+            max_width = max(widths)
+            total_height = sum(heights) + gap * (num_images - 1)
+            result_img = Image.new("RGB", (max_width, total_height), bg_color)
+            
+            y_offset = 0
+            for img in pil_images:
+                # 水平居中
+                x_offset = (max_width - img.width) // 2
+                result_img.paste(img, (x_offset, y_offset))
+                y_offset += img.height + gap
+                
+        else:  # grid
+            # 网格排列
+            rows = math.ceil(num_images / columns)
+            
+            # 计算每行每列的最大尺寸
+            max_width_per_col = []
+            for col in range(columns):
+                col_images = [pil_images[i] for i in range(num_images) if i % columns == col]
+                max_width_per_col.append(max([img.width for img in col_images]) if col_images else 0)
+                
+            max_height_per_row = []
+            for row in range(rows):
+                row_images = [pil_images[i] for i in range(num_images) if i // columns == row]
+                max_height_per_row.append(max([img.height for img in row_images]) if row_images else 0)
+            
+            # 计算总宽度和总高度
+            total_width = sum(max_width_per_col) + gap * (columns - 1)
+            total_height = sum(max_height_per_row) + gap * (rows - 1)
+            
+            result_img = Image.new("RGB", (total_width, total_height), bg_color)
+            
+            # 放置图像
+            for i, img in enumerate(pil_images):
+                row = i // columns
+                col = i % columns
+                
+                # 计算当前位置的x和y偏移
+                x_offset = sum(max_width_per_col[:col]) + gap * col
+                y_offset = sum(max_height_per_row[:row]) + gap * row
+                
+                # 在当前单元格内居中
+                x_center = (max_width_per_col[col] - img.width) // 2
+                y_center = (max_height_per_row[row] - img.height) // 2
+                
+                result_img.paste(img, (x_offset + x_center, y_offset + y_center))
+        
+        # 转换回tensor
+        result_np = np.array(result_img).astype(np.float32) / 255.0
+        result_tensor = torch.from_numpy(result_np)[None,]
+        
+        return (result_tensor,)
+    
+    def _parse_color(self, color_str):
+        """解析不同格式的颜色输入"""
+        color_str = color_str.strip()
+        
+        # 尝试解析为灰度值 (0.0-1.0)
+        try:
+            gray_value = float(color_str)
+            if 0.0 <= gray_value <= 1.0:
+                # 灰度值转换为RGB
+                gray_int = int(gray_value * 255)
+                return (gray_int, gray_int, gray_int)
+        except ValueError:
+            pass
+        
+        # 尝试解析为十六进制颜色 (#RRGGBB 或 RRGGBB)
+        if color_str.startswith('#'):
+            hex_color = color_str[1:]
+        else:
+            hex_color = color_str
+            
+        if len(hex_color) == 6:
+            try:
+                r = int(hex_color[0:2], 16)
+                g = int(hex_color[2:4], 16)
+                b = int(hex_color[4:6], 16)
+                return (r, g, b)
+            except ValueError:
+                pass
+        
+        # 尝试解析为RGB格式 (R,G,B)
+        if color_str.startswith('(') and color_str.endswith(')'):
+            try:
+                rgb = color_str[1:-1].split(',')
+                if len(rgb) == 3:
+                    r = int(rgb[0].strip())
+                    g = int(rgb[1].strip())
+                    b = int(rgb[2].strip())
+                    return (r, g, b)
+            except ValueError:
+                pass
+        
+        # 默认返回白色
+        return (255, 255, 255)
+
+
 NODE_CLASS_MAPPINGS = {
     "ImageEditStitch": ImageEditStitch,
     "ImageCropWithBBox": ImageCropWithBBox,
     "CroppedImagePaste": CroppedImagePaste,
     "ImageBlendModesByCSS": ImageBlendModesByCSS,
-    "ImageAddLabel": ImageAddLabel
+    "ImageDetailHLFreqSeparation": ImageDetailHLFreqSeparation,
+    "ImageAddLabel": ImageAddLabel,
+    "ImagePlot": ImagePlot
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -901,5 +1270,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ImageCropWithBBox": "Image Crop With BBox",
     "CroppedImagePaste": "Cropped Image Paste",
     "ImageBlendModesByCSS": "Image Blend Modes By CSS",
-    "ImageAddLabel": "Image Add Label"
+    "ImageDetailHLFreqSeparation": "Image Detail HL Freq Separation",
+    "ImageAddLabel": "Image Add Label",
+    "ImagePlot": "Image Plot"
 }
