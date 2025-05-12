@@ -223,7 +223,11 @@
 
 > <img src="imgs/Image Blend Modes By CSS.png" alt="Image Blend Modes By CSS" style="zoom:80%;" />
 
-#### 2.5 Image Add Label（图像添加标签）
+#### 2.5 Image Detail HL Freq Separation（图像细节高低频分离）
+
+> ![image-20250512221605282](imgs/image-20250512221605282.png)
+
+#### 2.6 Image Add Label（图像添加标签）
 
 > 为图像添加文本标签，支持上下左右四个方向
 >
@@ -268,6 +272,10 @@
 > > > 标签位置，可选 ["top", "bottom", "left", "right"]
 > > >
 > > > 默认【top】，表示标签在图像顶部
+
+#### 2.7 Image Plot（图像绘制）
+
+> ![image-20250512221704068](imgs/image-20250512221704068.png)
 
 ### 3. mask
 
