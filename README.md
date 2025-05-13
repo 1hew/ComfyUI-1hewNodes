@@ -81,7 +81,13 @@
 > >
 > > > add_background 设置为 True 时生效
 > > >
-> > > 控制透明区域的颜色，从0到1表示从黑色到白色
+> > > 控制透明区域的颜色
+> > >
+> > > > 支持 0.0-1.0 从 黑色到白色，灰度值（如 "0.5"）
+> > > >
+> > > > 支持 RGB 格式（如 "255,0,0"）
+> > > >
+> > > > 支持 HEX 格式（如 "#FF0000"）
 
 #### 1.3 Blend Modes Alpha（混合模式透明度）
 
@@ -140,12 +146,26 @@
 #### 2.2  Image Crop Square（图片裁剪方形）
 
 > <img src="imgs/Image Crop Square.png" alt="Image Crop Square" style="zoom:80%;" />
+>
+> fill_color
+>
+> > 支持 0.0-1.0 从 黑色到白色，灰度值（如 "0.5"）
+> >
+> > 支持 RGB 格式（如 "255,0,0"）
+> >
+> > 支持 HEX 格式（如 "#FF0000"）
+> >
+> > 支持 e,edge 字符串
+> >
+> > > 当 apply_mask 为 false 时，四周获取四周上的4个平均颜色
+> > >
+> > > 当 apply_mask 为 true 是，获取 mask 选择的平均颜色
 
 
 
-#### 2.3 Image Crop With BBox （图片裁剪_带裁剪边界框）
+#### 2.3 Image Crop With BBox （图片裁剪_带检测框）
 
-> <img src="imgs/Image Crop With BBox.png" alt="Image Crop With BBox" style="zoom: 50%;" />
+> ![Image Crop With BBox](imgs/Image Crop With BBox.png)
 >
 > ==输入==
 >
@@ -171,13 +191,47 @@
 >
 > ==参数==
 >
+> > aspect_ratio
+> >
+> > > 控制输出的比例
+> >
+> > scale_factor
+> >
+> > > 调整比例后的尺寸缩放因子
+> >
+> > extra_padding
+> >
+> > > 额外扩充像素
+> >
+> > exceed_image
+> >
+> > > 是否可以超出原图像尺寸
+> > >
+> > > > 如果是，超出的部分使用 fill_color 填充
+> >
 > > invert_mask
 > >
 > > > 反转输入mask
 > >
-> > padding
+> > fill_color
 > >
-> > > 检测框扩充像素
+> > > 填充颜色
+> > >
+> > > 支持 0.0-1.0 从 黑色到白色，灰度值（如 "0.5"）
+> > >
+> > > 支持 RGB 格式（如 "255,0,0"）
+> > >
+> > > 支持 HEX 格式（如 "#FF0000"）
+> > >
+> > > 支持 e,edge 字符串
+> > >
+> > > > 当 apply_mask 为 false 时，四周获取四周上的4个平均颜色
+> > > >
+> > > > 当 apply_mask 为 true 是，获取 mask 选择的平均颜色
+> >
+> > dicisible_by
+> >
+> > > 输出的尺寸可以被 此整数 整除
 >
 > ==应用==
 >
@@ -185,17 +239,23 @@
 > >
 > > > 结合 `Image Edit Stitch` 节点效果更佳
 > > >
-> > > <img src="imgs/Image Crop With BBox_1.png" alt="Image Crop With BBox_1" style="zoom:50%;" />
+> > > <img src="imgs/Image Crop With BBox_1.png" alt="Image Crop With BBox_1" style="zoom: 50%;" />
 > >
 > > ② 选取遮罩区域的图像
 > >
 > > > <img src="imgs/Image Crop With BBox_2.png" alt="Image Crop With BBox_2" style="zoom:50%;" />
 
-#### 2.4 Cropped Image Paste（裁剪图片拼贴）
+#### 2.4 Image BBox Crop（图像检测框裁剪）
+
+> ![Image BBox Crop](imgs/Image BBox Crop.png)
+
+
+
+#### 2.5 Image Cropped Paste（图片裁切后拼贴）
 
 > 将 `Image Crop With BBox` 裁剪后的图像，拼接回源图
 >
-> <img src="imgs/Cropped Image Paste.png" alt="Cropped Image Paste" style="zoom: 80%;" />
+> <img src="imgs/Image Cropped Paste.png" alt="Image Cropped Paste" style="zoom: 50%;" />
 >
 > ==输入==
 >
@@ -225,15 +285,15 @@
 > >
 > > > 拼贴块的透明度
 
-#### 2.5 Image Blend Modes By CSS （图片混合模式 CSS）
+#### 2.6 Image Blend Modes By CSS （图片混合模式 CSS）
 
 > <img src="imgs/Image Blend Modes By CSS.png" alt="Image Blend Modes By CSS" style="zoom:80%;" />
 
-#### 2.6 Image Detail HL Freq Separation（图像细节高低频分离）
+#### 2.7 Image Detail HL Freq Separation（图像细节高低频分离）
 
 > <img src="imgs/Image Detail HL Freq Separation.png" alt="Image Detail HL Freq Separation" style="zoom:80%;" />
 
-#### 2.7 Image Add Label（图像添加标签）
+#### 2.8 Image Add Label（图像添加标签）
 
 > 为图像添加文本标签，支持上下左右四个方向
 >
@@ -279,9 +339,17 @@
 > > >
 > > > 默认【top】，表示标签在图像顶部
 
-#### 2.8 Image Plot（图像绘制）
+#### 2.9 Image Plot（图像绘制）
 
 > <img src="imgs/Image Plot.png" alt="Image Plot" style="zoom: 80%;" />
+>
+> background_color
+>
+> > 支持 0.0-1.0 从 黑色到白色，灰度值（如 "0.5"）
+> >
+> > 支持 RGB 格式（如 "255,0,0"）
+> >
+> > 支持 HEX 格式（如 "#FF0000"）
 
 ### 3. mask
 
@@ -289,13 +357,13 @@
 
 > <img src="imgs/Mask Math Ops.png" alt="Mask Math Ops" style="zoom:80%;" />
 
-#### 3.2 Batch Mask Math Ops（批量遮罩数学运算）
+#### 3.2 Mask Batch Math Ops（遮罩批量数学运算）
 
-> <img src="imgs/Batch Mask Math Ops.png" alt="Batch Mask Math Ops" style="zoom:80%;" />
+> <img src="imgs/Mask Batch Math Ops.png" alt="Mask Batch Math Ops" style="zoom:80%;" />
 
-#### 3.3 Mask Blend（遮罩混合）
+#### 3.3 Mask BBox Crop（遮罩检测框裁剪）
 
-> <img src="imgs/Mask Blend.png" alt="Mask Blend" style="zoom:80%;" />
+> ![Mask BBox Crop](imgs/Mask BBox Crop.png)
 
 ### 4. util
 #### 4.1 Coordinate Extractor（坐标提取器）

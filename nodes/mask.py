@@ -84,9 +84,9 @@ class MaskMathOps:
         return (output_tensor,)
 
 
-class BatchMaskMathOps:
+class MaskBatchMathOps:
     """
-    批量蒙版数学运算节点 - 支持批量处理所有图层的OR和AND功能
+    蒙版批量数学运算节点 - 支持批量处理所有图层的OR和AND功能
     """
     
     @classmethod
@@ -143,84 +143,81 @@ class BatchMaskMathOps:
         return (output_tensor,)
 
 
-class MaskBlend:
+class MaskBBoxCrop:
     """
-    蒙版混合器 - 支持两个蒙版之间的混合，可调整混合比例
+    遮罩检测框裁剪 - 根据边界框信息批量裁剪遮罩
     """
-    
+
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "mask_a": ("MASK",),
-                "mask_b": ("MASK",),
-                "blend_factor": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01, "label": "混合比例 (0=仅A, 1=仅B)"})
+                "mask": ("MASK",),
+                "crop_bbox": ("CROP_BBOX",),
             }
         }
 
     RETURN_TYPES = ("MASK",)
-    RETURN_NAMES = ("mask",)
-    FUNCTION = "blend_masks"
+    RETURN_NAMES = ("cropped_mask",)
+    FUNCTION = "mask_bbox_crop"
     CATEGORY = "1hewNodes/mask"
 
-    def blend_masks(self, mask_a, mask_b, blend_factor=0.5):
-        # 获取蒙版尺寸
-        batch_size_a = mask_a.shape[0]
-        batch_size_b = mask_b.shape[0]
-        
-        # 创建输出蒙版列表
+    def mask_bbox_crop(self, mask, crop_bbox):
+        # 确保mask是3D张量 [batch, height, width]
+        if mask.dim() == 2:
+            mask = mask.unsqueeze(0)
+            
+        # 获取遮罩尺寸
+        batch_size, height, width = mask.shape
+
+        # 创建输出遮罩列表
         output_masks = []
-        
-        # 确定批处理大小（使用最大的批次大小）
-        max_batch_size = max(batch_size_a, batch_size_b)
-        
-        for b in range(max_batch_size):
-            # 获取当前批次的蒙版（循环使用如果批次大小不匹配）
-            current_mask_a = mask_a[b % batch_size_a]
-            current_mask_b = mask_b[b % batch_size_b]
-            
-            # 将蒙版转换为PIL格式以便处理
-            if mask_a.is_cuda:
-                mask_a_np = (current_mask_a.cpu().numpy() * 255).astype(np.uint8)
-                mask_b_np = (current_mask_b.cpu().numpy() * 255).astype(np.uint8)
+
+        for b in range(batch_size):
+            # 将遮罩转换为PIL格式
+            if mask.is_cuda:
+                mask_np = (mask[b].cpu().numpy() * 255).astype(np.uint8)
             else:
-                mask_a_np = (current_mask_a.numpy() * 255).astype(np.uint8)
-                mask_b_np = (current_mask_b.numpy() * 255).astype(np.uint8)
+                mask_np = (mask[b].numpy() * 255).astype(np.uint8)
+
+            mask_pil = Image.fromarray(mask_np).convert("L")
+
+            # 获取当前批次对应的边界框
+            bbox_str = crop_bbox[b % len(crop_bbox)]
+            x_min, y_min, x_max, y_max = map(int, bbox_str.split(","))
             
-            mask_a_pil = Image.fromarray(mask_a_np)
-            mask_b_pil = Image.fromarray(mask_b_np)
+            # 确保边界框不超出图像范围
+            x_min = max(0, x_min)
+            y_min = max(0, y_min)
+            x_max = min(mask_pil.width, x_max)
+            y_max = min(mask_pil.height, y_max)
             
-            # 调整蒙版大小以匹配
-            if mask_a_pil.size != mask_b_pil.size:
-                mask_b_pil = mask_b_pil.resize(mask_a_pil.size, Image.Resampling.LANCZOS)
-            
-            # 将PIL图像转换为numpy数组进行混合
-            mask_a_array = np.array(mask_a_pil).astype(np.float32) / 255.0
-            mask_b_array = np.array(mask_b_pil).astype(np.float32) / 255.0
-            
-            # 线性混合
-            result_array = mask_a_array * (1.0 - blend_factor) + mask_b_array * blend_factor
-            
+            # 裁切遮罩
+            cropped_mask = mask_pil.crop((x_min, y_min, x_max, y_max))
+
             # 转换回tensor
-            result_tensor = torch.from_numpy(result_array)
-            output_masks.append(result_tensor)
-        
+            cropped_mask_np = np.array(cropped_mask).astype(np.float32) / 255.0
+            output_masks.append(torch.from_numpy(cropped_mask_np))
+
         # 合并批次
-        output_tensor = torch.stack(output_masks)
-        
-        return (output_tensor,)
+        if output_masks:
+            output_mask_tensor = torch.stack(output_masks)
+            return (output_mask_tensor,)
+        else:
+            # 如果没有有效的输出遮罩，返回原始遮罩
+            return (mask,)
 
 
 # 注册节点
 NODE_CLASS_MAPPINGS = {
     "MaskMathOps": MaskMathOps,
-    "BatchMaskMathOps": BatchMaskMathOps,
-    "MaskBlend": MaskBlend,
+    "MaskBatchMathOps": MaskBatchMathOps,
+    "MaskBBoxCrop": MaskBBoxCrop,
 }
 
 # 节点显示名称
 NODE_DISPLAY_NAME_MAPPINGS = {
     "MaskMathOps": "Mask Math Ops",
-    "BatchMaskMathOps": "Batch Mask Math Ops",
-    "MaskBlend": "Mask Blend",
+    "MaskBatchMathOps": "Mask Batch Math Ops",
+    "MaskBBoxCrop": "Mask BBox Crop",
 }
