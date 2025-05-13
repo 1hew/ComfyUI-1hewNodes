@@ -226,19 +226,19 @@ class LumaMatte:
                 pass
         
         # 尝试解析为RGB格式 (R,G,B)
-        if color_str.startswith('(') and color_str.endswith(')'):
-            try:
-                rgb = color_str[1:-1].split(',')
-                if len(rgb) == 3:
-                    r = int(rgb[0].strip())
-                    g = int(rgb[1].strip())
-                    b = int(rgb[2].strip())
-                    return (r, g, b)
-            except ValueError:
-                pass
+        try:
+            rgb = color_str.split(',')
+            if len(rgb) == 3:
+                r = int(rgb[0].strip())
+                g = int(rgb[1].strip())
+                b = int(rgb[2].strip())
+                return (r, g, b)
+        except ValueError:
+            pass
         
         # 默认返回白色
         return (255, 255, 255)
+
 
 class BlendModesAlpha:
     """
