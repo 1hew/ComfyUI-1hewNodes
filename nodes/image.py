@@ -177,6 +177,141 @@ class ImageEditStitch:
         return combined_image, combined_mask, split_mask
 
 
+class ImageCropSquare:
+    """
+    图像方形裁剪器 - 根据遮罩裁切图像为方形，支持放大系数和填充颜色
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "mask": ("MASK",),
+                "scale_factor": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 3.0, "step": 0.01, "label": "放大系数"}),
+                "fill_color": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01, "label": "填充颜色(0黑-1白)"})
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "image_crop_square"
+    CATEGORY = "1hewNodes/image"
+
+    def image_crop_square(self, image, mask, scale_factor=1.0, fill_color=1.0):
+        # 获取图像尺寸
+        batch_size, height, width, channels = image.shape
+
+        # 创建输出图像列表
+        output_images = []
+
+        for b in range(batch_size):
+            # 将图像转换为PIL格式
+            if image.is_cuda:
+                img_np = (image[b].cpu().numpy() * 255).astype(np.uint8)
+                mask_np = (mask[b % mask.shape[0]].cpu().numpy() * 255).astype(np.uint8)
+            else:
+                img_np = (image[b].numpy() * 255).astype(np.uint8)
+                mask_np = (mask[b % mask.shape[0]].numpy() * 255).astype(np.uint8)
+
+            img_pil = Image.fromarray(img_np)
+            mask_pil = Image.fromarray(mask_np).convert("L")
+
+            # 调整遮罩大小以匹配图像 - 使用填充而非缩放
+            if img_pil.size != mask_pil.size:
+                # 创建一个与图像相同大小的空白遮罩
+                new_mask = Image.new("L", img_pil.size, 0)
+
+                # 计算居中位置
+                paste_x = max(0, (img_pil.width - mask_pil.width) // 2)
+                paste_y = max(0, (img_pil.height - mask_pil.height) // 2)
+
+                # 将原始遮罩粘贴到中心位置
+                new_mask.paste(mask_pil, (paste_x, paste_y))
+                mask_pil = new_mask
+
+            # 找到遮罩中非零区域的边界框
+            bbox = self.get_bbox(mask_pil)
+
+            # 如果没有找到有效区域，返回原始图像
+            if bbox is None:
+                output_images.append(image[b])
+                continue
+
+            # 计算边界框的宽度和高度
+            bbox_width = bbox[2] - bbox[0]
+            bbox_height = bbox[3] - bbox[1]
+            
+            # 计算中心点
+            center_x = (bbox[0] + bbox[2]) // 2
+            center_y = (bbox[1] + bbox[3]) // 2
+            
+            # 计算方形边长 (取最大值)
+            square_size = max(bbox_width, bbox_height)
+            
+            # 应用放大系数
+            square_size = int(square_size * scale_factor)
+            
+            # 计算方形边界框的左上角和右下角坐标
+            square_x1 = center_x - square_size // 2
+            square_y1 = center_y - square_size // 2
+            square_x2 = square_x1 + square_size
+            square_y2 = square_y1 + square_size
+            
+            # 创建填充颜色
+            fill_color_rgb = int(fill_color * 255)
+            bg_color = (fill_color_rgb, fill_color_rgb, fill_color_rgb)
+            
+            # 创建方形画布
+            square_img = Image.new("RGB", (square_size, square_size), bg_color)
+            
+            # 计算粘贴位置
+            paste_x = max(0, -square_x1)
+            paste_y = max(0, -square_y1)
+            
+            # 计算从原图裁剪的区域
+            crop_x1 = max(0, square_x1)
+            crop_y1 = max(0, square_y1)
+            crop_x2 = min(img_pil.width, square_x2)
+            crop_y2 = min(img_pil.height, square_y2)
+            
+            # 裁剪原图并粘贴到方形画布上
+            if crop_x1 < crop_x2 and crop_y1 < crop_y2:
+                cropped_region = img_pil.crop((crop_x1, crop_y1, crop_x2, crop_y2))
+                square_img.paste(cropped_region, (paste_x, paste_y))
+            
+            # 转换回tensor
+            square_img_np = np.array(square_img).astype(np.float32) / 255.0
+            output_images.append(torch.from_numpy(square_img_np))
+
+        # 合并批次
+        if output_images:
+            output_image_tensor = torch.stack(output_images)
+            return (output_image_tensor,)
+        else:
+            # 如果没有有效的输出图像，返回原始图像
+            return (image,)
+
+    def get_bbox(self, mask_pil):
+        # 将遮罩转换为numpy数组
+        mask_np = np.array(mask_pil)
+
+        # 找到非零区域的坐标
+        rows = np.any(mask_np > 10, axis=1)
+        cols = np.any(mask_np > 10, axis=0)
+
+        # 如果没有找到非零区域，返回None
+        if not np.any(rows) or not np.any(cols):
+            return None
+
+        # 获取边界框坐标
+        y_min, y_max = np.where(rows)[0][[0, -1]]
+        x_min, x_max = np.where(cols)[0][[0, -1]]
+
+        # 返回边界框 (left, top, right, bottom)
+        return (x_min, y_min, x_max + 1, y_max + 1)
+
+
 class ImageCropWithBBox:
     """
     图像裁切器增强版 - 根据遮罩裁切图像，并返回边界框信息以便后续粘贴回原位置
@@ -1257,6 +1392,7 @@ class ImagePlot:
 
 NODE_CLASS_MAPPINGS = {
     "ImageEditStitch": ImageEditStitch,
+    "ImageCropSquare": ImageCropSquare,
     "ImageCropWithBBox": ImageCropWithBBox,
     "CroppedImagePaste": CroppedImagePaste,
     "ImageBlendModesByCSS": ImageBlendModesByCSS,
@@ -1267,6 +1403,7 @@ NODE_CLASS_MAPPINGS = {
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "ImageEditStitch": "Image Edit Stitch",
+    "ImageCropSquare": "Image Crop Square",
     "ImageCropWithBBox": "Image Crop With BBox",
     "CroppedImagePaste": "Cropped Image Paste",
     "ImageBlendModesByCSS": "Image Blend Modes By CSS",
