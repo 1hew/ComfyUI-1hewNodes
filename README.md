@@ -83,7 +83,7 @@
 > > >
 > > > 控制透明区域的颜色，从0到1表示从黑色到白色
 
-#### 1.3 Blend Modes（混合模式）
+#### 1.3 Blend Modes Alpha（混合模式透明度）
 
 > <img src="imgs/Blend Modes.png" alt="Blend Modes" style="zoom:80%;" />
 
@@ -137,7 +137,13 @@
 > > >
 > > > 控制匹配尺寸后，填充区域的颜色，从0到1表示从黑色到白色
 
-#### 2.2 Image Crop With BBox （图片裁剪_带裁剪边界框）
+#### 2.2  Image Crop Square（图片裁剪方形）
+
+> <img src="imgs/Image Crop Square.png" alt="Image Crop Square" style="zoom:80%;" />
+
+
+
+#### 2.3 Image Crop With BBox （图片裁剪_带裁剪边界框）
 
 > <img src="imgs/Image Crop With BBox.png" alt="Image Crop With BBox" style="zoom: 50%;" />
 >
@@ -185,7 +191,7 @@
 > >
 > > > <img src="imgs/Image Crop With BBox_2.png" alt="Image Crop With BBox_2" style="zoom:50%;" />
 
-#### 2.3 Cropped Image Paste（裁剪图片拼贴）
+#### 2.4 Cropped Image Paste（裁剪图片拼贴）
 
 > 将 `Image Crop With BBox` 裁剪后的图像，拼接回源图
 >
@@ -219,15 +225,15 @@
 > >
 > > > 拼贴块的透明度
 
-#### 2.4 Image Blend Modes By CSS （图片混合模式 CSS）
+#### 2.5 Image Blend Modes By CSS （图片混合模式 CSS）
 
 > <img src="imgs/Image Blend Modes By CSS.png" alt="Image Blend Modes By CSS" style="zoom:80%;" />
 
-#### 2.5 Image Detail HL Freq Separation（图像细节高低频分离）
+#### 2.6 Image Detail HL Freq Separation（图像细节高低频分离）
 
-> ![image-20250512221605282](imgs/image-20250512221605282.png)
+> <img src="imgs/Image Detail HL Freq Separation.png" alt="Image Detail HL Freq Separation" style="zoom:80%;" />
 
-#### 2.6 Image Add Label（图像添加标签）
+#### 2.7 Image Add Label（图像添加标签）
 
 > 为图像添加文本标签，支持上下左右四个方向
 >
@@ -273,9 +279,9 @@
 > > >
 > > > 默认【top】，表示标签在图像顶部
 
-#### 2.7 Image Plot（图像绘制）
+#### 2.8 Image Plot（图像绘制）
 
-> ![image-20250512221704068](imgs/image-20250512221704068.png)
+> <img src="imgs/Image Plot.png" alt="Image Plot" style="zoom: 80%;" />
 
 ### 3. mask
 

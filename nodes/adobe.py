@@ -240,7 +240,7 @@ class LumaMatte:
         # 默认返回白色
         return (255, 255, 255)
 
-class BlendModes:
+class BlendModesAlpha:
     """
     图层叠加模式 - 支持基础图层输入，控制叠加模式和透明度强度
     """
@@ -713,11 +713,11 @@ class BlendModes:
 NODE_CLASS_MAPPINGS = {
     "Solid": Solid,
     "LumaMatte": LumaMatte,
-    "BlendModes": BlendModes,
+    "BlendModesAlpha": BlendModesAlpha,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "Solid": "Solid",
     "LumaMatte": "Luma Matte",
-    "BlendModes": "Blend Modes",
+    "BlendModesAlpha": "Blend Modes Alpha",
 }
