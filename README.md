@@ -165,7 +165,7 @@
 
 #### 2.3 Image Crop With BBox （图片裁剪_带检测框）
 
-> ![Image Crop With BBox](imgs/Image Crop With BBox.png)
+> <img src="imgs/Image Crop With BBox.png" alt="Image Crop With BBox" style="zoom:50%;" />
 >
 > ==输入==
 >
@@ -247,7 +247,7 @@
 
 #### 2.4 Image BBox Crop（图像检测框裁剪）
 
-> ![Image BBox Crop](imgs/Image BBox Crop.png)
+> <img src="imgs/Image BBox Crop.png" alt="Image BBox Crop" style="zoom:80%;" />
 
 
 
@@ -363,7 +363,7 @@
 
 #### 3.3 Mask BBox Crop（遮罩检测框裁剪）
 
-> ![Mask BBox Crop](imgs/Mask BBox Crop.png)
+> <img src="imgs/Mask BBox Crop.png" alt="Mask BBox Crop" style="zoom:80%;" />
 
 ### 4. util
 #### 4.1 Coordinate Extractor（坐标提取器）
