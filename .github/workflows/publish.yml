@@ -25,4 +25,8 @@ jobs:
         uses: Comfy-Org/publish-node-action@v1
         with:
           ## Add your own personal access token to your Github Repository secrets and reference it here.
+<<<<<<< HEAD
           personal_access_token: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
+=======
+          personal_access_token: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
+>>>>>>> df7ea87c31a6837096b1cd6ae0837584a460d542
