@@ -1,0 +1,14 @@
+[project]
+name = "1hewnodes"
+description = "This is a custom node collection for ComfyUI that provides some utility nodes."
+version = "1.0.0"
+license = {file = "LICENSE"}
+
+[project.urls]
+Repository = "https://github.com/1hew/ComfyUI-1hewNodes"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI-1hewNodes"
+Icon = ""
