@@ -93,9 +93,11 @@
 
 > <img src="imgs/Blend Modes.png" alt="Blend Modes" style="zoom:80%;" />
 
+
+
 ### 2. image
 
-#### 2.1 Image Resize Universal
+#### 2.1 Image Resize Universal（图像调整尺寸）
 
 > <img src="imgs/Image Resize Universal.png" alt="Image Resize Universal" style="zoom:80%;" />
 >
@@ -167,8 +169,6 @@
 > > > 当 apply_mask 为 false 时，四周获取四周上的4个平均颜色
 > > >
 > > > 当 apply_mask 为 true 是，获取 mask 选择的平均颜色
-
-
 
 #### 2.4 Image Crop With BBox （图片裁剪_带检测框）
 
@@ -255,8 +255,6 @@
 #### 2.5 Image BBox Crop（图像检测框裁剪）
 
 > <img src="imgs/Image BBox Crop.png" alt="Image BBox Crop" style="zoom:80%;" />
-
-
 
 #### 2.6 Image Cropped Paste（图片裁切后拼贴）
 
@@ -358,6 +356,8 @@
 > >
 > > 支持 HEX 格式（如 "#FF0000"）
 
+
+
 ### 3. mask
 
 #### 3.1 Mask Math Ops（遮罩数学运算）
@@ -372,7 +372,10 @@
 
 > <img src="imgs/Mask BBox Crop.png" alt="Mask BBox Crop" style="zoom:80%;" />
 
+
+
 ### 4. util
+
 #### 4.1 Coordinate Extractor（坐标提取器）
 
 > 从 JSON 格式的坐标数据中提取 x 和 y 坐标列表，用于后续处理。
