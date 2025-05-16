@@ -1,17 +1,17 @@
 <div align="center">
-<a href="./README.md"><img src="https://img.shields.io/badge/🇬🇧English-0b8cf5"></a>
-<a href="./README.ZH_CN.md"><img src="https://img.shields.io/badge/🇨🇳中文简体-e9e9e9"></a>
+<a href="./README.md"><img src="https://img.shields.io/badge/🇬🇧English-e9e9e9"></a>
+<a href="./README.ZH_CN.md"><img src="https://img.shields.io/badge/🇨🇳中文简体-0b8cf5"></a>
 </div>
 
-## ComfyUI-1hewNodes
+# ComfyUI-1hewNodes
 
-This is a custom node collection for ComfyUI that provides some utility nodes.
+这是 ComfyUI 的自定义节点集合，提供了一些实用程序节点。
 
 
 
-## 📡 Installation
+## 📡 安装
 
-Clone the repo into the **custom_nodes** directory and install the requirements:
+将仓库克隆到 **custom_nodes** 目录中：
 
 ```shell
 # Clone the repo
@@ -20,20 +20,19 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 
 
-## 📜 Changelog
+## 📜 更新
 
 **v1.0.4**
 
-- Fix the `image_cropped_paste` error，add a batch processing feature.
+- 修复 `image_cropped_paste` 错误，添加批处理功能。
 
 
 
 
 
-## 😀 Nodes
+## 😀 节点
 
 ### 1. adobe
-
 #### 1.1 Solid（纯色）
 
 > 通过拾色器面板生成纯色图像
@@ -415,7 +414,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 
 
-## 🙆 Thank
+## 🙆 致谢
 
 [ComfyUI](https://github.com/comfyanonymous/ComfyUI)
 
