@@ -1485,24 +1485,37 @@ class ImageCroppedPaste:
     FUNCTION = "image_cropped_paste"
     CATEGORY = "1hewNodes/image"
 
-    def iamge_cropped_paste(self, detail_image, processed_image, crop_bbox, blend_mode="normal", opacity=1.0,
+    def image_cropped_paste(self, detail_image, processed_image, crop_bbox, blend_mode="normal", opacity=1.0,
                             mask=None):
         try:
             # 获取图像尺寸
-            batch_size, height, width, channels = detail_image.shape
-            proc_batch_size = processed_image.shape[0]
+            batch_size = 1  # detail_image 只使用一个
+            height, width, channels = detail_image[0].shape
+            proc_batch_size = processed_image.shape[0]  # processed_image 支持批次
 
             # 创建输出图像列表
             output_images = []
 
-            for b in range(batch_size):
-                # 获取当前批次的图像
-                orig_img = detail_image[b]
-                proc_img = processed_image[b % proc_batch_size]
+            # 获取单个 detail_image
+            orig_img = detail_image[0]
 
-                # 将字符串转换为边界框坐标
-                bbox_str = crop_bbox[b % len(crop_bbox)]
-                bbox = list(map(int, bbox_str.split(",")))
+            # 将字符串转换为边界框坐标
+            bbox_str = crop_bbox[0] if isinstance(crop_bbox, list) else crop_bbox
+            bbox = list(map(int, bbox_str.split(",")))
+
+            # 准备遮罩
+            paste_mask = None
+            if mask is not None:
+                if mask.dim() == 2:
+                    mask = torch.unsqueeze(mask, 0)
+                mask_np = mask[0].numpy() * 255 if not mask.is_cuda else mask[0].cpu().numpy() * 255
+                mask_np = mask_np.astype(np.uint8)
+                mask_pil = Image.fromarray(mask_np).convert("L")
+
+            # 处理每个 processed_image
+            for b in range(proc_batch_size):
+                # 获取当前批次的处理图像
+                proc_img = processed_image[b]
 
                 # 将图像转换为PIL格式
                 if detail_image.is_cuda:
@@ -1525,21 +1538,12 @@ class ImageCroppedPaste:
                 # 创建结果图像的副本
                 result_pil = orig_pil.copy()
 
-                # 准备遮罩
-                paste_mask = None
-                if mask is not None and b < mask.shape[0]:
-                    if mask.is_cuda:
-                        mask_np = (mask[b].cpu().numpy() * 255).astype(np.uint8)
-                    else:
-                        mask_np = (mask[b].numpy() * 255).astype(np.uint8)
-
-                    mask_pil = Image.fromarray(mask_np).convert("L")
-
-                    # 调整遮罩大小以匹配处理后的图像
-                    if mask_pil.size != proc_pil.size:
-                        mask_pil = mask_pil.resize(proc_pil.size, Image.Resampling.LANCZOS)
-
-                    paste_mask = mask_pil
+                # 准备遮罩并调整大小以匹配处理后的图像
+                if mask is not None:
+                    current_mask_pil = mask_pil
+                    if current_mask_pil.size != proc_pil.size:
+                        current_mask_pil = current_mask_pil.resize(proc_pil.size, Image.Resampling.LANCZOS)
+                    paste_mask = current_mask_pil
 
                 # 应用混合模式
                 if blend_mode != "normal":

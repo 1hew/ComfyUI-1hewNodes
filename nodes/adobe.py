@@ -126,7 +126,7 @@ class LumaMatte:
             "optional": {
                 "invert_mask": ("BOOLEAN", {"default": False, "label": "反转遮罩"}),
                 "add_background": ("BOOLEAN", {"default": True, "label": "添加背景"}),
-                "background_color": ("STRING", {"default": "1.0", "label": "背景颜色 (灰度/HEX/RGB)"})
+                "background_color": ("STRING", {"default": "1.0", "label": "背景颜色 (灰度/HEX/RGB/average)"})
             }
         }
 
@@ -175,6 +175,29 @@ class LumaMatte:
                 mask_pil = ImageOps.invert(mask_pil)
 
             if add_background:
+                # 处理平均颜色
+                if bg_color == 'average':
+                    # 计算遮罩内的平均颜色
+                    img_array = np.array(img_pil)
+                    mask_array = np.array(mask_pil) / 255.0
+                    
+                    # 创建扩展的遮罩数组以匹配图像维度
+                    mask_expanded = np.expand_dims(mask_array, axis=2)
+                    if len(img_array.shape) == 3:
+                        mask_expanded = np.repeat(mask_expanded, img_array.shape[2], axis=2)
+                    
+                    # 计算遮罩内的像素总和和像素数量
+                    masked_pixels = img_array * mask_expanded
+                    pixel_count = np.sum(mask_array)
+                    
+                    if pixel_count > 0:
+                        # 计算平均颜色
+                        avg_color = np.sum(masked_pixels, axis=(0, 1)) / pixel_count
+                        bg_color = tuple(int(c) for c in avg_color)
+                    else:
+                        # 如果遮罩内没有像素，使用默认颜色
+                        bg_color = (255, 255, 255)
+                
                 # 使用解析后的背景颜色
                 background = Image.new('RGB', img_pil.size, bg_color)
                 background.paste(img_pil, (0, 0), mask_pil)
@@ -198,7 +221,51 @@ class LumaMatte:
     
     def _parse_color(self, color_str):
         """解析不同格式的颜色输入"""
+        if not color_str:
+            return (0, 0, 0)
+        
+        # 检查是否为 average 或 a 或 av 或 aver (不区分大小写)
+        if color_str.lower() in ['average', 'a', 'av', 'aver']:
+            return 'average'
+        
+        # 检查是否为 edge 或 e (不区分大小写)
+        if color_str.lower() in ['edge', 'e']:
+            return 'edge'
+        
+        # 移除括号（如果存在）
         color_str = color_str.strip()
+        if color_str.startswith('(') and color_str.endswith(')'):
+            color_str = color_str[1:-1].strip()
+        
+        # 尝试解析为灰度值
+        try:
+            gray = float(color_str)
+            return (int(gray * 255), int(gray * 255), int(gray * 255))
+        except ValueError:
+            pass
+        
+        # 尝试解析为 RGB 格式 (如 "0.5,0.7,0.9" 或 "128,192,255")
+        if ',' in color_str:
+            try:
+                # 分割并清理每个部分
+                parts = [part.strip() for part in color_str.split(',')]
+                if len(parts) >= 3:
+                    r, g, b = [float(parts[i]) for i in range(3)]
+                    # 判断是否为 0-1 范围
+                    if max(r, g, b) <= 1.0:
+                        return (int(r * 255), int(g * 255), int(b * 255))
+                    else:
+                        return (int(r), int(g), int(b))
+            except (ValueError, IndexError):
+                pass
+        
+        # 尝试解析为十六进制或颜色名称
+        try:
+            from PIL import ImageColor
+            return ImageColor.getrgb(color_str)
+        except (ValueError, ImportError):
+            # 默认返回黑色
+            return (0, 0, 0)
         
         # 尝试解析为灰度值 (0.0-1.0)
         try:
