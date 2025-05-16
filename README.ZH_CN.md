@@ -426,8 +426,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 
 
-## 🌟 Stargazers
+## 🌟 星星
 
-My gratitude extends to the generous souls who bestow a star.
+感谢慷慨赠送星星的人。
 
 [<img src="imgs/Stargazers.png" alt="Stargazers" style="zoom:80%;" />](https://github.com/1hew/ComfyUI-1hewNodes/stargazers)
