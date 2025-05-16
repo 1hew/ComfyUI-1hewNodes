@@ -427,7 +427,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 
 
-## 🌟 Stargazers
+## 🌟 Star
 
 My gratitude extends to the generous souls who bestow a star.
 
