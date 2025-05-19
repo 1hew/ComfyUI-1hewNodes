@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from PIL import Image, ImageOps
+import math  
 
 
 class Solid:
@@ -15,18 +16,22 @@ class Solid:
                 "preset_size": (["custom", "512×512 (1:1)", "768×768 (1:1)", "1024×1024 (1:1)", "1408×1408 (1:1)",
                                 "768×512 (3:2)", "1728×1152 (3:2)",
                                 "1024×768 (4:3)", "1664×1216 (4:3)",
-                                "832×480 (16:9)", "1280×720 (16:9)", "1920×1088 (16:9)",
-                                "2176×960 (21:9)"],
+                                "832×480 (16:9)", "1280×720 (16:9)", "1920×1080 (16:9)",
+                                "2176×960 (21:9)",
+                                "512×768 (2:3)", "1152×1728 (2:3)",
+                                "768×1024 (3:4)", "1216×1664 (3:4)",
+                                "480×832 (9:16)", "720×1280 (9:16)", "1080×1920 (9:16)",
+                                "960×2176 (9:21)"],
                               {"default": "custom"}),
-                "flip_size": ("BOOLEAN", {"default": False}),
                 "width": ("INT", {"default": 512, "min": 1, "max": 8192, "step": 8}),
                 "height": ("INT", {"default": 512, "min": 1, "max": 8192, "step": 8}),
-                "color": ("COLOR", {"default": "#FFFFFF"})
-            },
-            "optional": {
+                "color": ("COLOR", {"default": "#FFFFFF"}),
                 "alpha": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "invert": ("BOOLEAN", {"default": False}),
                 "mask_opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "divisible_by": ("INT", {"default": 2, "min": 1, "max": 1024, "step": 1, "label": "尺寸整除数"}),
+            },
+            "optional": {
                 "reference_images": ("IMAGE", )
             }
         }
@@ -36,7 +41,7 @@ class Solid:
     FUNCTION = "solid"
     CATEGORY = "1hewNodes/adobe"
 
-    def solid(self, preset_size, flip_size, width, height, color, alpha=1.0, invert=False, mask_opacity=1.0, reference_images=None):
+    def solid(self, preset_size, width, height, divisible_by, color, alpha=1.0, invert=False, mask_opacity=1.0, reference_images=None):
         images = []
         masks = []
 
@@ -54,13 +59,14 @@ class Solid:
                 dimensions = preset_size.split(" ")[0].split("×")
                 img_width = int(dimensions[0])
                 img_height = int(dimensions[1])
-
-                # 如果选择了反转尺寸，交换宽高
-                if flip_size:
-                    img_width, img_height = img_height, img_width
             else:
                 img_width = width
                 img_height = height
+
+            # 确保尺寸能被 divisible_by 整除
+            if divisible_by > 1:
+                img_width = math.ceil(img_width / divisible_by) * divisible_by
+                img_height = math.ceil(img_height / divisible_by) * divisible_by
 
             # 为了兼容批量处理，这里将单个尺寸的情况也当作一个批次处理
             num_images = 1
