@@ -961,6 +961,169 @@ class ImageCropSquare:
         return (255, 255, 255)
 
 
+class ImageCropEdge:
+    """
+    图像裁剪边缘 - 支持同时裁剪四边或单独设置每边裁剪量
+    """
+    
+    # 内置最大分辨率常量
+    MAX_RESOLUTION = 8192
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "left": ("FLOAT", {
+                    "default": 0,
+                    "min": 0.0,
+                    "max": cls.MAX_RESOLUTION,
+                    "step": 0.01,
+                    "label": "左侧裁剪"
+                }),
+                "right": ("FLOAT", {
+                    "default": 0,
+                    "min": 0.0,
+                    "max": cls.MAX_RESOLUTION,
+                    "step": 0.01,
+                    "label": "右侧裁剪"
+                }),
+                "top": ("FLOAT", {
+                    "default": 0,
+                    "min": 0.0,
+                    "max": cls.MAX_RESOLUTION,
+                    "step": 0.01,
+                    "label": "顶部裁剪"
+                }),
+                "bottom": ("FLOAT", {
+                    "default": 0,
+                    "min": 0.0,
+                    "max": cls.MAX_RESOLUTION,
+                    "step": 0.01,
+                    "label": "底部裁剪"
+                }),
+                "uniform": ("FLOAT", {
+                    "default": 0,
+                    "min": 0.0,
+                    "max": cls.MAX_RESOLUTION,
+                    "step": 0.01,
+                    "label": "四边同时裁剪"
+                }),
+                "divisible_by": ("INT", {
+                    "default": 8, 
+                    "min": 1, 
+                    "max": 1024, 
+                    "step": 1, 
+                    "label": "尺寸整除数"
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "crop"
+    CATEGORY = "1hewNodes/image"
+
+    @staticmethod
+    def num_round_up_to_multiple(num, multiple):
+        """将数字向上取整到指定倍数"""
+        return (num + multiple - 1) // multiple * multiple
+
+    def crop(self, image, uniform, left, right, top, bottom, divisible_by=8):
+        """执行裁剪操作"""
+        _, height, width, _ = image.shape
+
+        # 处理参数值：0-1为百分比，>=1为像素值
+        def process_value(value, dimension):
+            if value > 0:
+                if value < 1:  # 百分比模式 (0-1)
+                    return int(dimension * value)
+                else:  # 像素模式 (>=1)
+                    return int(value)
+            return 0
+
+        # 当uniform大于0时，覆盖left, right, top, bottom的值
+        if uniform > 0:
+            if uniform < 1:  # 百分比模式 (0-1)
+                # 修改：百分比接近1时应该裁剪更多（几乎裁剪完整个图像）
+                # 当uniform为0.5时裁剪掉25%，当uniform为0.9时裁剪掉45%
+                crop_percent = uniform / 2
+                uniform_left = int(width * crop_percent)
+                uniform_right = int(width * crop_percent)
+                uniform_top = int(height * crop_percent)
+                uniform_bottom = int(height * crop_percent)
+            else:  # 像素模式 (>=1)
+                uniform_left = int(uniform)
+                uniform_right = int(uniform)
+                uniform_top = int(uniform)
+                uniform_bottom = int(uniform)
+            left = uniform_left
+            right = uniform_right
+            top = uniform_top
+            bottom = uniform_bottom
+        else:
+            # 处理各边的值 - 保持原有逻辑
+            left = process_value(left, width)
+            right = process_value(right, width)
+            top = process_value(top, height)
+            bottom = process_value(bottom, height)
+
+        # 确保值为divisible_by的倍数
+        left = left // divisible_by * divisible_by
+        right = right // divisible_by * divisible_by
+        top = top // divisible_by * divisible_by
+        bottom = bottom // divisible_by * divisible_by
+
+        # 如果所有裁剪值为0，直接返回原图
+        if left == 0 and right == 0 and bottom == 0 and top == 0:
+            return (image,)
+
+        # 计算新的边界
+        inset_left = left
+        inset_right = width - right
+        inset_top = top
+        inset_bottom = height - bottom
+
+        # 确保最终尺寸是divisible_by的倍数
+        new_width = inset_right - inset_left
+        new_height = inset_bottom - inset_top
+        
+        # 调整边界以确保最终尺寸是divisible_by的倍数
+        target_width = new_width // divisible_by * divisible_by
+        target_height = new_height // divisible_by * divisible_by
+        
+        # 如果调整后尺寸变小，则从边界处减少裁剪量
+        if target_width < new_width:
+            width_diff = new_width - target_width
+            inset_right -= width_diff // 2
+            inset_left += (width_diff - width_diff // 2)
+        
+        if target_height < new_height:
+            height_diff = new_height - target_height
+            inset_bottom -= height_diff // 2
+            inset_top += (height_diff - height_diff // 2)
+
+        # 验证裁剪尺寸是否有效
+        if inset_top >= inset_bottom:
+            raise ValueError(
+                f"无效的裁剪尺寸：顶部({inset_top})超过或等于底部({inset_bottom})")
+        if inset_left >= inset_right:
+            raise ValueError(
+                f"无效的裁剪尺寸：左侧({inset_left})超过或等于右侧({inset_right})")
+
+        # 执行裁剪
+        print(f'裁剪图像 {width}x{height}，左侧裁剪至 {inset_left}，右侧裁剪至 {inset_right}，' +
+              f'顶部裁剪至 {inset_top}，底部裁剪至 {inset_bottom}')
+        
+        # 最终尺寸检查
+        final_width = inset_right - inset_left
+        final_height = inset_bottom - inset_top
+        if final_width % divisible_by != 0 or final_height % divisible_by != 0:
+            print(f"警告：裁剪后尺寸 {final_width}x{final_height} 不是 {divisible_by} 的倍数")
+        
+        image = image[:, inset_top:inset_bottom, inset_left:inset_right, :]
+        return (image,)
+
+
 class ImageCropWithBBox:
     """
     图像裁切器 - 根据遮罩裁切图像，并返回边界框信息以便后续粘贴回原位置
@@ -2430,24 +2593,26 @@ NODE_CLASS_MAPPINGS = {
     "ImageResizeUniversal": ImageResizeUniversal,
     "ImageEditStitch": ImageEditStitch,
     "ImageCropSquare": ImageCropSquare,
+    "ImageCropEdge": ImageCropEdge,
     "ImageCropWithBBox": ImageCropWithBBox,
     "ImageBBoxCrop": ImageBBoxCrop,
     "ImageCroppedPaste": ImageCroppedPaste,
     "ImageBlendModesByCSS": ImageBlendModesByCSS,
     "ImageDetailHLFreqSeparation": ImageDetailHLFreqSeparation,
     "ImageAddLabel": ImageAddLabel,
-    "ImagePlot": ImagePlot
+    "ImagePlot": ImagePlot,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "ImageResizeUniversal": "Image Resize Universal",
     "ImageEditStitch": "Image Edit Stitch",
     "ImageCropSquare": "Image Crop Square",
+    "ImageCropEdge": "Image Crop Edge",
     "ImageCropWithBBox": "Image Crop With BBox",
     "ImageBBoxCrop": "Image BBox Crop",
     "ImageCroppedPaste": "Image Cropped Paste",
     "ImageBlendModesByCSS": "Image Blend Modes By CSS",
     "ImageDetailHLFreqSeparation": "Image Detail HL Freq Separation",
     "ImageAddLabel": "Image Add Label",
-    "ImagePlot": "Image Plot"
+    "ImagePlot": "Image Plot",
 }

@@ -1,6 +1,7 @@
-import json
 import torch
+import json
 import numpy as np
+import os
 
 class CoordinateExtractor:
     """坐标提取器
@@ -105,13 +106,61 @@ class SliderValueRangeMapping:
             
         return (actual_value, int(actual_value))
 
+
+class PathSelect:
+    """
+    路径选择 - 提供一个层级结构的路径选择下拉框，并允许添加第四级自定义字段
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        # 定义路径选项
+        paths = []
+        
+        # 一级字段
+        level1 = ["kijai_wan", "org_wan"]
+        # 二级字段
+        level2 = ["VACE", "FLF2V", "Fun"]
+        # 三级字段
+        level3 = ["FLFControl", "Control", "FLF", "Inpaint"]
+        
+        # 生成所有可能的路径组合
+        for l1 in level1:
+            for l2 in level2:
+                for l3 in level3:
+                    paths.append(f"{l1}/{l2}/{l3}")
+        
+        return {
+            "required": {
+                "path": (paths, {"default": paths[0], "label": "选择路径"}),
+                "filename": ("STRING", {"default": "", "multiline": False, "label": "第四级字段"})
+            }
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("filename",)
+    FUNCTION = "select_path"
+    CATEGORY = "1hewNodes/util"
+
+    def select_path(self, path, filename):
+        # 如果提供了第四级字段，则添加到路径中
+        if filename and filename.strip():
+            full_path = f"{path}/{filename.strip()}"
+        else:
+            full_path = path
+            
+        return (full_path,)
+
+
 # 在NODE_CLASS_MAPPINGS中添加新节点
 NODE_CLASS_MAPPINGS = {
     "CoordinateExtractor": CoordinateExtractor,
-    "SliderValueRangeMapping": SliderValueRangeMapping
+    "SliderValueRangeMapping": SliderValueRangeMapping,
+    "PathSelect": PathSelect,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "CoordinateExtractor": "Coordinat Extractor",
-    "SliderValueRangeMapping": "Slider Value Range Mapping"
+    "SliderValueRangeMapping": "Slider Value Range Mapping",
+    "PathSelect": "Path Select",
 }

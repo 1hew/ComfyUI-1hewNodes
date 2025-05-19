@@ -22,9 +22,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.0.5**
+
+- Add `Path Select` 
+
 **v1.0.4**
 
-- Fix the `image_cropped_paste` error，add a batch processing feature.
+- Fix `Image Cropped Paste` error，add a batch processing feature.
 
 
 
@@ -412,6 +416,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 #### 4.2 Slider Value Range Mapping（滑块数值范围映射）
 
 > <img src="imgs/Slider Value Range Mapping.png" alt="Slider Value Range Mapping" style="zoom:80%;" />
+
+#### 4.3 Path Select（路径选择）
+
+> <img src="imgs/Path Select.png" alt="Path Select" style="zoom:80%;" />
+
+
 
 
 
