@@ -29,7 +29,7 @@ class Solid:
                 "alpha": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "invert": ("BOOLEAN", {"default": False}),
                 "mask_opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "divisible_by": ("INT", {"default": 2, "min": 1, "max": 1024, "step": 1, "label": "尺寸整除数"}),
+                "divisible_by": ("INT", {"default": 8, "min": 1, "max": 1024, "step": 1, "label": "尺寸整除数"}),
             },
             "optional": {
                 "reference_images": ("IMAGE", )
