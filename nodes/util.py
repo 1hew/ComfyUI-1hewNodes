@@ -2,8 +2,9 @@ import torch
 import json
 import numpy as np
 import os
+import re
 
-class CoordinateExtractor:
+class CoordinateExtract:
     """坐标提取器
     [
         {
@@ -47,6 +48,64 @@ class CoordinateExtractor:
         except Exception as e:
             print(f"Error extracting coordinates: {e}")
             return ([], [])
+
+class PromptExtract:
+    """
+    从文本中提取指定语言的内容
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "text": ("STRING", {}),
+                "language": (["en", "zh"], {"default": "en"}),
+            }
+        }
+    
+    RETURN_TYPES = ("STRING",)
+    FUNCTION = "prompt_extract"
+    CATEGORY = "1hewNodes/util"
+    
+    def prompt_extract(self, text, language):
+        # 尝试解析JSON文本
+        try:
+            # 如果输入是标准JSON格式
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            # 如果不是标准JSON，尝试解析为键值对格式
+            try:
+                # 清理文本，移除多余的空格和换行符
+                cleaned_text = re.sub(r'\s+', ' ', text).strip()
+                # 将文本转换为标准JSON格式
+                if cleaned_text.startswith('{') and cleaned_text.endswith('}'):
+                    cleaned_text = cleaned_text[1:-1]
+                
+                # 构建JSON字符串
+                json_str = '{' + cleaned_text + '}'
+                data = json.loads(json_str)
+            except:
+                # 如果仍然无法解析，尝试使用正则表达式提取
+                pattern = r'"([^"]+)"\s*:\s*"([^"]+)"'
+                matches = re.findall(pattern, text)
+                data = {key: value for key, value in matches}
+        
+        # 根据选择的语言提取文本
+        if language == "en":
+            # 尝试查找英文相关的键
+            english_keys = ["English", "english", "英文", "英语", "ENGLISH", "ENG", "eng"]
+            for key in english_keys:
+                if key in data:
+                    return (data[key],)
+        else:  # language == "zh"
+            # 尝试查找中文相关的键
+            chinese_keys = ["Chinese", "chinese", "中文", "China", "china", "CHINESE", "CHN", "chn", "ZH", "zh"]
+            for key in chinese_keys:
+                if key in data:
+                    return (data[key],)
+        
+        # 如果没有找到匹配的键，返回错误信息
+        return (f"未找到{language}语言的文本",)
 
 
 class SliderValueRangeMapping:
@@ -118,17 +177,30 @@ class PathSelect:
         paths = []
         
         # 一级字段
-        level1 = ["kijai_wan", "org_wan"]
-        # 二级字段
-        level2 = ["VACE", "FLF2V", "Fun"]
-        # 三级字段
-        level3 = ["FLFControl", "Control", "FLF", "Inpaint"]
+        level1 = ["kijai_wan", "org_wan", "Flux"]
+        # 二级字段映射
+        level2_mapping = {
+            "kijai_wan": ["VACE", "FLF2V", "Fun"],
+            "org_wan": ["VACE", "FLF2V", "Fun"],
+            "Flux": ["ACE_Redux", "ACE", "TTP"]
+        }
+        # 三级字段映射
+        level3_mapping = {
+            "kijai_wan": ["FLFControl", "Control", "FLF", "Inpaint"],
+            "org_wan": ["FLFControl", "Control", "FLF", "Inpaint"],
+            "Flux": []  # Flux 使用 filename 作为三级字段，所以这里为空
+        }
         
         # 生成所有可能的路径组合
         for l1 in level1:
-            for l2 in level2:
-                for l3 in level3:
-                    paths.append(f"{l1}/{l2}/{l3}")
+            for l2 in level2_mapping[l1]:
+                if l1 == "Flux":
+                    # 对于 Flux，直接添加二级路径
+                    paths.append(f"{l1}/{l2}")
+                else:
+                    # 对于其他一级字段，添加三级路径
+                    for l3 in level3_mapping[l1]:
+                        paths.append(f"{l1}/{l2}/{l3}")
         
         return {
             "required": {
@@ -154,13 +226,15 @@ class PathSelect:
 
 # 在NODE_CLASS_MAPPINGS中添加新节点
 NODE_CLASS_MAPPINGS = {
-    "CoordinateExtractor": CoordinateExtractor,
+    "CoordinateExtract": CoordinateExtract,
+    "PromptExtract": PromptExtract,
     "SliderValueRangeMapping": SliderValueRangeMapping,
     "PathSelect": PathSelect,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "CoordinateExtractor": "Coordinat Extractor",
+    "CoordinateExtract": "Coordinat Extract",
+    "PromptExtract": "Prompt Extract",
     "SliderValueRangeMapping": "Slider Value Range Mapping",
     "PathSelect": "Path Select",
 }
