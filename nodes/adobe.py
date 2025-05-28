@@ -23,8 +23,8 @@ class Solid:
                                 "480×832 (9:16)", "720×1280 (9:16)", "1080×1920 (9:16)",
                                 "960×2176 (9:21)"],
                               {"default": "custom"}),
-                "width": ("INT", {"default": 512, "min": 1, "max": 8192, "step": 8}),
-                "height": ("INT", {"default": 512, "min": 1, "max": 8192, "step": 8}),
+                "width": ("INT", {"default": 512, "min": 1, "max": 8192, "step": 1}),
+                "height": ("INT", {"default": 512, "min": 1, "max": 8192, "step": 1}),
             },
             "optional": {
                 "reference_images": ("IMAGE", ),
