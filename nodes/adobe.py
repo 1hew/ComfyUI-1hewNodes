@@ -25,14 +25,14 @@ class Solid:
                               {"default": "custom"}),
                 "width": ("INT", {"default": 512, "min": 1, "max": 8192, "step": 8}),
                 "height": ("INT", {"default": 512, "min": 1, "max": 8192, "step": 8}),
+            },
+            "optional": {
+                "reference_images": ("IMAGE", ),
                 "color": ("COLOR", {"default": "#FFFFFF"}),
                 "alpha": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "invert": ("BOOLEAN", {"default": False}),
                 "mask_opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "divisible_by": ("INT", {"default": 8, "min": 1, "max": 1024, "step": 1, "label": "尺寸整除数"}),
-            },
-            "optional": {
-                "reference_images": ("IMAGE", )
             }
         }
 
@@ -41,7 +41,7 @@ class Solid:
     FUNCTION = "solid"
     CATEGORY = "1hewNodes/adobe"
 
-    def solid(self, preset_size, width, height, divisible_by, color, alpha=1.0, invert=False, mask_opacity=1.0, reference_images=None):
+    def solid(self, preset_size, width, height, divisible_by, color="#FFFFFF", alpha=1.0, invert=False, mask_opacity=1.0, reference_images=None):
         images = []
         masks = []
 
