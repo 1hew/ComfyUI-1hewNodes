@@ -6,10 +6,6 @@ import sys
 # 初始化映射字典
 NODE_CLASS_MAPPINGS = {}
 NODE_DISPLAY_NAME_MAPPINGS = {}
-# 添加自定义类型
-CUSTOM_TYPES = {
-    "CROP_BBOX": {"display_name": "crop_bbox", "color": (107, 176, 255)}  # 蓝色
-}
 
 # 获取当前目录
 current_dir = os.path.dirname(os.path.realpath(__file__))
@@ -37,5 +33,8 @@ if os.path.exists(nodes_dir) and os.path.isdir(nodes_dir):
             except Exception as e:
                 print(f"导入节点模块 {module_name} 时出错: {e}")
 
+# 添加这行来支持文档
+WEB_DIRECTORY = os.path.join(current_dir, "web")
+
 # 导出映射
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
