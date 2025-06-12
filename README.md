@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.1.1**
+
+- feat (image_crop): Added intelligent batch processing for `Image BBox Paste`
+
 **v1.1.0**
 
 - build: Add new tile nodes
@@ -31,13 +35,15 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 <summary><b>v1.0.5</b></summary>
 - Add Path Select
 
-</details>
-
+​	</details>
 
 <details>
 <summary><b>v1.0.4</b></summary>
+
 - Fix Image Cropped Paste error, add batch processing feature.
-</details>
+
+​	</details>
+
 
 
 ## 📋 Node List
