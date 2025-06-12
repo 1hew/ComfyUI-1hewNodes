@@ -64,6 +64,7 @@ class PromptExtract:
         }
     
     RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("text",)
     FUNCTION = "prompt_extract"
     CATEGORY = "1hewNodes/util"
     

@@ -1,123 +1,16 @@
 import torch
 import numpy as np
-from PIL import Image, ImageOps
-import math  
+from PIL import Image, ImageOps, ImageEnhance, ImageColor, ImageFilter
+import math
+import colorsys
+try:
+    from pilgram.css import blending
+except ImportError:
+    print("警告: pilgram 库未安装，CSS混合模式功能将不可用")
+    blending = None
 
 
-class Solid:
-    """
-    根据输入的颜色和尺寸生成纯色图像
-    """
-
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "preset_size": (["custom", "512×512 (1:1)", "768×768 (1:1)", "1024×1024 (1:1)", "1408×1408 (1:1)",
-                                "768×512 (3:2)", "1728×1152 (3:2)",
-                                "1024×768 (4:3)", "1664×1216 (4:3)",
-                                "832×480 (16:9)", "1280×720 (16:9)", "1920×1080 (16:9)",
-                                "2176×960 (21:9)",
-                                "512×768 (2:3)", "1152×1728 (2:3)",
-                                "768×1024 (3:4)", "1216×1664 (3:4)",
-                                "480×832 (9:16)", "720×1280 (9:16)", "1080×1920 (9:16)",
-                                "960×2176 (9:21)"],
-                              {"default": "custom"}),
-                "width": ("INT", {"default": 512, "min": 1, "max": 8192, "step": 1}),
-                "height": ("INT", {"default": 512, "min": 1, "max": 8192, "step": 1}),
-            },
-            "optional": {
-                "reference_images": ("IMAGE", ),
-                "color": ("COLOR", {"default": "#FFFFFF"}),
-                "alpha": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "invert": ("BOOLEAN", {"default": False}),
-                "mask_opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "divisible_by": ("INT", {"default": 8, "min": 1, "max": 1024, "step": 1, "label": "尺寸整除数"}),
-            }
-        }
-
-    RETURN_TYPES = ("IMAGE", "MASK")
-    RETURN_NAMES = ("image", "mask")
-    FUNCTION = "solid"
-    CATEGORY = "1hewNodes/adobe"
-
-    def solid(self, preset_size, width, height, divisible_by, color="#FFFFFF", alpha=1.0, invert=False, mask_opacity=1.0, reference_images=None):
-        images = []
-        masks = []
-
-        if reference_images is not None:
-            # 处理批量参考图像
-            for reference_image in reference_images:
-                # 从参考图像获取尺寸
-                h, w, _ = reference_image.shape
-                img_width = w
-                img_height = h
-        else:
-            # 处理预设尺寸或自定义尺寸
-            if preset_size != "custom":
-                # 从预设尺寸中提取宽度和高度（去掉比例部分）
-                dimensions = preset_size.split(" ")[0].split("×")
-                img_width = int(dimensions[0])
-                img_height = int(dimensions[1])
-            else:
-                img_width = width
-                img_height = height
-
-            # 确保尺寸能被 divisible_by 整除
-            if divisible_by > 1:
-                img_width = math.ceil(img_width / divisible_by) * divisible_by
-                img_height = math.ceil(img_height / divisible_by) * divisible_by
-
-            # 为了兼容批量处理，这里将单个尺寸的情况也当作一个批次处理
-            num_images = 1
-            reference_images = [None] * num_images
-
-        # 解析颜色值
-        if color.startswith("#"):
-            color = color[1:]
-        r = int(color[0:2], 16) / 255.0
-        g = int(color[2:4], 16) / 255.0
-        b = int(color[4:6], 16) / 255.0
-
-        # 如果需要反转颜色
-        if invert:
-            r = 1.0 - r
-            g = 1.0 - g
-            b = 1.0 - b
-
-        for reference_image in reference_images:
-            if reference_image is not None:
-                # 从参考图像获取尺寸
-                h, w, _ = reference_image.shape
-                img_width = w
-                img_height = h
-
-            # 创建纯色图像
-            image = np.zeros((img_height, img_width, 3), dtype=np.float32)
-            image[:, :, 0] = r
-            image[:, :, 1] = g
-            image[:, :, 2] = b
-            # 应用 alpha 调整亮度
-            image = image * alpha
-
-            # 创建透明度蒙版
-            mask = np.ones((img_height, img_width), dtype=np.float32) * mask_opacity
-
-            # 转换为ComfyUI需要的格式 (批次, 高度, 宽度, 通道)
-            image = torch.from_numpy(image).unsqueeze(0)
-            mask = torch.from_numpy(mask).unsqueeze(0)
-
-            images.append(image)
-            masks.append(mask)
-
-        # 合并所有图像和蒙版
-        final_images = torch.cat(images, dim=0)
-        final_masks = torch.cat(masks, dim=0)
-
-        return (final_images, final_masks)
-
-
-class LumaMatte:
+class ImageLumaMatte:
     """
     亮度蒙版 - 支持批量处理图像
     """
@@ -138,12 +31,12 @@ class LumaMatte:
 
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
-    FUNCTION = "luma_matte"
+    FUNCTION = "image_luma_matte"
 
-    CATEGORY = "1hewNodes/adobe"
+    CATEGORY = "1hewNodes/image/blend"
 
 
-    def luma_matte(self, images, mask, invert_mask=False, add_background=True, background_color="1.0"):
+    def image_luma_matte(self, images, mask, invert_mask=False, add_background=True, background_color="1.0"):
         # 获取图像尺寸
         batch_size, height, width, channels = images.shape
         mask_batch_size = mask.shape[0]
@@ -313,7 +206,7 @@ class LumaMatte:
         return (255, 255, 255)
 
 
-class BlendModesAlpha:
+class ImageBlendModesByAlpha:
     """
     图层叠加模式 - 支持基础图层输入，控制叠加模式和透明度强度
     """
@@ -341,7 +234,7 @@ class BlendModesAlpha:
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
     FUNCTION = "blend_modes"
-    CATEGORY = "1hewNodes/adobe"
+    CATEGORY = "1hewNodes/image/blend"
 
     def blend_modes(self, base_image, overlay_image, blend_mode, opacity, overlay_mask=None, invert_mask=False):
         # 初始化结果为基础图层
@@ -783,14 +676,226 @@ class BlendModesAlpha:
         return result
 
 
+class ImageBlendModesByCSS:
+    """
+    CSS 图层叠加模式 - 基于 Pilgram 库实现的 CSS 混合模式
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "overlay_image": ("IMAGE",),
+                "base_image": ("IMAGE",),
+                "blend_mode": (["normal", "multiply", "screen", "overlay", "darken", "lighten", 
+                                "color_dodge", "color_burn", "hard_light", "soft_light", 
+                                "difference", "exclusion", "hue", "saturation", "color", "luminosity"], 
+                               {"default": "normal"}),
+                "blend_percentage": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01})
+            },
+            "optional": {
+                "overlay_mask": ("MASK",),
+                "invert_mask": ("BOOLEAN", {"default": False, "label": "反转遮罩"})
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "image_blend_modes_by_css"
+    CATEGORY = "1hewNodes/image/blend"
+
+    def image_blend_modes_by_css(self, base_image, overlay_image, blend_mode, blend_percentage, overlay_mask=None, invert_mask=False):
+        # 检查并安装 pilgram 库
+        if not self._check_pilgram():
+            raise ImportError("无法导入 pilgram 库，请确保已安装。可以使用 pip install pilgram 安装。")
+        
+        import pilgram.css.blending as blending
+        
+        # 初始化结果为基础图层
+        result = base_image.clone()
+        
+        # 检查并转换 RGBA 图像为 RGB
+        base_image = self._convert_rgba_to_rgb(base_image)
+        overlay_image = self._convert_rgba_to_rgb(overlay_image)
+        
+        # 获取批次大小
+        base_batch_size = base_image.shape[0]
+        overlay_batch_size = overlay_image.shape[0]
+        
+        # 创建输出图像列表
+        output_images = []
+        
+        # 处理每个批次的图像
+        for b in range(base_batch_size):
+            # 获取当前批次的基础图像
+            current_base = base_image[b]
+            
+            # 确定使用哪个叠加图像（如果叠加图像数量少于基础图像数量，则循环使用）
+            overlay_index = b % overlay_batch_size
+            current_overlay = overlay_image[overlay_index]
+            
+            # 将张量转换为PIL图像
+            base_pil = self._tensor_to_pil(current_base)
+            overlay_pil = self._tensor_to_pil(current_overlay)
+            
+            # 确保两个图像具有相同的尺寸
+            if base_pil.size != overlay_pil.size:
+                overlay_pil = overlay_pil.resize(base_pil.size, Image.Resampling.LANCZOS)
+            
+            # 应用混合模式
+            blended_pil = self._apply_css_blend(base_pil, overlay_pil, blend_mode, blending)
+            
+            # 应用混合百分比
+            if blend_percentage < 1.0:
+                # 创建不透明度蒙版
+                opacity_mask = Image.new("L", base_pil.size, int(blend_percentage * 255))
+                # 反转蒙版
+                opacity_mask = ImageOps.invert(opacity_mask)
+                # 合成图像
+                blended_pil = Image.composite(base_pil, blended_pil, opacity_mask)
+            
+            # 如果提供了遮罩，则应用遮罩
+            if overlay_mask is not None:
+                # 确定使用哪个遮罩（如果遮罩数量少于图像数量，则循环使用）
+                mask_batch_size = overlay_mask.shape[0]
+                mask_index = b % mask_batch_size
+                current_mask = overlay_mask[mask_index]
+                
+                # 如果需要反转遮罩
+                if invert_mask:
+                    current_mask = 1.0 - current_mask
+                
+                # 将遮罩转换为PIL格式
+                if overlay_mask.is_cuda:
+                    mask_np = (current_mask.cpu().numpy() * 255).astype(np.uint8)
+                else:
+                    mask_np = (current_mask.numpy() * 255).astype(np.uint8)
+                mask_pil = Image.fromarray(mask_np)
+                
+                # 调整遮罩大小以匹配图像
+                if mask_pil.size != base_pil.size:
+                    mask_pil = mask_pil.resize(base_pil.size, Image.Resampling.LANCZOS)
+                
+                # 合成图像
+                final_pil = Image.composite(base_pil, blended_pil, mask_pil)
+            else:
+                final_pil = blended_pil
+            
+            # 转换回张量
+            final_tensor = self._pil_to_tensor(final_pil)
+            output_images.append(final_tensor)
+        
+        # 合并批次
+        result = torch.stack(output_images)
+        
+        return (result,)
+    
+    def _check_pilgram(self):
+        """检查是否已安装 pilgram 库"""
+        try:
+            import pilgram
+            return True
+        except ImportError:
+            try:
+                import pip
+                pip.main(['install', 'pilgram'])
+                import pilgram
+                return True
+            except:
+                return False
+    
+    def _convert_rgba_to_rgb(self, image):
+        """将RGBA图像转换为RGB图像"""
+        # 检查图像是否为RGBA格式（4通道）
+        if image.shape[3] == 4:
+            # 提取RGB通道
+            rgb_image = image[:, :, :, :3]
+            
+            # 获取Alpha通道
+            alpha_channel = image[:, :, :, 3:4]
+            
+            # 使用Alpha通道混合RGB与白色背景
+            white_bg = torch.ones_like(rgb_image)
+            rgb_image = rgb_image * alpha_channel + white_bg * (1 - alpha_channel)
+            
+            return rgb_image
+        else:
+            # 如果已经是RGB格式，直接返回
+            return image
+    
+    def _tensor_to_pil(self, tensor):
+        """将张量转换为PIL图像"""
+        # 确保张量在CPU上
+        if tensor.is_cuda:
+            tensor = tensor.cpu()
+        
+        # 转换为numpy数组
+        np_array = (tensor.numpy() * 255).astype(np.uint8)
+        
+        # 创建PIL图像
+        if np_array.shape[2] == 3:
+            return Image.fromarray(np_array, 'RGB')
+        elif np_array.shape[2] == 4:
+            return Image.fromarray(np_array, 'RGBA')
+        else:
+            raise ValueError(f"不支持的通道数: {np_array.shape[2]}")
+    
+    def _pil_to_tensor(self, pil_image):
+        """将PIL图像转换为张量"""
+        # 确保图像是RGB模式
+        if pil_image.mode != 'RGB':
+            pil_image = pil_image.convert('RGB')
+        
+        # 转换为numpy数组
+        np_array = np.array(pil_image).astype(np.float32) / 255.0
+        
+        # 转换为张量
+        return torch.from_numpy(np_array)
+    
+    def _apply_css_blend(self, base_pil, overlay_pil, blend_mode, blending):
+        """应用CSS混合模式"""
+        # 将CSS混合模式名称转换为pilgram函数名
+        mode_mapping = {
+            "normal": "normal",
+            "multiply": "multiply",
+            "screen": "screen",
+            "overlay": "overlay",
+            "darken": "darken",
+            "lighten": "lighten",
+            "color_dodge": "color_dodge",
+            "color_burn": "color_burn",
+            "hard_light": "hard_light",
+            "soft_light": "soft_light",
+            "difference": "difference",
+            "exclusion": "exclusion",
+            "hue": "hue",
+            "saturation": "saturation",
+            "color": "color",
+            "luminosity": "luminosity"
+        }
+        
+        # 获取对应的混合函数
+        blend_func_name = mode_mapping.get(blend_mode, "normal")
+        blend_func = getattr(blending, blend_func_name)
+        
+        # 应用混合
+        try:
+            result = blend_func(base_pil, overlay_pil)
+            return result
+        except Exception as e:
+            print(f"混合模式 {blend_mode} 应用失败: {str(e)}")
+            # 如果混合失败，返回原始图像
+            return base_pil
+
+
 NODE_CLASS_MAPPINGS = {
-    "Solid": Solid,
-    "LumaMatte": LumaMatte,
-    "BlendModesAlpha": BlendModesAlpha,
+    "ImageLumaMatte": ImageLumaMatte,
+    "ImageBlendModesByAlpha": ImageBlendModesByAlpha,
+    "ImageBlendModesByCSS": ImageBlendModesByCSS,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "Solid": "Solid",
-    "LumaMatte": "Luma Matte",
-    "BlendModesAlpha": "Blend Modes Alpha",
+    "ImageLumaMatte": "Image Luma Matte",
+    "ImageBlendModesByAlpha": "Image Blend Modes By Alpha",
+    "ImageBlendModesByCSS": "Image Blend Modes By CSS",
 }

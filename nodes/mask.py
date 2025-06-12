@@ -153,7 +153,7 @@ class MaskBBoxCrop:
         return {
             "required": {
                 "mask": ("MASK",),
-                "crop_bbox": ("CROP_BBOX",),
+                "bbox_meta": ("DICT",),
             }
         }
 
@@ -162,7 +162,7 @@ class MaskBBoxCrop:
     FUNCTION = "mask_bbox_crop"
     CATEGORY = "1hewNodes/mask"
 
-    def mask_bbox_crop(self, mask, crop_bbox):
+    def mask_bbox_crop(self, mask, bbox_meta):
         # 确保mask是3D张量 [batch, height, width]
         if mask.dim() == 2:
             mask = mask.unsqueeze(0)
@@ -172,6 +172,17 @@ class MaskBBoxCrop:
 
         # 创建输出遮罩列表
         output_masks = []
+        
+        # 处理 bbox_meta 格式
+        if isinstance(bbox_meta, dict):
+            if "batch_size" in bbox_meta and "bboxes" in bbox_meta:
+                # 多图像格式
+                bboxes_list = bbox_meta["bboxes"]
+            else:
+                # 单图像格式，转换为列表
+                bboxes_list = [bbox_meta]
+        else:
+            raise ValueError("bbox_meta must be a dictionary")
 
         for b in range(batch_size):
             # 将遮罩转换为PIL格式
@@ -183,8 +194,11 @@ class MaskBBoxCrop:
             mask_pil = Image.fromarray(mask_np).convert("L")
 
             # 获取当前批次对应的边界框
-            bbox_str = crop_bbox[b % len(crop_bbox)]
-            x_min, y_min, x_max, y_max = map(int, bbox_str.split(","))
+            bbox_dict = bboxes_list[b % len(bboxes_list)]
+            x_min = bbox_dict["x_min"]
+            y_min = bbox_dict["y_min"]
+            x_max = bbox_dict["x_max"]
+            y_max = bbox_dict["y_max"]
             
             # 确保边界框不超出图像范围
             x_min = max(0, x_min)
