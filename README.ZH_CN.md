@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.1.1**
+
+- feat(image_crop): 为 `Image BBox Paste` 添加智能批次处理功能
+
 **v1.1.0**
 
 - build: 添加 tile 新节点

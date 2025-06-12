@@ -1184,6 +1184,7 @@ class ImageBBoxCrop:
 class ImageBBoxPaste:
     """
     图像裁切后粘贴器 - 将处理后的裁剪图像粘贴回原始图像的位置
+    支持智能批次处理：自动循环复制较少的输入以匹配最大批次大小
     """
 
     @classmethod
@@ -1210,41 +1211,55 @@ class ImageBBoxPaste:
     CATEGORY = "1hewNodes/image/crop"
 
     def image_bbox_paste(self, base_image, cropped_image, bbox_meta, blend_mode="normal", opacity=1.0, cropped_mask=None):
-        # 获取图像尺寸
+        # 获取各输入的批次大小
         base_batch_size = base_image.shape[0]
         cropped_batch_size = cropped_image.shape[0]
         
-        # 创建输出图像列表
-        output_images = []
-        
-        # 处理 bbox_meta 格式
+        # 处理 bbox_meta 格式并获取其批次大小
         if isinstance(bbox_meta, dict):
             if "batch_size" in bbox_meta and "bboxes" in bbox_meta:
                 # 多图像格式
                 bboxes_list = bbox_meta["bboxes"]
+                bbox_batch_size = len(bboxes_list)
             else:
                 # 单图像格式，转换为列表
                 bboxes_list = [bbox_meta]
+                bbox_batch_size = 1
         else:
             raise ValueError("bbox_meta must be a dictionary")
         
-        for b in range(base_batch_size):
+        # 获取遮罩批次大小（如果存在）
+        mask_batch_size = cropped_mask.shape[0] if cropped_mask is not None else 1
+        
+        # 确定最大批次大小
+        max_batch_size = max(base_batch_size, cropped_batch_size, bbox_batch_size, mask_batch_size)
+        
+        # 创建输出图像列表
+        output_images = []
+        
+        for b in range(max_batch_size):
+            # 使用循环索引获取对应的输入
+            base_idx = b % base_batch_size
+            cropped_idx = b % cropped_batch_size
+            bbox_idx = b % bbox_batch_size
+            mask_idx = b % mask_batch_size if cropped_mask is not None else 0
+            
             # 将图像转换为PIL格式
             if base_image.is_cuda:
-                base_np = (base_image[b].cpu().numpy() * 255).astype(np.uint8)
+                base_np = (base_image[base_idx].cpu().numpy() * 255).astype(np.uint8)
             else:
-                base_np = (base_image[b].numpy() * 255).astype(np.uint8)
+                base_np = (base_image[base_idx].numpy() * 255).astype(np.uint8)
             
             if cropped_image.is_cuda:
-                cropped_np = (cropped_image[b % cropped_batch_size].cpu().numpy() * 255).astype(np.uint8)
+                cropped_np = (cropped_image[cropped_idx].cpu().numpy() * 255).astype(np.uint8)
             else:
-                cropped_np = (cropped_image[b % cropped_batch_size].numpy() * 255).astype(np.uint8)
+                cropped_np = (cropped_image[cropped_idx].numpy() * 255).astype(np.uint8)
             
             base_pil = Image.fromarray(base_np)
             cropped_pil = Image.fromarray(cropped_np)
             
             # 获取当前批次对应的边界框字典
-            bbox_dict = bboxes_list[b % len(bboxes_list)]
+            bbox_dict = bboxes_list[bbox_idx]
             x_min = bbox_dict["x_min"]
             y_min = bbox_dict["y_min"]
             x_max = bbox_dict["x_max"]
@@ -1254,9 +1269,9 @@ class ImageBBoxPaste:
             mask_pil = None
             if cropped_mask is not None:
                 if cropped_mask.is_cuda:
-                    mask_np = (cropped_mask[b % cropped_mask.shape[0]].cpu().numpy() * 255).astype(np.uint8)
+                    mask_np = (cropped_mask[mask_idx].cpu().numpy() * 255).astype(np.uint8)
                 else:
-                    mask_np = (cropped_mask[b % cropped_mask.shape[0]].numpy() * 255).astype(np.uint8)
+                    mask_np = (cropped_mask[mask_idx].numpy() * 255).astype(np.uint8)
                 mask_pil = Image.fromarray(mask_np).convert("L")
                 
                 # 调整遮罩大小以匹配处理后的图像

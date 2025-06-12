@@ -3,11 +3,6 @@ import numpy as np
 from PIL import Image, ImageOps, ImageEnhance, ImageColor, ImageFilter
 import math
 import colorsys
-try:
-    from pilgram.css import blending
-except ImportError:
-    print("警告: pilgram 库未安装，CSS混合模式功能将不可用")
-    blending = None
 
 
 class ImageLumaMatte:
