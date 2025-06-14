@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.1.2**
+
+- feat(image_tile): Improved the `Image Tile Merge` algorithm, using weight masks and cosine gradients to achieve perfect seamless stitching.
+
 **v1.1.1**
 
 - feat (image_crop): Added intelligent batch processing for `Image BBox Paste`
