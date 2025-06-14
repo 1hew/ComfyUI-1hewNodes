@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.1.2**
+
+- feat(image_tile): 改进 `Image Tile Merge`算法，使用权重蒙版和余弦渐变实现完美无缝拼接
+
 **v1.1.1**
 
 - feat(image_crop): 为 `Image BBox Paste` 添加智能批次处理功能
