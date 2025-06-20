@@ -9,8 +9,9 @@
 | `reference_image` | Required | IMAGE | - | - | Reference image (original image) |
 | `edit_image` | Required | IMAGE | - | - | Edited image |
 | `edit_mask` | Optional | MASK | - | - | Mask of edited area |
-| `position` | - | COMBO[STRING] | right | top, bottom, left, right | Stitch position: top, bottom, left, right |
-| `match_size` | - | BOOLEAN | True | True/False | Whether to match size, when enabled will adjust image size for matching |
+| `edit_image_position` | - | COMBO[STRING] | right | top, bottom, left, right | Edit image stitch position: top, bottom, left, right |
+| `match_edit_size` | - | BOOLEAN | True | True/False | Whether to match edit image size, when enabled will adjust reference image size to match edit image |
+| `spacing` | - | INT | 0 | 0-100 | Stitch spacing, controls pixel spacing between two images |
 | `fill_color` | - | FLOAT | 1.0 | 0.0-1.0 | Fill color, range 0.0 (black) - 1.0 (white), used for filling when sizes don't match |
 
 ## Outputs
@@ -24,6 +25,11 @@
 ## Function Description
 
 ### Size Handling
-- **Size matching**: When enabled, automatically adjusts image sizes for stitching
+- **Size matching**: When enabled, automatically adjusts reference image size to match edit image size
 - **Fill color**: Fill color used when image sizes don't match
 - **Proportional scaling**: Maintains image proportions during scaling adjustment
+
+### Stitching Control
+- **Edit image position**: Controls the stitching position of edit image relative to reference image
+- **Stitch spacing**: Adds specified pixel width spacing between two images, filled with fill color
+- **Spacing effect**: When spacing > 0, inserts spacing strips between stitched images for clearer visual separation

@@ -9,8 +9,9 @@
 | `reference_image` | 必选 | IMAGE | - | - | 参考图像（原始图像） |
 | `edit_image` | 必选 | IMAGE | - | - | 编辑后的图像 |
 | `edit_mask` | 可选 | MASK | - | - | 编辑区域的遮罩 |
-| `position` | - | COMBO[STRING] | right | top, bottom, left, right | 拼接位置：top(上方)、bottom(下方)、left(左侧)、right(右侧) |
-| `match_size` | - | BOOLEAN | True | True/False | 是否匹配尺寸，启用时会调整图像大小使其匹配 |
+| `edit_image_position` | - | COMBO[STRING] | right | top, bottom, left, right | 编辑图像拼接位置：top(上方)、bottom(下方)、left(左侧)、right(右侧) |
+| `match_edit_size` | - | BOOLEAN | True | True/False | 是否匹配编辑图像尺寸，启用时会调整参考图像大小使其匹配编辑图像 |
+| `spacing` | - | INT | 0 | 0-100 | 拼接间距，控制两个图像之间的像素间距 |
 | `fill_color` | - | FLOAT | 1.0 | 0.0-1.0 | 填充颜色，范围0.0(黑色)-1.0(白色)，用于尺寸不匹配时的填充 |
 
 ## 输出
@@ -24,6 +25,11 @@
 ## 功能说明
 
 ### 尺寸处理
-- **尺寸匹配**：启用时会自动调整图像大小以便拼接
+- **尺寸匹配**：启用时会自动调整参考图像大小以匹配编辑图像尺寸
 - **填充颜色**：当图像尺寸不匹配时使用的填充颜色
 - **等比例缩放**：保持图像比例进行缩放调整
+
+### 拼接控制
+- **编辑图像位置**：控制编辑图像相对于参考图像的拼接位置
+- **拼接间距**：在两个图像之间添加指定像素宽度的间距，使用填充颜色填充
+- **间距效果**：当spacing > 0时，会在拼接的图像之间插入间距条，提供更清晰的视觉分离

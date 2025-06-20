@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.1.6**
+
+- feat(ImageEditStitch): Add a “spacing” parameter to control the distance between stitched images.
+
 **v1.1.5**
 
 - feat: Added text processing and logic nodes, optimized existing node functions 

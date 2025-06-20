@@ -10,7 +10,7 @@
 | `layout` | - | COMBO[STRING] | horizontal | horizontal, vertical, grid | 排列方式：horizontal(水平)、vertical(垂直)、grid(网格) |
 | `spacing` | - | INT | 10 | 0-100 | 图像间隙，单位像素 |
 | `grid_columns` | - | INT | 2 | 1-100 | 网格模式下每行图像数量 |
-| `background_color` | - | STRING | 0.9 | 灰度值/HEX/RGB | 背景颜色，支持多种格式 |
+| `background_color` | - | STRING | 1.0 | 灰度值/HEX/RGB | 背景颜色，支持多种格式 |
 
 ## 输出
 
