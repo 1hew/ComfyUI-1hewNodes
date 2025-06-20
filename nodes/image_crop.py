@@ -13,10 +13,10 @@ class ImageCropSquare:
             "required": {
                 "image": ("IMAGE",),
                 "mask": ("MASK",),
-                "scale_factor": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 3.0, "step": 0.01, "label": "放大系数"}),
-                "apply_mask": ("BOOLEAN", {"default": False, "label": "应用遮罩抠图"}),
-                "extra_padding": ("INT", {"default": 0, "min": 0, "max": 512, "step": 1, "label": "额外边距(像素)"}),
-                "fill_color": ("STRING", {"default": "1.0", "label": "背景颜色 (灰度/HEX/RGB/edge)"})
+                "scale_factor": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 3.0, "step": 0.01}),
+                "apply_mask": ("BOOLEAN", {"default": False}),
+                "extra_padding": ("INT", {"default": 0, "min": 0, "max": 512, "step": 1}),
+                "fill_color": ("STRING", {"default": "1.0"})
             }
         }
 
@@ -396,43 +396,37 @@ class ImageCropEdge:
                     "default": 0,
                     "min": 0.0,
                     "max": cls.MAX_RESOLUTION,
-                    "step": 0.01,
-                    "label": "左侧裁剪"
+                    "step": 0.01
                 }),
                 "right_amount": ("FLOAT", {
                     "default": 0,
                     "min": 0.0,
                     "max": cls.MAX_RESOLUTION,
-                    "step": 0.01,
-                    "label": "右侧裁剪"
+                    "step": 0.01
                 }),
                 "top_amount": ("FLOAT", {
                     "default": 0,
                     "min": 0.0,
                     "max": cls.MAX_RESOLUTION,
-                    "step": 0.01,
-                    "label": "顶部裁剪"
+                    "step": 0.01
                 }),
                 "bottom_amount": ("FLOAT", {
                     "default": 0,
                     "min": 0.0,
                     "max": cls.MAX_RESOLUTION,
-                    "step": 0.01,
-                    "label": "底部裁剪"
+                    "step": 0.01
                 }),
                 "uniform_amount": ("FLOAT", {
                     "default": 0,
                     "min": 0.0,
                     "max": cls.MAX_RESOLUTION,
-                    "step": 0.01,
-                    "label": "四边同时裁剪"
+                    "step": 0.01
                 }),
                 "divisible_by": ("INT", {
                     "default": 8, 
                     "min": 1, 
                     "max": 1024, 
-                    "step": 1, 
-                    "label": "尺寸整除数"
+                    "step": 1
                 }),
             },
         }
@@ -554,13 +548,13 @@ class ImageCropWithBBox:
             "required": {
                 "image": ("IMAGE",),
                 "mask": ("MASK",),
-                "aspect_ratio": (["mask_ratio", "1:1", "3:2", "4:3", "16:9", "21:9", "2:3", "3:4", "9:16", "9:21"], {"default": "mask_ratio", "label": "输出比例"}),
-                "scale_factor": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 5.0, "step": 0.1, "label": "缩放系数"}),
-                "extra_padding": ("INT", {"default": 0, "min": 0, "max": 512, "step": 1, "label": "边距(像素)"}),
-                "exceed_image": ("BOOLEAN", {"default": False, "label": "允许超出原图"}),
-                "invert_mask": ("BOOLEAN", {"default": False, "label": "反转遮罩"}),
-                "fill_color": ("STRING", {"default": "1.0", "label": "背景颜色 (灰度/HEX/RGB/edge)"}),
-                "divisible_by": ("INT", {"default": 8, "min": 1, "max": 1024, "step": 1, "label": "尺寸整除数"})
+                "aspect_ratio": (["mask_ratio", "1:1", "3:2", "4:3", "16:9", "21:9", "2:3", "3:4", "9:16", "9:21"], {"default": "mask_ratio"}),
+                "scale_factor": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 5.0, "step": 0.1}),
+                "extra_padding": ("INT", {"default": 0, "min": 0, "max": 512, "step": 1}),
+                "exceed_image": ("BOOLEAN", {"default": False}),
+                "invert_mask": ("BOOLEAN", {"default": False}),
+                "fill_color": ("STRING", {"default": "1.0"}),
+                "divisible_by": ("INT", {"default": 8, "min": 1, "max": 1024, "step": 1})
             }
         }
 
@@ -1196,9 +1190,9 @@ class ImageBBoxPaste:
                 "bbox_meta": ("DICT",),
                 "blend_mode": (
                     ["normal", "multiply", "screen", "overlay", "soft_light", "difference"],
-                    {"default": "normal", "label": "混合模式"}
+                    {"default": "normal"}
                 ),
-                "opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01, "label": "不透明度"}),
+                "opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
             },
             "optional": {
                 "cropped_mask": ("MASK",),

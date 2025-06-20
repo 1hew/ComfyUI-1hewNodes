@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from PIL import Image, ImageOps, ImageDraw, ImageFont, ImageFilter, ImageEnhance, ImageColor
+import torch.nn.functional as F
 import os
 import math
 
@@ -33,7 +34,7 @@ class ImageSolid:
                 "alpha": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "invert": ("BOOLEAN", {"default": False}),
                 "mask_opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "divisible_by": ("INT", {"default": 8, "min": 1, "max": 1024, "step": 1, "label": "尺寸整除数"}),
+                "divisible_by": ("INT", {"default": 8, "min": 1, "max": 1024, "step": 1}),
             }
         }
 
@@ -137,11 +138,11 @@ class ImageResizeUniversal:
                 "proportional_width": ("INT", {"default": 1, "min": 1, "max": 1e8, "step": 1}),
                 "proportional_height": ("INT", {"default": 1, "min": 1, "max": 1e8, "step": 1}),
                 "method": (method_mode, {"default": 'lanczos'}),
-                "scale_to_side": (scale_to_list, {"default": 'None', "label": "按边缩放"}),
+                "scale_to_side": (scale_to_list, {"default": 'None'}),
                 "scale_to_length": ("INT", {"default": 1024, "min": 4, "max": 1e8, "step": 1}),
-                "fit": (fit_mode, {"default": "crop", "label": "适应方式"}),
-                "pad_color": ("STRING", {"default": "1.0", "label": "背景颜色 (灰度/HEX/RGB/edge)"}),
-                "divisible_by": ("INT", {"default": 8, "min": 1, "max": 1024, "step": 1, "label": "尺寸整除数"}),
+                "fit": (fit_mode, {"default": "crop"}),
+                "pad_color": ("STRING", {"default": "1.0"}),
+                "divisible_by": ("INT", {"default": 8, "min": 1, "max": 1024, "step": 1}),
             },
             "optional": {
                 "image": ("IMAGE",),  
@@ -536,10 +537,9 @@ class ImageEditStitch:
             "required": {
                 "reference_image": ("IMAGE",),
                 "edit_image": ("IMAGE",),
-                "position": (["top", "bottom", "left", "right"], {"default": "right", "label": "拼接位置"}),
-                "match_size": ("BOOLEAN", {"default": True, "label": "匹配尺寸"}),
-                "fill_color": (
-                "FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01, "label": "填充颜色(0黑-1白)"})
+                "position": (["top", "bottom", "left", "right"], {"default": "right"}),
+                "match_size": ("BOOLEAN", {"default": True}),
+                "fill_color": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01})
             },
             "optional": {
                 "edit_mask": ("MASK",)
@@ -933,7 +933,7 @@ class ImageDetailHLFreqSeparation:
 
 class ImageAddLabel:
     """
-    为图像添加标签文本 - 支持批量图像和批量标签
+    为图像添加标签文本 - 支持批量图像和批量标签，支持动态引用输入值
     """
 
     @classmethod
@@ -955,9 +955,13 @@ class ImageAddLabel:
                 "height": ("INT", {"default": 60, "min": 1, "max": 1024}),
                 "font_size": ("INT", {"default": 36, "min": 1, "max": 256}),
                 "invert_colors": ("BOOLEAN", {"default": True}),
-                "font": (font_files, {"default": "arial.ttf", "label": "字体文件"}),
-                "text": ("STRING", {"default": "", "multiline": True, "label": "标签文本(多行时每行对应一张图像)"}),
-                "direction": (["top", "bottom", "left", "right"], {"default": "top", "label": "标签位置"})
+                "font": (font_files, {"default": "arial.ttf"}),
+                "text": ("STRING", {"default": "", "multiline": True}),
+                "direction": (["top", "bottom", "left", "right"], {"default": "top"})
+            },
+            "optional": {
+                "input1": ("STRING", {"default": ""}),
+                "input2": ("STRING", {"default": ""})
             }
         }
 
@@ -966,7 +970,26 @@ class ImageAddLabel:
     FUNCTION = "image_add_label"
     CATEGORY = "1hewNodes/image"
 
-    def image_add_label(self, image, height, font_size, invert_colors, font, text, direction):
+    def parse_text_with_inputs(self, text, input1=None, input2=None):
+        """
+        解析文本中的输入引用
+        """
+        parsed_text = text
+        
+        # 替换 {input1} 引用
+        if input1 is not None and input1 != "":
+            parsed_text = parsed_text.replace("{input1}", str(input1))
+        
+        # 替换 {input2} 引用
+        if input2 is not None and input2 != "":
+            parsed_text = parsed_text.replace("{input2}", str(input2))
+            
+        return parsed_text
+
+    def image_add_label(self, image, height, font_size, invert_colors, font, text, direction, input1=None, input2=None):
+        # 解析文本中的输入引用
+        parsed_text = self.parse_text_with_inputs(text, input1, input2)
+        
         # 设置颜色，根据invert_colors决定黑白配色
         if invert_colors:
             font_color = "black"
@@ -979,7 +1002,7 @@ class ImageAddLabel:
         result = []
         
         # 处理多行文本，分割成标签列表
-        text_lines = text.strip().split('\n')
+        text_lines = parsed_text.strip().split('\n')
         
         for i, img in enumerate(image):
             # 选择对应的标签文本，如果标签数量少于图像数量，则循环使用
@@ -1147,100 +1170,208 @@ class ImageAddLabel:
 
 class ImagePlot:
     """
-    将多张图像拼合成一张大图
+    支持单张图像和批量图片收集，将输入按指定布局排列显示
     """
     
     @classmethod
     def INPUT_TYPES(s):
         return {
             "required": {
-                "images": ("IMAGE",),
-                "layout": (["horizontal", "vertical", "grid"], {"default": "horizontal", "label": "排列方式"}),
-                "gap": ("INT", {"default": 10, "min": 0, "max": 100, "label": "图像间隙"}),
-                "columns": ("INT", {"default": 2, "min": 1, "max": 10, "label": "每行图像数量(网格模式)"}),
-                "background_color": ("STRING", {"default": "1.0", "label": "背景颜色 (灰度/HEX/RGB)"})
+                "image": ("IMAGE",),
+                "layout": (["horizontal", "vertical", "grid"], {"default": "horizontal"}),
+                "spacing": ("INT", {"default": 10, "min": 0, "max": 100}),
+                "grid_columns": ("INT", {"default": 2, "min": 1, "max": 100}),
+                "background_color": ("STRING", {"default": "0.9"})
             }
         }
     
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
-    FUNCTION = "plot_image"
+    FUNCTION = "image_plot"
     CATEGORY = "1hewNodes/image"
     
-    def plot_image(self, images, layout, gap, columns, background_color):
+    def image_plot(self, image, layout, spacing, grid_columns, background_color):
+        """
+        主处理函数，自动检测输入类型并选择相应的处理方式
+        """
+        # 自动检测输入类型并选择处理方式
+        if self._is_video_collection(image):
+            return self._process_video_collection(image, layout, spacing, grid_columns, background_color)
+        else:
+            return self._process_standard_plot(image, layout, spacing, grid_columns, background_color)
+    
+    def _is_video_collection(self, image):
+        """自动检测是否为视频收集数据"""
+        # 只有当输入为列表格式时才认为是视频收集数据
+        if isinstance(image, list):
+            return True
+        # 移除基于帧数的检测，避免误判
+        return False
+    
+    def _process_standard_plot(self, image, layout, spacing, grid_columns, background_color):
+        """标准图像拼接处理"""
         # 解析背景颜色
         bg_color = self._parse_color(background_color)
         
         # 获取图像数量
-        num_images = images.shape[0]
+        num_images = image.shape[0]
         
         # 将所有图像转换为PIL格式
         pil_images = []
         for i in range(num_images):
-            img = 255. * images[i].cpu().numpy()
+            img = 255. * image[i].cpu().numpy()
             pil_img = Image.fromarray(np.clip(img, 0, 255).astype(np.uint8))
             pil_images.append(pil_img)
+        
+        # 根据布局处理图像
+        result_img = self._combine_images(pil_images, layout, spacing, grid_columns, bg_color)
+        
+        # 转换回tensor
+        result_np = np.array(result_img).astype(np.float32) / 255.0
+        result_tensor = torch.from_numpy(result_np)[None,]
+        
+        return (result_tensor,)
+    
+    def _process_video_collection(self, image, layout, spacing, grid_columns, background_color):
+        """视频收集处理，支持多批次图像的时间序列显示"""
+        try:
+            # 处理输入数据
+            batch_list = self._extract_batch_list(image)
+            if not batch_list:
+                print("警告: 没有找到有效的批量图片")
+                return (torch.zeros(1, 256, 256, 3),)
+            
+            print(f"接收到{len(batch_list)}个批量图片组")
+            
+            # 获取所有批次的最大帧数
+            max_frames = max(batch.shape[0] for batch in batch_list)
+            print(f"最大帧数: {max_frames}")
+            
+            # 为每一帧创建并列显示
+            combined_frames = []
+            for frame_idx in range(max_frames):
+                frame_images = []
+                
+                # 从每个批次中提取对应帧（循环使用如果帧数不足）
+                for batch in batch_list:
+                    actual_idx = frame_idx % batch.shape[0]
+                    frame_images.append(batch[actual_idx])
+                
+                # 合并当前帧的所有图片
+                combined_frame = self._combine_frame_images(
+                    frame_images, layout, spacing, grid_columns, background_color
+                )
+                combined_frames.append(combined_frame)
+            
+            # 合并所有帧
+            result_tensor = torch.stack(combined_frames, dim=0)
+            print(f"输出形状: {result_tensor.shape}")
+            
+            return (result_tensor,)
+            
+        except Exception as e:
+            print(f"视频收集显示错误: {str(e)}")
+            return (torch.zeros(1, 256, 256, 3),)
+    
+    def _extract_batch_list(self, video_collection):
+        """从video_collection中提取批量图片列表"""
+        if isinstance(video_collection, list):
+            return [item for item in video_collection if isinstance(item, torch.Tensor)]
+        elif isinstance(video_collection, torch.Tensor):
+            return [video_collection]
+        else:
+            print(f"未知的输入类型: {type(video_collection)}")
+            return []
+    
+    def _combine_frame_images(self, frame_images, layout, spacing, grid_columns, background_color):
+        """合并单帧的多个图片"""
+        if not frame_images:
+            return torch.zeros(256, 256, 3)
+        
+        # 统一图片尺寸
+        normalized_images = self._normalize_image_sizes(frame_images)
+        
+        # 转换为PIL图像
+        pil_images = []
+        for img_tensor in normalized_images:
+            img_np = (img_tensor.cpu().numpy() * 255).astype(np.uint8)
+            pil_img = Image.fromarray(img_np)
+            pil_images.append(pil_img)
+        
+        # 解析背景颜色
+        bg_color = self._parse_color(background_color)
+        
+        # 合并图像
+        result_img = self._combine_images(pil_images, layout, spacing, grid_columns, bg_color)
+        
+        # 转换回tensor
+        result_np = np.array(result_img).astype(np.float32) / 255.0
+        return torch.from_numpy(result_np)
+    
+    def _combine_images(self, pil_images, layout, spacing, grid_columns, bg_color):
+        """统一的图像合并逻辑"""
+        if not pil_images:
+            return Image.new('RGB', (256, 256), bg_color)
         
         # 获取所有图像的尺寸
         widths = [img.width for img in pil_images]
         heights = [img.height for img in pil_images]
+        num_images = len(pil_images)
         
-        # 根据布局计算最终图像的尺寸
         if layout == "horizontal":
             # 水平排列
-            total_width = sum(widths) + gap * (num_images - 1)
+            total_width = sum(widths) + spacing * (num_images - 1)
             max_height = max(heights)
             result_img = Image.new("RGB", (total_width, max_height), bg_color)
             
             x_offset = 0
             for img in pil_images:
-                # 垂直居中
                 y_offset = (max_height - img.height) // 2
                 result_img.paste(img, (x_offset, y_offset))
-                x_offset += img.width + gap
+                x_offset += img.width + spacing
                 
         elif layout == "vertical":
             # 垂直排列
             max_width = max(widths)
-            total_height = sum(heights) + gap * (num_images - 1)
+            total_height = sum(heights) + spacing * (num_images - 1)
             result_img = Image.new("RGB", (max_width, total_height), bg_color)
             
             y_offset = 0
             for img in pil_images:
-                # 水平居中
                 x_offset = (max_width - img.width) // 2
                 result_img.paste(img, (x_offset, y_offset))
-                y_offset += img.height + gap
+                y_offset += img.height + spacing
                 
-        else:  # grid
-            # 网格排列
-            rows = math.ceil(num_images / columns)
+        else:  # "grid" - 网格模式
+            # 使用grid_columns参数确定网格尺寸
+            cols = grid_columns
+            rows = math.ceil(num_images / cols)
             
             # 计算每行每列的最大尺寸
             max_width_per_col = []
-            for col in range(columns):
-                col_images = [pil_images[i] for i in range(num_images) if i % columns == col]
+            for col in range(cols):
+                col_images = [pil_images[i] for i in range(num_images) if i % cols == col]
                 max_width_per_col.append(max([img.width for img in col_images]) if col_images else 0)
                 
             max_height_per_row = []
             for row in range(rows):
-                row_images = [pil_images[i] for i in range(num_images) if i // columns == row]
+                row_images = [pil_images[i] for i in range(num_images) if i // cols == row]
                 max_height_per_row.append(max([img.height for img in row_images]) if row_images else 0)
             
             # 计算总宽度和总高度
-            total_width = sum(max_width_per_col) + gap * (columns - 1)
-            total_height = sum(max_height_per_row) + gap * (rows - 1)
+            total_width = sum(max_width_per_col) + spacing * (cols - 1)
+            total_height = sum(max_height_per_row) + spacing * (rows - 1)
             
             result_img = Image.new("RGB", (total_width, total_height), bg_color)
             
             # 放置图像
-            for i, img in enumerate(pil_images):
-                row = i // columns
-                col = i % columns
+            for i, img in enumerate(pil_images[:rows * cols]):
+                row = i // cols
+                col = i % cols
                 
                 # 计算当前位置的x和y偏移
-                x_offset = sum(max_width_per_col[:col]) + gap * col
-                y_offset = sum(max_height_per_row[:row]) + gap * row
+                x_offset = sum(max_width_per_col[:col]) + spacing * col
+                y_offset = sum(max_height_per_row[:row]) + spacing * row
                 
                 # 在当前单元格内居中
                 x_center = (max_width_per_col[col] - img.width) // 2
@@ -1248,11 +1379,27 @@ class ImagePlot:
                 
                 result_img.paste(img, (x_offset + x_center, y_offset + y_center))
         
-        # 转换回tensor
-        result_np = np.array(result_img).astype(np.float32) / 255.0
-        result_tensor = torch.from_numpy(result_np)[None,]
+        return result_img
+    
+    def _normalize_image_sizes(self, images):
+        """统一图片尺寸到最小公共尺寸"""
+        if not images:
+            return []
         
-        return (result_tensor,)
+        # 找到最小尺寸
+        min_height = min(img.shape[0] for img in images)
+        min_width = min(img.shape[1] for img in images)
+        
+        normalized = []
+        for img in images:
+            if img.shape[0] != min_height or img.shape[1] != min_width:
+                # 调整尺寸
+                img = img.permute(2, 0, 1).unsqueeze(0)  # [1, C, H, W]
+                img = F.interpolate(img, size=(min_height, min_width), mode='bilinear', align_corners=False)
+                img = img.squeeze(0).permute(1, 2, 0)  # [H, W, C]
+            normalized.append(img)
+        
+        return normalized
     
     def _parse_color(self, color_str):
         """解析不同格式的颜色输入"""

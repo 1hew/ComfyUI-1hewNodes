@@ -21,6 +21,14 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.1.5**
+
+- feat: 新增文本处理和逻辑节点，优化现有节点功能
+- refactor(util): 重构工具节点，重命名节点 `RangeMapping` 和 `PathBuild`
+- feat(logic): 新增 `ImageListAppend` 节点用于图像列表合并
+- feat(text): 新增 `TextCustomList` 和 `TextCustomExtract` 文本处理节点
+- style: 清理节点参数标签，保持简洁统一
+
 **v1.1.2**
 
 - feat(image_tile): 改进 `Image Tile Merge`算法，使用权重蒙版和余弦渐变实现完美无缝拼接
@@ -32,7 +40,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 **v1.1.0**
 
 - build: 添加 tile 新节点
-
 - feat: 更新节点功能
 - docs: 添加中英文文档，完善节点说明
 
@@ -96,10 +103,19 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🔧 工具节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Coordinate Extract | JSON坐标数据提取器 |
-| Slider Value Range Mapping | 数值范围映射工具 |
-| Path Select | 路径选择器，支持文件和目录选择 |
-| Prompt Extract | 提示词提取和处理工具 |
+| Range Mapping | 数值范围映射工具，支持滑块值的线性变换和精度控制 |
+| Path Build | 路径构建器，支持预设路径和自定义扩展 |
+
+### 🧠 逻辑节点
+| 节点名称 | 功能描述 |
+|---------|----------|
+| Image List Append | 图像列表追加器，智能合并图像到列表中 |
+
+### 📝 文本处理节点
+| 节点名称 | 功能描述 |
+|---------|----------|
+| Text Custom List | 文本自定义列表生成器，支持多种分隔符和数据类型 |
+| Text Custom Extract | 文本自定义提取器，从JSON中提取指定键值 |
 
 
 
@@ -112,6 +128,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 [ComfUI-Easy-Use](https://github.com/yolain/ComfyUI-Easy-Use)
 
 [ComfyUI_LayerStyle](https://github.com/chflame163/ComfyUI_LayerStyle)
+
+[Comfyui_TTP_Toolset](https://github.com/TTPlanetPig/Comfyui_TTP_Toolset)
 
 
 

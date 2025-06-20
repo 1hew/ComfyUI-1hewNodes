@@ -1,6 +1,6 @@
-# Slider Value Range Mapping - 滑块数值范围映射
+# Range Mapping - 范围映射
 
-**节点功能：** `Slider Value Range Mapping`节点将0-1范围的滑块值映射到指定的数值范围，支持精度控制和类型转换。
+**节点功能：** `Range Mapping`节点将0-1范围的滑块值映射到指定的数值范围，支持精度控制和类型转换。
 
 ## 输入
 
