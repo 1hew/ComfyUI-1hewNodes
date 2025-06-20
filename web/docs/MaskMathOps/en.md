@@ -6,8 +6,8 @@
 
 | Parameter Name | Input Selection | Data Type | Default Value | Value Range | Description |
 | -------------- | --------------- | --------- | ------------- | ----------- | ----------- |
-| `mask_a` | Required | MASK | - | - | First input mask |
-| `mask_b` | Required | MASK | - | - | Second input mask |
+| `mask_1` | Required | MASK | - | - | First input mask |
+| `mask_2` | Required | MASK | - | - | Second input mask |
 | `operation` | - | COMBO[STRING] | or | or, and, subtract (a-b), subtract (b-a), xor | Mathematical operation type |
 
 ## Outputs

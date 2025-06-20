@@ -1,6 +1,6 @@
-# Slider Value Range Mapping
+# Range Mapping
 
-**Node Function:** The `Slider Value Range Mapping` node maps slider values in the 0-1 range to specified numerical ranges, supporting precision control and type conversion.
+**Node Function:** The `Range Mapping` node maps slider values in the 0-1 range to specified numerical ranges, supporting precision control and type conversion.
 
 ## Inputs
 

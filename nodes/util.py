@@ -1,116 +1,7 @@
-import torch
-import json
-import numpy as np
-import os
-import re
-
-class CoordinateExtract:
-    """坐标提取器
-    [
-        {
-            "x": 0,
-            "y": 512
-        },
-        {
-            "x": 59,
-            "y": 510
-        }
-     ]
-    """
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "coordinates_json": ("STRING", {"multiline": True}),
-            }
-        }
-
-    RETURN_TYPES = ("FLOAT", "FLOAT")
-    RETURN_NAMES = ("x", "y")
-    OUTPUT_IS_LIST = (True, True)
-    FUNCTION = "coordinate_extract"
-    
-    CATEGORY = "1hewNodes/util"
-
-    def coordinate_extract(self, coordinates_json):
-        try:
-            # 解析 JSON 字符串为 Python 对象
-            if isinstance(coordinates_json, str):
-                points = json.loads(coordinates_json)
-            else:
-                points = coordinates_json
-            
-            # 提取 x 和 y 列表
-            x_list = [float(point["x"]) for point in points]
-            y_list = [float(point["y"]) for point in points]
-            
-            return (x_list, y_list)
-        except Exception as e:
-            print(f"Error extracting coordinates: {e}")
-            return ([], [])
-
-class PromptExtract:
-    """
-    从文本中提取指定语言的内容
-    """
-    
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "text": ("STRING", {}),
-                "language": (["en", "zh"], {"default": "en"}),
-            }
-        }
-    
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("text",)
-    FUNCTION = "prompt_extract"
-    CATEGORY = "1hewNodes/util"
-    
-    def prompt_extract(self, text, language):
-        # 尝试解析JSON文本
-        try:
-            # 如果输入是标准JSON格式
-            data = json.loads(text)
-        except json.JSONDecodeError:
-            # 如果不是标准JSON，尝试解析为键值对格式
-            try:
-                # 清理文本，移除多余的空格和换行符
-                cleaned_text = re.sub(r'\s+', ' ', text).strip()
-                # 将文本转换为标准JSON格式
-                if cleaned_text.startswith('{') and cleaned_text.endswith('}'):
-                    cleaned_text = cleaned_text[1:-1]
-                
-                # 构建JSON字符串
-                json_str = '{' + cleaned_text + '}'
-                data = json.loads(json_str)
-            except:
-                # 如果仍然无法解析，尝试使用正则表达式提取
-                pattern = r'"([^"]+)"\s*:\s*"([^"]+)"'
-                matches = re.findall(pattern, text)
-                data = {key: value for key, value in matches}
-        
-        # 根据选择的语言提取文本
-        if language == "en":
-            # 尝试查找英文相关的键
-            english_keys = ["English", "english", "英文", "英语", "ENGLISH", "ENG", "eng"]
-            for key in english_keys:
-                if key in data:
-                    return (data[key],)
-        else:  # language == "zh"
-            # 尝试查找中文相关的键
-            chinese_keys = ["Chinese", "chinese", "中文", "China", "china", "CHINESE", "CHN", "chn", "ZH", "zh"]
-            for key in chinese_keys:
-                if key in data:
-                    return (data[key],)
-        
-        # 如果没有找到匹配的键，返回错误信息
-        return (f"未找到{language}语言的文本",)
 
 
-class SliderValueRangeMapping:
-    """滑动条数值范围映射
+class RangeMapping:
+    """范围映射
     滑动条的数值会根据min和max_value的修改实时变化
     rounding参数控制小数位数精度
     """
@@ -150,11 +41,11 @@ class SliderValueRangeMapping:
     
     RETURN_TYPES = ("FLOAT","INT") 
     RETURN_NAMES = ('float','int')
-    FUNCTION = "slider_value_range_mapping"
+    FUNCTION = "range_mapping"
 
     CATEGORY = "1hewNodes/util"
 
-    def slider_value_range_mapping(self, value, min, max, rounding):
+    def range_mapping(self, value, min, max, rounding):
         # 将0-1范围的滑动条值映射到 min 和 max 之间
         actual_value = min + value * (max - min)
         
@@ -167,9 +58,9 @@ class SliderValueRangeMapping:
         return (actual_value, int(actual_value))
 
 
-class PathSelect:
+class PathBuild:
     """
-    路径选择 - 提供一个层级结构的路径选择下拉框，并允许添加第四级自定义字段
+    路径构建 - 提供一个层级结构的路径选择下拉框，并允许添加自定义路径扩展
     """
     
     @classmethod
@@ -178,18 +69,18 @@ class PathSelect:
         paths = []
         
         # 一级字段
-        level1 = ["kijai_wan", "org_wan", "Flux"]
+        level1 = ["Wan_kijai", "Wan_org", "Flux"]
         # 二级字段映射
         level2_mapping = {
-            "kijai_wan": ["VACE", "FLF2V", "Fun"],
-            "org_wan": ["VACE", "FLF2V", "Fun"],
+            "Wan_kijai": ["FusionX", "VACE", "FLF2V", "Fun"],
+            "Wan_org": ["VACE", "FLF2V", "Fun"],
             "Flux": ["ACE_Redux", "ACE", "TTP"]
         }
         # 三级字段映射
         level3_mapping = {
-            "kijai_wan": ["FLFControl", "Control", "FLF", "Inpaint"],
-            "org_wan": ["FLFControl", "Control", "FLF", "Inpaint"],
-            "Flux": []  # Flux 使用 filename 作为三级字段，所以这里为空
+            "Wan_kijai": ["FLFControl", "Control", "FLF", "Inpaint", "Outpaint"],
+            "Wan_org": ["FLFControl", "Control", "FLF", "Inpaint"],
+            "Flux": []  # Flux 使用 additional_path 作为三级字段，所以这里为空
         }
         
         # 生成所有可能的路径组合
@@ -205,37 +96,33 @@ class PathSelect:
         
         return {
             "required": {
-                "path": (paths, {"default": paths[0], "label": "选择路径"}),
-                "filename": ("STRING", {"default": "", "multiline": False, "label": "第四级字段"})
+                "preset_path": (paths, {"default": paths[0]}),
+                "additional_path": ("STRING", {"default": "", "multiline": False})
             }
         }
 
     RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("filename",)
-    FUNCTION = "select_path"
+    RETURN_NAMES = ("full_path",)
+    FUNCTION = "build_path"
     CATEGORY = "1hewNodes/util"
 
-    def select_path(self, path, filename):
-        # 如果提供了第四级字段，则添加到路径中
-        if filename and filename.strip():
-            full_path = f"{path}/{filename.strip()}"
+    def build_path(self, preset_path, additional_path):
+        # 如果提供了额外路径，则添加到预设路径中
+        if additional_path and additional_path.strip():
+            full_path = f"{preset_path}/{additional_path.strip()}"
         else:
-            full_path = path
+            full_path = preset_path
             
         return (full_path,)
+  
 
-
-# 在NODE_CLASS_MAPPINGS中添加新节点
+# 在NODE_CLASS_MAPPINGS中更新节点映射
 NODE_CLASS_MAPPINGS = {
-    "CoordinateExtract": CoordinateExtract,
-    "PromptExtract": PromptExtract,
-    "SliderValueRangeMapping": SliderValueRangeMapping,
-    "PathSelect": PathSelect,
+    "RangeMapping": RangeMapping,
+    "PathBuild": PathBuild,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "CoordinateExtract": "Coordinat Extract",
-    "PromptExtract": "Prompt Extract",
-    "SliderValueRangeMapping": "Slider Value Range Mapping",
-    "PathSelect": "Path Select",
+    "RangeMapping": "Range Mapping",
+    "PathBuild": "Path Build",
 }
