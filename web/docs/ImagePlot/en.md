@@ -10,7 +10,7 @@
 | `layout` | - | COMBO[STRING] | horizontal | horizontal, vertical, grid | Arrangement: horizontal, vertical, grid |
 | `spacing` | - | INT | 10 | 0-100 | Gap between images in pixels |
 | `grid_columns` | - | INT | 2 | 1-100 | Number of images per row in grid mode |
-| `background_color` | - | STRING | 0.9 | Grayscale/HEX/RGB | Background color, supports multiple formats |
+| `background_color` | - | STRING | 1.0 | Grayscale/HEX/RGB | Background color, supports multiple formats |
 
 ## Outputs
 

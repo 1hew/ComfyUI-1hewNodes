@@ -537,8 +537,9 @@ class ImageEditStitch:
             "required": {
                 "reference_image": ("IMAGE",),
                 "edit_image": ("IMAGE",),
-                "position": (["top", "bottom", "left", "right"], {"default": "right"}),
-                "match_size": ("BOOLEAN", {"default": True}),
+                "edit_image_position": (["top", "bottom", "left", "right"], {"default": "right"}),
+                "match_edit_size": ("BOOLEAN", {"default": True}),
+                "spacing": ("INT", {"default": 0, "min": 0, "max": 1000, "step": 1}),
                 "fill_color": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01})
             },
             "optional": {
@@ -551,8 +552,8 @@ class ImageEditStitch:
     FUNCTION = "image_edit_stitch"
     CATEGORY = "1hewNodes/image"
 
-    def image_edit_stitch(self, reference_image, edit_image, edit_mask=None, position='right', match_size=True,
-                          fill_color=1.0):
+    def image_edit_stitch(self, reference_image, edit_image, edit_mask=None, edit_image_position='right', match_edit_size=True,
+                          fill_color=1.0, spacing=0):
         # 检查输入
         if reference_image is None and edit_image is None:
             # 如果两个图像都为空，创建默认图像
@@ -587,7 +588,7 @@ class ImageEditStitch:
         edit_batch, edit_height, edit_width, edit_channels = edit_image.shape
 
         # 处理尺寸不匹配的情况
-        if match_size and (ref_height != edit_height or ref_width != edit_width):
+        if match_edit_size and (ref_height != edit_height or ref_width != edit_width):
             # 将图像转换为PIL格式以便于处理
             if reference_image.is_cuda:
                 ref_np = (reference_image[0].cpu().numpy() * 255).astype(np.uint8)
@@ -629,73 +630,155 @@ class ImageEditStitch:
             # 更新尺寸
             ref_height, ref_width = edit_height, edit_width
 
-        # 根据位置拼接图像
-        if position == "right":
+        # 创建间距填充（如果spacing > 0）
+        spacing_color = torch.full((1, 1, 1, 3), fill_color, dtype=torch.float32)
+        
+        # 根据编辑图像位置拼接图像
+        if edit_image_position == "right":
             # 参考图像在左，编辑图像在右
-            combined_image = torch.cat([
-                reference_image,
-                edit_image
-            ], dim=2)  # 水平拼接
+            if spacing > 0:
+                # 创建垂直间距条
+                spacing_strip = spacing_color.expand(1, ref_height, spacing, 3)
+                combined_image = torch.cat([
+                    reference_image,
+                    spacing_strip,
+                    edit_image
+                ], dim=2)  # 水平拼接
+                
+                # 拼接遮罩（参考区域为0，间距区域为0，编辑区域保持原样）
+                zero_mask_ref = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                zero_mask_spacing = torch.zeros((1, ref_height, spacing), dtype=torch.float32)
+                combined_mask = torch.cat([zero_mask_ref, zero_mask_spacing, edit_mask], dim=2)
+                
+                # 创建分离遮罩（参考区域为黑色，间距区域为黑色，编辑区域为白色）
+                split_mask_left = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                split_mask_spacing = torch.zeros((1, ref_height, spacing), dtype=torch.float32)
+                split_mask_right = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
+                split_mask = torch.cat([split_mask_left, split_mask_spacing, split_mask_right], dim=2)
+            else:
+                combined_image = torch.cat([
+                    reference_image,
+                    edit_image
+                ], dim=2)  # 水平拼接
+                
+                # 拼接遮罩（参考区域为0，编辑区域保持原样）
+                zero_mask = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                combined_mask = torch.cat([zero_mask, edit_mask], dim=2)
+                
+                # 创建分离遮罩（参考区域为黑色，编辑区域为白色）
+                split_mask_left = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                split_mask_right = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
+                split_mask = torch.cat([split_mask_left, split_mask_right], dim=2)
 
-            # 拼接遮罩（参考区域为0，编辑区域保持原样）
-            zero_mask = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
-            combined_mask = torch.cat([zero_mask, edit_mask], dim=2)
-
-            # 创建分离遮罩（参考区域为黑色，编辑区域为白色）
-            split_mask_left = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
-            split_mask_right = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
-            split_mask = torch.cat([split_mask_left, split_mask_right], dim=2)
-
-        elif position == "left":
+        elif edit_image_position == "left":
             # 编辑图像在左，参考图像在右
-            combined_image = torch.cat([
-                edit_image,
-                reference_image
-            ], dim=2)  # 水平拼接
+            if spacing > 0:
+                # 创建垂直间距条
+                spacing_strip = spacing_color.expand(1, edit_height, spacing, 3)
+                combined_image = torch.cat([
+                    edit_image,
+                    spacing_strip,
+                    reference_image
+                ], dim=2)  # 水平拼接
+                
+                # 拼接遮罩（编辑区域保持原样，间距区域为0，参考区域为0）
+                zero_mask_spacing = torch.zeros((1, edit_height, spacing), dtype=torch.float32)
+                zero_mask_ref = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                combined_mask = torch.cat([edit_mask, zero_mask_spacing, zero_mask_ref], dim=2)
+                
+                # 创建分离遮罩（编辑区域为白色，间距区域为黑色，参考区域为黑色）
+                split_mask_left = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
+                split_mask_spacing = torch.zeros((1, edit_height, spacing), dtype=torch.float32)
+                split_mask_right = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                split_mask = torch.cat([split_mask_left, split_mask_spacing, split_mask_right], dim=2)
+            else:
+                combined_image = torch.cat([
+                    edit_image,
+                    reference_image
+                ], dim=2)  # 水平拼接
+                
+                # 拼接遮罩（编辑区域保持原样，参考区域为0）
+                zero_mask = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                combined_mask = torch.cat([edit_mask, zero_mask], dim=2)
+                
+                # 创建分离遮罩（编辑区域为白色，参考区域为黑色）
+                split_mask_left = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
+                split_mask_right = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                split_mask = torch.cat([split_mask_left, split_mask_right], dim=2)
 
-            # 拼接遮罩（编辑区域保持原样，参考区域为0）
-            zero_mask = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
-            combined_mask = torch.cat([edit_mask, zero_mask], dim=2)
-
-            # 创建分离遮罩（编辑区域为白色，参考区域为黑色）
-            split_mask_left = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
-            split_mask_right = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
-            split_mask = torch.cat([split_mask_left, split_mask_right], dim=2)
-
-        elif position == "bottom":
+        elif edit_image_position == "bottom":
             # 参考图像在上，编辑图像在下
-            combined_image = torch.cat([
-                reference_image,
-                edit_image
-            ], dim=1)  # 垂直拼接
+            if spacing > 0:
+                # 创建水平间距条
+                spacing_strip = spacing_color.expand(1, spacing, ref_width, 3)
+                combined_image = torch.cat([
+                    reference_image,
+                    spacing_strip,
+                    edit_image
+                ], dim=1)  # 垂直拼接
+                
+                # 拼接遮罩（参考区域为0，间距区域为0，编辑区域保持原样）
+                zero_mask_ref = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                zero_mask_spacing = torch.zeros((1, spacing, ref_width), dtype=torch.float32)
+                combined_mask = torch.cat([zero_mask_ref, zero_mask_spacing, edit_mask], dim=1)
+                
+                # 创建分离遮罩（参考区域为黑色，间距区域为黑色，编辑区域为白色）
+                split_mask_top = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                split_mask_spacing = torch.zeros((1, spacing, ref_width), dtype=torch.float32)
+                split_mask_bottom = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
+                split_mask = torch.cat([split_mask_top, split_mask_spacing, split_mask_bottom], dim=1)
+            else:
+                combined_image = torch.cat([
+                    reference_image,
+                    edit_image
+                ], dim=1)  # 垂直拼接
+                
+                # 拼接遮罩（参考区域为0，编辑区域保持原样）
+                zero_mask = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                combined_mask = torch.cat([zero_mask, edit_mask], dim=1)
+                
+                # 创建分离遮罩（参考区域为黑色，编辑区域为白色）
+                split_mask_top = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                split_mask_bottom = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
+                split_mask = torch.cat([split_mask_top, split_mask_bottom], dim=1)
 
-            # 拼接遮罩（参考区域为0，编辑区域保持原样）
-            zero_mask = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
-            combined_mask = torch.cat([zero_mask, edit_mask], dim=1)
-
-            # 创建分离遮罩（参考区域为黑色，编辑区域为白色）
-            split_mask_top = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
-            split_mask_bottom = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
-            split_mask = torch.cat([split_mask_top, split_mask_bottom], dim=1)
-
-        elif position == "top":
+        elif edit_image_position == "top":
             # 编辑图像在上，参考图像在下
-            combined_image = torch.cat([
-                edit_image,
-                reference_image
-            ], dim=1)  # 垂直拼接
-
-            # 拼接遮罩（编辑区域保持原样，参考区域为0）
-            zero_mask = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
-            combined_mask = torch.cat([edit_mask, zero_mask], dim=1)
-
-            # 创建分离遮罩（编辑区域为白色，参考区域为黑色）
-            split_mask_top = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
-            split_mask_bottom = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
-            split_mask = torch.cat([split_mask_top, split_mask_bottom], dim=1)
+            if spacing > 0:
+                # 创建水平间距条
+                spacing_strip = spacing_color.expand(1, spacing, edit_width, 3)
+                combined_image = torch.cat([
+                    edit_image,
+                    spacing_strip,
+                    reference_image
+                ], dim=1)  # 垂直拼接
+                
+                # 拼接遮罩（编辑区域保持原样，间距区域为0，参考区域为0）
+                zero_mask_spacing = torch.zeros((1, spacing, edit_width), dtype=torch.float32)
+                zero_mask_ref = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                combined_mask = torch.cat([edit_mask, zero_mask_spacing, zero_mask_ref], dim=1)
+                
+                # 创建分离遮罩（编辑区域为白色，间距区域为黑色，参考区域为黑色）
+                split_mask_top = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
+                split_mask_spacing = torch.zeros((1, spacing, edit_width), dtype=torch.float32)
+                split_mask_bottom = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                split_mask = torch.cat([split_mask_top, split_mask_spacing, split_mask_bottom], dim=1)
+            else:
+                combined_image = torch.cat([
+                    edit_image,
+                    reference_image
+                ], dim=1)  # 垂直拼接
+                
+                # 拼接遮罩（编辑区域保持原样，参考区域为0）
+                zero_mask = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                combined_mask = torch.cat([edit_mask, zero_mask], dim=1)
+                
+                # 创建分离遮罩（编辑区域为白色，参考区域为黑色）
+                split_mask_top = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
+                split_mask_bottom = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                split_mask = torch.cat([split_mask_top, split_mask_bottom], dim=1)
 
         return combined_image, combined_mask, split_mask
-        
 
 class ImageDetailHLFreqSeparation:
     """
@@ -1181,7 +1264,7 @@ class ImagePlot:
                 "layout": (["horizontal", "vertical", "grid"], {"default": "horizontal"}),
                 "spacing": ("INT", {"default": 10, "min": 0, "max": 100}),
                 "grid_columns": ("INT", {"default": 2, "min": 1, "max": 100}),
-                "background_color": ("STRING", {"default": "0.9"})
+                "background_color": ("STRING", {"default": "1.0"})
             }
         }
     
