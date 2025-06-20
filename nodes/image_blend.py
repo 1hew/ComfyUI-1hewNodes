@@ -18,9 +18,9 @@ class ImageLumaMatte:
                 "mask": ("MASK",)
             },
             "optional": {
-                "invert_mask": ("BOOLEAN", {"default": False, "label": "反转遮罩"}),
-                "add_background": ("BOOLEAN", {"default": True, "label": "添加背景"}),
-                "background_color": ("STRING", {"default": "1.0", "label": "背景颜色 (灰度/HEX/RGB/average)"})
+                "invert_mask": ("BOOLEAN", {"default": False}),
+                "add_background": ("BOOLEAN", {"default": True}),
+                "background_color": ("STRING", {"default": "1.0"})
             }
         }
 

@@ -11,8 +11,8 @@ class MaskMathOps:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "mask_a": ("MASK",),
-                "mask_b": ("MASK",),
+                "mask_1": ("MASK",),
+                "mask_2": ("MASK",),
                 "operation": (["or", "and", "subtract (a-b)", "subtract (b-a)", "xor"], 
                              {"default": "or"})
             }
@@ -23,10 +23,10 @@ class MaskMathOps:
     FUNCTION = "mask_math_ops"
     CATEGORY = "1hewNodes/mask"
 
-    def mask_math_ops(self, mask_a, mask_b, operation):
+    def mask_math_ops(self, mask_1, mask_2, operation):
         # 获取蒙版尺寸
-        batch_size_a = mask_a.shape[0]
-        batch_size_b = mask_b.shape[0]
+        batch_size_a = mask_1.shape[0]
+        batch_size_b = mask_2.shape[0]
         
         # 创建输出蒙版列表
         output_masks = []
@@ -36,11 +36,11 @@ class MaskMathOps:
         
         for b in range(max_batch_size):
             # 获取当前批次的蒙版（循环使用如果批次大小不匹配）
-            current_mask_a = mask_a[b % batch_size_a]
-            current_mask_b = mask_b[b % batch_size_b]
+            current_mask_a = mask_1[b % batch_size_a]
+            current_mask_b = mask_2[b % batch_size_b]
             
             # 将蒙版转换为PIL格式以便处理
-            if mask_a.is_cuda:
+            if mask_1.is_cuda:
                 mask_a_np = (current_mask_a.cpu().numpy() * 255).astype(np.uint8)
                 mask_b_np = (current_mask_b.cpu().numpy() * 255).astype(np.uint8)
             else:
@@ -93,7 +93,7 @@ class MaskBatchMathOps:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "masks": ("MASK",),
+                "mask": ("MASK",),
                 "operation": (["or", "and"], {"default": "or"})
             }
         }
@@ -103,23 +103,23 @@ class MaskBatchMathOps:
     FUNCTION = "batch_mask_math_ops"
     CATEGORY = "1hewNodes/mask"
 
-    def batch_mask_math_ops(self, masks, operation):
+    def batch_mask_math_ops(self, mask, operation):
         # 获取批次大小
-        batch_size = masks.shape[0]
+        batch_size = mask.shape[0]
         
         # 如果批次大小为1，直接返回
         if batch_size <= 1:
-            return (masks,)
+            return (mask,)
         
         # 创建输出蒙版
         output_mask = None
         
         # 对每个批次进行处理
         for b in range(batch_size):
-            current_mask = masks[b]
+            current_mask = mask[b]
             
             # 将蒙版转换为numpy数组
-            if masks.is_cuda:
+            if mask.is_cuda:
                 mask_np = current_mask.cpu().numpy()
             else:
                 mask_np = current_mask.numpy()

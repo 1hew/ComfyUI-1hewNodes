@@ -253,7 +253,7 @@ class ImageTileMerge:
     CATEGORY = "1hewNodes/image/tile"
 
     def create_weight_mask(self, tile_width, tile_height, overlap_width, overlap_height, position, grid_size, blend_strength):
-        """创建更平滑的权重蒙版，模仿ttp.py的渐变效果"""
+        """创建更平滑的权重蒙版，边缘渐变效果"""
         col, row = position
         num_cols, num_rows = grid_size
         
@@ -305,7 +305,7 @@ class ImageTileMerge:
         return weight
 
     def image_tile_merge(self, tiles, tile_meta, blend_strength):
-        """改进的拼接方法，使用权重图确保完美匹配"""
+        """使用权重图确保完美匹配"""
         # 从tile_meta中提取信息
         tile_metas = tile_meta["tile_metas"]
         original_size = tile_meta["original_size"]

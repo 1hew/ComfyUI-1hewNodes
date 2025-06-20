@@ -21,6 +21,14 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.1.5**
+
+- feat: Added text processing and logic nodes, optimized existing node functions 
+- refactor(util): Refactored utility nodes, renamed nodes `RangeMapping` and `PathBuild` 
+- feat(logic): Added `ImageListAppend` node for image list merging
+- feat(text): Added `TextCustomList` and `TextCustomExtract` text processing nodes
+- style: Cleaned up node parameter labels to maintain simplicity and consistency
+
 **v1.1.2**
 
 - feat(image_tile): Improved the `Image Tile Merge` algorithm, using weight masks and cosine gradients to achieve perfect seamless stitching.
@@ -37,6 +45,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 <details>
 <summary><b>v1.0.5</b></summary>
+
 - Add Path Select
 
 ​	</details>
@@ -53,7 +62,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ## 📋 Node List
 
 ### 🖼️ Image Processing Nodes
-
 | Node Name | Description |
 |-----------|-------------|
 | Image Solid | Generate solid color images with multiple size and color format support |
@@ -64,7 +72,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Plot | Image plotting and visualization tools |
 
 ### 🎨 Image Blending Nodes
-
 | Node Name | Description |
 |-----------|-------------|
 | Image Luma Matte | Luminance-based image mask compositing |
@@ -72,7 +79,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Blend Modes By CSS | CSS standard blend modes based on Pilgram library |
 
 ### ✂️ Image Cropping Nodes
-
 | Node Name | Description |
 |-----------|-------------|
 | Image Crop Square | Square cropping with mask guidance and scaling support |
@@ -82,14 +88,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image BBox Paste | Paste cropped images back with multiple blend modes |
 
 ### 🧩 Image Tiling Nodes
-
 | Node Name | Description |
 |-----------|-------------|
 | Image Tile Split | Image tile splitting with overlap and custom grid support |
 | Image Tile Merge | Image tile merging with intelligent stitching |
 
 ### 🎭 Mask Operation Nodes
-
 | Node Name | Description |
 |-----------|-------------|
 | Mask Math Ops | Mask mathematical operations (intersection, union, difference, XOR) |
@@ -97,13 +101,21 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Mask BBox Crop | Mask bounding box cropping |
 
 ### 🔧 Utility Nodes
-
 | Node Name | Description |
 |-----------|-------------|
-| Coordinate Extract | JSON coordinate data extractor |
-| Slider Value Range Mapping | Value range mapping tool |
-| Path Select | Path selector supporting files and directories |
-| Prompt Extract | Prompt extraction and processing tool |
+| Range Mapping | Value range mapping tool supporting linear transformation and precision control for slider values |
+| Path Build | Path builder supporting preset paths and custom extensions |
+
+### 🧠 Logic Nodes
+| Node Name | Description |
+|-----------|-------------|
+| Image List Append | Image list appender for intelligently merging images into lists |
+
+### 📝 Text Processing Nodes
+| Node Name | Description |
+|-----------|-------------|
+| Text Custom List | Text custom list generator supporting multiple separators and data types |
+| Text Custom Extract | Text custom extractor for extracting specified key values from JSON |
 
 
 
@@ -116,6 +128,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 [ComfUI-Easy-Use](https://github.com/yolain/ComfyUI-Easy-Use)
 
 [ComfyUI_LayerStyle](https://github.com/chflame163/ComfyUI_LayerStyle)
+
+[Comfyui_TTP_Toolset](https://github.com/TTPlanetPig/Comfyui_TTP_Toolset)
 
 
 

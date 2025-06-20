@@ -6,7 +6,7 @@
 
 | Parameter Name | Input Selection | Data Type | Default Value | Value Range | Description |
 | -------------- | --------------- | --------- | ------------- | ----------- | ----------- |
-| `masks` | Required | MASK | - | - | Input mask batch |
+| `mask` | Required | MASK | - | - | Input mask batch |
 | `operation` | - | COMBO[STRING] | or | or, and | Batch operation type |
 
 ## Outputs
