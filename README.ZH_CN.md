@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.1.6**
+
+- feat(ImageEditStitch): 添加 spacing 参数控制拼接图像间的间距
+
 **v1.1.5**
 
 - feat: 新增文本处理和逻辑节点，优化现有节点功能
