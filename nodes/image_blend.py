@@ -14,7 +14,7 @@ class ImageLumaMatte:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "images": ("IMAGE",),
+                "image": ("IMAGE",),
                 "mask": ("MASK",)
             },
             "optional": {
@@ -31,9 +31,9 @@ class ImageLumaMatte:
     CATEGORY = "1hewNodes/image/blend"
 
 
-    def image_luma_matte(self, images, mask, invert_mask=False, add_background=True, background_color="1.0"):
+    def image_luma_matte(self, image, mask, invert_mask=False, add_background=True, background_color="1.0"):
         # 获取图像尺寸
-        batch_size, height, width, channels = images.shape
+        batch_size, height, width, channels = image.shape
         mask_batch_size = mask.shape[0]
         
         # 解析背景颜色
@@ -44,10 +44,10 @@ class ImageLumaMatte:
         
         for b in range(batch_size):
             # 将图像转换为PIL格式
-            if images.is_cuda:
-                img_np = (images[b].cpu().numpy() * 255).astype(np.uint8)
+            if image.is_cuda:
+                img_np = (image[b].cpu().numpy() * 255).astype(np.uint8)
             else:
-                img_np = (images[b].numpy() * 255).astype(np.uint8)
+                img_np = (image[b].numpy() * 255).astype(np.uint8)
             img_pil = Image.fromarray(img_np)
 
             # 确定使用哪个遮罩（如果遮罩数量少于图像数量，则循环使用）
@@ -889,8 +889,9 @@ NODE_CLASS_MAPPINGS = {
     "ImageBlendModesByCSS": ImageBlendModesByCSS,
 }
 
+# 节点显示名称
 NODE_DISPLAY_NAME_MAPPINGS = {
     "ImageLumaMatte": "Image Luma Matte",
-    "ImageBlendModesByAlpha": "Image Blend Modes By Alpha",
-    "ImageBlendModesByCSS": "Image Blend Modes By CSS",
+    "ImageBlendModesByAlpha": "Image Blend Modes by Alpha",
+    "ImageBlendModesByCSS": "Image Blend Modes by CSS",
 }

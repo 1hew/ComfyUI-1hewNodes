@@ -1,62 +1,37 @@
 # Image Blend Modes By Alpha
 
-**Node Function:** The `Image Blend Modes By Alpha` node provides multiple professional image blend modes, supporting opacity control and mask application, achieving Photoshop-like layer blending effects.
+**Node Function:** The `Image Blend Modes By Alpha` node provides comprehensive layer blending capabilities with support for base layer input, blend mode control, and opacity adjustment with optional mask application.
 
 ## Inputs
 
-| Parameter Name | Input Selection | Data Type | Default Value | Value Range | Description |
-| -------------- | --------------- | --------- | ------------- | ----------- | ----------- |
-| `overlay_image` | Required | IMAGE | - | - | Overlay image (top layer) |
-| `base_image` | Required | IMAGE | - | - | Base image (bottom layer) |
-| `blend_mode` | - | COMBO[STRING] | normal | Multiple blend modes | Blend mode selection |
-| `opacity` | - | FLOAT | 1.0 | 0.0-1.0 | Opacity of overlay image |
-| `overlay_mask` | Optional | MASK | - | - | Mask for overlay area |
-| `invert_mask` | Optional | BOOLEAN | False | True/False | Whether to invert mask |
+| Parameter | Required | Data Type | Default | Range | Description |
+| --------- | -------- | --------- | ------- | ----- | ----------- |
+| `base_image` | Required | IMAGE | - | - | Base layer image |
+| `overlay_image` | Required | IMAGE | - | - | Overlay layer image |
+| `blend_mode` | - | COMBO[STRING] | normal | normal, dissolve, darken, multiply, color burn, linear burn, add, lighten, screen, color dodge, linear dodge, overlay, soft light, hard light, linear light, vivid light, pin light, hard mix, difference, exclusion, subtract, divide, hue, saturation, color, luminosity | Blending mode selection |
+| `opacity` | - | FLOAT | 1.0 | 0.0-1.0 | Opacity of the overlay layer |
+| `overlay_mask` | Optional | MASK | - | - | Optional mask for selective blending |
+| `invert_mask` | - | BOOLEAN | False | True/False | Whether to invert the overlay mask |
 
 ## Outputs
 
 | Output Name | Data Type | Description |
 |-------------|-----------|-------------|
-| `image` | IMAGE | Blended image |
+| `image` | IMAGE | Blended result image |
 
-## Function Description
+## Features
 
 ### Blend Mode Categories
+- **Normal Modes**: normal, dissolve
+- **Darken Modes**: darken, multiply, color burn, linear burn
+- **Lighten Modes**: add, lighten, screen, color dodge, linear dodge
+- **Contrast Modes**: overlay, soft light, hard light, linear light, vivid light, pin light, hard mix
+- **Comparative Modes**: difference, exclusion, subtract, divide
+- **Color Modes**: hue, saturation, color, luminosity
 
-#### Basic Modes
-- **normal**: Normal overlay
-- **dissolve**: Dissolve effect, randomly discards pixels
-
-#### Darken Modes
-- **darken**: Darken, takes darker value
-- **multiply**: Multiply, color multiplication
-- **color burn**: Color burn
-- **linear burn**: Linear burn
-
-#### Lighten Modes
-- **lighten**: Lighten, takes brighter value
-- **screen**: Screen mode
-- **color dodge**: Color dodge
-- **linear dodge**: Linear dodge
-- **add**: Add mode
-
-#### Contrast Modes
-- **overlay**: Overlay mode
-- **soft light**: Soft light effect
-- **hard light**: Hard light effect
-- **linear light**: Linear light
-- **vivid light**: Vivid light mode
-- **pin light**: Pin light mode
-- **hard mix**: Hard mix
-
-#### Difference Modes
-- **difference**: Difference mode
-- **exclusion**: Exclusion mode
-- **subtract**: Subtract mode
-- **divide**: Divide mode
-
-#### Color Modes
-- **hue**: Hue mode
-- **saturation**: Saturation mode
-- **color**: Color mode
-- **luminosity**: Luminosity mode
+### Advanced Features
+- **RGBA Support**: Automatic conversion of RGBA images to RGB
+- **Batch Processing**: Handle multiple images with different batch sizes
+- **Size Adaptation**: Automatic resizing of overlay to match base layer
+- **Mask Integration**: Optional mask for selective blending areas
+- **Quality Processing**: High-quality blending algorithms
