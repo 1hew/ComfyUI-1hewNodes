@@ -1,132 +1,13 @@
 import json
 import re
 
-class TextCustomList:
-    """
-    自定义列表节点 - 生成自定义的文本/数值列表
-    支持多种分隔符和引号包裹，可以直接与 xyAny 节点配合使用进行笛卡尔积组合
-    自动检测并输出最适合的数据类型：int > float > string
-    """
-    
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "custom_text": ("STRING", {
-                    "default": "",
-                    "multiline": True,
-                    "placeholder": "Separate with comma(,), semicolon(;), or newline."
-                })
-            }
-        }
-    
-    RETURN_TYPES = ("*", "INT")
-    RETURN_NAMES = ("list", "count")
-    OUTPUT_IS_LIST = (True, False)
-    CATEGORY = "1hewNodes/text"
-    FUNCTION = "text_custom_list"
-
-    
-    def parse_text_list(self, text):
-        """
-        解析文本列表，支持多种分隔符和引号包裹
-        支持的分隔符：逗号(,)、分号(;)、换行符(\n)
-        支持双引号和单引号包裹的整体文本
-        忽略只包含一个或多个连字符(-)的行
-        """
-        if not text.strip():
-            return ["default"]
-        
-        # 简化的解析方法，避免复杂的正则表达式
-        # 首先按换行符分割
-        lines = text.split('\n')
-        
-        text_list = []
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-                
-            # 忽略只包含一个或多个连字符的行
-            if line and all(c == '-' for c in line):
-                continue
-                
-            # 处理逗号和分号分隔的项目
-            if ',' in line or ';' in line:
-                # 替换分号为逗号，统一处理
-                line = line.replace(';', ',')
-                items = line.split(',')
-                for item in items:
-                    item = item.strip()
-                    # 移除引号
-                    if (item.startswith('"') and item.endswith('"')) or (item.startswith("'") and item.endswith("'")):
-                        item = item[1:-1]
-                    if item:
-                        text_list.append(item)
-            else:
-                # 单个项目，移除引号
-                if (line.startswith('"') and line.endswith('"')) or (line.startswith("'") and line.endswith("'")):
-                    line = line[1:-1]
-                if line:
-                    text_list.append(line)
-        
-        # 如果解析结果为空，返回默认值
-        if not text_list:
-            text_list = ["default"]
-            
-        return text_list
-    
-    def detect_and_convert_type(self, text_list):
-        """
-        自动检测并转换为最适合的数据类型
-        优先级：int > float > string
-        如果包含小数点则保持为浮点数
-        """
-        if not text_list:
-            return []
-        
-        # 检测是否所有项目都可以转换为数字
-        all_int = True
-        all_float = True
-        
-        converted_list = []
-        
-        for item in text_list:
-            try:
-                # 如果包含小数点，直接作为浮点数处理
-                if '.' in str(item):
-                    float_val = float(item)
-                    converted_list.append(float_val)
-                    all_int = False  # 包含小数点就不是整数类型
-                else:
-                    # 不包含小数点，尝试转换为整数
-                    int_val = int(item)
-                    converted_list.append(int_val)
-            except (ValueError, TypeError):
-                # 无法转换为数字，保持原始字符串
-                all_int = False
-                all_float = False
-                converted_list.append(item)
-        
-        # 如果不能全部转换为数字，返回原始字符串列表
-        if not all_float:
-            return text_list
-        
-        return converted_list
-    
-    def text_custom_list(self, custom_text):
-        """
-        生成自动检测类型的自定义列表
-        """
-        text_list = self.parse_text_list(custom_text)
-        value_list = self.detect_and_convert_type(text_list)
-        return (value_list, len(value_list))
-
 
 class TextCustomExtract:
     """
     文本自定义提取器 - 从JSON对象或数组中提取指定键的值
     支持精确匹配模式和增强匹配模式
+    支持基于label值过滤并提取对应key的值
+    输出格式：数组时分行展示，单个对象时直接输出字符串
     """
     
     @classmethod
@@ -135,59 +16,121 @@ class TextCustomExtract:
             "required": {
                 "json_data": ("STRING", {
                     "multiline": True,
-                    "placeholder": "Enter JSON object or array data"
+                    "placeholder": "Enter json object or array data"
                 }),
                 "key": ("STRING", {
                     "default": "zh",
                     "placeholder": "Key name to extract"
                 }),
                 "precision_match": (["disabled", "enabled"], {"default": "disabled"})
+            },
+            "optional": {
+                "label_filter": ("STRING", {
+                    "default": "",
+                    "placeholder": "Filter by label values (comma separated, supports partial match)"
+                })
             }
         }
     
-    RETURN_TYPES = ("*",)
-    RETURN_NAMES = ("value",)
-    OUTPUT_IS_LIST = (True,)
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("string",)
     FUNCTION = "text_custom_extract"
     CATEGORY = "1hewNodes/text"
     
+    def clean_input_text(self, text: str) -> str:
+        """清理输入文本，移除多余的格式标记（借鉴SimpleBBoxConverter）"""
+        text = text.strip()
+        
+        # 移除代码块标记
+        if "```json" in text:
+            text = text.split("```json", 1)[1]
+            text = text.split("```", 1)[0]
+        elif "```" in text:
+            parts = text.split("```")
+            if len(parts) >= 3:
+                text = parts[1]
+        
+        # 移除可能的前缀文字（保留JSON结构）
+        # 查找第一个 [ 或 { 的位置
+        start_pos = -1
+        for i, char in enumerate(text):
+            if char in '[{':
+                start_pos = i
+                break
+        
+        if start_pos != -1:
+            text = text[start_pos:]
+        
+        # 查找最后一个 ] 或 } 的位置
+        end_pos = -1
+        for i in range(len(text) - 1, -1, -1):
+            if text[i] in ']}':
+                end_pos = i + 1
+                break
+        
+        if end_pos != -1:
+            text = text[:end_pos]
+        
+        return text
+    
     def parse_json_data(self, json_data):
         """
-        解析JSON数据，支持多种格式
+        解析JSON数据，采用SimpleBBoxConverter的多层次解析策略
         """
+        # 首先清理输入文本
+        if isinstance(json_data, str):
+            text = self.clean_input_text(json_data)
+        else:
+            text = str(json_data)
+        
+        if not text:
+            print("清理后的文本为空")
+            return {}
+        
+        print(f"清理后的文本: {text[:200]}...")
+        
         try:
             # 尝试直接解析JSON
-            if isinstance(json_data, str):
-                return json.loads(json_data)
-            else:
-                return json_data
-        except json.JSONDecodeError:
-            # 如果不是标准JSON，尝试解析为键值对格式
+            data = json.loads(text)
+            print(f"JSON解析成功，数据类型: {type(data)}")
+            return data
+        except json.JSONDecodeError as e:
+            print(f"JSON解析失败: {e}")
             try:
-                # 清理文本，移除多余的空格和换行符
-                cleaned_text = re.sub(r'\s+', ' ', json_data).strip()
-                
-                # 如果文本被大括号包围，移除它们
-                if cleaned_text.startswith('{') and cleaned_text.endswith('}'):
-                    cleaned_text = cleaned_text[1:-1]
-                
-                # 构建标准JSON字符串
-                json_str = '{' + cleaned_text + '}'
-                return json.loads(json_str)
-            except:
-                # 使用正则表达式提取键值对
-                pattern = r'"([^"]+)"\s*:\s*"([^"]+)"'
-                matches = re.findall(pattern, json_data)
-                if matches:
-                    return {key: value for key, value in matches}
-                
-                # 如果仍然无法解析，返回空字典
-                return {}
+                # 尝试使用ast.literal_eval
+                import ast
+                data = ast.literal_eval(text)
+                print(f"ast.literal_eval解析成功，数据类型: {type(data)}")
+                return data
+            except (ValueError, SyntaxError) as e:
+                print(f"ast.literal_eval解析失败: {e}")
+                # 尝试修复常见格式问题
+                try:
+                    # 修复单引号问题
+                    fixed_text = text.replace("'", '"')
+                    data = json.loads(fixed_text)
+                    print(f"修复单引号后解析成功，数据类型: {type(data)}")
+                    return data
+                except json.JSONDecodeError as e:
+                    print(f"修复单引号后仍然解析失败: {e}")
+                    # 最后尝试正则表达式提取
+                    try:
+                        pattern = r'"([^"]+)"\s*:\s*"([^"]+)"'
+                        matches = re.findall(pattern, text)
+                        if matches:
+                            result = {key: value for key, value in matches}
+                            print(f"正则表达式提取成功: {result}")
+                            return result
+                    except Exception as e:
+                        print(f"正则表达式提取失败: {e}")
+                    
+                    print(f"所有解析方法都失败，返回空字典")
+                    return {}
     
     def get_enhanced_keys(self, key_name):
         """
         根据输入的键名生成增强匹配的键名列表
-        包含 en/zh 语言增强匹配和常见变体
+        简化匹配逻辑，提高成功率
         """
         if not key_name.strip():
             return []
@@ -202,34 +145,24 @@ class TextCustomExtract:
             key_name.capitalize()
         ])
         
-        # 改进的语言匹配逻辑
-        # 英文相关键名
-        english_variants = ["English", "english", "英文", "英语", "ENGLISH", "ENG", "eng", "en", "EN"]
-        # 中文相关键名  
-        chinese_variants = ["Chinese", "chinese", "中文", "China", "china", "CHINESE", "CHN", "chn", "ZH", "zh"]
-        
-        # 检查是否为英文相关键名
-        if key_lower in ['en', 'english', 'eng'] or key_name in ['英文', '英语']:
-            enhanced_keys.extend(english_variants)
-        # 检查是否为中文相关键名
-        elif key_lower in ['zh', 'chinese', 'chn', 'china'] or key_name in ['中文']:
-            enhanced_keys.extend(chinese_variants)
-        
-        # 根据常见模式添加变体
-        common_patterns = {
-            'x': ['X', 'pos_x', 'position_x', 'coord_x', 'horizontal'],
-            'y': ['Y', 'pos_y', 'position_y', 'coord_y', 'vertical'],
-            'width': ['w', 'W', 'WIDTH', 'size_w'],
-            'height': ['h', 'H', 'HEIGHT', 'size_h'],
-            'id': ['ID', 'Id', 'identifier', 'key'],
-            'name': ['NAME', 'Name', 'title', 'label'],
-            'value': ['VALUE', 'Value', 'val', 'data'],
-            'a': ['A', 'alpha', 'first'],
-            'b': ['B', 'beta', 'second']
+        # 常见键名映射
+        key_mappings = {
+            'bbox': ['bbox', 'BBOX', 'Bbox', 'box', 'bounding_box', 'coordinates', 'coord', 'bbox_2d'],
+            'label': ['label', 'LABEL', 'Label', 'name', 'title', 'text', 'class'],
+            'confidence': ['confidence', 'CONFIDENCE', 'conf', 'score', 'probability', 'prob'],
+            'x': ['x', 'X', 'pos_x', 'position_x'],
+            'y': ['y', 'Y', 'pos_y', 'position_y'],
+            'width': ['width', 'w', 'W', 'WIDTH'],
+            'height': ['height', 'h', 'H', 'HEIGHT'],
+            'zh': ['zh', 'ZH', 'chinese', 'Chinese', 'CHINESE', '中文'],
+            'en': ['en', 'EN', 'english', 'English', 'ENGLISH', '英文', '英语']
         }
         
-        if key_lower in common_patterns:
-            enhanced_keys.extend(common_patterns[key_lower])
+        # 检查是否有对应的映射
+        for base_key, variants in key_mappings.items():
+            if key_lower == base_key or key_name in variants:
+                enhanced_keys.extend(variants)
+                break
         
         # 去重并保持顺序
         seen = set()
@@ -244,8 +177,6 @@ class TextCustomExtract:
     def find_key_in_object(self, obj, key_name, precision_match):
         """
         在对象中查找键值，支持精确匹配模式
-        precision_match="enabled": 精确匹配（只匹配完全相同的键名）
-        precision_match="disabled": 增强匹配（支持多种键名变体和语言匹配）
         """
         if not isinstance(obj, dict):
             return None
@@ -253,95 +184,538 @@ class TextCustomExtract:
         if not key_name.strip():
             return None
             
+        print(f"在对象中查找键: {key_name}, 对象键: {list(obj.keys())}")
+            
         if precision_match == "enabled":
             # 精确匹配模式：只匹配完全相同的键名
-            return obj.get(key_name)
+            result = obj.get(key_name)
+            print(f"精确匹配结果: {result}")
+            return result
         else:
             # 增强匹配模式：尝试多种键名变体
             enhanced_keys = self.get_enhanced_keys(key_name)
+            print(f"增强匹配键列表: {enhanced_keys}")
+            
             for key in enhanced_keys:
                 if key in obj:
-                    return obj[key]
-            # 不区分大小写搜索
+                    result = obj[key]
+                    print(f"找到匹配键 '{key}': {result}")
+                    return result
+            
+            # 如果还是没找到，尝试不区分大小写搜索
+            key_lower = key_name.lower()
             for obj_key, obj_value in obj.items():
-                if obj_key.lower() == key_name.lower():
+                if obj_key.lower() == key_lower:
+                    print(f"不区分大小写找到匹配键 '{obj_key}': {obj_value}")
                     return obj_value
         
+        print(f"未找到匹配的键")
         return None
     
-    def auto_convert_value(self, value):
+    def format_value_as_string(self, value):
         """
-        根据值的类型自动转换为对应类型
+        将值格式化为字符串
         """
         if value is None:
-            return None
+            return ""
         
-        # 如果已经是数字类型，直接返回
-        if isinstance(value, (int, float)):
-            return value
+        # 如果是列表或数组，转换为字符串表示
+        if isinstance(value, list):
+            # 如果是数字列表，格式化为逗号分隔
+            if all(isinstance(x, (int, float)) for x in value):
+                return ", ".join(map(str, value))
+            else:
+                return str(value)
         
-        # 如果是字符串，尝试转换为数字
-        if isinstance(value, str):
-            # 尝试转换为整数
-            try:
-                if '.' not in value and 'e' not in value.lower():
-                    return int(value)
-            except (ValueError, TypeError):
-                pass
-            
-            # 尝试转换为浮点数
-            try:
-                return float(value)
-            except (ValueError, TypeError):
-                pass
-            
-            # 无法转换为数字，返回原字符串
-            return value
-        
-        # 其他类型直接返回
-        return value
+        # 其他类型直接转换为字符串
+        return str(value)
     
-    def text_custom_extract(self, json_data, key, precision_match):
+    def parse_label_filters(self, label_filter):
+        """
+        解析label过滤器字符串，支持中文逗号和英文逗号分隔的多个过滤条件
+        """
+        if not label_filter or not label_filter.strip():
+            return []
+        
+        # 先将中文逗号替换为英文逗号，然后按英文逗号分割并清理空白
+        normalized_filter = label_filter.replace('，', ',')
+        filters = [f.strip() for f in normalized_filter.split(',') if f.strip()]
+        return filters
+    
+    def matches_label_filter(self, label_value, filters):
+        """
+        检查label值是否匹配任一过滤条件（支持部分匹配）
+        """
+        if not filters:
+            return True  # 没有过滤条件时，匹配所有
+        
+        if not label_value:
+            return False
+        
+        label_str = str(label_value).lower()
+        
+        # 检查是否有任一过滤条件匹配
+        for filter_str in filters:
+            if filter_str.lower() in label_str:
+                return True
+        
+        return False
+    
+    def text_custom_extract(self, json_data, key, precision_match, label_filter=""):
         try:
-            # 解析 JSON 数据（增强版）
+            print(f"开始提取，键名: {key}, 精确匹配: {precision_match}, label过滤: {label_filter}")
+            print(f"输入数据: {json_data[:200]}...")
+            
+            # 解析 JSON 数据（使用改进的解析方法）
             data = self.parse_json_data(json_data)
+            
+            if not data:
+                print("解析后的数据为空")
+                return ("",)
+            
+            # 解析label过滤条件
+            label_filters = self.parse_label_filters(label_filter)
+            print(f"Label过滤条件: {label_filters}")
             
             values = []
             
             # 判断是单个对象还是数组
             if isinstance(data, list):
-                # 数组形式：遍历每个对象
-                for item in data:
-                    value = self.find_key_in_object(item, key, precision_match)
-                    if value is not None:
-                        converted_value = self.auto_convert_value(value)
-                        values.append(converted_value)
+                print(f"处理数组，包含 {len(data)} 个元素")
+                # 数组形式：遍历每个对象，提取键值
+                for i, item in enumerate(data):
+                    print(f"处理第 {i+1} 个元素: {type(item)}")
+                    if isinstance(item, dict):
+                        # 如果有label过滤条件，先检查label是否匹配
+                        if label_filters:
+                            # 查找label字段（支持多种label键名）
+                            label_value = self.find_key_in_object(item, "label", "disabled")
+                            if not self.matches_label_filter(label_value, label_filters):
+                                print(f"第 {i+1} 个元素的label '{label_value}' 不匹配过滤条件，跳过")
+                                continue
+                            else:
+                                print(f"第 {i+1} 个元素的label '{label_value}' 匹配过滤条件")
+                        
+                        # 提取指定key的值
+                        value = self.find_key_in_object(item, key, precision_match)
+                        if value is not None:
+                            formatted_value = self.format_value_as_string(value)
+                            values.append(formatted_value)
+                            print(f"提取到值: {formatted_value}")
+                
+                # 数组格式：分行展示
+                if values:
+                    result = "\n".join(values)
+                    print(f"最终结果 (数组): {result}")
+                else:
+                    result = ""
+                    print("未找到任何匹配的值")
+                    
             elif isinstance(data, dict):
-                # 单个对象：直接提取
-                value = self.find_key_in_object(data, key, precision_match)
-                if value is not None:
-                    converted_value = self.auto_convert_value(value)
-                    values.append(converted_value)
+                print(f"处理单个对象，键: {list(data.keys())}")
+                
+                # 如果有label过滤条件，先检查label是否匹配
+                if label_filters:
+                    label_value = self.find_key_in_object(data, "label", "disabled")
+                    if not self.matches_label_filter(label_value, label_filters):
+                        print(f"对象的label '{label_value}' 不匹配过滤条件")
+                        result = ""
+                    else:
+                        print(f"对象的label '{label_value}' 匹配过滤条件")
+                        # 单个对象：直接提取
+                        value = self.find_key_in_object(data, key, precision_match)
+                        if value is not None:
+                            result = self.format_value_as_string(value)
+                            print(f"提取到值: {result}")
+                        else:
+                            result = ""
+                            print("未找到匹配的键")
+                else:
+                    # 没有label过滤，直接提取
+                    value = self.find_key_in_object(data, key, precision_match)
+                    if value is not None:
+                        result = self.format_value_as_string(value)
+                        print(f"提取到值: {result}")
+                    else:
+                        result = ""
+                        print("未找到匹配的键")
+            else:
+                print(f"不支持的数据类型: {type(data)}")
+                result = ""
             
-            # 如果没有找到任何值，返回空列表
-            if not values:
-                values = []
-            
-            return (values,)
+            return (result,)
             
         except Exception as e:
-            print(f"Error in text custom extract: {e}")
-            # 返回空列表
-            return ([],)
+            print(f"提取过程中发生错误: {e}")
+            import traceback
+            traceback.print_exc()
+            return ("",)
+
+
+class ListCustomInt:
+    """
+    自定义整数列表节点 - 生成整数类型的列表
+    支持连字符分割和多种分隔符
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "custom_text": ("STRING", {
+                    "default": "",
+                    "multiline": True,
+                    "placeholder": '-- splits override separator\nelse use "," ";" or newline.'
+                })
+            }
+        }
+    
+    RETURN_TYPES = ("INT", "INT")
+    RETURN_NAMES = ("int_list", "count")
+    OUTPUT_IS_LIST = (True, False)
+    CATEGORY = "1hewNodes/text"
+    FUNCTION = "list_custom_int"
+    
+    def parse_text_list(self, text):
+        """
+        解析文本列表，支持连字符分割和多种分隔符
+        当有只包含连字符的行时，只按 -- 进行分割，其他分割方式失效
+        否则按照逗号(,)、分号(;)、换行符(\n) 分割
+        """
+        if not text.strip():
+            return [0]
+        
+        # 检查是否有只包含连字符的行
+        lines = text.split('\n')
+        has_dash_separator = any(line.strip() and all(c == '-' for c in line.strip()) for line in lines)
+        
+        if has_dash_separator:
+            # 按连字符分割，其他分割方式失效（包括换行符）
+            sections = re.split(r'^\s*-+\s*$', text, flags=re.MULTILINE)
+            all_lists = []
+            
+            for section in sections:
+                section = section.strip()
+                if not section:
+                    continue
+                    
+                # 当有连字符分割时，每个段落作为一个完整项目，不进行任何其他分割
+                # 移除引号
+                if (section.startswith('"') and section.endswith('"')) or (section.startswith("'") and section.endswith("'")):
+                    section = section[1:-1]
+                if section:
+                    try:
+                        # 转换为整数，如果是浮点数则取整
+                        if '.' in section:
+                            int_val = int(float(section))
+                        else:
+                            int_val = int(section)
+                        all_lists.append(int_val)
+                    except (ValueError, TypeError):
+                        # 无法转换为整数，跳过
+                        continue
+            
+            return all_lists if all_lists else [0]
+        else:
+            # 按传统方式分割
+            return self._parse_section(text)
+    
+    def _parse_section(self, text):
+        """
+        解析单个文本段落并转换为整数，支持中英文逗号和分号
+        """
+        if not text.strip():
+            return []
+        
+        lines = text.split('\n')
+        int_list = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # 处理中英文逗号和分号分隔的项目
+            if ',' in line or ';' in line or '，' in line or '；' in line:
+                # 统一替换为英文逗号
+                line = line.replace(';', ',').replace('，', ',').replace('；', ',')
+                items = line.split(',')
+                for item in items:
+                    item = item.strip()
+                    # 移除引号
+                    if (item.startswith('"') and item.endswith('"')) or (item.startswith("'") and item.endswith("'")):
+                        item = item[1:-1]
+                    if item:
+                        try:
+                            # 转换为整数，如果是浮点数则取整
+                            if '.' in item:
+                                int_val = int(float(item))
+                            else:
+                                int_val = int(item)
+                            int_list.append(int_val)
+                        except (ValueError, TypeError):
+                            # 无法转换为整数，跳过
+                            continue
+            else:
+                # 单个项目，移除引号
+                if (line.startswith('"') and line.endswith('"')) or (line.startswith("'") and line.endswith("'")):
+                    line = line[1:-1]
+                if line:
+                    try:
+                        # 转换为整数，如果是浮点数则取整
+                        if '.' in line:
+                            int_val = int(float(line))
+                        else:
+                            int_val = int(line)
+                        int_list.append(int_val)
+                    except (ValueError, TypeError):
+                        # 无法转换为整数，跳过
+                        continue
+        
+        return int_list if int_list else [0]
+    
+    def list_custom_int(self, custom_text):
+        """
+        生成整数类型的自定义列表
+        """
+        int_list = self.parse_text_list(custom_text)
+        return (int_list, len(int_list))
+
+
+class ListCustomFloat:
+    """
+    自定义浮点数列表节点 - 生成浮点数类型的列表
+    支持连字符分割和多种分隔符
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "custom_text": ("STRING", {
+                    "default": "",
+                    "multiline": True,
+                    "placeholder": '-- splits override separator\nelse use "," ";" or newline.'
+                })
+            }
+        }
+    
+    RETURN_TYPES = ("FLOAT", "INT")
+    RETURN_NAMES = ("float_list", "count")
+    OUTPUT_IS_LIST = (True, False)
+    CATEGORY = "1hewNodes/text"
+    FUNCTION = "list_custom_float"
+    
+    def parse_text_list(self, text):
+        """
+        解析文本列表，支持连字符分割和多种分隔符
+        当有只包含连字符的行时，只按 -- 进行分割，其他分割方式失效
+        否则按照逗号(,)、分号(;)、换行符(\n) 分割
+        """
+        if not text.strip():
+            return [0.0]
+        
+        # 检查是否有只包含连字符的行
+        lines = text.split('\n')
+        has_dash_separator = any(line.strip() and all(c == '-' for c in line.strip()) for line in lines)
+        
+        if has_dash_separator:
+            # 按连字符分割，其他分割方式失效（包括换行符）
+            sections = re.split(r'^\s*-+\s*$', text, flags=re.MULTILINE)
+            all_lists = []
+            
+            for section in sections:
+                section = section.strip()
+                if not section:
+                    continue
+                    
+                # 当有连字符分割时，每个段落作为一个完整项目，不进行任何其他分割
+                # 移除引号
+                if (section.startswith('"') and section.endswith('"')) or (section.startswith("'") and section.endswith("'")):
+                    section = section[1:-1]
+                if section:
+                    try:
+                        float_val = float(section)
+                        all_lists.append(float_val)
+                    except (ValueError, TypeError):
+                        # 无法转换为浮点数，跳过
+                        continue
+            
+            return all_lists if all_lists else [0.0]
+        else:
+            # 按传统方式分割
+            return self._parse_section(text)
+    
+    def _parse_section(self, text):
+        """
+        解析单个文本段落并转换为浮点数，支持中英文逗号和分号
+        """
+        if not text.strip():
+            return []
+        
+        lines = text.split('\n')
+        float_list = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # 处理中英文逗号和分号分隔的项目
+            if ',' in line or ';' in line or '，' in line or '；' in line:
+                # 统一替换为英文逗号
+                line = line.replace(';', ',').replace('，', ',').replace('；', ',')
+                items = line.split(',')
+                for item in items:
+                    item = item.strip()
+                    # 移除引号
+                    if (item.startswith('"') and item.endswith('"')) or (item.startswith("'") and item.endswith("'")):
+                        item = item[1:-1]
+                    if item:
+                        try:
+                            float_val = float(item)
+                            float_list.append(float_val)
+                        except (ValueError, TypeError):
+                            # 无法转换为浮点数，跳过
+                            continue
+            else:
+                # 单个项目，移除引号
+                if (line.startswith('"') and line.endswith('"')) or (line.startswith("'") and line.endswith("'")):
+                    line = line[1:-1]
+                if line:
+                    try:
+                        float_val = float(line)
+                        float_list.append(float_val)
+                    except (ValueError, TypeError):
+                        # 无法转换为浮点数，跳过
+                        continue
+        
+        return float_list if float_list else [0.0]
+    
+    def list_custom_float(self, custom_text):
+        """
+        生成浮点数类型的自定义列表
+        """
+        float_list = self.parse_text_list(custom_text)
+        return (float_list, len(float_list))
+
+
+class ListCustomString:
+    """
+    自定义字符串列表节点 - 生成字符串类型的列表
+    支持连字符分割和多种分隔符
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "custom_text": ("STRING", {
+                    "default": "",
+                    "multiline": True,
+                    "placeholder": '-- splits override separator\nelse use "," ";" or newline.'
+                })
+            }
+        }
+    
+    RETURN_TYPES = ("STRING", "INT")
+    RETURN_NAMES = ("string_list", "count")
+    OUTPUT_IS_LIST = (True, False)
+    CATEGORY = "1hewNodes/text"
+    FUNCTION = "list_custom_string"
+    
+    def parse_text_list(self, text):
+        """
+        解析文本列表，支持连字符分割和多种分隔符
+        当有只包含连字符的行时，只按 -- 进行分割，其他分割方式失效
+        否则按照逗号(,)、分号(;)、换行符(\n) 分割
+        """
+        if not text.strip():
+            return ["default"]
+        
+        # 检查是否有只包含连字符的行
+        lines = text.split('\n')
+        has_dash_separator = any(line.strip() and all(c == '-' for c in line.strip()) for line in lines)
+        
+        if has_dash_separator:
+            # 按连字符分割，其他分割方式失效（包括换行符）
+            sections = re.split(r'^\s*-+\s*$', text, flags=re.MULTILINE)
+            all_lists = []
+            
+            for section in sections:
+                section = section.strip()
+                if not section:
+                    continue
+                    
+                # 当有连字符分割时，每个段落作为一个完整项目，不进行任何其他分割
+                # 移除引号
+                if (section.startswith('"') and section.endswith('"')) or (section.startswith("'") and section.endswith("'")):
+                    section = section[1:-1]
+                if section:
+                    all_lists.append(str(section))
+            
+            return all_lists if all_lists else ["default"]
+        else:
+            # 按传统方式分割（逗号、分号、换行符）
+            return self._parse_section(text)
+    
+    def _parse_section(self, text):
+        """
+        解析单个文本段落，支持中英文逗号和分号
+        """
+        if not text.strip():
+            return []
+        
+        lines = text.split('\n')
+        text_list = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # 处理中英文逗号和分号分隔的项目
+            if ',' in line or ';' in line or '，' in line or '；' in line:
+                # 统一替换为英文逗号
+                line = line.replace(';', ',').replace('，', ',').replace('；', ',')
+                items = line.split(',')
+                for item in items:
+                    item = item.strip()
+                    # 移除引号
+                    if (item.startswith('"') and item.endswith('"')) or (item.startswith("'") and item.endswith("'")):
+                        item = item[1:-1]
+                    if item:
+                        text_list.append(str(item))
+            else:
+                # 单个项目，移除引号
+                if (line.startswith('"') and line.endswith('"')) or (line.startswith("'") and line.endswith("'")):
+                    line = line[1:-1]
+                if line:
+                    text_list.append(str(line))
+        
+        return text_list if text_list else ["default"]
+    
+    def list_custom_string(self, custom_text):
+        """
+        生成字符串类型的自定义列表
+        """
+        text_list = self.parse_text_list(custom_text)
+        # 确保所有项目都是字符串类型
+        string_list = [str(item) for item in text_list]
+        return (string_list, len(string_list))
 
 
 # 节点映射
 NODE_CLASS_MAPPINGS = {
-    "TextCustomList": TextCustomList,
     "TextCustomExtract": TextCustomExtract,
+    "ListCustomInt": ListCustomInt,
+    "ListCustomFloat": ListCustomFloat,
+    "ListCustomString": ListCustomString,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "TextCustomList": "Text Custom List",
     "TextCustomExtract": "Text Custom Extract",
+    "ListCustomInt": "List Custom Int", 
+    "ListCustomFloat": "List Custom Float",
+    "ListCustomString": "List Custom String",
 }

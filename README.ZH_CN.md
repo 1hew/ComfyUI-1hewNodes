@@ -21,11 +21,19 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
-**v1.1.6**
+**v1.2.0**
+
+- feat: 新增 `conversion` ，重构图像混合与遮罩处理
+
+<details>
+<summary><b>v1.1.6</b></summary>
 
 - feat(ImageEditStitch): 添加 spacing 参数控制拼接图像间的间距
 
-**v1.1.5**
+​	</details>
+
+<details>
+<summary><b>v1.1.5</b></summary>
 
 - feat: 新增文本处理和逻辑节点，优化现有节点功能
 - refactor(util): 重构工具节点，重命名节点 `RangeMapping` 和 `PathBuild`
@@ -33,19 +41,30 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(text): 新增 `TextCustomList` 和 `TextCustomExtract` 文本处理节点
 - style: 清理节点参数标签，保持简洁统一
 
-**v1.1.2**
+​	</details>
+
+<details>
+<summary><b>v1.1.2</b></summary>
 
 - feat(image_tile): 改进 `Image Tile Merge`算法，使用权重蒙版和余弦渐变实现完美无缝拼接
 
-**v1.1.1**
+​	</details>
+
+<details>
+<summary><b>v1.1.1</b></summary>
 
 - feat(image_crop): 为 `Image BBox Paste` 添加智能批次处理功能
 
-**v1.1.0**
+​	</details>
+
+<details>
+<summary><b>v1.1.0</b></summary>
 
 - build: 添加 tile 新节点
 - feat: 更新节点功能
 - docs: 添加中英文文档，完善节点说明
+
+​	</details>
 
 <details>
 <summary><b>v1.0.5</b></summary>
@@ -79,17 +98,17 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Image Luma Matte | 基于亮度的图像蒙版合成 |
-| Image Blend Modes By Alpha | 基于透明度的图像混合，支持多种Photoshop风格混合模式 |
-| Image Blend Modes By CSS | CSS标准混合模式，基于Pilgram库实现 |
+| Image Blend Modes by Alpha | 基于透明度的图像混合，支持多种Photoshop风格混合模式 |
+| Image Blend Modes by CSS | CSS标准混合模式，基于Pilgram库实现 |
 
 ### ✂️ 图像裁剪节点
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Image Crop Square | 方形裁剪，支持遮罩引导和缩放 |
 | Image Crop Edge | 边缘裁剪，支持四边独立设置 |
-| Image Crop With BBox | 基于边界框的智能裁剪 |
-| Image BBox Crop | 批量边界框裁剪 |
-| Image BBox Paste | 裁剪图像回贴，支持多种混合模式 |
+| Image Crop With BBox Mask| 基于边界框的智能裁剪，支持宽高比控制 |
+| Image BBox Mask Crop | 批量边界框裁剪，支持多种输出模式 |
+| Image BBox Mask Paste | 裁剪图像回贴，支持多种混合模式 |
 
 ### 🧩 图像分块节点
 | 节点名称 | 功能描述 |
@@ -102,13 +121,22 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Mask Math Ops | 遮罩数学运算（交集、并集、差集、异或） |
 | Mask Batch Math Ops | 批量遮罩数学运算 |
-| Mask BBox Crop | 遮罩边界框裁剪 |
+| Mask BBox Mask Crop | 基于蒙版区域的遮罩边界框裁剪 |
 
 ### 🔧 工具节点
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Range Mapping | 数值范围映射工具，支持滑块值的线性变换和精度控制 |
 | Path Build | 路径构建器，支持预设路径和自定义扩展 |
+
+### 🔄 转换节点
+| 节点名称 | 功能描述 |
+|---------|----------|
+| String Coordinate to BBoxes | 将字符串格式坐标转换为BBOXES格式，支持多种输入格式 |
+| Image Batch to List | 将批量图像转换为图像列表，用于单独处理 |
+| Image List to Batch | 将图像列表转换为批量图像，自动进行尺寸标准化 |
+| Mask Batch to List | 将批量遮罩转换为遮罩列表，用于单独处理 |
+| Mask List to Batch | 将遮罩列表转换为批量遮罩，自动进行尺寸标准化 |
 
 ### 🧠 逻辑节点
 | 节点名称 | 功能描述 |
@@ -118,8 +146,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📝 文本处理节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Text Custom List | 文本自定义列表生成器，支持多种分隔符和数据类型 |
 | Text Custom Extract | 文本自定义提取器，从JSON中提取指定键值 |
+| List Custom Int | 自定义整数列表生成器，支持连字符分割和多种分隔符 |
+| List Custom Float | 自定义浮点数列表生成器，支持连字符分割和多种分隔符 |
+| List Custom String | 自定义字符串列表生成器，支持连字符分割和多种分隔符 |
 
 
 

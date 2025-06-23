@@ -1,6 +1,6 @@
 # Text Custom Extract
 
-**Node Function:** The `Text Custom Extract` node extracts values of specified keys from JSON objects or arrays, supporting both precise matching and enhanced matching modes, ideal for data extraction and processing scenarios.
+**Node Function:** The `Text Custom Extract` node extracts values of specified keys from JSON objects or arrays, supporting both precise matching and enhanced matching modes, with label filtering capabilities, ideal for data extraction and processing scenarios.
 
 ## Inputs
 
@@ -9,14 +9,21 @@
 | `json_data` | - | STRING | "" | Multiline text | JSON object or array data |
 | `key` | - | STRING | "zh" | Text | Key name to extract |
 | `precision_match` | - | COMBO[STRING] | disabled | disabled, enabled | Precision matching mode switch |
+| `label_filter` | Optional | STRING | "" | Text | Filter by label values (comma separated, supports partial match) |
 
 ## Outputs
 
 | Output Name | Data Type | Description |
 |-------------|-----------|-------------|
-| `value` | * | Extracted value list |
+| `string` | STRING | Extracted value string |
 
 ## Function Description
+
+### Label Filtering
+- **Filter support**: Filter objects by label values before extracting specified keys
+- **Multiple filters**: Support comma-separated multiple filter conditions
+- **Partial matching**: Support partial string matching for flexible filtering
+- **Chinese/English separators**: Support both Chinese (，) and English (,) comma separators
 
 ### Matching Modes
 - **Precise matching (enabled)**: Only matches exactly identical key names
@@ -31,15 +38,3 @@
   - Coordinates: x/X, y/Y, pos_x, position_x
   - Dimensions: width/w, height/h
   - Identifiers: id/ID, name/NAME
-
-### JSON Parsing Capabilities
-- **Standard JSON**: Supports standard JSON format parsing
-- **Key-value format**: Supports simplified key-value pair text
-- **Array processing**: Automatically traverses each object in JSON arrays
-- **Error-tolerant parsing**: Uses regular expressions for error-tolerant processing
-
-### Use Cases
-- **Configuration extraction**: Extract specific parameters from configuration files
-- **Data parsing**: Process JSON data returned by APIs
-- **Multilingual support**: Extract multilingual text content
-- **Coordinate extraction**: Extract coordinate information from position data

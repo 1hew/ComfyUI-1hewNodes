@@ -143,9 +143,9 @@ class MaskBatchMathOps:
         return (output_tensor,)
 
 
-class MaskBBoxCrop:
+class MaskBBoxMaskCrop:
     """
-    遮罩检测框裁剪 - 根据边界框信息批量裁剪遮罩
+    遮罩检测框裁剪 - 根据边界框遮罩信息批量裁剪遮罩
     """
 
     @classmethod
@@ -153,52 +153,55 @@ class MaskBBoxCrop:
         return {
             "required": {
                 "mask": ("MASK",),
-                "bbox_meta": ("DICT",),
+                "bbox_mask": ("MASK",),
             }
         }
 
     RETURN_TYPES = ("MASK",)
     RETURN_NAMES = ("cropped_mask",)
-    FUNCTION = "mask_bbox_crop"
+    FUNCTION = "mask_bbox_mask_crop"
     CATEGORY = "1hewNodes/mask"
 
-    def mask_bbox_crop(self, mask, bbox_meta):
+    def mask_bbox_mask_crop(self, mask, bbox_mask):
         # 确保mask是3D张量 [batch, height, width]
         if mask.dim() == 2:
             mask = mask.unsqueeze(0)
+        if bbox_mask.dim() == 2:
+            bbox_mask = bbox_mask.unsqueeze(0)
             
         # 获取遮罩尺寸
-        batch_size, height, width = mask.shape
+        batch_size = mask.shape[0]
+        bbox_batch_size = bbox_mask.shape[0]
 
         # 创建输出遮罩列表
         output_masks = []
         
-        # 处理 bbox_meta 格式
-        if isinstance(bbox_meta, dict):
-            if "batch_size" in bbox_meta and "bboxes" in bbox_meta:
-                # 多图像格式
-                bboxes_list = bbox_meta["bboxes"]
-            else:
-                # 单图像格式，转换为列表
-                bboxes_list = [bbox_meta]
-        else:
-            raise ValueError("bbox_meta must be a dictionary")
-
         for b in range(batch_size):
+            # 获取当前批次对应的边界框遮罩
+            bbox_idx = b % bbox_batch_size
+            current_bbox_mask = bbox_mask[bbox_idx]
+            current_mask = mask[b]
+            
             # 将遮罩转换为PIL格式
             if mask.is_cuda:
-                mask_np = (mask[b].cpu().numpy() * 255).astype(np.uint8)
+                mask_np = (current_mask.cpu().numpy() * 255).astype(np.uint8)
+                bbox_np = (current_bbox_mask.cpu().numpy() * 255).astype(np.uint8)
             else:
-                mask_np = (mask[b].numpy() * 255).astype(np.uint8)
+                mask_np = (current_mask.numpy() * 255).astype(np.uint8)
+                bbox_np = (current_bbox_mask.numpy() * 255).astype(np.uint8)
 
             mask_pil = Image.fromarray(mask_np).convert("L")
-
-            # 获取当前批次对应的边界框
-            bbox_dict = bboxes_list[b % len(bboxes_list)]
-            x_min = bbox_dict["x_min"]
-            y_min = bbox_dict["y_min"]
-            x_max = bbox_dict["x_max"]
-            y_max = bbox_dict["y_max"]
+            bbox_pil = Image.fromarray(bbox_np).convert("L")
+            
+            # 从bbox_mask中获取边界框坐标
+            bbox = self.get_bbox_from_mask(bbox_pil)
+            
+            if bbox is None:
+                # 如果没有找到有效区域，返回原始遮罩
+                output_masks.append(current_mask)
+                continue
+            
+            x_min, y_min, x_max, y_max = bbox
             
             # 确保边界框不超出图像范围
             x_min = max(0, x_min)
@@ -215,23 +218,61 @@ class MaskBBoxCrop:
 
         # 合并批次
         if output_masks:
-            output_mask_tensor = torch.stack(output_masks)
+            # 检查所有遮罩是否具有相同尺寸
+            sizes = [mask.shape for mask in output_masks]
+            if len(set(sizes)) == 1:
+                output_mask_tensor = torch.stack(output_masks)
+            else:
+                # 如果尺寸不同，填充到相同尺寸
+                output_masks = self.pad_to_same_size(output_masks)
+                output_mask_tensor = torch.stack(output_masks)
             return (output_mask_tensor,)
         else:
             # 如果没有有效的输出遮罩，返回原始遮罩
             return (mask,)
+    
+    def get_bbox_from_mask(self, mask_pil):
+        """从遮罩中获取边界框"""
+        mask_np = np.array(mask_pil)
+        rows = np.any(mask_np > 10, axis=1)
+        cols = np.any(mask_np > 10, axis=0)
+
+        if not np.any(rows) or not np.any(cols):
+            return None
+
+        y_min, y_max = np.where(rows)[0][[0, -1]]
+        x_min, x_max = np.where(cols)[0][[0, -1]]
+
+        return (x_min, y_min, x_max + 1, y_max + 1)
+    
+    def pad_to_same_size(self, masks):
+        """将所有遮罩填充到相同尺寸"""
+        max_height = max(mask.shape[0] for mask in masks)
+        max_width = max(mask.shape[1] for mask in masks)
+        
+        padded_masks = []
+        
+        for mask in masks:
+            h, w = mask.shape
+            pad_h = max_height - h
+            pad_w = max_width - w
+            
+            padded_mask = torch.nn.functional.pad(mask, (0, pad_w, 0, pad_h), value=0)
+            padded_masks.append(padded_mask)
+        
+        return padded_masks
 
 
 # 注册节点
 NODE_CLASS_MAPPINGS = {
     "MaskMathOps": MaskMathOps,
     "MaskBatchMathOps": MaskBatchMathOps,
-    "MaskBBoxCrop": MaskBBoxCrop,
+    "MaskBBoxMaskCrop": MaskBBoxMaskCrop,
 }
 
 # 节点显示名称
 NODE_DISPLAY_NAME_MAPPINGS = {
     "MaskMathOps": "Mask Math Ops",
     "MaskBatchMathOps": "Mask Batch Math Ops",
-    "MaskBBoxCrop": "Mask BBox Crop",
+    "MaskBBoxMaskCrop": "Mask BBox Mask Crop",
 }

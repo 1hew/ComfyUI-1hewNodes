@@ -1,27 +1,27 @@
 # Image Luma Matte
 
-**Node Function:** The `Image Luma Matte` node is used to create luma matte effects based on masks, supporting mask inversion, background addition, and multiple background color options, commonly used for image compositing and cutout processing.
+**Node Function:** The `Image Luma Matte` node creates luminance-based composites by applying masks to images, supporting batch processing with customizable background options.
 
 ## Inputs
 
-| Parameter Name | Input Selection | Data Type | Default Value | Value Range | Description |
-| -------------- | --------------- | --------- | ------------- | ----------- | ----------- |
-| `images` | Required | IMAGE | - | - | Input image batch |
-| `mask` | Required | MASK | - | - | Mask for matting |
-| `invert_mask` | Optional | BOOLEAN | False | True/False | Whether to invert mask |
-| `add_background` | Optional | BOOLEAN | True | True/False | Whether to add background |
-| `background_color` | Optional | STRING | 1.0 | Grayscale/HEX/RGB/average | Background color, supports multiple formats or "average" for automatic calculation |
+| Parameter | Required | Data Type | Default | Range | Description |
+| --------- | -------- | --------- | ------- | ----- | ----------- |
+| `image` | Required | IMAGE | - | - | Input image to process |
+| `mask` | Required | MASK | - | - | Mask defining the matte area |
+| `invert_mask` | - | BOOLEAN | False | True/False | Whether to invert the mask |
+| `add_background` | - | BOOLEAN | True | True/False | Whether to add background or create transparent output |
+| `background_color` | - | STRING | "1.0" | Color values | Background color: grayscale (0.0-1.0), RGB ("r,g,b"), hex ("#RRGGBB"), or "average" for mask area average color |
 
 ## Outputs
 
 | Output Name | Data Type | Description |
 |-------------|-----------|-------------|
-| `image` | IMAGE | Image after matte application |
+| `image` | IMAGE | Processed image with luma matte applied |
 
-## Function Description
+## Features
 
-### Application Scenarios
-- **Portrait cutout**: Background replacement based on portrait segmentation masks
-- **Object extraction**: Extract specific objects and add new backgrounds
-- **Image compositing**: Prepare matte materials for image compositing
-- **Batch processing**: Batch process matte effects for multiple images
+### Background Options
+- **Solid Colors**: Support for grayscale, RGB, and hex color formats
+- **Average Color**: Automatically calculate average color from masked area
+- **Transparent Output**: Create RGBA output when background is disabled
+- **Flexible Input**: Multiple color format support for easy use

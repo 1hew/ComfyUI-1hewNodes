@@ -1,35 +1,37 @@
 # Image Crop Edge
 
-**Node Function:** The `Image Crop Edge` node is used to crop edge areas of images, supporting separate settings for four-side crop amounts or uniform cropping, and ensuring output dimensions meet divisibility constraints.
+Crop image edges - supports cropping all four sides simultaneously or setting individual crop amounts for each side.
 
-## Inputs
+## Parameters
 
-| Parameter Name | Input Selection | Data Type | Default Value | Value Range | Description |
-| -------------- | --------------- | --------- | ------------- | ----------- | ----------- |
-| `image` | Required | IMAGE | - | - | Input image |
-| `left_amount` | - | FLOAT | 0 | 0.0-8192 | Left crop amount, ≤1 for ratio, >1 for pixels |
-| `right_amount` | - | FLOAT | 0 | 0.0-8192 | Right crop amount, ≤1 for ratio, >1 for pixels |
-| `top_amount` | - | FLOAT | 0 | 0.0-8192 | Top crop amount, ≤1 for ratio, >1 for pixels |
-| `bottom_amount` | - | FLOAT | 0 | 0.0-8192 | Bottom crop amount, ≤1 for ratio, >1 for pixels |
-| `uniform_amount` | - | FLOAT | 0 | 0.0-8192 | Uniform crop amount for all sides, higher priority than individual side settings |
-| `divisible_by` | - | INT | 8 | 1-1024 | Divisibility number, ensures output dimensions are divisible by specified number |
+- **image**: Input image
+- **left_amount**: Left crop amount (0-1 for percentage, >=1 for pixels)
+- **right_amount**: Right crop amount (0-1 for percentage, >=1 for pixels)
+- **top_amount**: Top crop amount (0-1 for percentage, >=1 for pixels)
+- **bottom_amount**: Bottom crop amount (0-1 for percentage, >=1 for pixels)
+- **uniform_amount**: Uniform crop amount for all sides (overrides individual settings when > 0)
+- **divisible_by**: Ensure output dimensions are divisible by this value (default: 8)
 
-## Outputs
+## Features
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `image` | IMAGE | Cropped image |
+- **Flexible Input**: Supports both percentage (0-1) and pixel (>=1) values
+- **Uniform Cropping**: Use uniform_amount to crop all sides equally
+- **Individual Control**: Set different crop amounts for each side
+- **Dimension Alignment**: Automatically adjusts to ensure output dimensions are divisible by specified value
+- **Batch Processing**: Supports batch image processing
 
-## Function Description
+## Usage
 
-### Flexible Cropping
-- **Individual Side Control**: Can separately set crop amounts for left, right, top, and bottom sides
-- **Uniform Cropping**: uniform_amount setting overrides all individual side settings
-- **Dual Mode**: Supports ratio mode (0-1) and pixel mode (≥1)
-- **Priority Handling**: Uniform cropping has the highest priority
+1. Connect your image to the input
+2. Set crop amounts using either:
+   - **uniform_amount** for equal cropping on all sides
+   - Individual **left_amount**, **right_amount**, **top_amount**, **bottom_amount** for precise control
+3. Adjust **divisible_by** if you need specific dimension requirements
+4. The node will output the cropped image
 
-### Application Scenarios
-- **Image Preprocessing**: Prepare input dimensions that meet AI model requirements
-- **Border Removal**: Remove unwanted areas around images
-- **Size Standardization**: Crop different sized images to standard dimensions
-- **Batch Processing**: Uniformly process edge areas of multiple images
+## Notes
+
+- When **uniform_amount** > 0, it overrides individual side settings
+- Values between 0-1 are treated as percentages of the image dimension
+- Values >= 1 are treated as pixel amounts
+- Output dimensions are automatically adjusted to be divisible by the specified value
