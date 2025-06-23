@@ -21,11 +21,19 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
-**v1.1.6**
+**v1.2.0**
 
-- feat(ImageEditStitch): Add a “spacing” parameter to control the distance between stitched images.
+- feat: Added `conversion`, and restructured image mixing and masking processing
 
-**v1.1.5**
+<details>
+<summary><b>v1.1.6</b></summary>
+
+- feat(ImageEditStitch): Add a “spacing” parameter to control the distance between stitched images
+
+​	</details>
+
+<details>
+<summary><b>v1.1.5</b></summary>
 
 - feat: Added text processing and logic nodes, optimized existing node functions 
 - refactor(util): Refactored utility nodes, renamed nodes `RangeMapping` and `PathBuild` 
@@ -33,19 +41,30 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(text): Added `TextCustomList` and `TextCustomExtract` text processing nodes
 - style: Cleaned up node parameter labels to maintain simplicity and consistency
 
-**v1.1.2**
+​	</details>
 
-- feat(image_tile): Improved the `Image Tile Merge` algorithm, using weight masks and cosine gradients to achieve perfect seamless stitching.
+<details>
+<summary><b>v1.1.2</b></summary>
 
-**v1.1.1**
+- feat(image_tile): Improved the `Image Tile Merge` algorithm, using weight masks and cosine gradients to achieve perfect seamless stitching
+
+​	</details>
+
+<details>
+<summary><b>v1.1.1</b></summary>
 
 - feat (image_crop): Added intelligent batch processing for `Image BBox Paste`
 
-**v1.1.0**
+​	</details>
+
+<details>
+<summary><b>v1.1.0</b></summary>
 
 - build: Add new tile nodes
 - feat: Update node functionality
 - docs: Add bilingual documentation, improve node descriptions
+
+​	</details>
 
 <details>
 <summary><b>v1.0.5</b></summary>
@@ -79,17 +98,17 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|-------------|
 | Image Luma Matte | Luminance-based image mask compositing |
-| Image Blend Modes By Alpha | Alpha-based image blending with multiple Photoshop-style blend modes |
-| Image Blend Modes By CSS | CSS standard blend modes based on Pilgram library |
+| Image Blend Modes by Alpha | Alpha-based image blending with multiple Photoshop-style blend modes |
+| Image Blend Modes by CSS | CSS standard blend modes based on Pilgram library |
 
 ### ✂️ Image Cropping Nodes
 | Node Name | Description |
 |-----------|-------------|
 | Image Crop Square | Square cropping with mask guidance and scaling support |
 | Image Crop Edge | Edge cropping with independent settings for four sides |
-| Image Crop With BBox | Smart cropping based on bounding boxes |
-| Image BBox Crop | Batch bounding box cropping |
-| Image BBox Paste | Paste cropped images back with multiple blend modes |
+| Image Crop With BBox Mask | Smart cropping based on bounding boxes with aspect ratio control |
+| Image BBox Mask Crop | Batch bounding box cropping with multiple output modes |
+| Image BBox Mask Paste | Paste cropped images back with multiple blend modes |
 
 ### 🧩 Image Tiling Nodes
 | Node Name | Description |
@@ -102,13 +121,22 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Mask Math Ops | Mask mathematical operations (intersection, union, difference, XOR) |
 | Mask Batch Math Ops | Batch mask mathematical operations |
-| Mask BBox Crop | Mask bounding box cropping |
+| Mask BBox Mask Crop | Mask bounding box cropping based on mask regions |
 
 ### 🔧 Utility Nodes
 | Node Name | Description |
 |-----------|-------------|
 | Range Mapping | Value range mapping tool supporting linear transformation and precision control for slider values |
 | Path Build | Path builder supporting preset paths and custom extensions |
+
+### 🔄 Conversion Nodes
+| Node Name | Description |
+|-----------|-------------|
+| String Coordinate to BBoxes | Convert string format coordinates to BBOXES format with multiple input format support |
+| Image Batch to List | Convert batch images to image lists for individual processing |
+| Image List to Batch | Convert image lists to batch images with automatic size normalization |
+| Mask Batch to List | Convert batch masks to mask lists for individual processing |
+| Mask List to Batch | Convert mask lists to batch masks with automatic size normalization |
 
 ### 🧠 Logic Nodes
 | Node Name | Description |
@@ -118,8 +146,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📝 Text Processing Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Text Custom List | Text custom list generator supporting multiple separators and data types |
 | Text Custom Extract | Text custom extractor for extracting specified key values from JSON |
+| List Custom Int | Custom integer list generator with dash separator and multiple delimiter support |
+| List Custom Float | Custom float list generator with dash separator and multiple delimiter support |
+| List Custom String | Custom string list generator with dash separator and multiple delimiter support |
 
 
 
