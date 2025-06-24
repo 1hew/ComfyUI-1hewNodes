@@ -1,6 +1,6 @@
-# Mask BBox Mask Crop
+# Mask Crop by BBox Mask
 
-**节点功能：** `Mask BBox Mask Crop` 节点根据边界框蒙版信息批量裁剪蒙版，支持多图像处理和精确的区域提取功能。
+**节点功能：** `Mask Crop by BBox Mask` 节点根据边界框蒙版信息批量裁剪蒙版，支持多图像处理和精确的区域提取功能。
 
 ## 输入
 

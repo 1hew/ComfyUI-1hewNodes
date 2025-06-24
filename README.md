@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.1**
+
+- refactor(image/crop): Renamed node classes and updated related documentation
+
 **v1.2.0**
 
 - feat: Added `conversion`, and restructured image mixing and masking processing
@@ -106,9 +110,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Image Crop Square | Square cropping with mask guidance and scaling support |
 | Image Crop Edge | Edge cropping with independent settings for four sides |
-| Image Crop With BBox Mask | Smart cropping based on bounding boxes with aspect ratio control |
-| Image BBox Mask Crop | Batch bounding box cropping with multiple output modes |
-| Image BBox Mask Paste | Paste cropped images back with multiple blend modes |
+| Image Crop with BBox Mask | Smart cropping based on bounding boxes with aspect ratio control |
+| Image Crop by Mask Alpha | Batch mask-based cropping with alpha channel support |
+| Image Paste by BBox Mask | Paste cropped images back with multiple blend modes |
 
 ### 🧩 Image Tiling Nodes
 | Node Name | Description |
@@ -121,7 +125,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Mask Math Ops | Mask mathematical operations (intersection, union, difference, XOR) |
 | Mask Batch Math Ops | Batch mask mathematical operations |
-| Mask BBox Mask Crop | Mask bounding box cropping based on mask regions |
+| Mask Crop by BBox Mask | Mask bounding box cropping based on mask regions |
 
 ### 🔧 Utility Nodes
 | Node Name | Description |
@@ -132,11 +136,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🔄 Conversion Nodes
 | Node Name | Description |
 |-----------|-------------|
-| String Coordinate to BBoxes | Convert string format coordinates to BBOXES format with multiple input format support |
 | Image Batch to List | Convert batch images to image lists for individual processing |
 | Image List to Batch | Convert image lists to batch images with automatic size normalization |
 | Mask Batch to List | Convert batch masks to mask lists for individual processing |
 | Mask List to Batch | Convert mask lists to batch masks with automatic size normalization |
+| String Coordinate to BBoxes | Convert string format coordinates to BBOXES format with multiple input format support |
+| String Coordinate to BBox Mask | Convert string format coordinates to BBoxMask format with image dimension support and flexible output modes |
 
 ### 🧠 Logic Nodes
 | Node Name | Description |

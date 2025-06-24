@@ -834,7 +834,7 @@ class ImageCropWithBBoxMask:
         return padded_images, padded_masks
 
 
-class ImageBBoxMaskCrop:
+class ImageCropByMaskAlpha:
     """
     图像遮罩裁剪 - 根据边界框遮罩信息批量裁剪图像
     支持两种输出模式：完整区域或仅白色区域（带alpha通道）
@@ -852,24 +852,27 @@ class ImageBBoxMaskCrop:
 
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("cropped_image",)
-    FUNCTION = "image_bbox_mask_crop"
+    FUNCTION = "image_crop_by_mask_alpha"
     CATEGORY = "1hewNodes/image/crop"
 
-    def image_bbox_mask_crop(self, image, mask, output_mode="bbox_rgb"):
+    def image_crop_by_mask_alpha(self, image, mask, output_mode="bbox_rgb"):
         batch_size, height, width, channels = image.shape
         mask_batch_size = mask.shape[0]
         
+        # 修改：使用最大批次数进行循环
+        max_batch = max(batch_size, mask_batch_size)
         output_images = []
         
-        for b in range(batch_size):
-            # 获取对应的遮罩
+        for b in range(max_batch):
+            # 获取对应的图像和遮罩索引
+            img_idx = b % batch_size
             mask_idx = b % mask_batch_size
             
             if image.is_cuda:
-                img_np = (image[b].cpu().numpy() * 255).astype(np.uint8)
+                img_np = (image[img_idx].cpu().numpy() * 255).astype(np.uint8)
                 mask_np = (mask[mask_idx].cpu().numpy() * 255).astype(np.uint8)
             else:
-                img_np = (image[b].numpy() * 255).astype(np.uint8)
+                img_np = (image[img_idx].numpy() * 255).astype(np.uint8)
                 mask_np = (mask[mask_idx].numpy() * 255).astype(np.uint8)
             
             img_pil = Image.fromarray(img_np)
@@ -971,7 +974,7 @@ class ImageBBoxMaskCrop:
         return padded_images
 
 
-class ImageBBoxMaskPaste:
+class ImagePasteByBBoxMask:
     """
     图像遮罩粘贴器 - 将处理后的裁剪图像根据边界框遮罩粘贴回原始图像的位置
     """
@@ -996,10 +999,10 @@ class ImageBBoxMaskPaste:
 
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
-    FUNCTION = "image_bbox_mask_paste"
+    FUNCTION = "image_paste_by_bbox_mask"
     CATEGORY = "1hewNodes/image/crop"
 
-    def image_bbox_mask_paste(self, base_image, cropped_image, bbox_mask, blend_mode="normal", opacity=1.0, cropped_mask=None):
+    def image_paste_by_bbox_mask(self, base_image, cropped_image, bbox_mask, blend_mode="normal", opacity=1.0, cropped_mask=None):
         # 获取各输入的批次大小
         base_batch_size = base_image.shape[0]
         cropped_batch_size = cropped_image.shape[0]
@@ -1191,14 +1194,14 @@ NODE_CLASS_MAPPINGS = {
     "ImageCropSquare": ImageCropSquare,
     "ImageCropEdge": ImageCropEdge,
     "ImageCropWithBBoxMask": ImageCropWithBBoxMask,
-    "ImageBBoxMaskCrop": ImageBBoxMaskCrop,
-    "ImageBBoxMaskPaste": ImageBBoxMaskPaste,
+    "ImageCropByMaskAlpha": ImageCropByMaskAlpha,
+    "ImagePasteByBBoxMask": ImagePasteByBBoxMask,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "ImageCropSquare": "Image Crop Square",
     "ImageCropEdge": "Image Crop Edge",
-    "ImageCropWithBBoxMask": "Image Crop With BBox Mask",
-    "ImageBBoxMaskCrop": "Image BBox Mask Crop",
-    "ImageBBoxMaskPaste": "Image BBox Mask Paste",
+    "ImageCropWithBBoxMask": "Image Crop with BBox Mask",
+    "ImageCropByMaskAlpha": "Image Crop by Mask Alpha",
+    "ImagePasteByBBoxMask": "Image Paste by BBox Mask",
 }

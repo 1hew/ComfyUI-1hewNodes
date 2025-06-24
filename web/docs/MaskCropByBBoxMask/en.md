@@ -1,6 +1,6 @@
-# Mask BBox Mask Crop
+# Mask Crop by BBox Mask
 
-**Node Function:** The `Mask BBox Mask Crop` node crops masks in batches based on bounding box mask information, supporting multi-image processing and precise region extraction functionality.
+**Node Function:** The `Mask Crop by BBox Mask` node crops masks in batches based on bounding box mask information, supporting multi-image processing and precise region extraction functionality.
 
 ## Inputs
 
