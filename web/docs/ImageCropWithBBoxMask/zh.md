@@ -1,6 +1,6 @@
-# Image Crop With BBox Mask - 图像边界框遮罩裁剪
+# Image Crop with BBox Mask - 图像边界框遮罩裁剪
 
-**节点功能：** `Image Crop With BBox Mask`节点根据遮罩裁切图像，并返回边界框遮罩信息以便后续粘贴回原位置。
+**节点功能：** `Image Crop with BBox Mask`节点根据遮罩裁切图像，并返回边界框遮罩信息以便后续粘贴回原位置。
 
 ## 输入
 

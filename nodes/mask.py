@@ -143,7 +143,7 @@ class MaskBatchMathOps:
         return (output_tensor,)
 
 
-class MaskBBoxMaskCrop:
+class MaskCropByBBoxMask:
     """
     遮罩检测框裁剪 - 根据边界框遮罩信息批量裁剪遮罩
     """
@@ -159,10 +159,10 @@ class MaskBBoxMaskCrop:
 
     RETURN_TYPES = ("MASK",)
     RETURN_NAMES = ("cropped_mask",)
-    FUNCTION = "mask_bbox_mask_crop"
+    FUNCTION = "mask_crop_by_bbox_mask"
     CATEGORY = "1hewNodes/mask"
 
-    def mask_bbox_mask_crop(self, mask, bbox_mask):
+    def mask_crop_by_bbox_mask(self, mask, bbox_mask):
         # 确保mask是3D张量 [batch, height, width]
         if mask.dim() == 2:
             mask = mask.unsqueeze(0)
@@ -267,12 +267,12 @@ class MaskBBoxMaskCrop:
 NODE_CLASS_MAPPINGS = {
     "MaskMathOps": MaskMathOps,
     "MaskBatchMathOps": MaskBatchMathOps,
-    "MaskBBoxMaskCrop": MaskBBoxMaskCrop,
+    "MaskCropByBBoxMask": MaskCropByBBoxMask,
 }
 
 # 节点显示名称
 NODE_DISPLAY_NAME_MAPPINGS = {
     "MaskMathOps": "Mask Math Ops",
     "MaskBatchMathOps": "Mask Batch Math Ops",
-    "MaskBBoxMaskCrop": "Mask BBox Mask Crop",
+    "MaskCropByBBoxMask": "Mask Crop by BBox Mask",
 }

@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.1**
+
+- refactor(image/crop): 重命名节点类并更新相关文档
+
 **v1.2.0**
 
 - feat: 新增 `conversion` ，重构图像混合与遮罩处理
@@ -106,9 +110,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Image Crop Square | 方形裁剪，支持遮罩引导和缩放 |
 | Image Crop Edge | 边缘裁剪，支持四边独立设置 |
-| Image Crop With BBox Mask| 基于边界框的智能裁剪，支持宽高比控制 |
-| Image BBox Mask Crop | 批量边界框裁剪，支持多种输出模式 |
-| Image BBox Mask Paste | 裁剪图像回贴，支持多种混合模式 |
+| Image Crop with BBox Mask| 基于边界框的智能裁剪，支持宽高比控制 |
+| Image Crop by Mask Alpha | 基于遮罩的批量裁剪，支持alpha通道 |
+| Image Paste by BBox Mask | 裁剪图像回贴，支持多种混合模式 |
 
 ### 🧩 图像分块节点
 | 节点名称 | 功能描述 |
@@ -121,7 +125,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Mask Math Ops | 遮罩数学运算（交集、并集、差集、异或） |
 | Mask Batch Math Ops | 批量遮罩数学运算 |
-| Mask BBox Mask Crop | 基于蒙版区域的遮罩边界框裁剪 |
+| Mask Crop by BBox Mask | 基于蒙版区域的遮罩边界框裁剪 |
 
 ### 🔧 工具节点
 | 节点名称 | 功能描述 |
@@ -132,11 +136,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🔄 转换节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| String Coordinate to BBoxes | 将字符串格式坐标转换为BBOXES格式，支持多种输入格式 |
 | Image Batch to List | 将批量图像转换为图像列表，用于单独处理 |
 | Image List to Batch | 将图像列表转换为批量图像，自动进行尺寸标准化 |
 | Mask Batch to List | 将批量遮罩转换为遮罩列表，用于单独处理 |
 | Mask List to Batch | 将遮罩列表转换为批量遮罩，自动进行尺寸标准化 |
+| String Coordinate to BBoxes | 将字符串格式坐标转换为BBOXES格式，支持多种输入格式 |
+| String Coordinate to BBox Mask | 将字符串格式坐标转换为BBoxMask格式，支持图像尺寸获取和灵活的输出模式 |
 
 ### 🧠 逻辑节点
 | 节点名称 | 功能描述 |

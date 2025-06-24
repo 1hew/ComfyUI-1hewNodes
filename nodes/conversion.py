@@ -5,65 +5,6 @@ import torch
 from typing import List, Dict, Any, Union
 
 
-class StringCoordinateToBBoxes:
-    """
-    将字符串格式的坐标列表转换为 BBOXES 格式
-    支持多种输入格式："x1,y1,x2,y2" 或 "[x1,y1,x2,y2]" 或多行坐标
-    """
-    
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "coordinates_string": ("STRING", {
-                    "default": "",
-                    "multiline": True,
-                    "placeholder": 'Supports "[x1,y1,x2,y2]" or multi-line coordinates'
-                })
-            }
-        }
-    
-    RETURN_TYPES = ("BBOXES",)
-    RETURN_NAMES = ("bboxes",)
-    FUNCTION = "string_coordinate_to_bboxes"
-    CATEGORY = "1hewNodes/conversion"
-    
-    def string_coordinate_to_bboxes(self, coordinates_string: str):
-        """将字符串坐标转换为 BBOXES 格式"""
-        if not coordinates_string.strip():
-            return ([[]])
-        
-        lines = coordinates_string.strip().split('\n')
-        bboxes = []
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            
-            # 清理格式
-            line = line.replace('[', '').replace(']', '').replace('(', '').replace(')', '')
-            
-            # 分割坐标
-            coords = []
-            for part in line.replace(',', ' ').split():
-                try:
-                    coords.append(int(float(part)))
-                except ValueError:
-                    continue
-            
-            if len(coords) >= 4:
-                bboxes.append(coords[:4])
-        
-        if not bboxes:
-            return ([[]])
-        
-        # 转换为 SAM2 兼容格式
-        sam2_bboxes = [bboxes]
-        
-        return (sam2_bboxes,)
-
-
 class ImageBatchToList:
     """
     将批量Image转换为Image列表
@@ -235,19 +176,200 @@ class MaskListToBatch:
         return (batch_mask,)
 
 
+class StringCoordinateToBBoxes:
+    """
+    将字符串格式的坐标列表转换为 BBOXES 格式
+    支持多种输入格式："x1,y1,x2,y2" 或 "[x1,y1,x2,y2]" 或多行坐标
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "coordinates_string": ("STRING", {
+                    "default": "",
+                    "multiline": True,
+                    "placeholder": 'Supports "[x1,y1,x2,y2]" or multi-line coordinates'
+                })
+            }
+        }
+    
+    RETURN_TYPES = ("BBOXES",)
+    RETURN_NAMES = ("bboxes",)
+    FUNCTION = "string_coordinate_to_bboxes"
+    CATEGORY = "1hewNodes/conversion"
+    
+    def string_coordinate_to_bboxes(self, coordinates_string: str):
+        """将字符串坐标转换为 BBOXES 格式"""
+        if not coordinates_string.strip():
+            return ([[]])
+        
+        lines = coordinates_string.strip().split('\n')
+        bboxes = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # 清理格式
+            line = line.replace('[', '').replace(']', '').replace('(', '').replace(')', '')
+            
+            # 分割坐标
+            coords = []
+            for part in line.replace(',', ' ').split():
+                try:
+                    coords.append(int(float(part)))
+                except ValueError:
+                    continue
+            
+            if len(coords) >= 4:
+                bboxes.append(coords[:4])
+        
+        if not bboxes:
+            return ([[]])
+        
+        # 转换为 SAM2 兼容格式
+        sam2_bboxes = [bboxes]
+        
+        return (sam2_bboxes,)
+
+
+class StringCoordinateToBBoxMask:
+    """
+    将字符串格式的坐标列表转换为 BBoxMask 格式
+    支持多种输入格式："x1,y1,x2,y2" 或 "[x1,y1,x2,y2]" 或多行坐标
+    需要图像输入来获取宽高信息
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "coordinates_string": ("STRING", {
+                    "default": "",
+                    "multiline": True,
+                    "placeholder": 'Supports "[x1,y1,x2,y2]" or multi-line coordinates'
+                }),
+                "output_mode": (["separate", "merge"], {"default": "merge"})
+            }
+        }
+    
+    RETURN_TYPES = ("MASK",)
+    RETURN_NAMES = ("bbox_mask",)
+    FUNCTION = "string_coordinate_to_bbox_mask"
+    CATEGORY = "1hewNodes/conversion"
+    
+    def string_coordinate_to_bbox_mask(self, coordinates_string: str, image, output_mode="merge"):
+        """将字符串坐标转换为 BBoxMask 格式"""
+        # 获取图像尺寸
+        batch_size, height, width, channels = image.shape
+        
+        if not coordinates_string.strip():
+            # 返回空的mask
+            return (torch.zeros((batch_size, height, width), dtype=torch.float32),)
+        
+        lines = coordinates_string.strip().split('\n')
+        
+        # 解析每行坐标
+        bbox_lines = []
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # 清理格式
+            line = line.replace('[', '').replace(']', '').replace('(', '').replace(')', '')
+            
+            # 分割坐标
+            coords = []
+            for part in line.replace(',', ' ').split():
+                try:
+                    coords.append(int(float(part)))
+                except ValueError:
+                    continue
+            
+            if len(coords) >= 4:
+                bbox_lines.append(coords[:4])
+        
+        if not bbox_lines:
+            # 没有有效坐标，返回空mask
+            return (torch.zeros((batch_size, height, width), dtype=torch.float32),)
+        
+        if output_mode == "separate":
+            # 每个坐标行单独输出一个mask
+            bbox_masks = []
+            
+            # 为每个坐标行创建单独的mask
+            for bbox in bbox_lines:
+                line_masks = []
+                for b in range(batch_size):
+                    bbox_mask = torch.zeros((height, width), dtype=torch.float32)
+                    
+                    x1, y1, x2, y2 = bbox
+                    
+                    # 确保坐标在图像范围内
+                    x1 = max(0, min(x1, width))
+                    y1 = max(0, min(y1, height))
+                    x2 = max(0, min(x2, width))
+                    y2 = max(0, min(y2, height))
+                    
+                    # 确保x2 > x1 和 y2 > y1
+                    if x2 > x1 and y2 > y1:
+                        bbox_mask[y1:y2, x1:x2] = 1.0
+                    
+                    line_masks.append(bbox_mask)
+                
+                bbox_masks.extend(line_masks)
+            
+            # 堆叠所有mask
+            bbox_mask_tensor = torch.stack(bbox_masks)
+            
+        else:  # merge
+            # 将所有坐标合并到一个mask中
+            bbox_masks = []
+            
+            for b in range(batch_size):
+                bbox_mask = torch.zeros((height, width), dtype=torch.float32)
+                
+                # 将所有坐标区域合并到同一个mask中
+                for bbox in bbox_lines:
+                    x1, y1, x2, y2 = bbox
+                    
+                    # 确保坐标在图像范围内
+                    x1 = max(0, min(x1, width))
+                    y1 = max(0, min(y1, height))
+                    x2 = max(0, min(x2, width))
+                    y2 = max(0, min(y2, height))
+                    
+                    # 确保x2 > x1 和 y2 > y1
+                    if x2 > x1 and y2 > y1:
+                        bbox_mask[y1:y2, x1:x2] = 1.0
+                
+                bbox_masks.append(bbox_mask)
+            
+            # 堆叠所有mask
+            bbox_mask_tensor = torch.stack(bbox_masks)
+        
+        return (bbox_mask_tensor,)
+
+
 # 节点映射
 NODE_CLASS_MAPPINGS = {
-    "StringCoordinateToBBoxes": StringCoordinateToBBoxes,
     "ImageBatchToList": ImageBatchToList,
     "ImageListToBatch": ImageListToBatch,
     "MaskBatchToList": MaskBatchToList,
     "MaskListToBatch": MaskListToBatch,
+    "StringCoordinateToBBoxes": StringCoordinateToBBoxes,
+    "StringCoordinateToBBoxMask": StringCoordinateToBBoxMask,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "StringCoordinateToBBoxes": "String Coordinate to BBoxes",
     "ImageBatchToList": "Image Batch to List",
     "ImageListToBatch": "Image List to Batch",
     "MaskBatchToList": "Mask Batch to List",
     "MaskListToBatch": "Mask List to Batch",
+    "StringCoordinateToBBoxes": "String Coordinate to BBoxes",
+    "StringCoordinateToBBoxMask": "String Coordinate to BBox Mask",
 }

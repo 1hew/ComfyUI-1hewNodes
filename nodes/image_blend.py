@@ -222,7 +222,7 @@ class ImageBlendModesByAlpha:
             },
             "optional": {
                 "overlay_mask": ("MASK",),
-                "invert_mask": ("BOOLEAN", {"default": False, "label": "反转遮罩"})
+                "invert_mask": ("BOOLEAN", {"default": False})
             }
         }
 
@@ -690,7 +690,7 @@ class ImageBlendModesByCSS:
             },
             "optional": {
                 "overlay_mask": ("MASK",),
-                "invert_mask": ("BOOLEAN", {"default": False, "label": "反转遮罩"})
+                "invert_mask": ("BOOLEAN", {"default": False})
             }
         }
 
