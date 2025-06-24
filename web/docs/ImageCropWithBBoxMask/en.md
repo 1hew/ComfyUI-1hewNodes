@@ -1,6 +1,6 @@
-# Image Crop With BBox Mask
+# Image Crop with BBox Mask
 
-**Node Function:** The `Image Crop With BBox Mask` node crops images based on masks and returns bounding box mask information for subsequent pasting back to original positions.
+**Node Function:** The `Image Crop with BBox Mask` node crops images based on masks and returns bounding box mask information for subsequent pasting back to original positions.
 
 ## Inputs
 
