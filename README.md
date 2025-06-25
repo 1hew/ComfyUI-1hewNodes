@@ -24,6 +24,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 **v1.2.1**
 
 - refactor(image/crop): Renamed node classes and updated related documentation
+- feat(image_crop): Enhanced the functionality and output options of the `ImageCropByMaskAlpha` node
 
 **v1.2.0**
 
@@ -111,7 +112,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Crop Square | Square cropping with mask guidance and scaling support |
 | Image Crop Edge | Edge cropping with independent settings for four sides |
 | Image Crop with BBox Mask | Smart cropping based on bounding boxes with aspect ratio control |
-| Image Crop by Mask Alpha | Batch mask-based cropping with alpha channel support |
+| Image Crop by Mask Alpha | Batch mask-based cropping with RGB/RGBA dual output modes and smart channel processing |
 | Image Paste by BBox Mask | Paste cropped images back with multiple blend modes |
 
 ### 🧩 Image Tiling Nodes
