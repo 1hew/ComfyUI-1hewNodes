@@ -850,8 +850,8 @@ class ImageCropByMaskAlpha:
             }
         }
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("cropped_image",)
+    RETURN_TYPES = ("IMAGE", "MASK")
+    RETURN_NAMES = ("cropped_image", "cropped_mask")
     FUNCTION = "image_crop_by_mask_alpha"
     CATEGORY = "1hewNodes/image/crop"
 
@@ -862,6 +862,7 @@ class ImageCropByMaskAlpha:
         # 修改：使用最大批次数进行循环
         max_batch = max(batch_size, mask_batch_size)
         output_images = []
+        output_masks = []
         
         for b in range(max_batch):
             # 获取对应的图像和遮罩索引
@@ -875,6 +876,11 @@ class ImageCropByMaskAlpha:
                 img_np = (image[img_idx].numpy() * 255).astype(np.uint8)
                 mask_np = (mask[mask_idx].numpy() * 255).astype(np.uint8)
             
+            # 新增：根据输出模式处理图像通道
+            if output_mode == "bbox_rgb" and img_np.shape[2] == 4:
+                # bbox_rgb模式下，如果输入是4通道，只取RGB通道
+                img_np = img_np[:, :, :3]
+            
             img_pil = Image.fromarray(img_np)
             mask_pil = Image.fromarray(mask_np).convert("L")
             
@@ -882,8 +888,23 @@ class ImageCropByMaskAlpha:
             bbox = self.get_bbox_from_mask(mask_pil)
             
             if bbox is None:
-                # 如果没有找到有效区域，返回原始图像
-                output_images.append(image[b])
+                # 如果没有找到有效区域，返回原始图像和遮罩
+                if output_mode == "bbox_rgb":
+                    # 确保bbox_rgb模式下输出3通道
+                    if image[img_idx].shape[2] == 4:
+                        rgb_image = image[img_idx][:, :, :3]
+                        output_images.append(rgb_image)
+                    else:
+                        output_images.append(image[img_idx])
+                else:
+                    # 为mask_rgba模式创建带alpha通道的图像
+                    if img_np.shape[2] == 3:
+                        img_rgba = np.concatenate([img_np, np.ones_like(img_np[:,:,0:1]) * 255], axis=2)
+                    else:
+                        img_rgba = img_np
+                    img_rgba_tensor = torch.from_numpy(img_rgba.astype(np.float32) / 255.0)
+                    output_images.append(img_rgba_tensor)
+                output_masks.append(mask[mask_idx])
                 continue
             
             x_min, y_min, x_max, y_max = bbox
@@ -894,18 +915,22 @@ class ImageCropByMaskAlpha:
             x_max = min(img_pil.width, x_max)
             y_max = min(img_pil.height, y_max)
             
+            # 裁剪图像和遮罩
+            cropped_img = img_pil.crop((x_min, y_min, x_max, y_max))
+            cropped_mask = mask_pil.crop((x_min, y_min, x_max, y_max))
+            
+            # 将裁剪后的mask转换为tensor
+            cropped_mask_np = np.array(cropped_mask).astype(np.float32) / 255.0
+            cropped_mask_tensor = torch.from_numpy(cropped_mask_np)
+            output_masks.append(cropped_mask_tensor)
+            
             if output_mode == "bbox_rgb":
-                # 模式1：输出完整的裁剪区域
-                cropped_img = img_pil.crop((x_min, y_min, x_max, y_max))
-                # 转换回tensor
+                # 模式1：输出完整的裁剪区域（RGB格式）
                 cropped_img_np = np.array(cropped_img).astype(np.float32) / 255.0
                 output_images.append(torch.from_numpy(cropped_img_np))
                 
             elif output_mode == "mask_rgba":
                 # 模式2：仅输出白色区域，带alpha通道
-                cropped_img = img_pil.crop((x_min, y_min, x_max, y_max))
-                cropped_mask = mask_pil.crop((x_min, y_min, x_max, y_max))
-                
                 # 转换为RGBA模式
                 cropped_img_rgba = cropped_img.convert("RGBA")
                 
@@ -925,18 +950,29 @@ class ImageCropByMaskAlpha:
                 output_images.append(torch.from_numpy(result_img_np))
         
         # 合并批次
-        if output_images:
-            # 检查所有图像是否具有相同尺寸
-            sizes = [img.shape for img in output_images]
-            if len(set(sizes)) == 1:
+        if output_images and output_masks:
+            # 处理图像
+            image_sizes = [img.shape for img in output_images]
+            if len(set(image_sizes)) == 1:
                 output_image_tensor = torch.stack(output_images)
             else:
                 # 如果尺寸不同，填充到相同尺寸
                 output_images = self.pad_to_same_size(output_images)
                 output_image_tensor = torch.stack(output_images)
-            return (output_image_tensor,)
+            
+            # 处理遮罩
+            mask_sizes = [mask.shape for mask in output_masks]
+            if len(set(mask_sizes)) == 1:
+                output_mask_tensor = torch.stack(output_masks)
+            else:
+                # 如果尺寸不同，填充到相同尺寸
+                output_masks = self.pad_masks_to_same_size(output_masks)
+                output_mask_tensor = torch.stack(output_masks)
+            
+            return (output_image_tensor, output_mask_tensor)
         else:
-            return (image,)
+            # 如果没有有效输出，返回原始数据
+            return (image, mask)
     
     def get_bbox_from_mask(self, mask_pil):
         """从遮罩中获取边界框"""
@@ -972,6 +1008,25 @@ class ImageCropByMaskAlpha:
             padded_images.append(padded_img)
         
         return padded_images
+    
+    def pad_masks_to_same_size(self, masks):
+        """将所有遮罩填充到相同尺寸"""
+        max_height = max(mask.shape[0] for mask in masks)
+        max_width = max(mask.shape[1] for mask in masks)
+        
+        padded_masks = []
+        
+        for mask in masks:
+            h, w = mask.shape
+            pad_h = max_height - h
+            pad_w = max_width - w
+            
+            # 填充空间维度
+            padded_mask = torch.nn.functional.pad(mask, (0, pad_w, 0, pad_h), value=0)
+            
+            padded_masks.append(padded_mask)
+        
+        return padded_masks
 
 
 class ImagePasteByBBoxMask:

@@ -24,6 +24,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 **v1.2.1**
 
 - refactor(image/crop): 重命名节点类并更新相关文档
+- feat(image_crop): 增强 `ImageCropByMaskAlpha` 节点的功能和输出选项
 
 **v1.2.0**
 
@@ -111,7 +112,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Crop Square | 方形裁剪，支持遮罩引导和缩放 |
 | Image Crop Edge | 边缘裁剪，支持四边独立设置 |
 | Image Crop with BBox Mask| 基于边界框的智能裁剪，支持宽高比控制 |
-| Image Crop by Mask Alpha | 基于遮罩的批量裁剪，支持alpha通道 |
+| Image Crop by Mask Alpha | 基于遮罩的批量裁剪，支持RGB/RGBA双输出模式和智能通道处理 |
 | Image Paste by BBox Mask | 裁剪图像回贴，支持多种混合模式 |
 
 ### 🧩 图像分块节点
