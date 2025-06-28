@@ -72,7 +72,7 @@ class PathBuild:
         level1 = ["Wan_kijai", "Wan_org", "Flux"]
         # 二级字段映射
         level2_mapping = {
-            "Wan_kijai": ["FusionX", "VACE", "FLF2V", "Fun"],
+            "Wan_kijai": ["FusionX_VACE",],
             "Wan_org": ["VACE", "FLF2V", "Fun"],
             "Flux": ["ACE_Redux", "ACE", "TTP"]
         }
@@ -83,7 +83,7 @@ class PathBuild:
             "Flux": []  # Flux 使用 additional_path 作为三级字段，所以这里为空
         }
         
-        # 生成所有可能的路径组合
+        # 生成所有可能的路径组合（遍历模式）
         for l1 in level1:
             for l2 in level2_mapping[l1]:
                 if l1 == "Flux":
@@ -93,6 +93,17 @@ class PathBuild:
                     # 对于其他一级字段，添加三级路径
                     for l3 in level3_mapping[l1]:
                         paths.append(f"{l1}/{l2}/{l3}")
+        
+        # 添加固定的自定义路径（固定模式）
+        custom_paths = [
+            # 可以在这里添加更多固定路径
+            # "Custom/Path1",
+            "Wan_kijai/FusionX_Phantom",
+            # ... 方便后面补充更多固定路径
+        ]
+        
+        # 合并遍历生成的路径和固定路径
+        paths.extend(custom_paths)
         
         return {
             "required": {
