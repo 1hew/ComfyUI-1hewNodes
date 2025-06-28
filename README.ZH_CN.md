@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.2**
+- feat(image): 添加 `Image BBox Overlay by Mask` 节点，基于遮罩的图像边界框叠加
+
 **v1.2.1**
 
 - refactor(image/crop): 重命名节点类并更新相关文档
@@ -98,6 +101,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Detail HL Freq Separation | 高低频分离处理 |
 | Image Add Label | 为图像添加文本标签 |
 | Image Plot | 图像绘制和可视化工具 |
+| Image BBox Overlay by Mask | 基于遮罩的图像边界框叠加，支持独立和合并模式 |
 
 ### 🎨 图像混合节点
 | 节点名称 | 功能描述 |

@@ -4,6 +4,7 @@ from PIL import Image, ImageOps, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 import torch.nn.functional as F
 import os
 import math
+from skimage.measure import label, regionprops
 
 
 class ImageSolid:
@@ -1017,6 +1018,7 @@ class ImageDetailHLFreqSeparation:
 class ImageAddLabel:
     """
     为图像添加标签文本 - 支持批量图像和批量标签，支持动态引用输入值
+    支持 -- 分隔符功能，当存在只包含连字符的行时，-- 之间的内容作为完整标签
     """
 
     @classmethod
@@ -1039,7 +1041,11 @@ class ImageAddLabel:
                 "font_size": ("INT", {"default": 36, "min": 1, "max": 256}),
                 "invert_colors": ("BOOLEAN", {"default": True}),
                 "font": (font_files, {"default": "arial.ttf"}),
-                "text": ("STRING", {"default": "", "multiline": True}),
+                "text": ("STRING", {
+                    "default": "", 
+                    "multiline": True,
+                    "placeholder": "-- splits override separator\nelse use newline."
+                }),
                 "direction": (["top", "bottom", "left", "right"], {"default": "top"})
             },
             "optional": {
@@ -1069,6 +1075,46 @@ class ImageAddLabel:
             
         return parsed_text
 
+    def parse_text_list(self, text):
+        """
+        解析文本列表，支持连字符分割和换行分割
+        当有只包含连字符的行时，只按 -- 进行分割，其他分割方式失效
+        否则按照换行符(\n) 分割
+        """
+        import re
+        
+        if not text.strip():
+            return [""]
+        
+        # 检查是否有只包含连字符的行
+        lines = text.split('\n')
+        has_dash_separator = any(line.strip() and all(c == '-' for c in line.strip()) for line in lines)
+        
+        if has_dash_separator:
+            # 按连字符分割，其他分割方式失效（包括换行符）
+            sections = re.split(r'^\s*-+\s*$', text, flags=re.MULTILINE)
+            all_lists = []
+            
+            for section in sections:
+                section = section.strip()
+                if not section:
+                    continue
+                    
+                # 当有连字符分割时，每个段落作为一个完整项目，保留内部换行
+                # 移除引号
+                if (section.startswith('"') and section.endswith('"')) or (section.startswith("'") and section.endswith("'")):
+                    section = section[1:-1]
+                if section:
+                    all_lists.append(str(section))
+            
+            return all_lists if all_lists else [""]
+        else:
+            # 按传统方式分割（换行符）
+            text_lines = text.strip().split('\n')
+            # 过滤空行
+            text_lines = [line.strip() for line in text_lines if line.strip()]
+            return text_lines if text_lines else [""]
+
     def image_add_label(self, image, height, font_size, invert_colors, font, text, direction, input1=None, input2=None):
         # 解析文本中的输入引用
         parsed_text = self.parse_text_with_inputs(text, input1, input2)
@@ -1084,8 +1130,8 @@ class ImageAddLabel:
         # 获取图像尺寸
         result = []
         
-        # 处理多行文本，分割成标签列表
-        text_lines = parsed_text.strip().split('\n')
+        # 处理文本，支持 -- 分隔符功能
+        text_lines = self.parse_text_list(parsed_text)
         
         for i, img in enumerate(image):
             # 选择对应的标签文本，如果标签数量少于图像数量，则循环使用
@@ -1528,6 +1574,204 @@ class ImagePlot:
         return (255, 255, 255)
 
 
+class ImageBBoxOverlayByMask:
+    """
+    基于遮罩的图像边界框叠加节点 - 根据遮罩生成检测框并以描边形式叠加到图像上
+    支持独立模式和合并模式
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "mask": ("MASK",),
+                "bbox_color": (["red", "green", "blue", "yellow", "cyan", "magenta", "white", "black"], 
+                              {"default": "red"}),
+                "line_width": ("INT", {"default": 3, "min": 1, "max": 20, "step": 1}),
+                "padding": ("INT", {"default": 0, "min": 0, "max": 50, "step": 1}),
+                "output_mode": (["separate", "merge"], {"default": "separate"})
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "overlay_bbox"
+    CATEGORY = "1hewNodes/image"
+
+    def overlay_bbox(self, image, mask, bbox_color="red", line_width=3, padding=0, output_mode="separate"):
+        # 确保输入是正确的维度
+        if image.dim() == 3:
+            image = image.unsqueeze(0)
+        if mask.dim() == 2:
+            mask = mask.unsqueeze(0)
+            
+        batch_size = image.shape[0]
+        mask_batch_size = mask.shape[0]
+        
+        # 颜色映射
+        color_map = {
+            "red": (255, 0, 0),
+            "green": (0, 255, 0),
+            "blue": (0, 0, 255),
+            "yellow": (255, 255, 0),
+            "cyan": (0, 255, 255),
+            "magenta": (255, 0, 255),
+            "white": (255, 255, 255),
+            "black": (0, 0, 0)
+        }
+        
+        bbox_rgb = color_map.get(bbox_color, (255, 0, 0))
+        
+        output_images = []
+        
+        for b in range(batch_size):
+            # 获取当前批次的图像
+            current_image = image[b]
+            
+            # 转换图像为PIL格式
+            if current_image.is_cuda:
+                img_np = (current_image.cpu().numpy() * 255).astype(np.uint8)
+            else:
+                img_np = (current_image.numpy() * 255).astype(np.uint8)
+            
+            img_pil = Image.fromarray(img_np, 'RGB')
+            draw = ImageDraw.Draw(img_pil)
+            
+            if output_mode == "merge":
+                # 合并模式：将所有mask合并为一个边界框
+                combined_mask = None
+                for m in range(mask_batch_size):
+                    mask_idx = m % mask_batch_size
+                    current_mask = mask[mask_idx]
+                    
+                    # 转换遮罩为numpy格式
+                    if current_mask.is_cuda:
+                        mask_np = (current_mask.cpu().numpy() * 255).astype(np.uint8)
+                    else:
+                        mask_np = (current_mask.numpy() * 255).astype(np.uint8)
+                    
+                    if combined_mask is None:
+                        combined_mask = mask_np
+                    else:
+                        # 合并mask（取最大值）
+                        combined_mask = np.maximum(combined_mask, mask_np)
+                
+                # 调整合并后的遮罩尺寸
+                mask_pil = Image.fromarray(combined_mask, 'L')
+                if mask_pil.size != img_pil.size:
+                    mask_pil = mask_pil.resize(img_pil.size, Image.Resampling.LANCZOS)
+                
+                # 获取合并后的边界框
+                bbox = self.get_single_bbox_from_mask(mask_pil, padding)
+                if bbox is not None:
+                    x_min, y_min, x_max, y_max = bbox
+                    draw.rectangle(
+                        [x_min, y_min, x_max, y_max],
+                        outline=bbox_rgb,
+                        width=line_width
+                    )
+                    print(f"合并边界框: ({x_min}, {y_min}, {x_max}, {y_max})")
+            else:
+                # 独立模式：为每个独立的mask区域生成单独的边界框
+                all_bboxes = []
+                for m in range(mask_batch_size):
+                    mask_idx = m % mask_batch_size
+                    current_mask = mask[mask_idx]
+                    
+                    # 转换遮罩为numpy格式
+                    if current_mask.is_cuda:
+                        mask_np = (current_mask.cpu().numpy() * 255).astype(np.uint8)
+                    else:
+                        mask_np = (current_mask.numpy() * 255).astype(np.uint8)
+                    
+                    mask_pil = Image.fromarray(mask_np, 'L')
+                    
+                    # 调整遮罩尺寸以匹配图像
+                    if mask_pil.size != img_pil.size:
+                        mask_pil = mask_pil.resize(img_pil.size, Image.Resampling.LANCZOS)
+                    
+                    # 获取当前mask的所有独立区域的边界框
+                    bboxes = self.get_multiple_bboxes_from_mask(mask_pil, padding)
+                    all_bboxes.extend(bboxes)
+                
+                # 绘制所有边界框
+                for i, bbox in enumerate(all_bboxes):
+                    x_min, y_min, x_max, y_max = bbox
+                    draw.rectangle(
+                        [x_min, y_min, x_max, y_max],
+                        outline=bbox_rgb,
+                        width=line_width
+                    )
+                    print(f"独立边界框 {i+1}: ({x_min}, {y_min}, {x_max}, {y_max})")
+            
+            # 转换回tensor
+            result_np = np.array(img_pil).astype(np.float32) / 255.0
+            result_tensor = torch.from_numpy(result_np)
+            output_images.append(result_tensor)
+        
+        # 合并批次
+        output_tensor = torch.stack(output_images)
+        
+        return (output_tensor,)
+    
+    def get_single_bbox_from_mask(self, mask_pil, padding=0):
+        """从遮罩中提取单个边界框坐标（合并所有白色区域）"""
+        mask_np = np.array(mask_pil)
+        
+        # 创建二值遮罩（mask值大于128认为是有效区域）
+        binary_mask = mask_np > 128
+        
+        # 找到有效像素的坐标
+        y_coords, x_coords = np.where(binary_mask)
+        
+        if len(y_coords) == 0 or len(x_coords) == 0:
+            return None
+        
+        # 获取边界框坐标
+        x_min = int(np.min(x_coords))
+        x_max = int(np.max(x_coords))
+        y_min = int(np.min(y_coords))
+        y_max = int(np.max(y_coords))
+        
+        # 添加填充
+        x_min = max(0, x_min - padding)
+        y_min = max(0, y_min - padding)
+        x_max = min(mask_pil.width - 1, x_max + padding)
+        y_max = min(mask_pil.height - 1, y_max + padding)
+        
+        return (x_min, y_min, x_max, y_max)
+    
+    def get_multiple_bboxes_from_mask(self, mask_pil, padding=0):
+        """从遮罩中提取多个独立区域的边界框坐标"""
+        mask_np = np.array(mask_pil)
+        
+        # 创建二值遮罩
+        binary_mask = mask_np > 128
+        
+        if not np.any(binary_mask):
+            return []
+        
+        # 使用连通组件分析找到独立的区域
+        labeled_mask = label(binary_mask)
+        regions = regionprops(labeled_mask)
+        
+        bboxes = []
+        for region in regions:
+            # 获取区域的边界框
+            min_row, min_col, max_row, max_col = region.bbox
+            
+            # 添加填充
+            x_min = max(0, min_col - padding)
+            y_min = max(0, min_row - padding)
+            x_max = min(mask_pil.width - 1, max_col - 1 + padding)
+            y_max = min(mask_pil.height - 1, max_row - 1 + padding)
+            
+            bboxes.append((x_min, y_min, x_max, y_max))
+        
+        return bboxes
+
+
 
 NODE_CLASS_MAPPINGS = {
     "ImageSolid": ImageSolid,
@@ -1536,6 +1780,7 @@ NODE_CLASS_MAPPINGS = {
     "ImageDetailHLFreqSeparation": ImageDetailHLFreqSeparation,
     "ImageAddLabel": ImageAddLabel,
     "ImagePlot": ImagePlot,
+    "ImageBBoxOverlayByMask": ImageBBoxOverlayByMask,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -1545,4 +1790,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ImageDetailHLFreqSeparation": "Image Detail HL Freq Separation",
     "ImageAddLabel": "Image Add Label",
     "ImagePlot": "Image Plot",
+    "ImageBBoxOverlayByMask": "Image BBox Overlay by Mask",
 }
