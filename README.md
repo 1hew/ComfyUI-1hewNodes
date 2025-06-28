@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.2**
+- feat(image): Added the `Image BBox Overlay by Mask` node, which overlays the image bounding box based on a mask.
+
 **v1.2.1**
 
 - refactor(image/crop): Renamed node classes and updated related documentation
@@ -91,13 +94,14 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ### 🖼️ Image Processing Nodes
 | Node Name | Description |
-|-----------|-------------|
+|-----------|--------------|
 | Image Solid | Generate solid color images with multiple size and color format support |
 | Image Resize Universal | Universal image resizing with multiple algorithms and constraints |
 | Image Edit Stitch | Image stitching and merging with multiple stitching modes |
 | Image Detail HL Freq Separation | High-low frequency separation processing |
 | Image Add Label | Add text labels to images |
 | Image Plot | Image plotting and visualization tools |
+| Image BBox Overlay by Mask | Mask-based image bounding box overlay with independent and merge modes |
 
 ### 🎨 Image Blending Nodes
 | Node Name | Description |
