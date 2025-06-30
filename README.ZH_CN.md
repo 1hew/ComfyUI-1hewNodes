@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.3**
+- fix(image_blend): 修复 `Image Blend Modes by Alpha` 节点设备不一致的问题
+
 **v1.2.2**
 - feat(image): 添加 `Image BBox Overlay by Mask` 节点，基于遮罩的图像边界框叠加
 

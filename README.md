@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.3**
+- fix(image_blend): Fixed the issue of inconsistency between devices for the `Image Blend Modes by Alpha` node.
+
 **v1.2.2**
 - feat(image): Added the `Image BBox Overlay by Mask` node, which overlays the image bounding box based on a mask.
 
