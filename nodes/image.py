@@ -1576,7 +1576,7 @@ class ImagePlot:
 
 class ImageBBoxOverlayByMask:
     """
-    基于遮罩的图像边界框叠加节点 - 根据遮罩生成检测框并以描边形式叠加到图像上
+    基于遮罩的图像边界框叠加节点 - 根据遮罩生成检测框并以描边或填充形式叠加到图像上
     支持独立模式和合并模式
     """
     
@@ -1588,8 +1588,9 @@ class ImageBBoxOverlayByMask:
                 "mask": ("MASK",),
                 "bbox_color": (["red", "green", "blue", "yellow", "cyan", "magenta", "white", "black"], 
                               {"default": "red"}),
-                "line_width": ("INT", {"default": 3, "min": 1, "max": 20, "step": 1}),
-                "padding": ("INT", {"default": 0, "min": 0, "max": 50, "step": 1}),
+                "stroke_width": ("INT", {"default": 4, "min": 1, "max": 100, "step": 1}),
+                "fill": ("BOOLEAN", {"default": True}),
+                "padding": ("INT", {"default": 0, "min": 0, "max": 1000, "step": 1}),
                 "output_mode": (["separate", "merge"], {"default": "separate"})
             }
         }
@@ -1599,7 +1600,7 @@ class ImageBBoxOverlayByMask:
     FUNCTION = "overlay_bbox"
     CATEGORY = "1hewNodes/image"
 
-    def overlay_bbox(self, image, mask, bbox_color="red", line_width=3, padding=0, output_mode="separate"):
+    def overlay_bbox(self, image, mask, bbox_color="red", stroke_width=3, fill=False, padding=0, output_mode="separate"):
         # 确保输入是正确的维度
         if image.dim() == 3:
             image = image.unsqueeze(0)
@@ -1666,11 +1667,7 @@ class ImageBBoxOverlayByMask:
                 bbox = self.get_single_bbox_from_mask(mask_pil, padding)
                 if bbox is not None:
                     x_min, y_min, x_max, y_max = bbox
-                    draw.rectangle(
-                        [x_min, y_min, x_max, y_max],
-                        outline=bbox_rgb,
-                        width=line_width
-                    )
+                    self.draw_bbox(draw, x_min, y_min, x_max, y_max, bbox_rgb, stroke_width, fill)
                     print(f"合并边界框: ({x_min}, {y_min}, {x_max}, {y_max})")
             else:
                 # 独立模式：为每个独立的mask区域生成单独的边界框
@@ -1698,11 +1695,7 @@ class ImageBBoxOverlayByMask:
                 # 绘制所有边界框
                 for i, bbox in enumerate(all_bboxes):
                     x_min, y_min, x_max, y_max = bbox
-                    draw.rectangle(
-                        [x_min, y_min, x_max, y_max],
-                        outline=bbox_rgb,
-                        width=line_width
-                    )
+                    self.draw_bbox(draw, x_min, y_min, x_max, y_max, bbox_rgb, stroke_width, fill)
                     print(f"独立边界框 {i+1}: ({x_min}, {y_min}, {x_max}, {y_max})")
             
             # 转换回tensor
@@ -1714,6 +1707,22 @@ class ImageBBoxOverlayByMask:
         output_tensor = torch.stack(output_images)
         
         return (output_tensor,)
+    
+    def draw_bbox(self, draw, x_min, y_min, x_max, y_max, color, stroke_width, fill):
+        """绘制边界框，支持填充和描边模式"""
+        if fill:
+            # 填充模式：绘制填充的矩形
+            draw.rectangle(
+                [x_min, y_min, x_max, y_max],
+                fill=color
+            )
+        else:
+            # 描边模式：仅绘制边框
+            draw.rectangle(
+                [x_min, y_min, x_max, y_max],
+                outline=color,
+                width=stroke_width
+            )
     
     def get_single_bbox_from_mask(self, mask_pil, padding=0):
         """从遮罩中提取单个边界框坐标（合并所有白色区域）"""

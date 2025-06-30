@@ -232,15 +232,12 @@ class ImageBlendModesByAlpha:
     CATEGORY = "1hewNodes/image/blend"
 
     def blend_modes(self, base_image, overlay_image, blend_mode, opacity, overlay_mask=None, invert_mask=False):
-        # 初始化结果为基础图层
-        result = base_image.clone()
-        
         # 检查并转换 RGBA 图像为 RGB
         base_image = self._convert_rgba_to_rgb(base_image)
         overlay_image = self._convert_rgba_to_rgb(overlay_image)
         
         # 处理叠加图层
-        blended = self._apply_blend(result, overlay_image, blend_mode, opacity)
+        blended = self._apply_blend(base_image, overlay_image, blend_mode, opacity)
         
         # 如果提供了遮罩，则应用遮罩
         if overlay_mask is not None:
@@ -346,11 +343,15 @@ class ImageBlendModesByAlpha:
                 # 调整大小
                 img = img.resize((base_width, base_height), Image.Resampling.LANCZOS)
                 
-                # 转换回张量
+                # 转换回张量并确保在正确的设备上
                 img_np = np.array(img).astype(np.float32) / 255.0
-                resized_overlay.append(torch.from_numpy(img_np))
+                img_tensor = torch.from_numpy(img_np).to(base.device)  # 添加 .to(base.device)
+                resized_overlay.append(img_tensor)
             
             overlay = torch.stack(resized_overlay)
+        
+        # 确保 overlay 在与 base 相同的设备上
+        overlay = overlay.to(base.device)
         
         # 应用混合模式
         result = base.clone()
