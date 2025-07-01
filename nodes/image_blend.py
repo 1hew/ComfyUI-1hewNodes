@@ -273,9 +273,12 @@ class ImageBlendModesByAlpha:
                     # 调整大小
                     mask_pil = mask_pil.resize((current_base.shape[1], current_base.shape[0]), Image.Resampling.LANCZOS)
                     
-                    # 转换回numpy格式
+                    # 转换回numpy格式并确保在正确的设备上
                     mask_np = np.array(mask_pil).astype(np.float32) / 255.0
-                    current_mask = torch.from_numpy(mask_np)
+                    current_mask = torch.from_numpy(mask_np).to(current_base.device)
+                
+                # 确保遮罩在正确的设备上
+                current_mask = current_mask.to(current_base.device)
                 
                 # 扩展遮罩维度以匹配图像通道
                 current_mask = current_mask.unsqueeze(-1).expand_as(current_base)
@@ -761,19 +764,31 @@ class ImageBlendModesByCSS:
                 if invert_mask:
                     current_mask = 1.0 - current_mask
                 
-                # 将遮罩转换为PIL格式
-                if overlay_mask.is_cuda:
-                    mask_np = (current_mask.cpu().numpy() * 255).astype(np.uint8)
-                else:
-                    mask_np = (current_mask.numpy() * 255).astype(np.uint8)
-                mask_pil = Image.fromarray(mask_np)
+                # 将遮罩调整为与图像相同的尺寸
+                if current_mask.shape[:2] != current_base.shape[:2]:
+                    # 将遮罩转换为PIL格式
+                    if overlay_mask.is_cuda:
+                        mask_np = (current_mask.cpu().numpy() * 255).astype(np.uint8)
+                    else:
+                        mask_np = (current_mask.numpy() * 255).astype(np.uint8)
+                    mask_pil = Image.fromarray(mask_np)
+                    
+                    # 调整大小
+                    mask_pil = mask_pil.resize((current_base.shape[1], current_base.shape[0]), Image.Resampling.LANCZOS)
+                    
+                    # 转换回numpy格式并确保在正确的设备上
+                    mask_np = np.array(mask_pil).astype(np.float32) / 255.0
+                    current_mask = torch.from_numpy(mask_np).to(current_base.device)
                 
-                # 调整遮罩大小以匹配图像
-                if mask_pil.size != base_pil.size:
-                    mask_pil = mask_pil.resize(base_pil.size, Image.Resampling.LANCZOS)
+                # 确保遮罩在正确的设备上
+                current_mask = current_mask.to(current_base.device)
                 
-                # 合成图像
-                final_pil = Image.composite(base_pil, blended_pil, mask_pil)
+                # 扩展遮罩维度以匹配图像通道
+                current_mask = current_mask.unsqueeze(-1).expand_as(current_base)
+                
+                # 应用遮罩混合
+                masked_result = current_base * (1.0 - current_mask) + current_blended * current_mask
+                output_images.append(masked_result)
             else:
                 final_pil = blended_pil
             
