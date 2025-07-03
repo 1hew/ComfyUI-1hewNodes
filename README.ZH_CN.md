@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.5**
+- feat(mask): 添加 `Mask Fill Hole` 节点，用于填充遮罩中的封闭区域孔洞，支持批量处理。
+
 **v1.2.3**
 - fix(image_blend): 修复 `Image Blend Modes by Alpha` 节点设备不一致的问题
 
@@ -131,6 +134,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎭 遮罩操作节点
 | 节点名称 | 功能描述 |
 |---------|----------|
+| Mask Fill Hole | 填充遮罩中的封闭区域孔洞，支持批量处理 |
 | Mask Math Ops | 遮罩数学运算（交集、并集、差集、异或） |
 | Mask Batch Math Ops | 批量遮罩数学运算 |
 | Mask Crop by BBox Mask | 基于蒙版区域的遮罩边界框裁剪 |

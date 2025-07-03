@@ -1019,6 +1019,7 @@ class ImageAddLabel:
     """
     为图像添加标签文本 - 支持批量图像和批量标签，支持动态引用输入值
     支持 -- 分隔符功能，当存在只包含连字符的行时，-- 之间的内容作为完整标签
+    height_pad参数为基础高度，最终高度会根据文本行数自动调整
     """
 
     @classmethod
@@ -1037,10 +1038,10 @@ class ImageAddLabel:
         return {
             "required": {
                 "image": ("IMAGE",),
-                "height": ("INT", {"default": 60, "min": 1, "max": 1024}),
+                "height_pad": ("INT", {"default": 24, "min": 0, "max": 1024}),
                 "font_size": ("INT", {"default": 36, "min": 1, "max": 256}),
-                "invert_colors": ("BOOLEAN", {"default": True}),
-                "font": (font_files, {"default": "arial.ttf"}),
+                "invert_color": ("BOOLEAN", {"default": True}),
+                "font": (font_files, {"default": "Alibaba-PuHuiTi-Regular.otf"}),
                 "text": ("STRING", {
                     "default": "", 
                     "multiline": True,
@@ -1115,12 +1116,12 @@ class ImageAddLabel:
             text_lines = [line.strip() for line in text_lines if line.strip()]
             return text_lines if text_lines else [""]
 
-    def image_add_label(self, image, height, font_size, invert_colors, font, text, direction, input1=None, input2=None):
+    def image_add_label(self, image, height_pad, font_size, invert_color, font, text, direction, input1=None, input2=None):
         # 解析文本中的输入引用
         parsed_text = self.parse_text_with_inputs(text, input1, input2)
         
-        # 设置颜色，根据invert_colors决定黑白配色
-        if invert_colors:
+        # 设置颜色，根据invert_color决定黑白配色
+        if invert_color:
             font_color = "black"
             label_color = "white"
         else:
@@ -1144,10 +1145,6 @@ class ImageAddLabel:
 
             # 创建标签区域
             if direction in ["top", "bottom"]:
-                label_img = Image.new("RGB", (width, height), label_color)
-                # 创建绘图对象
-                draw = ImageDraw.Draw(label_img)
-
                 # 尝试加载字体，如果失败则使用默认字体
                 try:
                     # 检查字体文件是否存在
@@ -1169,39 +1166,51 @@ class ImageAddLabel:
                     print(f"无法加载字体 {font}: {e}，使用默认字体")
                     font_obj = ImageFont.load_default()
 
-                # 计算文本尺寸
+                # 创建临时绘制对象来计算文本尺寸
+                temp_img = Image.new("RGB", (1, 1))
+                temp_draw = ImageDraw.Draw(temp_img)
+                
+                # 计算文本尺寸和基线信息
                 try:
-                    # 对于较新版本的PIL
-                    text_bbox = draw.textbbox((0, 0), current_text, font=font_obj)
+                    text_bbox = temp_draw.textbbox((0, 0), current_text, font=font_obj)
                     text_width = text_bbox[2] - text_bbox[0]
                     text_height = text_bbox[3] - text_bbox[1]
+                    # 获取文本的上边距（从基线到顶部的距离）
+                    text_top_offset = -text_bbox[1]  # bbox[1] 通常是负值，表示基线以上的高度
                 except AttributeError:
-                    # 对于较旧版本的PIL
-                    text_width, text_height = draw.textsize(current_text, font=font_obj)
+                    text_width, text_height = temp_draw.textsize(current_text, font=font_obj)
+                    text_top_offset = 0  # 旧版本API的fallback
 
-                # 计算文本位置 - 左对齐，空出10像素，垂直居中
-                text_x = 10  # 左边距10像素
-                text_y = (height - text_height) // 2  # 垂直居中
+                # 确保最小边距，避免文本被遮挡
+                min_padding = max(height_pad, 4)  # 最小4像素边距
+                
+                # 计算实际需要的高度：文本高度 + 上下边距
+                actual_height = text_height + min_padding
+                
+                # 创建标签图像
+                label_img = Image.new("RGB", (width, actual_height), label_color)
+                draw = ImageDraw.Draw(label_img)
+
+                # 计算文本位置 - 左对齐，空出10像素，确保文本完全在标签区域内
+                text_x = 10
+                # 使用文本的实际顶部偏移量来正确定位
+                text_y = min_padding // 2 + text_top_offset
 
                 # 绘制文本
                 draw.text((text_x, text_y), current_text, fill=font_color, font=font_obj)
 
                 # 合并图像和标签
                 if direction == "top":
-                    new_img = Image.new("RGB", (width, orig_height + height))
+                    new_img = Image.new("RGB", (width, orig_height + actual_height))
                     new_img.paste(label_img, (0, 0))
-                    new_img.paste(img_pil, (0, height))
+                    new_img.paste(img_pil, (0, actual_height))
                 else:  # bottom
-                    new_img = Image.new("RGB", (width, orig_height + height))
+                    new_img = Image.new("RGB", (width, orig_height + actual_height))
                     new_img.paste(img_pil, (0, 0))
                     new_img.paste(label_img, (0, orig_height))
             else:  # left or right
-                # 对于左右方向，我们需要创建一个临时的水平标签，然后旋转它
                 if direction == "left":
-                    # 创建一个水平标签（类似于top标签）
-                    temp_label_img = Image.new("RGB", (orig_height, height), label_color)
-                    draw = ImageDraw.Draw(temp_label_img)
-
+                    # 创建一个水平标签，宽度使用原始图像高度
                     try:
                         font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", font)
                         if not os.path.exists(font_path):
@@ -1220,17 +1229,32 @@ class ImageAddLabel:
                         print(f"无法加载字体 {font}: {e}，使用默认字体")
                         font_obj = ImageFont.load_default()
 
-                    # 计算文本尺寸
+                    # 创建临时绘制对象来计算文本尺寸
+                    temp_img = Image.new("RGB", (1, 1))
+                    temp_draw = ImageDraw.Draw(temp_img)
+                    
+                    # 计算文本尺寸和基线信息
                     try:
-                        text_bbox = draw.textbbox((0, 0), current_text, font=font_obj)
+                        text_bbox = temp_draw.textbbox((0, 0), current_text, font=font_obj)
                         text_width = text_bbox[2] - text_bbox[0]
                         text_height = text_bbox[3] - text_bbox[1]
+                        text_top_offset = -text_bbox[1]
                     except AttributeError:
-                        text_width, text_height = draw.textsize(current_text, font=font_obj)
+                        text_width, text_height = temp_draw.textsize(current_text, font=font_obj)
+                        text_top_offset = 0
 
-                    # 计算文本位置 - 左对齐，空出10像素，垂直居中
-                    text_x = 10  # 左边距10像素
-                    text_y = (height - text_height) // 2  # 垂直居中
+                    # 确保最小边距
+                    min_padding = max(height_pad, 4)
+                    
+                    # 计算实际需要的高度：文本高度 + 上下边距
+                    actual_height = text_height + min_padding
+                    
+                    temp_label_img = Image.new("RGB", (orig_height, actual_height), label_color)
+                    draw = ImageDraw.Draw(temp_label_img)
+
+                    # 计算文本位置 - 左对齐，空出10像素，确保文本完全显示
+                    text_x = 10
+                    text_y = min_padding // 2 + text_top_offset
 
                     # 绘制文本
                     draw.text((text_x, text_y), current_text, fill=font_color, font=font_obj)
@@ -1239,15 +1263,12 @@ class ImageAddLabel:
                     label_img = temp_label_img.rotate(90, expand=True)
 
                     # 合并图像和标签
-                    new_img = Image.new("RGB", (width + height, orig_height))
+                    new_img = Image.new("RGB", (width + actual_height, orig_height))
                     new_img.paste(label_img, (0, 0))
-                    new_img.paste(img_pil, (height, 0))
+                    new_img.paste(img_pil, (actual_height, 0))
 
                 else:  # right
-                    # 创建一个水平标签（类似于top标签）
-                    temp_label_img = Image.new("RGB", (orig_height, height), label_color)
-                    draw = ImageDraw.Draw(temp_label_img)
-
+                    # 创建一个水平标签，宽度使用原始图像高度
                     try:
                         font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", font)
                         if not os.path.exists(font_path):
@@ -1266,17 +1287,32 @@ class ImageAddLabel:
                         print(f"无法加载字体 {font}: {e}，使用默认字体")
                         font_obj = ImageFont.load_default()
 
-                    # 计算文本尺寸
+                    # 创建临时绘制对象来计算文本尺寸
+                    temp_img = Image.new("RGB", (1, 1))
+                    temp_draw = ImageDraw.Draw(temp_img)
+                    
+                    # 计算文本尺寸和基线信息
                     try:
-                        text_bbox = draw.textbbox((0, 0), current_text, font=font_obj)
+                        text_bbox = temp_draw.textbbox((0, 0), current_text, font=font_obj)
                         text_width = text_bbox[2] - text_bbox[0]
                         text_height = text_bbox[3] - text_bbox[1]
+                        text_top_offset = -text_bbox[1]
                     except AttributeError:
-                        text_width, text_height = draw.textsize(current_text, font=font_obj)
+                        text_width, text_height = temp_draw.textsize(current_text, font=font_obj)
+                        text_top_offset = 0
 
-                    # 计算文本位置 - 左对齐，空出10像素，垂直居中
-                    text_x = 10  # 左边距10像素
-                    text_y = (height - text_height) // 2  # 垂直居中
+                    # 确保最小边距
+                    min_padding = max(height_pad, 4)
+                    
+                    # 计算实际需要的高度：文本高度 + 上下边距
+                    actual_height = text_height + min_padding
+                    
+                    temp_label_img = Image.new("RGB", (orig_height, actual_height), label_color)
+                    draw = ImageDraw.Draw(temp_label_img)
+
+                    # 计算文本位置 - 左对齐，空出10像素，确保文本完全显示
+                    text_x = 10
+                    text_y = min_padding // 2 + text_top_offset
 
                     # 绘制文本
                     draw.text((text_x, text_y), current_text, fill=font_color, font=font_obj)
@@ -1285,7 +1321,7 @@ class ImageAddLabel:
                     label_img = temp_label_img.rotate(270, expand=True)
 
                     # 合并图像和标签
-                    new_img = Image.new("RGB", (width + height, orig_height))
+                    new_img = Image.new("RGB", (width + actual_height, orig_height))
                     new_img.paste(img_pil, (0, 0))
                     new_img.paste(label_img, (width, 0))
 

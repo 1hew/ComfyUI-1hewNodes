@@ -19,7 +19,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 
 
+# ComfyUI-1hewNodes
 ## 📜 Changelog
+
+**v1.2.5**
+- feat(mask): Added the `Mask Fill Hole` node, which fills holes in enclosed areas of masks with support for batch processing.
 
 **v1.2.3**
 - fix(image_blend): Fixed the issue of inconsistency between devices for the `Image Blend Modes by Alpha` node.
@@ -131,6 +135,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎭 Mask Operation Nodes
 | Node Name | Description |
 |-----------|-------------|
+| Mask Fill Hole | Fill holes in enclosed areas of masks with batch processing support |
 | Mask Math Ops | Mask mathematical operations (intersection, union, difference, XOR) |
 | Mask Batch Math Ops | Batch mask mathematical operations |
 | Mask Crop by BBox Mask | Mask bounding box cropping based on mask regions |

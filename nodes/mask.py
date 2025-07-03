@@ -1,6 +1,83 @@
 import torch
 import numpy as np
 from PIL import Image, ImageOps
+from scipy import ndimage
+from skimage import morphology
+
+class MaskFillHole:
+    """
+    遮罩孔洞填充节点 - 支持填充封闭区域内的孔洞
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "mask": ("MASK",),
+                "invert_mask": ("BOOLEAN", {"default": False}),
+            }
+        }
+
+    RETURN_TYPES = ("MASK",)
+    RETURN_NAMES = ("mask",)
+    FUNCTION = "fill_holes"
+    CATEGORY = "1hewNodes/mask"
+
+    def fill_holes(self, mask, invert_mask):
+        # 确保mask是3D张量 [batch, height, width]
+        if mask.dim() == 2:
+            mask = mask.unsqueeze(0)
+            
+        batch_size = mask.shape[0]
+        output_masks = []
+        
+        for b in range(batch_size):
+            current_mask = mask[b]
+            
+            # 将mask转换为numpy数组
+            if mask.is_cuda:
+                mask_np = (current_mask.cpu().numpy() * 255).astype(np.uint8)
+            else:
+                mask_np = (current_mask.numpy() * 255).astype(np.uint8)
+            
+            # 转换为PIL图像进行处理
+            mask_pil = Image.fromarray(mask_np, mode="L")
+            
+            # 执行填充操作
+            filled_mask = self._fill_holes_internal(mask_pil, invert_mask)
+            
+            # 转换回tensor
+            filled_np = np.array(filled_mask).astype(np.float32) / 255.0
+            filled_tensor = torch.from_numpy(filled_np)
+            output_masks.append(filled_tensor)
+        
+        # 合并批次
+        output_tensor = torch.stack(output_masks)
+        
+        return (output_tensor,)
+    
+    def _fill_holes_internal(self, mask_pil, invert_mask):
+        """
+        填充封闭区域内的孔洞
+        """
+        # 转换为numpy数组
+        mask_array = np.array(mask_pil)
+        
+        # 二值化处理
+        binary_mask = mask_array > 127
+        
+        # 使用scipy的binary_fill_holes填充孔洞（使用8连通性）
+        structure = ndimage.generate_binary_structure(2, 2)
+        filled_mask = ndimage.binary_fill_holes(binary_mask, structure=structure)
+        
+        # 如果需要反转mask，在填充完成后再反转
+        if invert_mask:
+            filled_mask = ~filled_mask
+        
+        # 转换回PIL图像
+        filled_array = (filled_mask * 255).astype(np.uint8)
+        return Image.fromarray(filled_array, mode="L")
+
 
 class MaskMathOps:
     """
@@ -263,8 +340,9 @@ class MaskCropByBBoxMask:
         return padded_masks
 
 
-# 注册节点
+# 节点类映射
 NODE_CLASS_MAPPINGS = {
+    "MaskFillHole": MaskFillHole,
     "MaskMathOps": MaskMathOps,
     "MaskBatchMathOps": MaskBatchMathOps,
     "MaskCropByBBoxMask": MaskCropByBBoxMask,
@@ -272,6 +350,7 @@ NODE_CLASS_MAPPINGS = {
 
 # 节点显示名称
 NODE_DISPLAY_NAME_MAPPINGS = {
+    "MaskFillHole": "Mask Fill Hole",
     "MaskMathOps": "Mask Math Ops",
     "MaskBatchMathOps": "Mask Batch Math Ops",
     "MaskCropByBBoxMask": "Mask Crop by BBox Mask",
