@@ -17,11 +17,11 @@ class ImageSolid:
         return {
             "required": {
                 "preset_size": (["custom", "512×512 (1:1)", "768×768 (1:1)", "1024×1024 (1:1)", "1408×1408 (1:1)",
-                                "768×512 (3:2)", "1728×1152 (3:2)",
+                                "768×512 (3:2)", "1248×832 (3:2)", "1728×1152 (3:2)",
                                 "1024×768 (4:3)", "1664×1216 (4:3)",
                                 "832×480 (16:9)", "1280×720 (16:9)", "1920×1080 (16:9)",
                                 "2176×960 (21:9)",
-                                "512×768 (2:3)", "1152×1728 (2:3)",
+                                "512×768 (2:3)", "832×1248 (3:2)", "1152×1728 (2:3)",
                                 "768×1024 (3:4)", "1216×1664 (3:4)",
                                 "480×832 (9:16)", "720×1280 (9:16)", "1080×1920 (9:16)",
                                 "960×2176 (9:21)"],
@@ -781,239 +781,6 @@ class ImageEditStitch:
 
         return combined_image, combined_mask, split_mask
 
-class ImageDetailHLFreqSeparation:
-    """
-    图像细节保留-高低频分离技术
-    执行流程：
-    1. 图像A和B分别进行反转和高斯模糊处理
-    2. 将反转和模糊后的图像混合（使用CSS混合模式）
-    3. 将混合结果再次反转
-    4. 使用遮罩C混合两组混合结果
-    5. 进行最终混合和色阶调整
-    """
-    
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "generate_image": ("IMAGE",),
-                "detail_image": ("IMAGE",),
-                "detail_mask": ("MASK",),
-                "gaussian_blur": ("FLOAT", {"default": 10.00, "min": 0.00, "max": 1000.00, "step": 0.01})
-            }
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
-    FUNCTION = "process_images"
-    CATEGORY = "1hewNodes/image"
-
-    def process_images(self, detail_image, generate_image, detail_mask, gaussian_blur=10.00):
-        # 获取批次大小
-        batch_size_a = detail_image.shape[0]
-        batch_size_b = generate_image.shape[0]
-        batch_size_c = detail_mask.shape[0]
-        
-        # 使用最大批次大小
-        max_batch_size = max(batch_size_a, batch_size_b, batch_size_c)
-        
-        # 创建输出图像列表
-        output_images = []
-        
-        for b in range(max_batch_size):
-            # 获取当前批次的图像和遮罩
-            current_image_a = detail_image[b % batch_size_a]
-            current_image_b = generate_image[b % batch_size_b]
-            current_mask_c = detail_mask[b % batch_size_c]
-            
-            # 将图像转换为PIL格式
-            pil_image_a = self._tensor_to_pil(current_image_a)
-            pil_image_b = self._tensor_to_pil(current_image_b)
-            
-            # 步骤1: 图像A处理 - 反转得到a1
-            a1 = ImageOps.invert(pil_image_a)
-            
-            # 步骤2: 图像A处理 - 高斯模糊得到a2
-            a2 = self._gaussian_blur(pil_image_a, gaussian_blur)
-            
-            # 步骤3: 混合a1和a2得到c1 - 使用CSS混合模式normal
-            c1 = self._blend_images_css(a1, a2, "normal", 0.5)
-            
-            # 新增步骤: 反转c1得到c1-1
-            c1_1 = ImageOps.invert(c1)
-            
-            # 步骤4: 图像B处理 - 反转得到b1
-            b1 = ImageOps.invert(pil_image_b)
-            
-            # 步骤5: 图像B处理 - 高斯模糊得到b2
-            b2 = self._gaussian_blur(pil_image_b, gaussian_blur)
-            
-            # 步骤6: 混合b1和b2得到c2 - 使用CSS混合模式normal
-            c2 = self._blend_images_css(b1, b2, "normal", 0.5)
-            
-            # 新增步骤: 反转c2得到c2-1
-            c2_1 = ImageOps.invert(c2)
-            
-            # 步骤7: 使用遮罩C混合c1-1和c2-1得到d
-            # 将遮罩转换为PIL格式
-            if detail_mask.is_cuda:
-                mask_np = (current_mask_c.cpu().numpy() * 255).astype(np.uint8)
-            else:
-                mask_np = (current_mask_c.numpy() * 255).astype(np.uint8)
-            mask_pil = Image.fromarray(mask_np)
-            
-            # 调整遮罩大小以匹配图像
-            if mask_pil.size != pil_image_a.size:
-                mask_pil = mask_pil.resize(pil_image_a.size, Image.Resampling.LANCZOS)
-            
-            # 使用遮罩混合c1-1和c2-1
-            # 注意：这里c2-1是base_img，c1-1是overlay_img
-            d = Image.composite(c1_1, c2_1, mask_pil)
-            
-            # 步骤8: 混合d和b2得到e - 使用CSS混合模式normal
-            # 注意：这里d是overlay_img，b2是base_img
-            e = self._blend_images_css(d, b2, "normal", 0.65)
-            
-            # 步骤9: 应用色阶调整得到f
-            f = self._adjust_levels(e, 83, 172, 1.0, 0, 255)
-            
-            # 转换回tensor
-            result_tensor = self._pil_to_tensor(f)
-            output_images.append(result_tensor)
-        
-        # 合并批次
-        output_tensor = torch.stack(output_images)
-        
-        return (output_tensor,)
-    
-    def _tensor_to_pil(self, tensor):
-        """将张量转换为PIL图像"""
-        # 确保张量在CPU上
-        if tensor.is_cuda:
-            tensor = tensor.cpu()
-        
-        # 转换为numpy数组
-        np_array = (tensor.numpy() * 255).astype(np.uint8)
-        
-        # 创建PIL图像
-        if np_array.shape[2] == 3:
-            return Image.fromarray(np_array, 'RGB')
-        elif np_array.shape[2] == 4:
-            return Image.fromarray(np_array, 'RGBA')
-        else:
-            raise ValueError(f"不支持的通道数: {np_array.shape[2]}")
-    
-    def _pil_to_tensor(self, pil_image):
-        """将PIL图像转换为张量"""
-        # 确保图像是RGB模式
-        if pil_image.mode != 'RGB':
-            pil_image = pil_image.convert('RGB')
-        
-        # 转换为numpy数组
-        np_array = np.array(pil_image).astype(np.float32) / 255.0
-        
-        # 转换为张量
-        return torch.from_numpy(np_array)
-    
-    def _gaussian_blur(self, image, blur):
-        """应用高斯模糊"""
-        if blur <= 0:
-            return image
-        
-        # 参考 LS_GaussianBlurV2 节点的实现
-        return image.filter(ImageFilter.GaussianBlur(radius=blur))
-    
-    def _blend_images_css(self, overlay_img, base_img, blend_mode, blend_percentage):
-        """使用CSS混合模式混合两个图像"""
-        # 确保两个图像具有相同的尺寸和模式
-        if overlay_img.size != base_img.size:
-            overlay_img = overlay_img.resize(base_img.size, Image.Resampling.LANCZOS)
-        
-        if overlay_img.mode != base_img.mode:
-            if 'A' in overlay_img.mode:
-                base_img = base_img.convert(overlay_img.mode)
-            else:
-                overlay_img = overlay_img.convert(base_img.mode)
-        
-        # 转换为numpy数组
-        overlay_array = np.array(overlay_img).astype(float)
-        base_array = np.array(base_img).astype(float)
-        
-        # 应用CSS混合模式
-        if blend_mode == "normal":
-            # 普通混合模式
-            blended_array = overlay_array * blend_percentage + base_array * (1 - blend_percentage)
-        elif blend_mode == "multiply":
-            # 正片叠底
-            blended_array = (overlay_array * base_array) / 255.0
-            blended_array = blended_array * blend_percentage + base_array * (1 - blend_percentage)
-        elif blend_mode == "screen":
-            # 滤色
-            blended_array = 255.0 - ((255.0 - overlay_array) * (255.0 - base_array) / 255.0)
-            blended_array = blended_array * blend_percentage + base_array * (1 - blend_percentage)
-        elif blend_mode == "overlay":
-            # 叠加
-            mask = base_array <= 127.5
-            blended_array = np.zeros_like(base_array)
-            blended_array[mask] = (2 * overlay_array[mask] * base_array[mask]) / 255.0
-            blended_array[~mask] = 255.0 - (2 * (255.0 - overlay_array[~mask]) * (255.0 - base_array[~mask]) / 255.0)
-            blended_array = blended_array * blend_percentage + base_array * (1 - blend_percentage)
-        elif blend_mode == "soft_light":
-            # 柔光
-            blended_array = np.zeros_like(base_array)
-            mask = overlay_array <= 127.5
-            blended_array[mask] = ((2 * overlay_array[mask] - 255.0) * (base_array[mask] - base_array[mask] * base_array[mask] / 255.0) / 255.0) + base_array[mask]
-            blended_array[~mask] = ((2 * overlay_array[~mask] - 255.0) * (np.sqrt(base_array[~mask] / 255.0) * 255.0 - base_array[~mask]) / 255.0) + base_array[~mask]
-            blended_array = blended_array * blend_percentage + base_array * (1 - blend_percentage)
-        else:
-            # 默认为普通混合
-            blended_array = overlay_array * blend_percentage + base_array * (1 - blend_percentage)
-        
-        # 确保值在有效范围内
-        blended_array = np.clip(blended_array, 0, 255).astype(np.uint8)
-        
-        # 转换回PIL图像
-        if overlay_img.mode == 'RGB':
-            return Image.fromarray(blended_array, 'RGB')
-        elif overlay_img.mode == 'RGBA':
-            return Image.fromarray(blended_array, 'RGBA')
-        else:
-            return Image.fromarray(blended_array)
-    
-    def _adjust_levels(self, image, black_point, white_point, gray_point=1.0, output_black_point=0, output_white_point=255):
-        """应用色阶调整，参考 ColorCorrectLevels 节点"""
-        # 确保值在0-255范围内
-        black_point = max(0, min(255, black_point))
-        white_point = max(0, min(255, white_point))
-        output_black_point = max(0, min(255, output_black_point))
-        output_white_point = max(0, min(255, output_white_point))
-        
-        # 转换为numpy数组
-        img_array = np.array(image)
-        
-        # 分别处理每个通道
-        result_array = np.zeros_like(img_array)
-        
-        for i in range(img_array.shape[2]):
-            channel = img_array[:, :, i].astype(float)
-            
-            # 应用黑白点调整
-            channel = np.clip(channel, black_point, white_point)
-            channel = (channel - black_point) / (white_point - black_point) * 255.0
-            
-            # 应用灰度点调整（gamma校正）
-            if gray_point != 1.0:
-                channel = 255.0 * (channel / 255.0) ** (1.0 / gray_point)
-            
-            # 应用输出黑白点调整
-            channel = (channel / 255.0) * (output_white_point - output_black_point) + output_black_point
-            
-            # 确保值在有效范围内
-            result_array[:, :, i] = np.clip(channel, 0, 255).astype(np.uint8)
-        
-        # 转换回PIL图像
-        return Image.fromarray(result_array)
-
 
 class ImageAddLabel:
     """
@@ -1045,7 +812,7 @@ class ImageAddLabel:
                 "text": ("STRING", {
                     "default": "", 
                     "multiline": True,
-                    "placeholder": "-- splits override separator\nelse use newline."
+                    "placeholder": "-- splits override separator\nelse use newline.\n\n变量支持：\n{index} - 批次索引 (从0开始: 0, 1, 2...)\n{idx} - 批次索引别名 (从0开始: 0, 1, 2...)\n{range} - 批次索引 (从0开始: 00, 01, 02...)\n{input1} - 自定义输入1\n{input2} - 自定义输入2\n\n数学运算支持：\n{index+1} - 索引加1\n{idx-1} - 索引减1\n{range*2} - 索引乘2\n{index/2} - 索引除2"
                 }),
                 "direction": (["top", "bottom", "left", "right"], {"default": "top"})
             },
@@ -1060,10 +827,12 @@ class ImageAddLabel:
     FUNCTION = "image_add_label"
     CATEGORY = "1hewNodes/image"
 
-    def parse_text_with_inputs(self, text, input1=None, input2=None):
+    def parse_text_with_inputs(self, text, input1=None, input2=None, batch_index=None, total_batches=None):
         """
-        解析文本中的输入引用
+        解析文本中的输入引用，支持变量和简单数学运算
         """
+        import re
+        
         parsed_text = text
         
         # 替换 {input1} 引用
@@ -1073,6 +842,56 @@ class ImageAddLabel:
         # 替换 {input2} 引用
         if input2 is not None and input2 != "":
             parsed_text = parsed_text.replace("{input2}", str(input2))
+        
+        # 处理索引相关变量和运算 - 批量标注时生效
+        if batch_index is not None and total_batches is not None:
+            # 定义变量值
+            variables = {
+                'index': batch_index,      # 从0开始
+                'idx': batch_index,        # 从0开始
+                'range': batch_index       # 从0开始
+            }
+            
+            # 使用正则表达式匹配 {变量名} 或 {变量名+数字} 或 {变量名-数字} 等表达式
+            pattern = r'\{((?:index|idx|range)(?:[+\-*/]\d+)?)\}'
+            
+            def replace_expression(match):
+                expression = match.group(1)
+                try:
+                    # 解析表达式
+                    if '+' in expression:
+                        var_name, operand = expression.split('+')
+                        result = variables[var_name.strip()] + int(operand.strip())
+                    elif '-' in expression:
+                        var_name, operand = expression.split('-')
+                        result = variables[var_name.strip()] - int(operand.strip())
+                    elif '*' in expression:
+                        var_name, operand = expression.split('*')
+                        result = variables[var_name.strip()] * int(operand.strip())
+                    elif '/' in expression:
+                        var_name, operand = expression.split('/')
+                        result = variables[var_name.strip()] // int(operand.strip())  # 整数除法
+                    else:
+                        # 纯变量名
+                        result = variables[expression.strip()]
+                    
+                    # 对于 range 变量，保持补零格式
+                    if expression.strip() == 'range' or (expression.startswith('range') and result >= 0):
+                        if total_batches >= 100:
+                            return f"{result:03d}"
+                        elif total_batches >= 10:
+                            return f"{result:02d}"
+                        else:
+                            return str(result)
+                    else:
+                        # index 和 idx 默认不补零
+                        return str(result)
+                        
+                except (ValueError, KeyError, ZeroDivisionError):
+                    # 如果解析失败，返回原始表达式
+                    return match.group(0)
+            
+            parsed_text = re.sub(pattern, replace_expression, parsed_text)
             
         return parsed_text
 
@@ -1116,10 +935,108 @@ class ImageAddLabel:
             text_lines = [line.strip() for line in text_lines if line.strip()]
             return text_lines if text_lines else [""]
 
-    def image_add_label(self, image, height_pad, font_size, invert_color, font, text, direction, input1=None, input2=None):
-        # 解析文本中的输入引用
-        parsed_text = self.parse_text_with_inputs(text, input1, input2)
+    def _calculate_max_label_size(self, image, text_lines, font, font_size, height_pad, direction):
+        """
+        预计算所有标签的最大尺寸，确保批量处理时尺寸一致
+        """
+        max_width = 0
+        max_height = 0
         
+        # 尝试加载字体
+        try:
+            font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", font)
+            if not os.path.exists(font_path):
+                system_font_dirs = [
+                    "C:/Windows/Fonts",
+                    "/usr/share/fonts",
+                    "/System/Library/Fonts"
+                ]
+                for font_dir in system_font_dirs:
+                    if os.path.exists(os.path.join(font_dir, font)):
+                        font_path = os.path.join(font_dir, font)
+                        break
+            font_obj = ImageFont.truetype(font_path, font_size)
+        except Exception as e:
+            print(f"无法加载字体 {font}: {e}，使用默认字体")
+            font_obj = ImageFont.load_default()
+        
+        # 创建临时绘制对象来计算文本尺寸
+        temp_img = Image.new("RGB", (1, 1))
+        temp_draw = ImageDraw.Draw(temp_img)
+        
+        # 遍历所有可能的文本，找到最大尺寸
+        for i, img in enumerate(image):
+            current_text = text_lines[i % len(text_lines)] if text_lines else ""
+            
+            # 计算文本尺寸
+            try:
+                text_bbox = temp_draw.textbbox((0, 0), current_text, font=font_obj)
+                text_width = text_bbox[2] - text_bbox[0]
+                text_height = text_bbox[3] - text_bbox[1]
+            except AttributeError:
+                text_width, text_height = temp_draw.textsize(current_text, font=font_obj)
+            
+            # 确保最小边距
+            min_padding = max(height_pad, 4)
+            actual_height = text_height + min_padding
+            
+            max_width = max(max_width, text_width)
+            max_height = max(max_height, actual_height)
+        
+        return max_width, max_height
+
+    def _calculate_max_label_size_from_texts(self, text_lines, font, font_size, height_pad, direction):
+        """
+        从文本列表预计算所有标签的最大尺寸，确保批量处理时尺寸一致
+        """
+        max_width = 0
+        max_height = 0
+        
+        # 尝试加载字体
+        try:
+            font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", font)
+            if not os.path.exists(font_path):
+                system_font_dirs = [
+                    "C:/Windows/Fonts",
+                    "/usr/share/fonts",
+                    "/System/Library/Fonts"
+                ]
+                for font_dir in system_font_dirs:
+                    if os.path.exists(os.path.join(font_dir, font)):
+                        font_path = os.path.join(font_dir, font)
+                        break
+            font_obj = ImageFont.truetype(font_path, font_size)
+        except Exception as e:
+            print(f"无法加载字体 {font}: {e}，使用默认字体")
+            font_obj = ImageFont.load_default()
+        
+        # 创建临时绘制对象来计算文本尺寸
+        temp_img = Image.new("RGB", (1, 1))
+        temp_draw = ImageDraw.Draw(temp_img)
+        
+        # 遍历所有文本，找到最大尺寸
+        for current_text in text_lines:
+            if not current_text:  # 跳过空文本
+                continue
+                
+            # 计算文本尺寸
+            try:
+                text_bbox = temp_draw.textbbox((0, 0), current_text, font=font_obj)
+                text_width = text_bbox[2] - text_bbox[0]
+                text_height = text_bbox[3] - text_bbox[1]
+            except AttributeError:
+                text_width, text_height = temp_draw.textsize(current_text, font=font_obj)
+            
+            # 确保最小边距
+            min_padding = max(height_pad, 4)
+            actual_height = text_height + min_padding
+            
+            max_width = max(max_width, text_width)
+            max_height = max(max_height, actual_height)
+        
+        return max_width, max_height
+
+    def image_add_label(self, image, height_pad, font_size, invert_color, font, text, direction, input1=None, input2=None):
         # 设置颜色，根据invert_color决定黑白配色
         if invert_color:
             font_color = "black"
@@ -1131,10 +1048,30 @@ class ImageAddLabel:
         # 获取图像尺寸
         result = []
         
-        # 处理文本，支持 -- 分隔符功能
-        text_lines = self.parse_text_list(parsed_text)
+        # 获取总批次数用于 {range} 功能
+        total_batches = len(image)
+        
+        # 预处理所有文本以计算最大标签尺寸
+        all_parsed_texts = []
+        for i in range(total_batches):
+            # 为每个批次解析文本，包含 {range} 替换
+            parsed_text = self.parse_text_with_inputs(text, input1, input2, i, total_batches)
+            all_parsed_texts.append(parsed_text)
+        
+        # 处理所有解析后的文本，支持 -- 分隔符功能
+        all_text_lines = []
+        for parsed_text in all_parsed_texts:
+            text_lines = self.parse_text_list(parsed_text)
+            all_text_lines.extend(text_lines)
+        
+        # 预计算所有标签的最大尺寸，确保批量处理时尺寸一致
+        max_label_size = self._calculate_max_label_size_from_texts(all_text_lines, font, font_size, height_pad, direction)
         
         for i, img in enumerate(image):
+            # 使用预处理的文本，包含 {range} 替换
+            parsed_text = all_parsed_texts[i]
+            text_lines = self.parse_text_list(parsed_text)
+            
             # 选择对应的标签文本，如果标签数量少于图像数量，则循环使用
             current_text = text_lines[i % len(text_lines)] if text_lines else ""
             
@@ -1184,11 +1121,11 @@ class ImageAddLabel:
                 # 确保最小边距，避免文本被遮挡
                 min_padding = max(height_pad, 4)  # 最小4像素边距
                 
-                # 计算实际需要的高度：文本高度 + 上下边距
-                actual_height = text_height + min_padding
+                # 使用预计算的统一高度，确保批量处理时尺寸一致
+                _, uniform_height = max_label_size
                 
                 # 创建标签图像
-                label_img = Image.new("RGB", (width, actual_height), label_color)
+                label_img = Image.new("RGB", (width, uniform_height), label_color)
                 draw = ImageDraw.Draw(label_img)
 
                 # 计算文本位置 - 左对齐，空出10像素，确保文本完全在标签区域内
@@ -1201,11 +1138,11 @@ class ImageAddLabel:
 
                 # 合并图像和标签
                 if direction == "top":
-                    new_img = Image.new("RGB", (width, orig_height + actual_height))
+                    new_img = Image.new("RGB", (width, orig_height + uniform_height))
                     new_img.paste(label_img, (0, 0))
-                    new_img.paste(img_pil, (0, actual_height))
+                    new_img.paste(img_pil, (0, uniform_height))
                 else:  # bottom
-                    new_img = Image.new("RGB", (width, orig_height + actual_height))
+                    new_img = Image.new("RGB", (width, orig_height + uniform_height))
                     new_img.paste(img_pil, (0, 0))
                     new_img.paste(label_img, (0, orig_height))
             else:  # left or right
@@ -1246,10 +1183,10 @@ class ImageAddLabel:
                     # 确保最小边距
                     min_padding = max(height_pad, 4)
                     
-                    # 计算实际需要的高度：文本高度 + 上下边距
-                    actual_height = text_height + min_padding
+                    # 使用预计算的统一高度，确保批量处理时尺寸一致
+                    _, uniform_height = max_label_size
                     
-                    temp_label_img = Image.new("RGB", (orig_height, actual_height), label_color)
+                    temp_label_img = Image.new("RGB", (orig_height, uniform_height), label_color)
                     draw = ImageDraw.Draw(temp_label_img)
 
                     # 计算文本位置 - 左对齐，空出10像素，确保文本完全显示
@@ -1263,9 +1200,9 @@ class ImageAddLabel:
                     label_img = temp_label_img.rotate(90, expand=True)
 
                     # 合并图像和标签
-                    new_img = Image.new("RGB", (width + actual_height, orig_height))
+                    new_img = Image.new("RGB", (width + uniform_height, orig_height))
                     new_img.paste(label_img, (0, 0))
-                    new_img.paste(img_pil, (actual_height, 0))
+                    new_img.paste(img_pil, (uniform_height, 0))
 
                 else:  # right
                     # 创建一个水平标签，宽度使用原始图像高度
@@ -1304,10 +1241,10 @@ class ImageAddLabel:
                     # 确保最小边距
                     min_padding = max(height_pad, 4)
                     
-                    # 计算实际需要的高度：文本高度 + 上下边距
-                    actual_height = text_height + min_padding
+                    # 使用预计算的统一高度，确保批量处理时尺寸一致
+                    _, uniform_height = max_label_size
                     
-                    temp_label_img = Image.new("RGB", (orig_height, actual_height), label_color)
+                    temp_label_img = Image.new("RGB", (orig_height, uniform_height), label_color)
                     draw = ImageDraw.Draw(temp_label_img)
 
                     # 计算文本位置 - 左对齐，空出10像素，确保文本完全显示
@@ -1321,7 +1258,7 @@ class ImageAddLabel:
                     label_img = temp_label_img.rotate(270, expand=True)
 
                     # 合并图像和标签
-                    new_img = Image.new("RGB", (width + actual_height, orig_height))
+                    new_img = Image.new("RGB", (width + uniform_height, orig_height))
                     new_img.paste(img_pil, (0, 0))
                     new_img.paste(label_img, (width, 0))
 
@@ -1822,7 +1759,6 @@ NODE_CLASS_MAPPINGS = {
     "ImageSolid": ImageSolid,
     "ImageResizeUniversal": ImageResizeUniversal,
     "ImageEditStitch": ImageEditStitch,
-    "ImageDetailHLFreqSeparation": ImageDetailHLFreqSeparation,
     "ImageAddLabel": ImageAddLabel,
     "ImagePlot": ImagePlot,
     "ImageBBoxOverlayByMask": ImageBBoxOverlayByMask,
@@ -1832,7 +1768,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ImageSolid": "Image Solid",
     "ImageResizeUniversal": "Image Resize Universal",
     "ImageEditStitch": "Image Edit Stitch",
-    "ImageDetailHLFreqSeparation": "Image Detail HL Freq Separation",
     "ImageAddLabel": "Image Add Label",
     "ImagePlot": "Image Plot",
     "ImageBBoxOverlayByMask": "Image BBox Overlay by Mask",

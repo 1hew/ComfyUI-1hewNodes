@@ -19,8 +19,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 
 
-# ComfyUI-1hewNodes
 ## 📜 Changelog
+
+**v1.2.6**
+- feat(image_hlfreq): Added high-low frequency separation node group, including `Image HLFreq Separate`, `Image HLFreq Combine`, and `Image HLFreq Transform` nodes with support for RGB, HSV, and IGBI frequency separation methods
 
 **v1.2.5**
 - feat(mask): Added the `Mask Fill Hole` node, which fills holes in enclosed areas of masks with support for batch processing.
@@ -105,7 +107,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Solid | Generate solid color images with multiple size and color format support |
 | Image Resize Universal | Universal image resizing with multiple algorithms and constraints |
 | Image Edit Stitch | Image stitching and merging with multiple stitching modes |
-| Image Detail HL Freq Separation | High-low frequency separation processing |
 | Image Add Label | Add text labels to images |
 | Image Plot | Image plotting and visualization tools |
 | Image BBox Overlay by Mask | Mask-based image bounding box overlay with independent and merge modes |
@@ -131,6 +132,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Image Tile Split | Image tile splitting with overlap and custom grid support |
 | Image Tile Merge | Image tile merging with intelligent stitching |
+
+### 🌊 High-Low Frequency Separation Nodes
+| Node Name | Description |
+|-----------|-------------|
+| Image HLFreq Separate | Advanced frequency separation node supporting RGB, HSV, and IGBI separation methods with precise high-low frequency image separation and automatic recombination |
+| Image HLFreq Combine | Advanced frequency recombination node supporting RGB, HSV, and IGBI recombination modes with intensity adjustment and intelligent batch matching |
+| Image HLFreq Transform | Advanced detail transfer node supporting IGBI, RGB, and HSV transfer methods for precise texture detail migration from detail images to generated images |
 
 ### 🎭 Mask Operation Nodes
 | Node Name | Description |
@@ -182,6 +190,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 [ComfyUI_LayerStyle](https://github.com/chflame163/ComfyUI_LayerStyle)
 
 [Comfyui_TTP_Toolset](https://github.com/TTPlanetPig/Comfyui_TTP_Toolset)
+
+[comfyUI_FrequencySeparation_RGB-HSV](https://github.com/risunobushi/comfyUI_FrequencySeparation_RGB-HSV)
 
 
 

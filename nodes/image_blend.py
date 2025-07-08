@@ -212,9 +212,9 @@ class ImageBlendModesByAlpha:
             "required": {
                 "overlay_image": ("IMAGE",),
                 "base_image": ("IMAGE",),
-                "blend_mode": (["normal", "dissolve", "darken", "multiply", "color burn", "linear burn", 
-                                "add", "lighten", "screen", "color dodge", "linear dodge",
-                                "overlay", "soft light", "hard light", "linear light", "vivid light", "pin light", "hard mix",
+                "blend_mode": (["normal", "dissolve", "darken", "multiply", "color_burn", "linear_burn", 
+                                "add", "lighten", "screen", "color_dodge", "linear_dodge",
+                                "overlay", "soft_light", "hard_light", "linear_light", "vivid_light", "pin_light", "hard_mix",
                                 "difference", "exclusion",  "subtract", "divide", 
                                 "hue", "saturation", "color", "luminosity",
                                  ], {"default": "normal"}),
@@ -318,15 +318,31 @@ class ImageBlendModesByAlpha:
         base_batch_size = base.shape[0]
         overlay_batch_size = overlay.shape[0]
         
-        # 如果批次大小不同，则调整叠加图层以匹配基础图层
+        # 处理批量不匹配：使用最大批次数量并复制较少批次的数据
         if base_batch_size != overlay_batch_size:
-            if overlay_batch_size == 1:
-                # 如果叠加层只有一个图像，则复制它以匹配基础层的批次大小
-                overlay = overlay.repeat(base_batch_size, 1, 1, 1)
-            else:
-                # 否则，循环使用叠加层的图像
-                indices = [i % overlay_batch_size for i in range(base_batch_size)]
-                overlay = overlay[indices]
+            max_batch_size = max(base_batch_size, overlay_batch_size)
+            
+            # 复制基础图像以匹配最大批次数量
+            if base_batch_size < max_batch_size:
+                repeat_factor = max_batch_size // base_batch_size
+                remainder = max_batch_size % base_batch_size
+                base_repeated = base.repeat(repeat_factor, 1, 1, 1)
+                if remainder > 0:
+                    base_remainder = base[:remainder]
+                    base = torch.cat([base_repeated, base_remainder], dim=0)
+                else:
+                    base = base_repeated
+            
+            # 复制叠加图像以匹配最大批次数量
+            if overlay_batch_size < max_batch_size:
+                repeat_factor = max_batch_size // overlay_batch_size
+                remainder = max_batch_size % overlay_batch_size
+                overlay_repeated = overlay.repeat(repeat_factor, 1, 1, 1)
+                if remainder > 0:
+                    overlay_remainder = overlay[:remainder]
+                    overlay = torch.cat([overlay_repeated, overlay_remainder], dim=0)
+                else:
+                    overlay = overlay_repeated
         
         # 确保两个图像具有相同的尺寸
         base_height, base_width = base.shape[1:3]
@@ -369,9 +385,9 @@ class ImageBlendModesByAlpha:
             result = self._darken_blend(base, overlay, opacity)
         elif blend_mode == "multiply":
             result = self._multiply_blend(base, overlay, opacity)
-        elif blend_mode == "color burn":
+        elif blend_mode == "color_burn":
             result = self._color_burn_blend(base, overlay, opacity)
-        elif blend_mode == "linear burn":
+        elif blend_mode == "linear_burn":
             result = self._linear_burn_blend(base, overlay, opacity)
         elif blend_mode == "add":
             result = self._add_blend(base, overlay, opacity)
@@ -379,23 +395,23 @@ class ImageBlendModesByAlpha:
             result = self._lighten_blend(base, overlay, opacity)
         elif blend_mode == "screen":
             result = self._screen_blend(base, overlay, opacity)
-        elif blend_mode == "color dodge":
+        elif blend_mode == "color_dodge":
             result = self._color_dodge_blend(base, overlay, opacity)
-        elif blend_mode == "linear dodge":
+        elif blend_mode == "linear_dodge":
             result = self._linear_dodge_blend(base, overlay, opacity)
         elif blend_mode == "overlay":
             result = self._overlay_blend(base, overlay, opacity)
-        elif blend_mode == "soft light":
+        elif blend_mode == "soft_light":
             result = self._soft_light_blend(base, overlay, opacity)
-        elif blend_mode == "hard light":
+        elif blend_mode == "hard_light":
             result = self._hard_light_blend(base, overlay, opacity)
-        elif blend_mode == "linear light":
+        elif blend_mode == "linear_light":
             result = self._linear_light_blend(base, overlay, opacity)
-        elif blend_mode == "vivid light":
+        elif blend_mode == "vivid_light":
             result = self._vivid_light_blend(base, overlay, opacity)
-        elif blend_mode == "pin light":
+        elif blend_mode == "pin_light":
             result = self._pin_light_blend(base, overlay, opacity)
-        elif blend_mode == "hard mix":
+        elif blend_mode == "hard_mix":
             result = self._hard_mix_blend(base, overlay, opacity)
         elif blend_mode == "difference":
             result = self._difference_blend(base, overlay, opacity)
@@ -673,6 +689,91 @@ class ImageBlendModesByAlpha:
         result[:, :, :, :3] = base_rgb * (1 - opacity) + result_rgb * opacity
         
         return result
+    
+    def _rgb_to_hsl(self, rgb):
+        """将RGB转换为HSL"""
+        # 确保输入在0-1范围内
+        rgb = torch.clamp(rgb, 0, 1)
+        
+        r, g, b = rgb[:, :, :, 0], rgb[:, :, :, 1], rgb[:, :, :, 2]
+        
+        max_val = torch.maximum(torch.maximum(r, g), b)
+        min_val = torch.minimum(torch.minimum(r, g), b)
+        diff = max_val - min_val
+        
+        # 计算亮度
+        l = (max_val + min_val) / 2.0
+        
+        # 计算饱和度
+        s = torch.zeros_like(l)
+        mask = diff != 0
+        s = torch.where(mask, diff / (2.0 - max_val - min_val), s)
+        s = torch.where(mask & (l < 0.5), diff / (max_val + min_val), s)
+        
+        # 计算色相
+        h = torch.zeros_like(l)
+        
+        # 红色主导
+        mask_r = (max_val == r) & (diff != 0)
+        h = torch.where(mask_r, ((g - b) / diff) % 6, h)
+        
+        # 绿色主导
+        mask_g = (max_val == g) & (diff != 0)
+        h = torch.where(mask_g, (b - r) / diff + 2, h)
+        
+        # 蓝色主导
+        mask_b = (max_val == b) & (diff != 0)
+        h = torch.where(mask_b, (r - g) / diff + 4, h)
+        
+        h = h / 6.0
+        
+        return torch.stack([h, s, l], dim=-1)
+    
+    def _hsl_to_rgb(self, hsl):
+        """将HSL转换为RGB"""
+        h, s, l = hsl[:, :, :, 0], hsl[:, :, :, 1], hsl[:, :, :, 2]
+        
+        # 确保色相在0-1范围内
+        h = h % 1.0
+        
+        c = (1 - torch.abs(2 * l - 1)) * s
+        x = c * (1 - torch.abs((h * 6) % 2 - 1))
+        m = l - c / 2
+        
+        r = torch.zeros_like(h)
+        g = torch.zeros_like(h)
+        b = torch.zeros_like(h)
+        
+        # 根据色相区间计算RGB
+        mask1 = (h >= 0) & (h < 1/6)
+        r = torch.where(mask1, c, r)
+        g = torch.where(mask1, x, g)
+        
+        mask2 = (h >= 1/6) & (h < 2/6)
+        r = torch.where(mask2, x, r)
+        g = torch.where(mask2, c, g)
+        
+        mask3 = (h >= 2/6) & (h < 3/6)
+        g = torch.where(mask3, c, g)
+        b = torch.where(mask3, x, b)
+        
+        mask4 = (h >= 3/6) & (h < 4/6)
+        g = torch.where(mask4, x, g)
+        b = torch.where(mask4, c, b)
+        
+        mask5 = (h >= 4/6) & (h < 5/6)
+        r = torch.where(mask5, x, r)
+        b = torch.where(mask5, c, b)
+        
+        mask6 = (h >= 5/6) & (h <= 1)
+        r = torch.where(mask6, c, r)
+        b = torch.where(mask6, x, b)
+        
+        r = r + m
+        g = g + m
+        b = b + m
+        
+        return torch.stack([r, g, b], dim=-1)
 
 
 class ImageBlendModesByCSS:
@@ -753,6 +854,9 @@ class ImageBlendModesByCSS:
                 # 合成图像
                 blended_pil = Image.composite(base_pil, blended_pil, opacity_mask)
             
+            # 将混合后的PIL图像转换为张量
+            current_blended = self._pil_to_tensor(blended_pil).to(current_base.device)
+            
             # 如果提供了遮罩，则应用遮罩
             if overlay_mask is not None:
                 # 确定使用哪个遮罩（如果遮罩数量少于图像数量，则循环使用）
@@ -790,11 +894,7 @@ class ImageBlendModesByCSS:
                 masked_result = current_base * (1.0 - current_mask) + current_blended * current_mask
                 output_images.append(masked_result)
             else:
-                final_pil = blended_pil
-            
-            # 转换回张量
-            final_tensor = self._pil_to_tensor(final_pil)
-            output_images.append(final_tensor)
+                output_images.append(current_blended)
         
         # 合并批次
         result = torch.stack(output_images)
