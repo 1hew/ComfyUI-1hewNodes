@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.6**
+- feat(image_hlfreq): 添加高低频分离节点组，包含 `Image HLFreq Separate`、`Image HLFreq Combine` 和 `Image HLFreq Transform` 三个节点，支持RGB、HSV、IGBI三种频率分离方法
+
 **v1.2.5**
 - feat(mask): 添加 `Mask Fill Hole` 节点，用于填充遮罩中的封闭区域孔洞，支持批量处理。
 
@@ -104,7 +107,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Solid | 生成纯色图像，支持多种尺寸和颜色格式 |
 | Image Resize Universal | 通用图像尺寸调整，支持多种算法和约束 |
 | Image Edit Stitch | 图像拼接与缝合，支持多种拼接模式 |
-| Image Detail HL Freq Separation | 高低频分离处理 |
 | Image Add Label | 为图像添加文本标签 |
 | Image Plot | 图像绘制和可视化工具 |
 | Image BBox Overlay by Mask | 基于遮罩的图像边界框叠加，支持独立和合并模式 |
@@ -130,6 +132,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Image Tile Split | 图像分块分割，支持重叠和自定义网格 |
 | Image Tile Merge | 图像分块合并，智能拼接处理 |
+
+### 🌊 高低频分离节点
+| 节点名称 | 功能描述 |
+|---------|----------|
+| Image HLFreq Separate | 高级频率分离节点，支持RGB、HSV、IGBI三种分离方法，提供精确的高低频图像分离和自动重组功能 |
+| Image HLFreq Combine | 高级频率重组节点，支持RGB、HSV、IGBI三种重组模式，提供强度调整和批处理智能匹配 |
+| Image HLFreq Transform | 高级细节迁移节点，支持IGBI、RGB、HSV三种迁移方法，实现从细节图像向生成图像的精确纹理细节迁移 |
 
 ### 🎭 遮罩操作节点
 | 节点名称 | 功能描述 |
@@ -181,6 +190,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 [ComfyUI_LayerStyle](https://github.com/chflame163/ComfyUI_LayerStyle)
 
 [Comfyui_TTP_Toolset](https://github.com/TTPlanetPig/Comfyui_TTP_Toolset)
+
+[comfyUI_FrequencySeparation_RGB-HSV](https://github.com/risunobushi/comfyUI_FrequencySeparation_RGB-HSV)
 
 
 
