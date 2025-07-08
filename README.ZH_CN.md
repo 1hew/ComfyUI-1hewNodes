@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.7**
+- feat(text): 添加 `List Custom Seed` 节点，支持生成唯一随机种子列表和control after generate功能
+
 **v1.2.6**
 - feat(image_hlfreq): 添加高低频分离节点组，包含 `Image HLFreq Separate`、`Image HLFreq Combine` 和 `Image HLFreq Transform` 三个节点，支持RGB、HSV、IGBI三种频率分离方法
 
@@ -176,6 +179,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | List Custom Int | 自定义整数列表生成器，支持连字符分割和多种分隔符 |
 | List Custom Float | 自定义浮点数列表生成器，支持连字符分割和多种分隔符 |
 | List Custom String | 自定义字符串列表生成器，支持连字符分割和多种分隔符 |
+| List Custom Seed | 自定义种子列表生成器，支持生成唯一随机种子列表和control after generate功能 |
 
 
 

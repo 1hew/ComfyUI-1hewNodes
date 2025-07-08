@@ -1,5 +1,7 @@
 import json
 import re
+import random
+import time
 
 
 class TextCustomExtract:
@@ -705,12 +707,100 @@ class ListCustomString:
         return (string_list, len(string_list))
 
 
+class ListCustomSeed:
+    """
+    自定义种子列表节点 - 生成种子类型的列表
+    基于输入种子生成指定数量的随机种子列表
+    种子范围：0 到 1125899906842624
+    保留control after generate功能，确保生成的种子不重复
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "seed": ("INT", {
+                    "default": 42,
+                    "min": 0,
+                    "max": 1125899906842624,
+                    "step": 1
+                }),
+                "count": ("INT", {
+                    "default": 3,
+                    "min": 1,
+                    "max": 1000,
+                    "step": 1
+                })
+            }
+        }
+    
+    RETURN_TYPES = ("INT", "INT")
+    RETURN_NAMES = ("seed_list", "count")
+    OUTPUT_IS_LIST = (True, False)
+    CATEGORY = "1hewNodes/text"
+    FUNCTION = "list_custom_seed"
+    
+    def __init__(self):
+        self.used_seeds = set()  # 用于跟踪已使用的随机种子
+    
+    def generate_unique_random_seeds(self, count):
+        """
+        生成不重复的随机种子列表
+        """
+        seeds = []
+        max_attempts = count * 10  # 防止无限循环
+        attempts = 0
+        
+        while len(seeds) < count and attempts < max_attempts:
+            seed = random.randint(0, 1125899906842624)
+            if seed not in self.used_seeds:
+                seeds.append(seed)
+                self.used_seeds.add(seed)
+            attempts += 1
+        
+        # 如果无法生成足够的唯一种子，清空已使用集合并重新开始
+        if len(seeds) < count:
+            self.used_seeds.clear()
+            while len(seeds) < count:
+                seed = random.randint(0, 1125899906842624)
+                if seed not in seeds:
+                    seeds.append(seed)
+        
+        return seeds
+    
+    def clamp_seed(self, seed):
+        """
+        确保种子值在有效范围内
+        """
+        return max(0, min(seed, 1125899906842624))
+    
+
+    
+    def list_custom_seed(self, seed, count):
+        """
+        生成种子类型的自定义列表
+        基于输入种子生成指定数量的随机种子列表
+        保留control after generate功能，确保生成的种子不重复
+        """
+        # 使用输入种子作为随机数生成器的种子
+        random.seed(seed)
+        
+        # 生成不重复的随机种子列表
+        seed_list = self.generate_unique_random_seeds(count)
+        
+        # 确保所有种子都在有效范围内
+        seed_list = [self.clamp_seed(s) for s in seed_list]
+        
+        return (seed_list, len(seed_list))
+
+
 # 节点映射
 NODE_CLASS_MAPPINGS = {
     "TextCustomExtract": TextCustomExtract,
     "ListCustomInt": ListCustomInt,
     "ListCustomFloat": ListCustomFloat,
     "ListCustomString": ListCustomString,
+    "ListCustomSeed": ListCustomSeed,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -718,4 +808,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ListCustomInt": "List Custom Int", 
     "ListCustomFloat": "List Custom Float",
     "ListCustomString": "List Custom String",
+    "ListCustomSeed": "List Custom Seed",
 }
