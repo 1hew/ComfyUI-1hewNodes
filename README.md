@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.7**
+- feat(text): Added `List Custom Seed` node for creating unique random seed lists with control after generate functionality
+
 **v1.2.6**
 - feat(image_hlfreq): Added high-low frequency separation node group, including `Image HLFreq Separate`, `Image HLFreq Combine`, and `Image HLFreq Transform` nodes with support for RGB, HSV, and IGBI frequency separation methods
 
@@ -176,6 +179,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | List Custom Int | Custom integer list generator with dash separator and multiple delimiter support |
 | List Custom Float | Custom float list generator with dash separator and multiple delimiter support |
 | List Custom String | Custom string list generator with dash separator and multiple delimiter support |
+| List Custom Seed | Custom seed list generator for creating unique random seed lists with control after generate functionality |
 
 
 
