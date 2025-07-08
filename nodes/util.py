@@ -1,3 +1,40 @@
+class ImageGetSize:
+    """
+    获取图像的宽度和高度信息
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+            }
+        }
+    
+    RETURN_TYPES = ("INT", "INT")
+    RETURN_NAMES = ("width", "height")
+    FUNCTION = "get_image_size"
+    CATEGORY = "1hewNodes/util"
+    
+    def get_image_size(self, image):
+        """
+        获取图像的宽度和高度
+        
+        Args:
+            image: 输入的图像张量，格式为 (batch, height, width, channels)
+            
+        Returns:
+            tuple: (width, height) 图像的宽度和高度
+        """
+        # 确保输入是正确的维度
+        if image.dim() == 3:
+            image = image.unsqueeze(0)
+        
+        # 获取图像尺寸 (batch, height, width, channels)
+        batch_size, height, width, channels = image.shape
+        
+        # 返回宽度和高度（整数类型）
+        return (int(width), int(height))
 
 
 class RangeMapping:
@@ -129,11 +166,13 @@ class PathBuild:
 
 # 在NODE_CLASS_MAPPINGS中更新节点映射
 NODE_CLASS_MAPPINGS = {
+    "ImageGetSize": ImageGetSize,
     "RangeMapping": RangeMapping,
     "PathBuild": PathBuild,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    "ImageGetSize": "Image Get Size",
     "RangeMapping": "Range Mapping",
     "PathBuild": "Path Build",
 }
