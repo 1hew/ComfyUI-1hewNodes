@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.8**
+- feat(image): Added `Image Resize Flux Kontext` node with support for automatic and manual size selection for images and masks
+- feat(image): Enhanced `Image Edit Stitch` node with improved stitching algorithms and parameter handling
+
 **v1.2.7**
 - feat(text): Added `List Custom Seed` node for creating unique random seed lists with control after generate functionality
 
@@ -109,6 +113,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|--------------|
 | Image Solid | Generate solid color images with multiple size and color format support |
 | Image Resize Universal | Universal image resizing with multiple algorithms and constraints |
+| Image Resize Flux Kontext | Resize images to FluxKontext dimensions with support for automatic and manual size selection for images and masks |
 | Image Edit Stitch | Image stitching and merging with multiple stitching modes |
 | Image Add Label | Add text labels to images |
 | Image Plot | Image plotting and visualization tools |

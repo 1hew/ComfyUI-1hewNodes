@@ -12,11 +12,14 @@ class ImageCropSquare:
         return {
             "required": {
                 "image": ("IMAGE",),
-                "mask": ("MASK",),
                 "scale_factor": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 3.0, "step": 0.01}),
                 "apply_mask": ("BOOLEAN", {"default": False}),
                 "extra_padding": ("INT", {"default": 0, "min": 0, "max": 512, "step": 1}),
-                "fill_color": ("STRING", {"default": "1.0"})
+                "fill_color": ("STRING", {"default": "1.0"}),
+                "divisible_by": ("INT", {"default": 8, "min": 1, "max": 1024, "step": 1})
+            },
+            "optional": {
+                "mask": ("MASK",)
             }
         }
 
@@ -25,7 +28,7 @@ class ImageCropSquare:
     FUNCTION = "image_crop_square"
     CATEGORY = "1hewNodes/image/crop"
 
-    def image_crop_square(self, image, mask, scale_factor=1.0, fill_color="1.0", apply_mask=False, extra_padding=0):
+    def image_crop_square(self, image, scale_factor=1.0, fill_color="1.0", apply_mask=False, extra_padding=0, divisible_by=8, mask=None):
         # 获取图像尺寸
         batch_size, height, width, channels = image.shape
 
@@ -36,10 +39,20 @@ class ImageCropSquare:
             # 将图像转换为PIL格式
             if image.is_cuda:
                 img_np = (image[b].cpu().numpy() * 255).astype(np.uint8)
-                mask_np = (mask[b % mask.shape[0]].cpu().numpy() * 255).astype(np.uint8)
+                # 处理可选的mask参数
+                if mask is not None:
+                    mask_np = (mask[b % mask.shape[0]].cpu().numpy() * 255).astype(np.uint8)
+                else:
+                    # 创建空遮罩
+                    mask_np = np.zeros((height, width), dtype=np.uint8)
             else:
                 img_np = (image[b].numpy() * 255).astype(np.uint8)
-                mask_np = (mask[b % mask.shape[0]].numpy() * 255).astype(np.uint8)
+                # 处理可选的mask参数
+                if mask is not None:
+                    mask_np = (mask[b % mask.shape[0]].numpy() * 255).astype(np.uint8)
+                else:
+                    # 创建空遮罩
+                    mask_np = np.zeros((height, width), dtype=np.uint8)
 
             img_pil = Image.fromarray(img_np)
             mask_pil = Image.fromarray(mask_np).convert("L")
@@ -60,11 +73,59 @@ class ImageCropSquare:
             # 找到遮罩中非零区域的边界框
             bbox = self.get_bbox(mask_pil)
 
-            # 如果没有找到有效区域，返回原始图像
+            # 如果没有找到有效区域（遮罩为空），执行居中方形裁剪
             if bbox is None:
-                output_images.append(image[b])
+                # 计算最大方形尺寸
+                square_size = min(img_pil.width, img_pil.height)
+                
+                # 应用放大系数
+                scaled_size = int(square_size * scale_factor)
+                
+                # 计算居中裁剪的坐标
+                center_x = img_pil.width // 2
+                center_y = img_pil.height // 2
+                
+                crop_x1 = center_x - scaled_size // 2
+                crop_y1 = center_y - scaled_size // 2
+                crop_x2 = crop_x1 + scaled_size
+                crop_y2 = crop_y1 + scaled_size
+                
+                # 确保裁剪坐标在图像范围内
+                crop_x1 = max(0, crop_x1)
+                crop_y1 = max(0, crop_y1)
+                crop_x2 = min(img_pil.width, crop_x2)
+                crop_y2 = min(img_pil.height, crop_y2)
+                
+                # 最终尺寸（包含额外边距）
+                final_size = scaled_size + extra_padding * 2
+                
+                # 确保最终尺寸是divisible_by的倍数
+                final_size = (final_size // divisible_by) * divisible_by
+                if final_size <= 0:
+                    final_size = divisible_by
+                
+                # 解析填充颜色
+                bg_color = self.parse_color(fill_color)
+                
+                # 创建方形画布
+                square_img = Image.new("RGB", (final_size, final_size), bg_color)
+                
+                # 裁剪原图
+                cropped_region = img_pil.crop((crop_x1, crop_y1, crop_x2, crop_y2))
+                
+                # 计算粘贴位置（居中）
+                paste_x = (final_size - cropped_region.width) // 2
+                paste_y = (final_size - cropped_region.height) // 2
+                
+                # 粘贴到方形画布
+                square_img.paste(cropped_region, (paste_x, paste_y))
+                
+                # 转换回tensor
+                square_img_np = np.array(square_img).astype(np.float32) / 255.0
+                output_images.append(torch.from_numpy(square_img_np))
                 continue
 
+            # 处理有效遮罩的情况
             # 计算边界框的宽度和高度
             bbox_width = bbox[2] - bbox[0]
             bbox_height = bbox[3] - bbox[1]
@@ -87,6 +148,11 @@ class ImageCropSquare:
             
             # 最终尺寸 (包含额外边距)
             final_size = scaled_size + extra_padding * 2
+            
+            # 确保最终尺寸是divisible_by的倍数
+            final_size = (final_size // divisible_by) * divisible_by
+            if final_size <= 0:
+                final_size = divisible_by
             
             # 最终边界框坐标
             square_x1 = center_x - final_size // 2
