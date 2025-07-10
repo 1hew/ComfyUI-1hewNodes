@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.8**
+- feat(image): 添加 `Image Resize Flux Kontext` 节点，支持图像和遮罩的尺寸自动选择和手动选择
+- feat(image): 优化 `Image Edit Stitch` 节点图像拼接算法和参数处理
+
 **v1.2.7**
 - feat(text): 添加 `List Custom Seed` 节点，支持生成唯一随机种子列表和control after generate功能
 
@@ -109,6 +113,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Image Solid | 生成纯色图像，支持多种尺寸和颜色格式 |
 | Image Resize Universal | 通用图像尺寸调整，支持多种算法和约束 |
+| Image Resize Flux Kontext | 图像尺寸调整为FluxKontext尺寸，支持图像和遮罩的尺寸自动选择和手动选择 |
 | Image Edit Stitch | 图像拼接与缝合，支持多种拼接模式 |
 | Image Add Label | 为图像添加文本标签 |
 | Image Plot | 图像绘制和可视化工具 |

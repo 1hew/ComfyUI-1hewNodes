@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import os
 import math
 from skimage.measure import label, regionprops
+import comfy.utils
 
 
 class ImageSolid:
@@ -527,9 +528,127 @@ class ImageResizeUniversal:
         print(f"[{message_type.upper()}] {message}")
 
 
+class ImageResizeFluxKontext:
+    """
+    Flux预设图像缩放器 - 支持预设分辨率和自动最优选择
+    """
+    
+    # 将PRESET_RESOLUTIONS移到类内部
+    PRESET_RESOLUTIONS = [
+        ("672x1568 [1:2.33] (3:7)", 672, 1568),
+        ("688x1504 [1:2.19]", 688, 1504),
+        ("720x1456 [1:2.00] (1:2)", 720, 1456),
+        ("752x1392 [1:1.85]", 752, 1392),
+        ("800x1328 [1:1.66]", 800, 1328),
+        ("832x1248 [1:1.50] (2:3)", 832, 1248),
+        ("880x1184 [1:1.35]", 880, 1184),
+        ("944x1104 [1:1.17]", 944, 1104),
+        ("1024x1024 [1:1.00] (1:1)", 1024, 1024),
+        ("1104x944 [1.17:1]", 1104, 944),
+        ("1184x880 [1.35:1]", 1184, 880),
+        ("1248x832 [1.50:1] (3:2)", 1248, 832),
+        ("1328x800 [1.66:1]", 1328, 800),
+        ("1392x752 [1.85:1]", 1392, 752),
+        ("1456x720 [2.00:1] (2:1)", 1456, 720),
+        ("1504x688 [2.19:1]", 1504, 688),
+        ("1568x672 [2.33:1] (7:3)", 1568, 672),
+    ]
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        preset_options = ["auto"] + [preset[0] for preset in cls.PRESET_RESOLUTIONS]
+        return {
+            "required": {
+                "preset_size": (preset_options, {"default": "auto"}),
+            },
+            "optional": {
+                "image": ("IMAGE",),
+                "mask": ("MASK",),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "MASK")
+    RETURN_NAMES = ("image", "mask")
+    FUNCTION = "image_resize_flux_kontext"
+    CATEGORY = "1hewNodes/image"
+
+    def image_resize_flux_kontext(self, preset_size, image=None, mask=None):
+        # 确定目标尺寸
+        if preset_size == "auto":
+            if image is not None:
+                # 根据输入图像的宽高比选择最合适的尺寸（类似FluxKontextImageScale的逻辑）
+                input_width = image.shape[2]
+                input_height = image.shape[1]
+                aspect_ratio = input_width / input_height
+                
+                # 找到最接近的宽高比
+                _, width, height = min((abs(aspect_ratio - w / h), w, h) for _, w, h in self.PRESET_RESOLUTIONS)
+            elif mask is not None:
+                # 根据输入mask的宽高比选择最合适的尺寸
+                input_width = mask.shape[2]
+                input_height = mask.shape[1]
+                aspect_ratio = input_width / input_height
+                
+                # 找到最接近的宽高比
+                _, width, height = min((abs(aspect_ratio - w / h), w, h) for _, w, h in self.PRESET_RESOLUTIONS)
+            else:
+                # 如果没有输入图像和mask，使用默认尺寸
+                width, height = 1024, 1024
+        else:
+            # 查找对应的预设尺寸
+            for preset in self.PRESET_RESOLUTIONS:
+                if preset[0] == preset_size:
+                    width, height = preset[1], preset[2]
+                    break
+            else:
+                # 如果没找到，使用默认尺寸
+                width, height = 1024, 1024
+        
+        # 处理图像
+        if image is not None:
+            # 缩放图像到目标尺寸
+            scaled_image = comfy.utils.common_upscale(image.movedim(-1, 1), width, height, "lanczos", "center").movedim(1, -1)
+        else:
+            # 创建纯色图像（黑色）
+            scaled_image = torch.zeros((1, height, width, 3), dtype=torch.float32)
+        
+        # 处理遮罩
+        if mask is not None:
+            # 确保mask是正确的格式
+            if len(mask.shape) == 3:
+                # mask形状为 (batch, height, width)
+                batch_size, mask_height, mask_width = mask.shape
+            elif len(mask.shape) == 4:
+                # mask形状为 (batch, channel, height, width)
+                batch_size, channels, mask_height, mask_width = mask.shape
+                if channels == 1:
+                    mask = mask.squeeze(1)  # 移除通道维度
+                else:
+                    mask = mask[:, 0, :, :]  # 取第一个通道
+            
+            # 使用torch.nn.functional.interpolate来缩放mask
+            import torch.nn.functional as F
+            
+            # 添加batch和channel维度进行插值
+            mask_for_resize = mask.unsqueeze(1)  # 添加channel维度
+            scaled_mask = F.interpolate(
+                mask_for_resize, 
+                size=(height, width), 
+                mode='bilinear', 
+                align_corners=False
+            )
+            scaled_mask = scaled_mask.squeeze(1)  # 移除channel维度
+        else:
+            # 创建全白遮罩
+            scaled_mask = torch.ones((1, height, width), dtype=torch.float32)
+        
+        return (scaled_image, scaled_mask)
+
+
 class ImageEditStitch:
     """
-    图像编辑缝合 - 将参考图像和编辑图像拼接在一起，支持上下左右四种拼接方式
+        图像编辑缝合 - 将参考图像和编辑图像拼接在一起，支持上下左右四种拼接方式
+        优化版本：当match_edit_size为false时，保持reference_image的原始比例
     """
 
     @classmethod
@@ -539,7 +658,7 @@ class ImageEditStitch:
                 "reference_image": ("IMAGE",),
                 "edit_image": ("IMAGE",),
                 "edit_image_position": (["top", "bottom", "left", "right"], {"default": "right"}),
-                "match_edit_size": ("BOOLEAN", {"default": True}),
+                "match_edit_size": ("BOOLEAN", {"default": False}),
                 "spacing": ("INT", {"default": 0, "min": 0, "max": 1000, "step": 1}),
                 "fill_color": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01})
             },
@@ -554,7 +673,7 @@ class ImageEditStitch:
     CATEGORY = "1hewNodes/image"
 
     def image_edit_stitch(self, reference_image, edit_image, edit_mask=None, edit_image_position='right', match_edit_size=True,
-                          fill_color=1.0, spacing=0):
+                        fill_color=1.0, spacing=0):
         # 检查输入
         if reference_image is None and edit_image is None:
             # 如果两个图像都为空，创建默认图像
@@ -588,48 +707,16 @@ class ImageEditStitch:
         ref_batch, ref_height, ref_width, ref_channels = reference_image.shape
         edit_batch, edit_height, edit_width, edit_channels = edit_image.shape
 
-        # 处理尺寸不匹配的情况
-        if match_edit_size and (ref_height != edit_height or ref_width != edit_width):
-            # 将图像转换为PIL格式以便于处理
-            if reference_image.is_cuda:
-                ref_np = (reference_image[0].cpu().numpy() * 255).astype(np.uint8)
-            else:
-                ref_np = (reference_image[0].numpy() * 255).astype(np.uint8)
-
-            ref_pil = Image.fromarray(ref_np)
-
-            # 计算等比例缩放的尺寸
-            ref_aspect = ref_width / ref_height
-            edit_aspect = edit_width / edit_height
-
-            # 等比例缩放参考图像以匹配编辑图像
-            if ref_aspect > edit_aspect:
-                # 宽度优先
-                new_width = edit_width
-                new_height = int(edit_width / ref_aspect)
-            else:
-                # 高度优先
-                new_height = edit_height
-                new_width = int(edit_height * ref_aspect)
-
-            # 调整参考图像大小，保持纵横比
-            ref_pil = ref_pil.resize((new_width, new_height), Image.Resampling.LANCZOS)
-
-            # 创建一个与编辑图像相同大小的填充颜色图像
-            fill_color_rgb = int(fill_color * 255)
-            new_ref_pil = Image.new("RGB", (edit_width, edit_height), (fill_color_rgb, fill_color_rgb, fill_color_rgb))
-
-            # 将调整大小后的参考图像粘贴到中心位置
-            paste_x = (edit_width - new_width) // 2
-            paste_y = (edit_height - new_height) // 2
-            new_ref_pil.paste(ref_pil, (paste_x, paste_y))
-
-            # 转换回tensor
-            ref_np = np.array(new_ref_pil).astype(np.float32) / 255.0
-            reference_image = torch.from_numpy(ref_np).unsqueeze(0)
-
-            # 更新尺寸
-            ref_height, ref_width = edit_height, edit_width
+        # 处理尺寸调整逻辑
+        if match_edit_size:
+            # 原有逻辑：将reference_image调整为edit_image的尺寸，使用pad填充
+            if ref_height != edit_height or ref_width != edit_width:
+                reference_image = self._resize_with_padding(reference_image, edit_width, edit_height, fill_color)
+                ref_height, ref_width = edit_height, edit_width
+        else:
+            # 新优化逻辑：保持reference_image的原始比例，根据拼接方向调整尺寸
+            reference_image = self._resize_keeping_aspect_ratio(reference_image, edit_image, edit_image_position)
+            ref_batch, ref_height, ref_width, ref_channels = reference_image.shape
 
         # 创建间距填充（如果spacing > 0）
         spacing_color = torch.full((1, 1, 1, 3), fill_color, dtype=torch.float32)
@@ -780,6 +867,86 @@ class ImageEditStitch:
                 split_mask = torch.cat([split_mask_top, split_mask_bottom], dim=1)
 
         return combined_image, combined_mask, split_mask
+
+    def _resize_with_padding(self, image, target_width, target_height, fill_color):
+        """
+        原有的resize逻辑：使用padding填充到目标尺寸
+        """
+        # 将图像转换为PIL格式以便于处理
+        if image.is_cuda:
+            img_np = (image[0].cpu().numpy() * 255).astype(np.uint8)
+        else:
+            img_np = (image[0].numpy() * 255).astype(np.uint8)
+
+        img_pil = Image.fromarray(img_np)
+        
+        # 计算等比例缩放的尺寸
+        img_width, img_height = img_pil.size
+        img_aspect = img_width / img_height
+        target_aspect = target_width / target_height
+
+        # 等比例缩放图像以适应目标尺寸
+        if img_aspect > target_aspect:
+            # 宽度优先
+            new_width = target_width
+            new_height = int(target_width / img_aspect)
+        else:
+            # 高度优先
+            new_height = target_height
+            new_width = int(target_height * img_aspect)
+
+        # 调整图像大小，保持纵横比
+        img_pil = img_pil.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+        # 创建一个目标尺寸的填充颜色图像
+        fill_color_rgb = int(fill_color * 255)
+        new_img_pil = Image.new("RGB", (target_width, target_height), (fill_color_rgb, fill_color_rgb, fill_color_rgb))
+
+        # 将调整大小后的图像粘贴到中心位置
+        paste_x = (target_width - new_width) // 2
+        paste_y = (target_height - new_height) // 2
+        new_img_pil.paste(img_pil, (paste_x, paste_y))
+
+        # 转换回tensor
+        img_np = np.array(new_img_pil).astype(np.float32) / 255.0
+        return torch.from_numpy(img_np).unsqueeze(0)
+
+    def _resize_keeping_aspect_ratio(self, reference_image, edit_image, edit_image_position):
+        """
+        新的resize逻辑：保持reference_image的原始比例，根据拼接方向调整尺寸
+        """
+        # 获取图像尺寸
+        ref_batch, ref_height, ref_width, ref_channels = reference_image.shape
+        edit_batch, edit_height, edit_width, edit_channels = edit_image.shape
+        
+        # 将图像转换为PIL格式以便于处理
+        if reference_image.is_cuda:
+            ref_np = (reference_image[0].cpu().numpy() * 255).astype(np.uint8)
+        else:
+            ref_np = (reference_image[0].numpy() * 255).astype(np.uint8)
+
+        ref_pil = Image.fromarray(ref_np)
+        
+        # 根据拼接方向确定需要匹配的维度
+        if edit_image_position in ["left", "right"]:
+            # 水平拼接：匹配高度
+            target_height = edit_height
+            # 保持原始比例计算新宽度
+            aspect_ratio = ref_width / ref_height
+            target_width = int(target_height * aspect_ratio)
+        else:  # top, bottom
+            # 垂直拼接：匹配宽度
+            target_width = edit_width
+            # 保持原始比例计算新高度
+            aspect_ratio = ref_height / ref_width
+            target_height = int(target_width * aspect_ratio)
+        
+        # 调整参考图像大小，保持纵横比
+        ref_pil = ref_pil.resize((target_width, target_height), Image.Resampling.LANCZOS)
+        
+        # 转换回tensor
+        ref_np = np.array(ref_pil).astype(np.float32) / 255.0
+        return torch.from_numpy(ref_np).unsqueeze(0)
 
 
 class ImageAddLabel:
@@ -1758,6 +1925,7 @@ class ImageBBoxOverlayByMask:
 NODE_CLASS_MAPPINGS = {
     "ImageSolid": ImageSolid,
     "ImageResizeUniversal": ImageResizeUniversal,
+    "ImageResizeFluxKontext": ImageResizeFluxKontext,
     "ImageEditStitch": ImageEditStitch,
     "ImageAddLabel": ImageAddLabel,
     "ImagePlot": ImagePlot,
@@ -1767,6 +1935,7 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "ImageSolid": "Image Solid",
     "ImageResizeUniversal": "Image Resize Universal",
+    "ImageResizeFluxKontext": "Image Resize Flux Kontext",
     "ImageEditStitch": "Image Edit Stitch",
     "ImageAddLabel": "Image Add Label",
     "ImagePlot": "Image Plot",
