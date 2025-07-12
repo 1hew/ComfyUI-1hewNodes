@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.9**
+ - feat(image_crop): 重构 Image Crop with BBox Mask 节点
+
 **v1.2.8**
 - feat(image): 添加 `Image Resize Flux Kontext` 节点，支持图像和遮罩的尺寸自动选择和手动选择
 - feat(image): 优化 `Image Edit Stitch` 节点图像拼接算法和参数处理
@@ -131,7 +134,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Image Crop Square | 方形裁剪，支持遮罩引导和缩放 |
 | Image Crop Edge | 边缘裁剪，支持四边独立设置 |
-| Image Crop with BBox Mask| 基于边界框的智能裁剪，支持宽高比控制 |
+| Image Crop with BBox Mask| 智能边界框裁剪，支持精确比例控制和缩放强度调节 |
 | Image Crop by Mask Alpha | 基于遮罩的批量裁剪，支持RGB/RGBA双输出模式和智能通道处理 |
 | Image Paste by BBox Mask | 裁剪图像回贴，支持多种混合模式 |
 
