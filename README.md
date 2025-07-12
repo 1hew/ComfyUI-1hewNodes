@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.9**
+ - feat(image_crop): Refactored `Image Crop with BBox Mask` node
+ 
 **v1.2.8**
 - feat(image): Added `Image Resize Flux Kontext` node with support for automatic and manual size selection for images and masks
 - feat(image): Enhanced `Image Edit Stitch` node with improved stitching algorithms and parameter handling
@@ -131,7 +134,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Image Crop Square | Square cropping with mask guidance and scaling support |
 | Image Crop Edge | Edge cropping with independent settings for four sides |
-| Image Crop with BBox Mask | Smart cropping based on bounding boxes with aspect ratio control |
+| Image Crop with BBox Mask | Smart bounding box cropping with precise aspect ratio control and scale strength adjustment |
 | Image Crop by Mask Alpha | Batch mask-based cropping with RGB/RGBA dual output modes and smart channel processing |
 | Image Paste by BBox Mask | Paste cropped images back with multiple blend modes |
 
