@@ -670,8 +670,34 @@ class ImageCropWithBBoxMask:
     def parse_ratio_exact(self, preset_ratio, img_width, img_height, mask_width, mask_height):
         """精确解析比例设置"""
         if preset_ratio == "mask_ratio":
+
             if mask_height > 0:
-                return Fraction(mask_width, mask_height)
+                # 计算mask的原始比例
+                original_ratio = mask_width / mask_height
+                
+                # 简化为最简分数
+                simplified_w, simplified_h = self.get_simplified_ratio(mask_width, mask_height)
+                
+                # 如果简化后的分子分母过大，则调整为接近的标准比例
+                if simplified_w > 21 or simplified_h > 21:
+                    # 寻找最接近的标准比例
+                    standard_ratios = [
+                        (1, 1), (3, 2), (4, 3), (16, 9), (21, 9),
+                        (2, 3), (3, 4), (9, 16), (9, 21)
+                    ]
+                    
+                    best_ratio = (1, 1)
+                    min_diff = float('inf')
+                    
+                    for w, h in standard_ratios:
+                        ratio_diff = abs(w/h - original_ratio)
+                        if ratio_diff < min_diff:
+                            min_diff = ratio_diff
+                            best_ratio = (w, h)
+                    
+                    return Fraction(best_ratio[0], best_ratio[1])
+                else:
+                    return Fraction(simplified_w, simplified_h)
             else:
                 return Fraction(1, 1)
         elif preset_ratio == "image_ratio":
@@ -686,6 +712,28 @@ class ImageCropWithBBoxMask:
             }
             return ratio_map.get(preset_ratio, Fraction(1, 1))
     
+    def calculate_exact_dimensions(self, target_ratio, divisible_by, base_width=None, base_height=None):
+        """计算精确符合比例和divisible_by约束的尺寸"""
+        ratio_w = target_ratio.numerator
+        ratio_h = target_ratio.denominator
+        
+        if base_width is not None:
+            # 基于宽度计算
+            unit = math.ceil(base_width / (ratio_w * divisible_by))
+            final_width = unit * ratio_w * divisible_by
+            final_height = unit * ratio_h * divisible_by
+        elif base_height is not None:
+            # 基于高度计算
+            unit = math.ceil(base_height / (ratio_h * divisible_by))
+            final_width = unit * ratio_w * divisible_by
+            final_height = unit * ratio_h * divisible_by
+        else:
+            # 默认最小尺寸
+            final_width = ratio_w * divisible_by
+            final_height = ratio_h * divisible_by
+        
+        return int(final_width), int(final_height)
+    
     def calculate_padding_size(self, mask_bbox, target_ratio, divisible_by):
         """计算基于mask bbox的padding尺寸以满足目标比例和divisible_by"""
         x_min, y_min, x_max, y_max = mask_bbox
@@ -694,76 +742,79 @@ class ImageCropWithBBoxMask:
         mask_center_x = (x_min + x_max) / 2.0
         mask_center_y = (y_min + y_max) / 2.0
         
-        # 计算目标比例
-        target_w_ratio = float(target_ratio.numerator)
-        target_h_ratio = float(target_ratio.denominator)
+        # 方案1：基于mask宽度计算精确尺寸
+        width_1, height_1 = self.calculate_exact_dimensions(target_ratio, divisible_by, base_width=mask_width)
         
-        # 基于mask尺寸计算需要的最小尺寸
-        # 方案1：基于mask宽度计算高度
-        height_from_width = mask_width * target_h_ratio / target_w_ratio
-        # 方案2：基于mask高度计算宽度  
-        width_from_height = mask_height * target_w_ratio / target_h_ratio
+        # 方案2：基于mask高度计算精确尺寸
+        width_2, height_2 = self.calculate_exact_dimensions(target_ratio, divisible_by, base_height=mask_height)
         
-        # 选择能包含mask的最小尺寸
-        if height_from_width >= mask_height:
-            # 基于宽度的方案可行
-            base_width = mask_width
-            base_height = height_from_width
-        else:
-            # 基于高度的方案
-            base_width = width_from_height
-            base_height = mask_height
-        
-        # 调整到divisible_by的倍数
-        final_width = math.ceil(base_width / divisible_by) * divisible_by
-        final_height = math.ceil(base_height / divisible_by) * divisible_by
-        
-        # 验证比例是否正确，如果不正确则调整
-        actual_ratio = final_width / final_height
-        target_ratio_float = target_w_ratio / target_h_ratio
-        
-        if abs(actual_ratio - target_ratio_float) > 0.01:  # 允许小误差
-            # 重新计算以保持精确比例
-            if actual_ratio > target_ratio_float:
-                # 宽度过大，调整高度
-                final_height = math.ceil((final_width * target_h_ratio / target_w_ratio) / divisible_by) * divisible_by
+        # 选择能包含mask的最小尺寸方案
+        if width_1 >= mask_width and height_1 >= mask_height:
+            if width_2 >= mask_width and height_2 >= mask_height:
+                # 两个方案都可行，选择面积更小的
+                if width_1 * height_1 <= width_2 * height_2:
+                    final_width, final_height = width_1, height_1
+                else:
+                    final_width, final_height = width_2, height_2
             else:
-                # 高度过大，调整宽度
-                final_width = math.ceil((final_height * target_w_ratio / target_h_ratio) / divisible_by) * divisible_by
+                final_width, final_height = width_1, height_1
+        elif width_2 >= mask_width and height_2 >= mask_height:
+            final_width, final_height = width_2, height_2
+        else:
+            # 两个方案都不够，选择面积更大的
+            if width_1 * height_1 >= width_2 * height_2:
+                final_width, final_height = width_1, height_1
+            else:
+                final_width, final_height = width_2, height_2
         
-        return int(final_width), int(final_height), mask_center_x, mask_center_y
+        return final_width, final_height, mask_center_x, mask_center_y
     
     def calculate_max_size_in_image(self, center_x, center_y, target_ratio, img_width, img_height, divisible_by):
         """计算在图像内以给定中心点能达到的最大尺寸"""
-        target_w_ratio = float(target_ratio.numerator)
-        target_h_ratio = float(target_ratio.denominator)
+        ratio_w = target_ratio.numerator
+        ratio_h = target_ratio.denominator
         
-        # 计算从中心点到边界的最大距离
+        # 计算从中心点到边界的距离
         max_half_width = min(center_x, img_width - center_x)
         max_half_height = min(center_y, img_height - center_y)
         
-        # 基于比例约束计算最大尺寸
-        max_width_from_width = max_half_width * 2
-        max_height_from_width = max_width_from_width * target_h_ratio / target_w_ratio
+        # 基于边界约束计算最大可能的单位数
+        max_unit_from_width = int((max_half_width * 2) / (ratio_w * divisible_by))
+        max_unit_from_height = int((max_half_height * 2) / (ratio_h * divisible_by))
         
-        max_height_from_height = max_half_height * 2
-        max_width_from_height = max_height_from_height * target_w_ratio / target_h_ratio
+        # 选择较小的单位数以确保不超出边界
+        max_unit = min(max_unit_from_width, max_unit_from_height)
+        max_unit = max(1, max_unit)  # 确保至少为1
         
-        # 选择不超出图像边界的最大尺寸
-        if max_height_from_width <= img_height:
-            final_width = max_width_from_width
-            final_height = max_height_from_width
-        else:
-            final_width = max_width_from_height
-            final_height = max_height_from_height
+        final_width = max_unit * ratio_w * divisible_by
+        final_height = max_unit * ratio_h * divisible_by
         
-        # 调整到divisible_by的倍数（向下取整以确保不超出边界）
-        final_width = (int(final_width) // divisible_by) * divisible_by
-        final_height = (int(final_height) // divisible_by) * divisible_by
+        return final_width, final_height
+    
+    def calculate_interpolated_size(self, padding_size, max_size, scale_strength, target_ratio, divisible_by):
+        """计算插值后的尺寸"""
+        padding_width, padding_height = padding_size
+        max_width, max_height = max_size
         
-        # 确保最小尺寸
-        final_width = max(divisible_by, final_width)
-        final_height = max(divisible_by, final_height)
+        # 线性插值
+        interp_width = padding_width + (max_width - padding_width) * scale_strength
+        interp_height = padding_height + (max_height - padding_height) * scale_strength
+        
+        # 基于插值结果计算精确尺寸
+        ratio_w = target_ratio.numerator
+        ratio_h = target_ratio.denominator
+        
+        # 计算单位数（基于面积插值）
+        padding_area = padding_width * padding_height
+        max_area = max_width * max_height
+        interp_area = padding_area + (max_area - padding_area) * scale_strength
+        
+        # 根据目标比例和面积计算尺寸
+        unit_area = ratio_w * ratio_h * divisible_by * divisible_by
+        target_unit = max(1, int(math.sqrt(interp_area / unit_area)))
+        
+        final_width = target_unit * ratio_w * divisible_by
+        final_height = target_unit * ratio_h * divisible_by
         
         return final_width, final_height
     
@@ -774,6 +825,15 @@ class ImageCropWithBBoxMask:
         
         return (center_x - half_w >= 0 and center_x + half_w <= img_width and
                 center_y - half_h >= 0 and center_y + half_h <= img_height)
+    
+    def crop_from_center(self, center_x, center_y, target_ratio, img_width, img_height, divisible_by):
+        """以mask中心为基准裁剪原图以符合比例和divisible_by需求"""
+        # 计算能在图像内放置的最大尺寸
+        max_width, max_height = self.calculate_max_size_in_image(
+            center_x, center_y, target_ratio, img_width, img_height, divisible_by
+        )
+        
+        return max_width, max_height
     
     def calculate_crop_region(self, center_x, center_y, target_width, target_height, img_width, img_height):
         """计算裁剪区域，确保不超出图像边界"""
@@ -906,9 +966,9 @@ class ImageCropWithBBoxMask:
                     
                     # 检查是否能在图像内放置
                     if not self.can_fit_in_image(center_x, center_y, target_width, target_height, img_width, img_height):
-                        # 如果padding后的尺寸超出图像，则回退到裁剪模式
-                        print(f"Padding size {target_width}x{target_height} exceeds image bounds, falling back to crop mode")
-                        target_width, target_height = self.calculate_max_size_in_image(
+                        # 如果padding后的尺寸超出图像，则以mask中心进行原图裁剪
+                        print(f"Padding size {target_width}x{target_height} exceeds image bounds, cropping from center")
+                        target_width, target_height = self.crop_from_center(
                             mask_center_x, mask_center_y, target_ratio, img_width, img_height, divisible_by
                         )
                         center_x, center_y = mask_center_x, mask_center_y
@@ -932,29 +992,31 @@ class ImageCropWithBBoxMask:
                         mask_center_x, mask_center_y, target_ratio, img_width, img_height, divisible_by
                     )
                     
-                    # 如果padding尺寸超出图像，使用最大尺寸作为起点
-                    if not self.can_fit_in_image(mask_center_x, mask_center_y, padding_width, padding_height, img_width, img_height):
-                        padding_width, padding_height = max_width, max_height
-                    
-                    # 线性插值
-                    target_width = int(padding_width + (max_width - padding_width) * scale_strength)
-                    target_height = int(padding_height + (max_height - padding_height) * scale_strength)
-                    
-                    # 确保是divisible_by的倍数
-                    target_width = (target_width // divisible_by) * divisible_by
-                    target_height = (target_height // divisible_by) * divisible_by
-                    
-                    # 确保最小尺寸
-                    target_width = max(divisible_by, target_width)
-                    target_height = max(divisible_by, target_height)
+                    # 检查padding尺寸是否能在图像内放置
+                    if self.can_fit_in_image(mask_center_x, mask_center_y, padding_width, padding_height, img_width, img_height):
+                        # padding尺寸可行，进行插值
+                        target_width, target_height = self.calculate_interpolated_size(
+                            (padding_width, padding_height), (max_width, max_height), 
+                            scale_strength, target_ratio, divisible_by
+                        )
+                    else:
+                        # padding尺寸不可行，使用裁剪模式的插值
+                        crop_width, crop_height = self.crop_from_center(
+                            mask_center_x, mask_center_y, target_ratio, img_width, img_height, divisible_by
+                        )
+                        target_width, target_height = self.calculate_interpolated_size(
+                            (crop_width, crop_height), (max_width, max_height), 
+                            scale_strength, target_ratio, divisible_by
+                        )
                     
                     center_x, center_y = mask_center_x, mask_center_y
                 
             except Exception as e:
                 print(f"Error calculating target size: {e}")
                 # 使用默认尺寸
-                target_width = max(divisible_by, (mask_width // divisible_by + 1) * divisible_by)
-                target_height = max(divisible_by, (mask_height // divisible_by + 1) * divisible_by)
+                target_width, target_height = self.calculate_exact_dimensions(
+                    target_ratio, divisible_by, base_width=mask_width
+                )
                 center_x, center_y = mask_center_x, mask_center_y
             
             # 计算裁剪区域（基于计算出的中心点，不超出原图）
