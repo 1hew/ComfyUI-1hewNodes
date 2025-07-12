@@ -908,8 +908,16 @@ class ImageCropWithBBoxMask:
                     mask_np = (mask[b].numpy() * 255).astype(np.uint8)
                 
                 # 确保数组形状正确
-                if len(img_np.shape) != 3 or img_np.shape[2] != 3:
+                if len(img_np.shape) != 3:
                     print(f"Warning: Unexpected image shape {img_np.shape}, skipping batch {b}")
+                    continue
+                
+                # 处理 4 通道 RGBA 图像，转换为 3 通道 RGB
+                if img_np.shape[2] == 4:
+                    print(f"Converting 4-channel RGBA image to 3-channel RGB for batch {b}")
+                    img_np = img_np[:, :, :3]  # 去除 alpha 通道
+                elif img_np.shape[2] != 3:
+                    print(f"Warning: Unexpected image channels {img_np.shape[2]}, skipping batch {b}")
                     continue
                     
                 if len(mask_np.shape) != 2:
