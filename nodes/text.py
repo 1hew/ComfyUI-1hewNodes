@@ -2,6 +2,8 @@ import json
 import re
 import random
 import time
+import os
+from collections import OrderedDict
 
 
 class TextFormat:
@@ -58,6 +60,115 @@ class TextFormat:
         except Exception as e:
             print(f"TextFormat error: {e}")
             return ("",)
+
+
+class TextLoadLocal:
+    def __init__(self):
+        self.prompt_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "prompt")
+        if not os.path.exists(self.prompt_dir):
+            os.makedirs(self.prompt_dir)
+    
+    @classmethod
+    def get_available_json_files(cls):
+        instance = cls()
+        files = []
+        
+        # 扫描prompt目录及其子目录中的JSON文件
+        for root, dirs, filenames in os.walk(instance.prompt_dir):
+            for filename in filenames:
+                if filename.endswith('.json'):
+                    # 获取相对于prompt目录的路径
+                    rel_path = os.path.relpath(os.path.join(root, filename), instance.prompt_dir)
+                    files.append(rel_path.replace('\\', '/'))
+        
+        return files if files else ["No JSON files found"]
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "file": (cls.get_available_json_files(),),
+            }
+        }
+    
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("en_string", "zh_string")
+    FUNCTION = "load_json_prompt"
+    CATEGORY = "1hewNodes/text"
+    
+    def load_json_prompt(self, file):
+        if file == "No JSON files found":
+            return ("Please add JSON files to the prompt folder", "请在prompt文件夹中添加JSON文件")
+        
+        file_path = os.path.join(self.prompt_dir, file.replace('/', os.sep))
+        
+        if not os.path.exists(file_path):
+            return (f"File not found: {file}", f"文件不存在: {file}")
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                # 使用object_pairs_hook保持键的顺序
+                data = json.load(f, object_pairs_hook=OrderedDict)
+            
+            en_result = self._build_prompt_from_json(data, "en")
+            zh_result = self._build_prompt_from_json(data, "zh")
+            
+            return (en_result[0], zh_result[0])
+                
+        except json.JSONDecodeError as e:
+            return (f"JSON format error: {str(e)}", f"JSON格式错误: {str(e)}")
+        except Exception as e:
+            return (f"File reading error: {str(e)}", f"读取文件错误: {str(e)}")
+    
+    def _build_prompt_from_json(self, data, language):
+        """从JSON数据中根据语言构建完整的提示词"""
+        if not isinstance(data, dict):
+            return ("JSON file format is incorrect, should be object format",) if language == "en" else ("JSON文件格式不正确，应为对象格式",)
+        
+        # 检查是否有语言特定的数据
+        lang_data = data.get(language, {})
+        if not lang_data:
+            return (f"No data found for language '{language}'",) if language == "en" else (f"未找到语言 '{language}' 的数据",)
+        
+        if not isinstance(lang_data, dict):
+            return (str(lang_data),)
+        
+        # 构建完整的提示词 - 按照JSON中键的原始顺序
+        prompt_parts = []
+        
+        # 遍历所有键，按照它们在JSON中的顺序
+        for key, value in lang_data.items():
+            # 跳过以#开头的键（注释键）
+            if key.startswith('#'):
+                continue
+                
+            if isinstance(value, str) and value.strip():
+                # 检查字符串内容是否为注释（以#开头的行）
+                lines = value.split('\n')
+                filtered_lines = []
+                for line in lines:
+                    stripped_line = line.strip()
+                    if not stripped_line.startswith('#'):
+                        filtered_lines.append(line)
+                
+                filtered_content = '\n'.join(filtered_lines).strip()
+                if filtered_content:
+                    prompt_parts.append(filtered_content)
+                    
+            elif isinstance(value, (dict, list)):
+                # 如果是复杂数据类型，转换为JSON字符串
+                json_str = json.dumps(value, ensure_ascii=False, indent=2)
+                # 过滤JSON字符串中的注释行
+                lines = json_str.split('\n')
+                filtered_lines = [line for line in lines if not line.strip().startswith('#')]
+                filtered_json = '\n'.join(filtered_lines).strip()
+                if filtered_json:
+                    prompt_parts.append(filtered_json)
+        
+        # 用双换行符连接所有部分
+        full_prompt = '\n\n'.join(prompt_parts)
+        
+        return (full_prompt,)
 
 
 class TextCustomExtract:
@@ -854,6 +965,7 @@ class ListCustomSeed:
 # 节点映射
 NODE_CLASS_MAPPINGS = {
     "TextFormat": TextFormat,
+    "TextLoadLocal": TextLoadLocal,
     "TextCustomExtract": TextCustomExtract,
     "ListCustomInt": ListCustomInt,
     "ListCustomFloat": ListCustomFloat,
@@ -863,6 +975,7 @@ NODE_CLASS_MAPPINGS = {
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "TextFormat": "Text Format",
+    "TextLoadLocal": "Text Load Local",
     "TextCustomExtract": "Text Custom Extract",
     "ListCustomInt": "List Custom Int", 
     "ListCustomFloat": "List Custom Float",
