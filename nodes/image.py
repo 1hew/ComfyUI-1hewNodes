@@ -979,7 +979,7 @@ class ImageAddLabel:
                 "text": ("STRING", {
                     "default": "", 
                     "multiline": True,
-                    "placeholder": "-- splits override separator\nelse use newline.\n\n变量支持：\n{index} - 批次索引 (从0开始: 0, 1, 2...)\n{idx} - 批次索引别名 (从0开始: 0, 1, 2...)\n{range} - 批次索引 (从0开始: 00, 01, 02...)\n{input1} - 自定义输入1\n{input2} - 自定义输入2\n\n数学运算支持：\n{index+1} - 索引加1\n{idx-1} - 索引减1\n{range*2} - 索引乘2\n{index/2} - 索引除2"
+                    "placeholder": "-- splits override separator\nelse use newline."
                 }),
                 "direction": (["top", "bottom", "left", "right"], {"default": "top"})
             },
@@ -1102,106 +1102,93 @@ class ImageAddLabel:
             text_lines = [line.strip() for line in text_lines if line.strip()]
             return text_lines if text_lines else [""]
 
-    def _calculate_max_label_size(self, image, text_lines, font, font_size, height_pad, direction):
+    def _calculate_text_size(self, text, font_obj):
         """
-        预计算所有标签的最大尺寸，确保批量处理时尺寸一致
+        计算文本的尺寸，支持多行文本
+        使用固定行高确保一致性
         """
-        max_width = 0
-        max_height = 0
-        
-        # 尝试加载字体
-        try:
-            font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", font)
-            if not os.path.exists(font_path):
-                system_font_dirs = [
-                    "C:/Windows/Fonts",
-                    "/usr/share/fonts",
-                    "/System/Library/Fonts"
-                ]
-                for font_dir in system_font_dirs:
-                    if os.path.exists(os.path.join(font_dir, font)):
-                        font_path = os.path.join(font_dir, font)
-                        break
-            font_obj = ImageFont.truetype(font_path, font_size)
-        except Exception as e:
-            print(f"无法加载字体 {font}: {e}，使用默认字体")
-            font_obj = ImageFont.load_default()
-        
         # 创建临时绘制对象来计算文本尺寸
         temp_img = Image.new("RGB", (1, 1))
         temp_draw = ImageDraw.Draw(temp_img)
         
-        # 遍历所有可能的文本，找到最大尺寸
-        for i, img in enumerate(image):
-            current_text = text_lines[i % len(text_lines)] if text_lines else ""
-            
-            # 计算文本尺寸
+        # 分割文本为多行
+        lines = text.split('\n')
+        max_width = 0
+        
+        # 使用字体度量信息获取固定行高
+        try:
+            # 尝试使用字体内置度量信息
+            ascent, descent = font_obj.getmetrics()
+            fixed_line_height = ascent + descent
+            text_top_offset = 0
+        except AttributeError:
+            # 回退方案：使用更全面的标准字符串计算固定行高
+            # 包含英文字母、数字、常用标点符号和更多中文字符
+            standard_chars = (
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+                "!@#$%^&*()_+-=[]{}|;':,.<>?/~`"
+                "中文测试样本汉字字符高度宽度计算标准参考"
+                "一二三四五六七八九十百千万亿"
+                "的了是我不在人们有来他这上着个地到大里说就去子得也和那要下看天时过出小么起你都把好还多没为又可家学只以主会样年想生同老中十从自面前头道它后然走很像见两用她国动进成回什边作对开而己些现山民候经发工向事命给长水几义三声于高手知理眼志点心战二问但身方实吃做叫当住听革打呢真全才四已所敌之最光产情路分总条白话东席次亲如被花口放儿常气五第使写军吧文运再果怎定许快明行因别飞外树物活部门无往船望新带队先力完却站代员机更九您每风级跟笑啊孩万少直意夜比阶连车重便斗马哪化太指变社似士者干石满日决百原拿群究各六本思解立河村八难早论吗根共让相研今其书坐接应关信觉步反处记将千找争领或师结块跑谁草越字加脚紧爱等习阵怕月青半火法题建赶位唱海七女任件感准张团屋离色脸片科倒睛利世刚且由送切星导晚表够整认响雪流未场该并底深刻平伟忙提确近亮轻讲农古黑告界拉名呀土清阳照办史改历转画造嘴此治北必服雨穿内识验传业菜爬睡兴形量咱观苦体众通冲合破友度术饭公旁房极南枪读沙岁线野坚空收算至政城劳落钱特围弟胜教热获艺厂河段济功委中华人民共和国"
+            )
             try:
-                text_bbox = temp_draw.textbbox((0, 0), current_text, font=font_obj)
-                text_width = text_bbox[2] - text_bbox[0]
-                text_height = text_bbox[3] - text_bbox[1]
+                text_bbox = temp_draw.textbbox((0, 0), standard_chars, font=font_obj)
+                fixed_line_height = text_bbox[3] - text_bbox[1]
+                text_top_offset = -text_bbox[1]
             except AttributeError:
-                text_width, text_height = temp_draw.textsize(current_text, font=font_obj)
-            
-            # 确保最小边距
-            min_padding = max(height_pad, 4)
-            actual_height = text_height + min_padding
-            
-            max_width = max(max_width, text_width)
-            max_height = max(max_height, actual_height)
+                # 最终回退方案
+                _, fixed_line_height = temp_draw.textsize(standard_chars, font=font_obj)
+                text_top_offset = 0
         
-        return max_width, max_height
-
-    def _calculate_max_label_size_from_texts(self, text_lines, font, font_size, height_pad, direction):
-        """
-        从文本列表预计算所有标签的最大尺寸，确保批量处理时尺寸一致
-        """
-        max_width = 0
-        max_height = 0
-        
-        # 尝试加载字体
-        try:
-            font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", font)
-            if not os.path.exists(font_path):
-                system_font_dirs = [
-                    "C:/Windows/Fonts",
-                    "/usr/share/fonts",
-                    "/System/Library/Fonts"
-                ]
-                for font_dir in system_font_dirs:
-                    if os.path.exists(os.path.join(font_dir, font)):
-                        font_path = os.path.join(font_dir, font)
-                        break
-            font_obj = ImageFont.truetype(font_path, font_size)
-        except Exception as e:
-            print(f"无法加载字体 {font}: {e}，使用默认字体")
-            font_obj = ImageFont.load_default()
-        
-        # 创建临时绘制对象来计算文本尺寸
-        temp_img = Image.new("RGB", (1, 1))
-        temp_draw = ImageDraw.Draw(temp_img)
-        
-        # 遍历所有文本，找到最大尺寸
-        for current_text in text_lines:
-            if not current_text:  # 跳过空文本
-                continue
+        # 计算每行的实际宽度，但使用固定行高
+        line_heights = []
+        for line in lines:
+            try:
+                text_bbox = temp_draw.textbbox((0, 0), line, font=font_obj)
+                line_width = text_bbox[2] - text_bbox[0]
+            except AttributeError:
+                line_width, _ = temp_draw.textsize(line, font=font_obj)
                 
-            # 计算文本尺寸
-            try:
-                text_bbox = temp_draw.textbbox((0, 0), current_text, font=font_obj)
-                text_width = text_bbox[2] - text_bbox[0]
-                text_height = text_bbox[3] - text_bbox[1]
-            except AttributeError:
-                text_width, text_height = temp_draw.textsize(current_text, font=font_obj)
+            max_width = max(max_width, line_width)
+            line_heights.append(fixed_line_height)  # 使用固定行高
             
-            # 确保最小边距
-            min_padding = max(height_pad, 4)
-            actual_height = text_height + min_padding
+        total_height = fixed_line_height * len(lines)  # 总高度 = 固定行高 × 行数
             
-            max_width = max(max_width, text_width)
-            max_height = max(max_height, actual_height)
+        return max_width, total_height, text_top_offset, line_heights
+
+    def _draw_multiline_text(self, draw, text, x, y, font_obj, font_color, line_heights):
+        """
+        绘制多行文本，使用固定行高
+        """
+        lines = text.split('\n')
+        current_y = y
         
-        return max_width, max_height
+        for i, line in enumerate(lines):
+            draw.text((x, current_y), line, fill=font_color, font=font_obj)
+            if i < len(line_heights):
+                current_y += line_heights[i]  # 使用固定行高间距
+
+    def _load_font(self, font, font_size):
+        """
+        加载字体对象
+        """
+        try:
+            font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", font)
+            if not os.path.exists(font_path):
+                system_font_dirs = [
+                    "C:/Windows/Fonts",
+                    "/usr/share/fonts",
+                    "/System/Library/Fonts"
+                ]
+                for font_dir in system_font_dirs:
+                    if os.path.exists(os.path.join(font_dir, font)):
+                        font_path = os.path.join(font_dir, font)
+                        break
+            font_obj = ImageFont.truetype(font_path, font_size)
+        except Exception as e:
+            print(f"无法加载字体 {font}: {e}，使用默认字体")
+            font_obj = ImageFont.load_default()
+        return font_obj
 
     def image_add_label(self, image, height_pad, font_size, invert_color, font, text, direction, input1=None, input2=None):
         # 设置颜色，根据invert_color决定黑白配色
@@ -1212,228 +1199,105 @@ class ImageAddLabel:
             font_color = "white"
             label_color = "black"
 
-        # 获取图像尺寸
         result = []
-        
-        # 获取总批次数用于 {range} 功能
         total_batches = len(image)
         
-        # 预处理所有文本以计算最大标签尺寸
-        all_parsed_texts = []
+        # 加载字体
+        font_obj = self._load_font(font, font_size)
+        
+        # 预处理所有文本，获取每张图片对应的文本
+        all_current_texts = []
+        
         for i in range(total_batches):
             # 为每个批次解析文本，包含 {range} 替换
             parsed_text = self.parse_text_with_inputs(text, input1, input2, i, total_batches)
-            all_parsed_texts.append(parsed_text)
-        
-        # 处理所有解析后的文本，支持 -- 分隔符功能
-        all_text_lines = []
-        for parsed_text in all_parsed_texts:
-            text_lines = self.parse_text_list(parsed_text)
-            all_text_lines.extend(text_lines)
-        
-        # 预计算所有标签的最大尺寸，确保批量处理时尺寸一致
-        max_label_size = self._calculate_max_label_size_from_texts(all_text_lines, font, font_size, height_pad, direction)
-        
-        for i, img in enumerate(image):
-            # 使用预处理的文本，包含 {range} 替换
-            parsed_text = all_parsed_texts[i]
-            text_lines = self.parse_text_list(parsed_text)
             
-            # 选择对应的标签文本，如果标签数量少于图像数量，则循环使用
+            # 解析文本列表并获取当前文本
+            text_lines = self.parse_text_list(parsed_text)
             current_text = text_lines[i % len(text_lines)] if text_lines else ""
+            all_current_texts.append(current_text)
+        
+        # 处理每张图片
+        for i, img in enumerate(image):
+            current_text = all_current_texts[i]
+            
+            # 计算当前文本的标签尺寸（支持多行文本，使用固定行高）
+            text_width, text_height, text_top_offset, line_heights = self._calculate_text_size(current_text, font_obj)
+            min_padding = max(height_pad, 4)
+            label_height = text_height + min_padding
             
             # 将图像转换为PIL格式
-            i = 255. * img.cpu().numpy()
-            img_pil = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
+            img_data = 255. * img.cpu().numpy()
+            img_pil = Image.fromarray(np.clip(img_data, 0, 255).astype(np.uint8))
             width, orig_height = img_pil.size
-
+    
             # 创建标签区域
             if direction in ["top", "bottom"]:
-                # 尝试加载字体，如果失败则使用默认字体
-                try:
-                    # 检查字体文件是否存在
-                    font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", font)
-                    if not os.path.exists(font_path):
-                        # 尝试在系统字体目录查找
-                        system_font_dirs = [
-                            "C:/Windows/Fonts",  # Windows
-                            "/usr/share/fonts",  # Linux
-                            "/System/Library/Fonts"  # macOS
-                        ]
-                        for font_dir in system_font_dirs:
-                            if os.path.exists(os.path.join(font_dir, font)):
-                                font_path = os.path.join(font_dir, font)
-                                break
-
-                    font_obj = ImageFont.truetype(font_path, font_size)
-                except Exception as e:
-                    print(f"无法加载字体 {font}: {e}，使用默认字体")
-                    font_obj = ImageFont.load_default()
-
-                # 创建临时绘制对象来计算文本尺寸
-                temp_img = Image.new("RGB", (1, 1))
-                temp_draw = ImageDraw.Draw(temp_img)
-                
-                # 计算文本尺寸和基线信息
-                try:
-                    text_bbox = temp_draw.textbbox((0, 0), current_text, font=font_obj)
-                    text_width = text_bbox[2] - text_bbox[0]
-                    text_height = text_bbox[3] - text_bbox[1]
-                    # 获取文本的上边距（从基线到顶部的距离）
-                    text_top_offset = -text_bbox[1]  # bbox[1] 通常是负值，表示基线以上的高度
-                except AttributeError:
-                    text_width, text_height = temp_draw.textsize(current_text, font=font_obj)
-                    text_top_offset = 0  # 旧版本API的fallback
-
-                # 确保最小边距，避免文本被遮挡
-                min_padding = max(height_pad, 4)  # 最小4像素边距
-                
-                # 使用预计算的统一高度，确保批量处理时尺寸一致
-                _, uniform_height = max_label_size
-                
                 # 创建标签图像
-                label_img = Image.new("RGB", (width, uniform_height), label_color)
+                label_img = Image.new("RGB", (width, label_height), label_color)
                 draw = ImageDraw.Draw(label_img)
-
+    
                 # 计算文本位置 - 左对齐，空出10像素，确保文本完全在标签区域内
                 text_x = 10
-                # 使用文本的实际顶部偏移量来正确定位
                 text_y = min_padding // 2 + text_top_offset
-
-                # 绘制文本
-                draw.text((text_x, text_y), current_text, fill=font_color, font=font_obj)
-
+    
+                # 绘制多行文本
+                self._draw_multiline_text(draw, current_text, text_x, text_y, font_obj, font_color, line_heights)
+    
                 # 合并图像和标签
                 if direction == "top":
-                    new_img = Image.new("RGB", (width, orig_height + uniform_height))
+                    new_img = Image.new("RGB", (width, orig_height + label_height))
                     new_img.paste(label_img, (0, 0))
-                    new_img.paste(img_pil, (0, uniform_height))
+                    new_img.paste(img_pil, (0, label_height))
                 else:  # bottom
-                    new_img = Image.new("RGB", (width, orig_height + uniform_height))
+                    new_img = Image.new("RGB", (width, orig_height + label_height))
                     new_img.paste(img_pil, (0, 0))
                     new_img.paste(label_img, (0, orig_height))
+                    
             else:  # left or right
                 if direction == "left":
-                    # 创建一个水平标签，宽度使用原始图像高度
-                    try:
-                        font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", font)
-                        if not os.path.exists(font_path):
-                            system_font_dirs = [
-                                "C:/Windows/Fonts",
-                                "/usr/share/fonts",
-                                "/System/Library/Fonts"
-                            ]
-                            for font_dir in system_font_dirs:
-                                if os.path.exists(os.path.join(font_dir, font)):
-                                    font_path = os.path.join(font_dir, font)
-                                    break
-
-                        font_obj = ImageFont.truetype(font_path, font_size)
-                    except Exception as e:
-                        print(f"无法加载字体 {font}: {e}，使用默认字体")
-                        font_obj = ImageFont.load_default()
-
-                    # 创建临时绘制对象来计算文本尺寸
-                    temp_img = Image.new("RGB", (1, 1))
-                    temp_draw = ImageDraw.Draw(temp_img)
-                    
-                    # 计算文本尺寸和基线信息
-                    try:
-                        text_bbox = temp_draw.textbbox((0, 0), current_text, font=font_obj)
-                        text_width = text_bbox[2] - text_bbox[0]
-                        text_height = text_bbox[3] - text_bbox[1]
-                        text_top_offset = -text_bbox[1]
-                    except AttributeError:
-                        text_width, text_height = temp_draw.textsize(current_text, font=font_obj)
-                        text_top_offset = 0
-
-                    # 确保最小边距
-                    min_padding = max(height_pad, 4)
-                    
-                    # 使用预计算的统一高度，确保批量处理时尺寸一致
-                    _, uniform_height = max_label_size
-                    
-                    temp_label_img = Image.new("RGB", (orig_height, uniform_height), label_color)
+                    temp_label_img = Image.new("RGB", (orig_height, label_height), label_color)
                     draw = ImageDraw.Draw(temp_label_img)
-
+    
                     # 计算文本位置 - 左对齐，空出10像素，确保文本完全显示
                     text_x = 10
                     text_y = min_padding // 2 + text_top_offset
-
-                    # 绘制文本
-                    draw.text((text_x, text_y), current_text, fill=font_color, font=font_obj)
-
+    
+                    # 绘制多行文本（保持一致性）
+                    self._draw_multiline_text(draw, current_text, text_x, text_y, font_obj, font_color, line_heights)
+    
                     # 旋转标签图像逆时针90度
                     label_img = temp_label_img.rotate(90, expand=True)
-
+    
                     # 合并图像和标签
-                    new_img = Image.new("RGB", (width + uniform_height, orig_height))
+                    new_img = Image.new("RGB", (width + label_height, orig_height))
                     new_img.paste(label_img, (0, 0))
-                    new_img.paste(img_pil, (uniform_height, 0))
-
+                    new_img.paste(img_pil, (label_height, 0))
+    
                 else:  # right
-                    # 创建一个水平标签，宽度使用原始图像高度
-                    try:
-                        font_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fonts", font)
-                        if not os.path.exists(font_path):
-                            system_font_dirs = [
-                                "C:/Windows/Fonts",
-                                "/usr/share/fonts",
-                                "/System/Library/Fonts"
-                            ]
-                            for font_dir in system_font_dirs:
-                                if os.path.exists(os.path.join(font_dir, font)):
-                                    font_path = os.path.join(font_dir, font)
-                                    break
-
-                        font_obj = ImageFont.truetype(font_path, font_size)
-                    except Exception as e:
-                        print(f"无法加载字体 {font}: {e}，使用默认字体")
-                        font_obj = ImageFont.load_default()
-
-                    # 创建临时绘制对象来计算文本尺寸
-                    temp_img = Image.new("RGB", (1, 1))
-                    temp_draw = ImageDraw.Draw(temp_img)
-                    
-                    # 计算文本尺寸和基线信息
-                    try:
-                        text_bbox = temp_draw.textbbox((0, 0), current_text, font=font_obj)
-                        text_width = text_bbox[2] - text_bbox[0]
-                        text_height = text_bbox[3] - text_bbox[1]
-                        text_top_offset = -text_bbox[1]
-                    except AttributeError:
-                        text_width, text_height = temp_draw.textsize(current_text, font=font_obj)
-                        text_top_offset = 0
-
-                    # 确保最小边距
-                    min_padding = max(height_pad, 4)
-                    
-                    # 使用预计算的统一高度，确保批量处理时尺寸一致
-                    _, uniform_height = max_label_size
-                    
-                    temp_label_img = Image.new("RGB", (orig_height, uniform_height), label_color)
+                    temp_label_img = Image.new("RGB", (orig_height, label_height), label_color)
                     draw = ImageDraw.Draw(temp_label_img)
-
-                    # 计算文本位置 - 左对齐，空出10像素，确保文本完全显示
+    
+                    # 计算文本位置 - 左对齐，空出10像素
                     text_x = 10
                     text_y = min_padding // 2 + text_top_offset
-
-                    # 绘制文本
-                    draw.text((text_x, text_y), current_text, fill=font_color, font=font_obj)
-
+    
+                    # 绘制多行文本（保持一致性）
+                    self._draw_multiline_text(draw, current_text, text_x, text_y, font_obj, font_color, line_heights)
+    
                     # 旋转标签图像顺时针90度（即逆时针270度）
                     label_img = temp_label_img.rotate(270, expand=True)
-
+    
                     # 合并图像和标签
-                    new_img = Image.new("RGB", (width + uniform_height, orig_height))
+                    new_img = Image.new("RGB", (width + label_height, orig_height))
                     new_img.paste(img_pil, (0, 0))
                     new_img.paste(label_img, (width, 0))
-
+    
             # 转换回tensor
             img_np = np.array(new_img).astype(np.float32) / 255.0
             img_tensor = torch.from_numpy(img_np)[None,]
             result.append(img_tensor)
-
+    
         return (torch.cat(result, dim=0),)
 
 
