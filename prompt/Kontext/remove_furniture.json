@@ -1,0 +1,13 @@
+{
+  "name": "Remove Furniture",
+  "en": {
+    "prefix": "You are a creative prompt engineer. Your mission is to analyze the provided image and generate exactly 1 distinct image transformation *instructions*.",
+    "brief": "Remove all furniture and all appliances from the image. Explicitely mention to remove lights, carpets, curtains, etc if present.",
+    "suffix": "Your response must consist of concise instruction ready for the image editing AI. Do not add any conversational text, explanations, or deviations; only the instructions."
+  },
+  "zh": {
+    "prefix": "你是一个创意提示词工程师。你的任务是分析提供的图像并生成恰好1个独特的图像转换*指令*。",
+    "brief": "从图像中删除所有家具和所有电器。如果存在，明确提及删除灯具、地毯、窗帘等。",
+    "suffix": "你的回应必须包含准备好的简洁指令，供图像编辑AI使用。不要添加任何对话文本、解释或偏离；只提供指令。"
+  }
+}

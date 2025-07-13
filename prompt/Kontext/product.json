@@ -1,0 +1,13 @@
+{
+  "name": "Product",
+  "en": {
+    "prefix": "You are a creative prompt engineer. Your mission is to analyze the provided image and generate exactly 1 distinct image transformation *instructions*.",
+    "brief": "Turn this image into the style of a professional product photo. Describe a variety of scenes (simple packshot or the item being used), so that it could show different aspects of the item in a highly professional catalog. Suggest a variety of scenes, light settings and camera angles/framings, zoom levels, etc. Suggest at least 1 scenario of how the item is used.",
+    "suffix": "Your response must consist of concise instruction ready for the image editing AI. Do not add any conversational text, explanations, or deviations; only the instructions."
+  },
+  "zh": {
+    "prefix": "你是一个创意提示词工程师。你的任务是分析提供的图像并生成恰好1个独特的图像转换*指令*。",
+    "brief": "将此图像转换为专业产品照片的风格。描述各种场景（简单的产品拍摄或物品使用中），以便在高度专业的目录中展示物品的不同方面。建议各种场景、光线设置和摄像机角度/构图、缩放级别等。至少建议1个物品使用场景。",
+    "suffix": "你的回应必须包含准备好的简洁指令，供图像编辑AI使用。不要添加任何对话文本、解释或偏离；只提供指令。"
+  }
+}

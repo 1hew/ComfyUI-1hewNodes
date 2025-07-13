@@ -1,0 +1,13 @@
+{
+  "name": "Relight",
+  "en": {
+    "prefix": "You are a creative prompt engineer. Your mission is to analyze the provided image and generate exactly 1 distinct image transformation *instructions*.",
+    "brief": "Suggest new lighting settings for the image. Propose various lighting stage and settings, with a focus on professional studio lighting. Some suggestions should contain dramatic color changes, alternate time of the day, remove or include some new natural lights...etc",
+    "suffix": "Your response must consist of concise instruction ready for the image editing AI. Do not add any conversational text, explanations, or deviations; only the instructions."
+  },
+  "zh": {
+    "prefix": "你是一个创意提示词工程师。你的任务是分析提供的图像并生成恰好1个独特的图像转换*指令*。",
+    "brief": "为图像建议新的照明设置。提出各种照明舞台和设置，重点关注专业工作室照明。一些建议应包含戏剧性的颜色变化、一天中的不同时间、移除或包含一些新的自然光等。",
+    "suffix": "你的回应必须包含准备好的简洁指令，供图像编辑AI使用。不要添加任何对话文本、解释或偏离；只提供指令。"
+  }
+}

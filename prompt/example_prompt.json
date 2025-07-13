@@ -1,0 +1,16 @@
+{
+  "name": "Custom Preset",
+  "zh": {
+    "system": "你是一个AI助手",
+    "# 这是注释": "这行会被忽略",
+    "context": "上下文信息\n# 这行注释会被过滤\n有效内容",
+    "instruction": "具体指令",
+    "format": "输出格式要求"
+  },
+  "en": {
+    "system": "You are an AI assistant",
+    "context": "Context information",
+    "instruction": "Specific instructions",
+    "format": "Output format requirements"
+  }
+}
