@@ -4,6 +4,62 @@ import random
 import time
 
 
+class TextFormat:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "any_text": ("*", {"forceInput": True}),  # 使用 "*" 接受任意类型
+                "prefix": ("STRING", {"default": ""}),
+                "suffix": ("STRING", {"default": ""}),
+                "separator": ("STRING", {"default": "\\n"}),
+            }
+        }
+
+    @classmethod
+    def VALIDATE_INPUTS(cls, input_types):
+        # 根据官方文档，对于通配输入，通过接受input_types参数来跳过类型校验
+        return True
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("text",)
+    FUNCTION = "text_format"
+    CATEGORY = "1hewNodes/text"
+
+    def text_format(self, any_text, prefix="", suffix="", separator="\n"):
+        try:
+            # 处理特殊的换行符表示
+            if separator == "\\n":
+                separator = "\n"
+            
+            # 确保输入是可迭代的
+            if not isinstance(any_text, (list, tuple)):
+                # 如果不是列表或元组，尝试转换为列表
+                if hasattr(any_text, '__iter__') and not isinstance(any_text, str):
+                    any_text = list(any_text)
+                else:
+                    any_text = [any_text]
+            
+            # 格式化每个元素
+            formatted_items = []
+            for item in any_text:
+                formatted_item = f"{prefix}{str(item)}{suffix}"
+                formatted_items.append(formatted_item)
+            
+            # 使用分隔符连接所有元素
+            result = separator.join(formatted_items)
+            
+            # 确保返回字符串类型
+            return (str(result),)
+            
+        except Exception as e:
+            print(f"TextFormat error: {e}")
+            return ("",)
+
+
 class TextCustomExtract:
     """
     文本自定义提取器 - 从JSON对象或数组中提取指定键的值
@@ -794,8 +850,10 @@ class ListCustomSeed:
         return (seed_list, len(seed_list))
 
 
+
 # 节点映射
 NODE_CLASS_MAPPINGS = {
+    "TextFormat": TextFormat,
     "TextCustomExtract": TextCustomExtract,
     "ListCustomInt": ListCustomInt,
     "ListCustomFloat": ListCustomFloat,
@@ -804,6 +862,7 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    "TextFormat": "Text Format",
     "TextCustomExtract": "Text Custom Extract",
     "ListCustomInt": "List Custom Int", 
     "ListCustomFloat": "List Custom Float",

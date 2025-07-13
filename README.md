@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.12**
+- feat(text): Added `Text Format` node for flexible text formatting with wildcard input support
+
 **v1.2.9**
  - feat(image_crop): Refactored `Image Crop with BBox Mask` node
  
@@ -183,6 +186,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📝 Text Processing Nodes
 | Node Name | Description |
 |-----------|-------------|
+| Text Format | Text formatter with wildcard input support for flexible data formatting with custom prefix, suffix, and separator |
 | Text Custom Extract | Text custom extractor for extracting specified key values from JSON |
 | List Custom Int | Custom integer list generator with dash separator and multiple delimiter support |
 | List Custom Float | Custom float list generator with dash separator and multiple delimiter support |
