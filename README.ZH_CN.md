@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.12**
+- feat(text): 添加 `Text Format` 节点，支持通配符输入的灵活文本格式化功能
+
 **v1.2.9**
  - feat(image_crop): 重构 Image Crop with BBox Mask 节点
 
@@ -183,6 +186,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📝 文本处理节点
 | 节点名称 | 功能描述 |
 |---------|----------|
+| Text Format | 文本格式化器，支持通配符输入的灵活数据格式化，可自定义前缀、后缀和分隔符 |
 | Text Custom Extract | 文本自定义提取器，从JSON中提取指定键值 |
 | List Custom Int | 自定义整数列表生成器，支持连字符分割和多种分隔符 |
 | List Custom Float | 自定义浮点数列表生成器，支持连字符分割和多种分隔符 |
