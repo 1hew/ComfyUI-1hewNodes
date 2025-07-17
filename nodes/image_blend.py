@@ -7,7 +7,8 @@ import colorsys
 
 class ImageLumaMatte:
     """
-    亮度蒙版 - 支持批量处理图像
+    亮度蒙版 - 支持批量处理图像，增强的背景颜色支持
+    支持多种颜色格式：灰度值、HEX、RGB、颜色名称、edge（边缘色）、average（平均色）
     """
     
     @classmethod
@@ -19,25 +20,23 @@ class ImageLumaMatte:
             },
             "optional": {
                 "invert_mask": ("BOOLEAN", {"default": False}),
-                "add_background": ("BOOLEAN", {"default": True}),
-                "background_color": ("STRING", {"default": "1.0"})
+                "feather": ("INT", {"default": 0, "min": 0, "max": 50, "step": 1}),
+                "background_add": ("BOOLEAN", {"default": True}),
+                "background_color": ("STRING", {"default": "1.0"}),
+                "out_alpha": ("BOOLEAN", {"default": False}),
             }
         }
 
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
-    FUNCTION = "image_luma_matte"
-
+    FUNCTION = "image_luma_matte_v2"
     CATEGORY = "1hewNodes/image/blend"
 
-
-    def image_luma_matte(self, image, mask, invert_mask=False, add_background=True, background_color="1.0"):
+    def image_luma_matte_v2(self, image, mask, invert_mask=False, feather=0, background_add=True, 
+                           background_color="1.0", out_alpha=False):
         # 获取图像尺寸
         batch_size, height, width, channels = image.shape
         mask_batch_size = mask.shape[0]
-        
-        # 解析背景颜色
-        bg_color = self._parse_color(background_color)
         
         # 创建输出图像
         output_images = []
@@ -68,44 +67,53 @@ class ImageLumaMatte:
             if invert_mask:
                 mask_pil = ImageOps.invert(mask_pil)
 
-            if add_background:
-                # 处理平均颜色
+            # 羽化边缘处理
+            if feather > 0:
+                mask_pil = mask_pil.filter(ImageFilter.GaussianBlur(radius=feather))
+
+            # 解析背景颜色
+            bg_color = self._parse_color_advanced(background_color, img_pil, mask_pil)
+
+            if background_add:
+                # 创建背景图像
                 if bg_color == 'average':
                     # 计算遮罩内的平均颜色
-                    img_array = np.array(img_pil)
-                    mask_array = np.array(mask_pil) / 255.0
-                    
-                    # 创建扩展的遮罩数组以匹配图像维度
-                    mask_expanded = np.expand_dims(mask_array, axis=2)
-                    if len(img_array.shape) == 3:
-                        mask_expanded = np.repeat(mask_expanded, img_array.shape[2], axis=2)
-                    
-                    # 计算遮罩内的像素总和和像素数量
-                    masked_pixels = img_array * mask_expanded
-                    pixel_count = np.sum(mask_array)
-                    
-                    if pixel_count > 0:
-                        # 计算平均颜色
-                        avg_color = np.sum(masked_pixels, axis=(0, 1)) / pixel_count
-                        bg_color = tuple(int(c) for c in avg_color)
-                    else:
-                        # 如果遮罩内没有像素，使用默认颜色
-                        bg_color = (255, 255, 255)
+                    bg_color = self._get_average_color(img_pil, mask_pil)
+                elif bg_color == 'edge':
+                    # 获取图像边缘的平均颜色
+                    bg_color = self._get_edge_color(img_pil)
                 
-                # 使用解析后的背景颜色
+                # 使用解析后的背景颜色创建背景
                 background = Image.new('RGB', img_pil.size, bg_color)
-                background.paste(img_pil, (0, 0), mask_pil)
+                result = background.copy()
+                result.paste(img_pil, (0, 0), mask_pil)
 
-                # 转换回numpy格式
-                background_np = np.array(background).astype(np.float32) / 255.0
-                output_images.append(torch.from_numpy(background_np))
+                if out_alpha:
+                    # 转换为RGBA并保留alpha通道
+                    result = result.convert('RGBA')
+                    # 将遮罩应用到alpha通道
+                    alpha_channel = mask_pil.copy()
+                    result.putalpha(alpha_channel)
+                    # 转换回numpy格式，保留所有4个通道
+                    result_np = np.array(result).astype(np.float32) / 255.0
+                else:
+                    # 转换回numpy格式
+                    result_np = np.array(result).astype(np.float32) / 255.0
+                
+                output_images.append(torch.from_numpy(result_np))
             else:
                 # 创建透明图像
-                transparent = Image.new('RGBA', img_pil.size)
-                transparent.paste(img_pil, (0, 0), mask_pil)
+                if out_alpha:
+                    transparent = Image.new('RGBA', img_pil.size, (0, 0, 0, 0))
+                    transparent.paste(img_pil, (0, 0), mask_pil)
+                    # 转换回numpy格式，保留所有4个通道
+                    transparent_np = np.array(transparent).astype(np.float32) / 255.0
+                else:
+                    # 创建黑色背景的RGB图像
+                    transparent = Image.new('RGB', img_pil.size, (0, 0, 0))
+                    transparent.paste(img_pil, (0, 0), mask_pil)
+                    transparent_np = np.array(transparent).astype(np.float32) / 255.0
 
-                # 转换回numpy格式，保留所有4个通道（包括alpha）
-                transparent_np = np.array(transparent).astype(np.float32) / 255.0
                 output_images.append(torch.from_numpy(transparent_np))
 
         # 合并批次
@@ -113,17 +121,27 @@ class ImageLumaMatte:
         
         return (output_tensor,)
     
-    def _parse_color(self, color_str):
-        """解析不同格式的颜色输入"""
+    def _parse_color_advanced(self, color_str, img_pil=None, mask_pil=None):
+        """
+        高级颜色解析，支持多种格式：
+        - 灰度值: "0.5", "1.0"
+        - HEX: "#FF0000", "FF0000"
+        - RGB: "255,0,0", "1.0,0.0,0.0", "(255,128,64)"
+        - 颜色名称: "red", "blue", "white"
+        - 特殊值: "edge", "average"
+        """
         if not color_str:
             return (0, 0, 0)
         
-        # 检查是否为 average 或 a 或 av 或 aver (不区分大小写)
-        if color_str.lower() in ['average', 'a', 'av', 'aver']:
+        # 检查特殊值
+        color_lower = color_str.lower().strip()
+        
+        # 检查是否为 average 或其缩写
+        if color_lower in ['average', 'avg', 'a', 'av', 'aver']:
             return 'average'
         
-        # 检查是否为 edge 或 e (不区分大小写)
-        if color_str.lower() in ['edge', 'e']:
+        # 检查是否为 edge 或其缩写
+        if color_lower in ['edge', 'e', 'ed']:
             return 'edge'
         
         # 移除括号（如果存在）
@@ -131,17 +149,22 @@ class ImageLumaMatte:
         if color_str.startswith('(') and color_str.endswith(')'):
             color_str = color_str[1:-1].strip()
         
-        # 尝试解析为灰度值
+        # 尝试解析为灰度值 (0.0-1.0)
         try:
             gray = float(color_str)
-            return (int(gray * 255), int(gray * 255), int(gray * 255))
+            if 0.0 <= gray <= 1.0:
+                gray_int = int(gray * 255)
+                return (gray_int, gray_int, gray_int)
+            elif gray > 1.0 and gray <= 255:
+                # 可能是0-255范围的灰度值
+                gray_int = int(gray)
+                return (gray_int, gray_int, gray_int)
         except ValueError:
             pass
         
-        # 尝试解析为 RGB 格式 (如 "0.5,0.7,0.9" 或 "128,192,255")
+        # 尝试解析为 RGB 格式
         if ',' in color_str:
             try:
-                # 分割并清理每个部分
                 parts = [part.strip() for part in color_str.split(',')]
                 if len(parts) >= 3:
                     r, g, b = [float(parts[i]) for i in range(3)]
@@ -153,30 +176,11 @@ class ImageLumaMatte:
             except (ValueError, IndexError):
                 pass
         
-        # 尝试解析为十六进制或颜色名称
-        try:
-            from PIL import ImageColor
-            return ImageColor.getrgb(color_str)
-        except (ValueError, ImportError):
-            # 默认返回黑色
-            return (0, 0, 0)
+        # 尝试解析为十六进制颜色
+        hex_color = color_str
+        if hex_color.startswith('#'):
+            hex_color = hex_color[1:]
         
-        # 尝试解析为灰度值 (0.0-1.0)
-        try:
-            gray_value = float(color_str)
-            if 0.0 <= gray_value <= 1.0:
-                # 灰度值转换为RGB
-                gray_int = int(gray_value * 255)
-                return (gray_int, gray_int, gray_int)
-        except ValueError:
-            pass
-        
-        # 尝试解析为十六进制颜色 (#RRGGBB 或 RRGGBB)
-        if color_str.startswith('#'):
-            hex_color = color_str[1:]
-        else:
-            hex_color = color_str
-            
         if len(hex_color) == 6:
             try:
                 r = int(hex_color[0:2], 16)
@@ -185,20 +189,77 @@ class ImageLumaMatte:
                 return (r, g, b)
             except ValueError:
                 pass
-        
-        # 尝试解析为RGB格式 (R,G,B)
-        try:
-            rgb = color_str.split(',')
-            if len(rgb) == 3:
-                r = int(rgb[0].strip())
-                g = int(rgb[1].strip())
-                b = int(rgb[2].strip())
+        elif len(hex_color) == 3:
+            try:
+                r = int(hex_color[0], 16) * 17  # 扩展单个十六进制数字
+                g = int(hex_color[1], 16) * 17
+                b = int(hex_color[2], 16) * 17
                 return (r, g, b)
+            except ValueError:
+                pass
+        
+        # 尝试解析为颜色名称
+        try:
+            return ImageColor.getrgb(color_str)
         except ValueError:
             pass
         
         # 默认返回白色
         return (255, 255, 255)
+    
+    def _get_average_color(self, img_pil, mask_pil):
+        """计算遮罩内的平均颜色"""
+        img_array = np.array(img_pil.convert('RGB'))
+        mask_array = np.array(mask_pil) / 255.0
+        
+        # 创建扩展的遮罩数组以匹配图像维度
+        mask_expanded = np.expand_dims(mask_array, axis=2)
+        mask_expanded = np.repeat(mask_expanded, 3, axis=2)
+        
+        # 计算遮罩内的像素总和和像素数量
+        masked_pixels = img_array * mask_expanded
+        pixel_count = np.sum(mask_array)
+        
+        if pixel_count > 0:
+            # 计算平均颜色
+            avg_color = np.sum(masked_pixels, axis=(0, 1)) / pixel_count
+            return tuple(int(c) for c in avg_color)
+        else:
+            # 如果遮罩内没有像素，返回图像整体平均颜色
+            return tuple(int(c) for c in np.mean(img_array, axis=(0, 1)))
+    
+    def _get_edge_color(self, img_pil, side='all'):
+        """获取图像边缘的平均颜色"""
+        width, height = img_pil.size
+        img_rgb = img_pil.convert('RGB')
+        
+        if side == 'left':
+            edge = img_rgb.crop((0, 0, 1, height))
+        elif side == 'right':
+            edge = img_rgb.crop((width-1, 0, width, height))
+        elif side == 'top':
+            edge = img_rgb.crop((0, 0, width, 1))
+        elif side == 'bottom':
+            edge = img_rgb.crop((0, height-1, width, height))
+        else:  # 'all' - 所有边缘
+            # 获取所有边缘像素
+            top = np.array(img_rgb.crop((0, 0, width, 1)))
+            bottom = np.array(img_rgb.crop((0, height-1, width, height)))
+            left = np.array(img_rgb.crop((0, 0, 1, height)))
+            right = np.array(img_rgb.crop((width-1, 0, width, height)))
+            
+            # 合并所有边缘像素并计算平均值
+            all_edges = np.vstack([
+                top.reshape(-1, 3), 
+                bottom.reshape(-1, 3), 
+                left.reshape(-1, 3), 
+                right.reshape(-1, 3)
+            ])
+            return tuple(np.mean(all_edges, axis=0).astype(int))
+        
+        # 计算单边的平均颜色
+        edge_array = np.array(edge)
+        return tuple(np.mean(edge_array.reshape(-1, 3), axis=0).astype(int))
 
 
 class ImageBlendModesByAlpha:

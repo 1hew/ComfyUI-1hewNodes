@@ -6,6 +6,155 @@ import os
 from collections import OrderedDict
 
 
+class TextJoinMulti:
+    """
+    文本连接节点 - 支持5个多行文本输入，使用指定连接符连接
+    """
+    
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "text1": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "text_1"
+                }),
+                "text2": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "text_2"
+                }),
+                "text3": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "text_3"
+                }),
+                "text4": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "text_4"
+                }),
+                "text5": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "text_5"
+                }),
+                "separator": ("STRING", {"default": "\\n"}),
+            },
+            "optional": {
+                "input": ("STRING", {"default": ""}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("string",)
+    FUNCTION = "text_join_multi"
+    CATEGORY = "1hewNodes/text"
+    
+    def parse_text_with_input(self, text, input):
+        parsed_text = text
+        
+        # 处理 {input} 引用
+        input_value = "" if input is None or input == "" else str(input)
+        parsed_text = parsed_text.replace("{input}", input_value)
+        
+        import re
+        
+        # 先按行分割文本
+        lines = parsed_text.split('\n')
+        result = []
+        in_multiline_comment = False
+        multiline_quote_type = None
+        
+        for line in lines:
+            original_line = line
+            processed_line = ""
+            i = 0
+            
+            while i < len(line):
+                # 如果当前在多行注释中
+                if in_multiline_comment:
+                    # 查找多行注释的结束
+                    end_pos = line.find(multiline_quote_type, i)
+                    if end_pos != -1:
+                        # 找到结束标记，跳过它并继续处理剩余部分
+                        i = end_pos + len(multiline_quote_type)
+                        in_multiline_comment = False
+                        multiline_quote_type = None
+                    else:
+                        # 整行都在多行注释中，跳过整行
+                        break
+                else:
+                    # 检查是否遇到多行注释开始
+                    if line[i:i+3] == '"""' or line[i:i+3] == "'''":
+                        multiline_quote_type = line[i:i+3]
+                        # 查找同行是否有结束标记
+                        end_pos = line.find(multiline_quote_type, i + 3)
+                        if end_pos != -1:
+                            # 同行内的多行注释，跳过这部分
+                            i = end_pos + 3
+                        else:
+                            # 跨行多行注释开始
+                            in_multiline_comment = True
+                            break
+                    # 检查是否遇到单行注释
+                    elif line[i] == '#':
+                        # 遇到单行注释，忽略行的剩余部分
+                        break
+                    else:
+                        # 普通字符，添加到处理后的行中
+                        processed_line += line[i]
+                        i += 1
+            
+            # 如果不在多行注释中，且处理后的行不是以#开头的注释行
+            if not in_multiline_comment:
+                # 移除行尾空白字符
+                processed_line = processed_line.rstrip()
+                # 只有当行有内容或者是原本就存在的空行时才添加
+                if processed_line or (not original_line.strip() and not original_line.startswith('#')):
+                    result.append(processed_line)
+        
+        # 重新组合文本
+        parsed_text = '\n'.join(result)
+        
+        # 如果最终结果只有空行或空内容，返回空字符串
+        if not parsed_text.strip():
+            return ""
+            
+        return parsed_text
+
+    def text_join_multi(self, text1, text2, text3, text4, text5, separator="\n", input=None):
+
+        try:
+            # 处理特殊的换行符表示
+            if separator == "\\n":
+                separator = "\n"
+            
+            # 收集所有非空文本，并处理 {input} 引用和注释过滤
+            text_list = []
+            for text in [text1, text2, text3, text4, text5]:
+                if text and text.strip():
+                    # 处理文本中的 {input} 引用和注释过滤
+                    parsed_text = self.parse_text_with_input(text, input)
+                    # 过滤后如果文本仍然有内容，则添加到列表
+                    if parsed_text.strip():
+                        text_list.append(parsed_text)
+            
+            # 使用分隔符连接所有文本
+            result = separator.join(text_list)
+            
+            # 确保返回字符串类型
+            return (str(result),)
+            
+        except Exception as e:
+            print(f"TextJoinMulti error: {e}")
+            return ("",)
+
+
 class TextFormat:
     def __init__(self):
         pass
@@ -87,7 +236,7 @@ class TextLoadLocal:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "file": (cls.get_available_json_files(),),
+                "file": (cls.get_available_json_files(), {"default": ""}),
             }
         }
     
@@ -964,6 +1113,7 @@ class ListCustomSeed:
 
 # 节点映射
 NODE_CLASS_MAPPINGS = {
+    "TextJoinMulti": TextJoinMulti,
     "TextFormat": TextFormat,
     "TextLoadLocal": TextLoadLocal,
     "TextCustomExtract": TextCustomExtract,
@@ -974,6 +1124,7 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    "TextJoinMulti": "Text Join Multi",
     "TextFormat": "Text Format",
     "TextLoadLocal": "Text Load Local",
     "TextCustomExtract": "Text Custom Extract",

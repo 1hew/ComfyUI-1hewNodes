@@ -447,164 +447,6 @@ class ImageCropSquare:
         return (255, 255, 255)
 
 
-class ImageCropEdge:
-    """
-    图像裁剪边缘 - 支持同时裁剪四边或单独设置每边裁剪量
-    """
-    
-    # 内置最大分辨率常量
-    MAX_RESOLUTION = 8192
-
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "left_amount": ("FLOAT", {
-                    "default": 0,
-                    "min": 0.0,
-                    "max": cls.MAX_RESOLUTION,
-                    "step": 0.01
-                }),
-                "right_amount": ("FLOAT", {
-                    "default": 0,
-                    "min": 0.0,
-                    "max": cls.MAX_RESOLUTION,
-                    "step": 0.01
-                }),
-                "top_amount": ("FLOAT", {
-                    "default": 0,
-                    "min": 0.0,
-                    "max": cls.MAX_RESOLUTION,
-                    "step": 0.01
-                }),
-                "bottom_amount": ("FLOAT", {
-                    "default": 0,
-                    "min": 0.0,
-                    "max": cls.MAX_RESOLUTION,
-                    "step": 0.01
-                }),
-                "uniform_amount": ("FLOAT", {
-                    "default": 0,
-                    "min": 0.0,
-                    "max": cls.MAX_RESOLUTION,
-                    "step": 0.01
-                }),
-                "divisible_by": ("INT", {
-                    "default": 8, 
-                    "min": 1, 
-                    "max": 1024, 
-                    "step": 1
-                }),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
-    FUNCTION = "crop"
-    CATEGORY = "1hewNodes/image/crop"
-
-    @staticmethod
-    def num_round_up_to_multiple(num, multiple):
-        """将数字向上取整到指定倍数"""
-        return (num + multiple - 1) // multiple * multiple
-
-    def crop(self, image, uniform_amount, left_amount, right_amount, top_amount, bottom_amount, divisible_by=8):
-        """执行裁剪操作"""
-        _, height, width, _ = image.shape
-
-        # 处理参数值：0-1为百分比，>=1为像素值
-        def process_value(value, dimension):
-            if value > 0:
-                if value < 1:  # 百分比模式 (0-1)
-                    return int(dimension * value)
-                else:  # 像素模式 (>=1)
-                    return int(value)
-            return 0
-
-        # 当uniform_amount大于0时，覆盖left_amount, right_amount, top_amount, bottom_amount的值
-        if uniform_amount > 0:
-            if uniform_amount < 1:  # 百分比模式 (0-1)
-                # 修改：百分比接近1时应该裁剪更多（几乎裁剪完整个图像）
-                # 当uniform_amount为0.5时裁剪掉25%，当uniform_amount为0.9时裁剪掉45%
-                crop_percent = uniform_amount / 2
-                uniform_left = int(width * crop_percent)
-                uniform_right = int(width * crop_percent)
-                uniform_top = int(height * crop_percent)
-                uniform_bottom = int(height * crop_percent)
-            else:  # 像素模式 (>=1)
-                uniform_left = int(uniform_amount)
-                uniform_right = int(uniform_amount)
-                uniform_top = int(uniform_amount)
-                uniform_bottom = int(uniform_amount)
-            left = uniform_left
-            right = uniform_right
-            top = uniform_top
-            bottom = uniform_bottom
-        else:
-            # 处理各边的值 - 保持原有逻辑
-            left = process_value(left_amount, width)
-            right = process_value(right_amount, width)
-            top = process_value(top_amount, height)
-            bottom = process_value(bottom_amount, height)
-
-        # 确保值为divisible_by的倍数
-        left = left // divisible_by * divisible_by
-        right = right // divisible_by * divisible_by
-        top = top // divisible_by * divisible_by
-        bottom = bottom // divisible_by * divisible_by
-
-        # 如果所有裁剪值为0，直接返回原图
-        if left == 0 and right == 0 and bottom == 0 and top == 0:
-            return (image,)
-
-        # 计算新的边界
-        inset_left = left
-        inset_right = width - right
-        inset_top = top
-        inset_bottom = height - bottom
-
-        # 确保最终尺寸是divisible_by的倍数
-        new_width = inset_right - inset_left
-        new_height = inset_bottom - inset_top
-        
-        # 调整边界以确保最终尺寸是divisible_by的倍数
-        target_width = new_width // divisible_by * divisible_by
-        target_height = new_height // divisible_by * divisible_by
-        
-        # 如果调整后尺寸变小，则从边界处减少裁剪量
-        if target_width < new_width:
-            width_diff = new_width - target_width
-            inset_right -= width_diff // 2
-            inset_left += (width_diff - width_diff // 2)
-        
-        if target_height < new_height:
-            height_diff = new_height - target_height
-            inset_bottom -= height_diff // 2
-            inset_top += (height_diff - height_diff // 2)
-
-        # 验证裁剪尺寸是否有效
-        if inset_top >= inset_bottom:
-            raise ValueError(
-                f"无效的裁剪尺寸：顶部({inset_top})超过或等于底部({inset_bottom})")
-        if inset_left >= inset_right:
-            raise ValueError(
-                f"无效的裁剪尺寸：左侧({inset_left})超过或等于右侧({inset_right})")
-
-        # 执行裁剪
-        print(f'裁剪图像 {width}x{height}，左侧裁剪至 {inset_left}，右侧裁剪至 {inset_right}，' +
-              f'顶部裁剪至 {inset_top}，底部裁剪至 {inset_bottom}')
-        
-        # 最终尺寸检查
-        final_width = inset_right - inset_left
-        final_height = inset_bottom - inset_top
-        if final_width % divisible_by != 0 or final_height % divisible_by != 0:
-            print(f"警告：裁剪后尺寸 {final_width}x{final_height} 不是 {divisible_by} 的倍数")
-        
-        image = image[:, inset_top:inset_bottom, inset_left:inset_right, :]
-        return (image,)
-        
-
 class ImageCropWithBBoxMask:
     """
     图像裁切器 - 根据遮罩裁切图像，并返回边界框遮罩信息以便后续粘贴回原位置
@@ -1310,8 +1152,8 @@ class ImagePasteByBBoxMask:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "base_image": ("IMAGE",),
                 "cropped_image": ("IMAGE",),
+                "base_image": ("IMAGE",),
                 "bbox_mask": ("MASK",),
                 "blend_mode": (
                     ["normal", "multiply", "screen", "overlay", "soft_light", "difference"],
@@ -1517,18 +1359,391 @@ class ImagePasteByBBoxMask:
         return Image.fromarray(result_array)
 
 
+class ImageEdgeCropPad:
+    """
+    图像边缘裁剪填充 - 支持向内裁剪和向外填充
+    负数值：向内裁剪
+    正数值：向外填充（pad）
+    支持多种颜色格式的填充颜色和边缘填充模式
+    输出 mask：裁剪或填充的区域为白色，原图区域为黑色
+    """
+    
+    # 内置最大分辨率常量
+    MAX_RESOLUTION = 8192
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "left_amount": ("FLOAT", {
+                    "default": 0,
+                    "min": -cls.MAX_RESOLUTION,
+                    "max": cls.MAX_RESOLUTION,
+                    "step": 0.01
+                }),
+                "right_amount": ("FLOAT", {
+                    "default": 0,
+                    "min": -cls.MAX_RESOLUTION,
+                    "max": cls.MAX_RESOLUTION,
+                    "step": 0.01
+                }),
+                "top_amount": ("FLOAT", {
+                    "default": 0,
+                    "min": -cls.MAX_RESOLUTION,
+                    "max": cls.MAX_RESOLUTION,
+                    "step": 0.01
+                }),
+                "bottom_amount": ("FLOAT", {
+                    "default": 0,
+                    "min": -cls.MAX_RESOLUTION,
+                    "max": cls.MAX_RESOLUTION,
+                    "step": 0.01
+                }),
+                "uniform_amount": ("FLOAT", {
+                    "default": 0,
+                    "min": -cls.MAX_RESOLUTION,
+                    "max": cls.MAX_RESOLUTION,
+                    "step": 0.01
+                }),
+                "pad_color": ("STRING", {"default": "0.0"}),
+                "divisible_by": ("INT", {
+                    "default": 8, 
+                    "min": 1, 
+                    "max": 1024, 
+                    "step": 1
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("IMAGE", "MASK")
+    RETURN_NAMES = ("image", "mask")
+    FUNCTION = "crop_or_pad"
+    CATEGORY = "1hewNodes/image/crop"
+
+    def crop_or_pad(self, image, uniform_amount, left_amount, right_amount, top_amount, bottom_amount, 
+                   pad_color="0.0", divisible_by=8):
+        """执行裁剪或填充操作"""
+        batch_size, height, width, channels = image.shape
+        
+        # 处理参数值：0-1为百分比，>=1为像素值
+        def process_value(value, dimension):
+            if value != 0:
+                if abs(value) < 1:  # 百分比模式 (0-1)
+                    return int(dimension * value)
+                else:  # 像素模式 (>=1)
+                    return int(value)
+            return 0
+
+        # 当uniform_amount不为0时，覆盖其他参数的值
+        if uniform_amount != 0:
+            if abs(uniform_amount) < 1:  # 百分比模式
+                if uniform_amount < 0:  # 负数：向内裁剪
+                    crop_percent = abs(uniform_amount) / 2
+                    uniform_left = -int(width * crop_percent)
+                    uniform_right = -int(width * crop_percent)
+                    uniform_top = -int(height * crop_percent)
+                    uniform_bottom = -int(height * crop_percent)
+                else:  # 正数：向外填充
+                    pad_percent = uniform_amount / 2
+                    uniform_left = int(width * pad_percent)
+                    uniform_right = int(width * pad_percent)
+                    uniform_top = int(height * pad_percent)
+                    uniform_bottom = int(height * pad_percent)
+            else:  # 像素模式
+                uniform_left = int(uniform_amount)
+                uniform_right = int(uniform_amount)
+                uniform_top = int(uniform_amount)
+                uniform_bottom = int(uniform_amount)
+            
+            left = uniform_left
+            right = uniform_right
+            top = uniform_top
+            bottom = uniform_bottom
+        else:
+            # 处理各边的值
+            left = process_value(left_amount, width)
+            right = process_value(right_amount, width)
+            top = process_value(top_amount, height)
+            bottom = process_value(bottom_amount, height)
+
+        # 确保值为divisible_by的倍数
+        left = (abs(left) // divisible_by * divisible_by) * (1 if left >= 0 else -1)
+        right = (abs(right) // divisible_by * divisible_by) * (1 if right >= 0 else -1)
+        top = (abs(top) // divisible_by * divisible_by) * (1 if top >= 0 else -1)
+        bottom = (abs(bottom) // divisible_by * divisible_by) * (1 if bottom >= 0 else -1)
+
+        # 如果所有值为0，直接返回原图和全黑mask
+        if left == 0 and right == 0 and bottom == 0 and top == 0:
+            mask = torch.zeros((batch_size, height, width), dtype=torch.float32, device=image.device)
+            return (image, mask)
+
+        # 处理批量图像
+        output_images = []
+        output_masks = []
+        
+        for b in range(batch_size):
+            # 将图像转换为tensor格式进行处理
+            img_tensor = image[b:b+1]  # 保持批次维度
+            
+            # 执行裁剪或填充
+            result_tensor, result_mask = self._crop_or_pad_tensor(img_tensor, left, right, top, bottom, pad_color)
+            
+            output_images.append(result_tensor.squeeze(0))
+            output_masks.append(result_mask.squeeze(0))
+
+        # 合并批次
+        output_tensor = torch.stack(output_images)
+        output_mask = torch.stack(output_masks)
+        
+        return (output_tensor, output_mask)
+
+    def _crop_or_pad_tensor(self, img_tensor, left, right, top, bottom, pad_color):
+        """
+        对图像tensor执行裁剪或填充操作，同时生成对应的mask
+        """
+        B, H, W, C = img_tensor.shape
+        original_H, original_W = H, W  # 保存原始尺寸
+        
+        # 计算裁剪和填充的数量
+        crop_left = max(0, -left)
+        crop_right = max(0, -right)
+        crop_top = max(0, -top)
+        crop_bottom = max(0, -bottom)
+        
+        pad_left = max(0, left)
+        pad_right = max(0, right)
+        pad_top = max(0, top)
+        pad_bottom = max(0, bottom)
+        
+        # 创建原始尺寸的mask，初始为全黑（0）
+        original_mask = torch.zeros((B, original_H, original_W), dtype=torch.float32, device=img_tensor.device)
+        
+        # 先执行裁剪
+        if crop_left > 0 or crop_right > 0 or crop_top > 0 or crop_bottom > 0:
+            # 计算裁剪边界
+            crop_x1 = crop_left
+            crop_y1 = crop_top
+            crop_x2 = W - crop_right
+            crop_y2 = H - crop_bottom
+            
+            # 验证裁剪尺寸
+            if crop_x1 >= crop_x2 or crop_y1 >= crop_y2:
+                raise ValueError(f"裁剪尺寸无效：裁剪后图像尺寸为 {crop_x2-crop_x1}x{crop_y2-crop_y1}")
+            
+            # 在原始尺寸的mask中标记被裁剪的区域为白色（1）
+            for b in range(B):
+                # 标记被裁剪的区域
+                if crop_top > 0:
+                    original_mask[b, :crop_top, :] = 1.0  # 顶部裁剪区域
+                if crop_bottom > 0:
+                    original_mask[b, original_H-crop_bottom:, :] = 1.0  # 底部裁剪区域
+                if crop_left > 0:
+                    original_mask[b, :, :crop_left] = 1.0  # 左侧裁剪区域
+                if crop_right > 0:
+                    original_mask[b, :, original_W-crop_right:] = 1.0  # 右侧裁剪区域
+            
+            # 执行图像裁剪
+            img_tensor = img_tensor[:, crop_y1:crop_y2, crop_x1:crop_x2, :]
+            B, H, W, C = img_tensor.shape
+            print(f'裁剪图像：左{crop_left}，右{crop_right}，上{crop_top}，下{crop_bottom}')
+        
+        # 再执行填充
+        if pad_left > 0 or pad_right > 0 or pad_top > 0 or pad_bottom > 0:
+            # 计算新的尺寸
+            new_height = H + pad_top + pad_bottom
+            new_width = W + pad_left + pad_right
+            
+            # 创建输出tensor和mask
+            out_tensor = torch.zeros((B, new_height, new_width, C), dtype=img_tensor.dtype, device=img_tensor.device)
+            out_mask = torch.ones((B, new_height, new_width), dtype=torch.float32, device=img_tensor.device)
+            
+            # 检查是否为 edge 模式的颜色参数
+            color_lower = pad_color.lower().strip()
+            if color_lower in ['edge', 'e', 'ed']:
+                # 使用 ImagePadKJ 风格的边缘填充模式
+                for b in range(B):
+                    # 先放置原图像
+                    out_tensor[b, pad_top:pad_top+H, pad_left:pad_left+W, :] = img_tensor[b]
+                    # 原图区域设为黑色（0）
+                    out_mask[b, pad_top:pad_top+H, pad_left:pad_left+W] = 0.0
+                    
+                    # 获取各边缘的平均颜色
+                    top_edge = img_tensor[b, 0, :, :]  # [W, C]
+                    bottom_edge = img_tensor[b, H-1, :, :]  # [W, C]
+                    left_edge = img_tensor[b, :, 0, :]  # [H, C]
+                    right_edge = img_tensor[b, :, W-1, :]  # [H, C]
+                    
+                    top_color = top_edge.mean(dim=0)  # [C]
+                    bottom_color = bottom_edge.mean(dim=0)  # [C]
+                    left_color = left_edge.mean(dim=0)  # [C]
+                    right_color = right_edge.mean(dim=0)  # [C]
+                    
+                    # 填充各区域
+                    if pad_top > 0:
+                        out_tensor[b, :pad_top, :, :] = top_color.unsqueeze(0).unsqueeze(0)
+                    if pad_bottom > 0:
+                        out_tensor[b, pad_top+H:, :, :] = bottom_color.unsqueeze(0).unsqueeze(0)
+                    if pad_left > 0:
+                        out_tensor[b, :, :pad_left, :] = left_color.unsqueeze(0).unsqueeze(0)
+                    if pad_right > 0:
+                        out_tensor[b, :, pad_left+W:, :] = right_color.unsqueeze(0).unsqueeze(0)
+            else:
+                # 普通颜色填充模式
+                fill_color = self._parse_color_advanced(pad_color, img_tensor[0])
+                bg_color = torch.tensor(fill_color, dtype=img_tensor.dtype, device=img_tensor.device) / 255.0
+                
+                # 填充背景颜色
+                for b in range(B):
+                    out_tensor[b, :, :, :] = bg_color.unsqueeze(0).unsqueeze(0)
+                    out_tensor[b, pad_top:pad_top+H, pad_left:pad_left+W, :] = img_tensor[b]
+                    # 原图区域设为黑色（0）
+                    out_mask[b, pad_top:pad_top+H, pad_left:pad_left+W] = 0.0
+            
+            img_tensor = out_tensor
+            mask_tensor = out_mask
+            print(f'填充图像：左{pad_left}，右{pad_right}，上{pad_top}，下{pad_bottom}，颜色{pad_color}')
+            
+            return img_tensor, mask_tensor
+        else:
+            # 只有裁剪操作或无操作的情况
+            # 返回裁剪后的图像和原始尺寸的mask
+            return img_tensor, original_mask
+
+    def _parse_color_advanced(self, color_str, img_tensor=None):
+        """
+        高级颜色解析，支持多种格式：
+        - 灰度值: "0.5", "1.0"
+        - HEX: "#FF0000", "FF0000"
+        - RGB: "255,0,0", "1.0,0.0,0.0", "(255,128,64)"
+        - 颜色名称: "red", "blue", "white"
+        - 特殊值: "edge", "average"
+        """
+        if not color_str:
+            return (0, 0, 0)
+        
+        # 检查特殊值
+        color_lower = color_str.lower().strip()
+        
+        # 检查是否为 average 或其缩写
+        if color_lower in ['average', 'avg', 'a', 'av', 'aver']:
+            if img_tensor is not None:
+                return self._get_average_color_tensor(img_tensor)
+            return (128, 128, 128)  # 默认灰色
+        
+        # 检查是否为 edge 或其缩写
+        if color_lower in ['edge', 'e', 'ed']:
+            if img_tensor is not None:
+                return self._get_edge_color_tensor(img_tensor)
+            return (128, 128, 128)  # 默认灰色
+        
+        # 移除括号（如果存在）
+        color_str = color_str.strip()
+        if color_str.startswith('(') and color_str.endswith(')'):
+            color_str = color_str[1:-1].strip()
+        
+        # 尝试解析为灰度值 (0.0-1.0)
+        try:
+            gray = float(color_str)
+            if 0.0 <= gray <= 1.0:
+                gray_int = int(gray * 255)
+                return (gray_int, gray_int, gray_int)
+            elif gray > 1.0 and gray <= 255:
+                # 可能是0-255范围的灰度值
+                gray_int = int(gray)
+                return (gray_int, gray_int, gray_int)
+        except ValueError:
+            pass
+        
+        # 尝试解析为 RGB 格式
+        if ',' in color_str:
+            try:
+                parts = [part.strip() for part in color_str.split(',')]
+                if len(parts) >= 3:
+                    r, g, b = [float(parts[i]) for i in range(3)]
+                    # 判断是否为 0-1 范围
+                    if max(r, g, b) <= 1.0:
+                        return (int(r * 255), int(g * 255), int(b * 255))
+                    else:
+                        return (int(r), int(g), int(b))
+            except (ValueError, IndexError):
+                pass
+        
+        # 尝试解析为十六进制颜色
+        hex_color = color_str
+        if hex_color.startswith('#'):
+            hex_color = hex_color[1:]
+        
+        if len(hex_color) == 6:
+            try:
+                r = int(hex_color[0:2], 16)
+                g = int(hex_color[2:4], 16)
+                b = int(hex_color[4:6], 16)
+                return (r, g, b)
+            except ValueError:
+                pass
+        elif len(hex_color) == 3:
+            try:
+                r = int(hex_color[0], 16) * 17  # 扩展单个十六进制数字
+                g = int(hex_color[1], 16) * 17
+                b = int(hex_color[2], 16) * 17
+                return (r, g, b)
+            except ValueError:
+                pass
+        
+        # 尝试解析为颜色名称
+        try:
+            return ImageColor.getrgb(color_str)
+        except ValueError:
+            pass
+        
+        # 默认返回黑色
+        return (0, 0, 0)
+    
+    def _get_average_color_tensor(self, img_tensor):
+        """计算tensor图像的平均颜色"""
+        # img_tensor shape: [H, W, C]
+        avg_color = torch.mean(img_tensor, dim=(0, 1))  # 在H和W维度上求平均
+        avg_color_255 = (avg_color * 255).int().tolist()
+        return tuple(avg_color_255)
+    
+    def _get_edge_color_tensor(self, img_tensor):
+        """获取tensor图像边缘的平均颜色"""
+        H, W, C = img_tensor.shape
+        
+        # 获取所有边缘像素
+        top_edge = img_tensor[0, :, :]  # 顶部边缘
+        bottom_edge = img_tensor[H-1, :, :]  # 底部边缘
+        left_edge = img_tensor[:, 0, :]  # 左侧边缘
+        right_edge = img_tensor[:, W-1, :]  # 右侧边缘
+        
+        # 合并所有边缘像素
+        all_edges = torch.cat([
+            top_edge.reshape(-1, C),
+            bottom_edge.reshape(-1, C),
+            left_edge.reshape(-1, C),
+            right_edge.reshape(-1, C)
+        ], dim=0)
+        
+        # 计算平均颜色
+        avg_color = torch.mean(all_edges, dim=0)
+        avg_color_255 = (avg_color * 255).int().tolist()
+        return tuple(avg_color_255)
+
+
 NODE_CLASS_MAPPINGS = {
     "ImageCropSquare": ImageCropSquare,
-    "ImageCropEdge": ImageCropEdge,
     "ImageCropWithBBoxMask": ImageCropWithBBoxMask,
     "ImageCropByMaskAlpha": ImageCropByMaskAlpha,
     "ImagePasteByBBoxMask": ImagePasteByBBoxMask,
+    "ImageEdgeCropPad": ImageEdgeCropPad,
+
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "ImageCropSquare": "Image Crop Square",
-    "ImageCropEdge": "Image Crop Edge",
     "ImageCropWithBBoxMask": "Image Crop with BBox Mask",
     "ImageCropByMaskAlpha": "Image Crop by Mask Alpha",
     "ImagePasteByBBoxMask": "Image Paste by BBox Mask",
+    "ImageEdgeCropPad": "Image Edge Crop Pad",
 }
