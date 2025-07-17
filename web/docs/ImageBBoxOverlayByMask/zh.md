@@ -8,7 +8,7 @@
 | -------- | -------- | -------- | ------ | -------- | ---- |
 | `image` | 必选 | IMAGE | - | - | 要叠加边界框的图像 |
 | `mask` | 必选 | MASK | - | - | 用于生成边界框的遮罩 |
-| `bbox_color` | - | COMBO[STRING] | red | red, green, blue, yellow, cyan, magenta, white, black | 边界框颜色 |
+| `bbox_color` | - | COMBO[STRING] | green | red, green, blue, yellow, cyan, magenta, white, black | 边界框颜色 |
 | `line_width` | - | INT | 3 | 1-20 | 边界框线条宽度 |
 | `padding` | - | INT | 0 | 0-50 | 边界框填充像素数 |
 | `output_mode` | - | COMBO[STRING] | separate | separate, merge | 输出模式：separate（独立模式），merge（合并模式） |
