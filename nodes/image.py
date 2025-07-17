@@ -951,9 +951,11 @@ class ImageEditStitch:
 
 class ImageAddLabel:
     """
-    为图像添加标签文本 - 支持批量图像和批量标签，支持动态引用输入值
+    为图像添加标签文本 - 支持比例缩放的标签
+    标签大小会根据图像尺寸自动调整，确保同比例不同尺寸的图片在缩放后标签大小保持一致
+    支持批量图像和批量标签，支持动态引用输入值
     支持 -- 分隔符功能，当存在只包含连字符的行时，-- 之间的内容作为完整标签
-    height_pad参数为基础高度，最终高度会根据文本行数自动调整
+    自动选择最佳缩放模式，根据标签方向智能优化
     """
 
     @classmethod
@@ -991,8 +993,93 @@ class ImageAddLabel:
 
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
-    FUNCTION = "image_add_label"
+    FUNCTION = "image_add_label_v2"
     CATEGORY = "1hewNodes/image"
+
+    def auto_select_scale_mode(self, image_width, image_height, direction="top"):
+        """
+        自动选择最佳的缩放模式
+        根据图像的宽高比、尺寸特征和标签放置方向来智能选择
+        """
+        aspect_ratio = image_width / image_height
+        
+        # 根据 direction 优先选择合适的缩放模式
+        if direction in ["top", "bottom"]:
+            # 顶部/底部标签：标签高度相对于图像高度的比例应该保持一致
+            # 优先使用 height 模式，确保标签高度占图像高度的比例在等比例缩放时保持一致
+            
+            if aspect_ratio > 3.0:
+                # 极宽图像：使用高度模式，避免标签过大
+                return "height"
+            elif aspect_ratio < 0.3:
+                # 极高图像：可能需要考虑面积，避免标签过小
+                return "area" if min(image_width, image_height) < 512 else "height"
+            else:
+                # 大多数情况使用高度模式
+                return "height"
+                
+        elif direction in ["left", "right"]:
+            # 左侧/右侧标签：标签宽度相对于图像宽度的比例应该保持一致
+            # 优先使用 width 模式，确保标签宽度占图像宽度的比例在等比例缩放时保持一致
+            
+            if aspect_ratio < 0.33:
+                # 极高图像：使用宽度模式，避免标签过大
+                return "width"
+            elif aspect_ratio > 3.0:
+                # 极宽图像：可能需要考虑面积，避免标签过小
+                return "area" if min(image_width, image_height) < 512 else "width"
+            else:
+                # 大多数情况使用宽度模式
+                return "width"
+        
+        # 回退到原有逻辑（用于其他未知的 direction 值）
+        if 0.8 <= aspect_ratio <= 1.25:
+            # 接近正方形的图像 (宽高比在 0.8-1.25 之间)
+            return "area"
+        elif aspect_ratio > 2.0:
+            # 极宽图像
+            return "height"
+        elif aspect_ratio < 0.5:
+            # 极高图像
+            return "width"
+        else:
+            # 默认使用面积模式
+            return "area"
+
+    def calculate_scale_factor(self, image_width, image_height, base_font_size, scale_mode=None, direction="top"):
+        """
+        根据不同的缩放模式计算缩放因子
+        如果未指定 scale_mode，则自动选择最佳模式
+        """
+        if scale_mode is None:
+            scale_mode = self.auto_select_scale_mode(image_width, image_height, direction)
+        
+        # 使用1024作为基准分辨率
+        base_resolution = 1024
+        
+        if scale_mode == "area":
+            # 基于面积的缩放 - 推荐模式，确保同比例图像标签大小一致
+            base_area = base_resolution * base_resolution
+            current_area = image_width * image_height
+            scale_factor = math.sqrt(current_area / base_area)
+        elif scale_mode == "width":
+            # 基于宽度的缩放
+            scale_factor = image_width / base_resolution
+        elif scale_mode == "height":
+            # 基于高度的缩放
+            scale_factor = image_height / base_resolution
+        elif scale_mode == "min_side":
+            # 基于最短边的缩放
+            min_side = min(image_width, image_height)
+            scale_factor = min_side / base_resolution
+        elif scale_mode == "max_side":
+            # 基于最长边的缩放
+            max_side = max(image_width, image_height)
+            scale_factor = max_side / base_resolution
+        else:
+            scale_factor = 1.0
+            
+        return scale_factor
 
     def parse_text_with_inputs(self, text, input1=None, input2=None, batch_index=None, total_batches=None):
         """
@@ -1123,7 +1210,6 @@ class ImageAddLabel:
             text_top_offset = 0
         except AttributeError:
             # 回退方案：使用更全面的标准字符串计算固定行高
-            # 包含英文字母、数字、常用标点符号和更多中文字符
             standard_chars = (
                 "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
                 "!@#$%^&*()_+-=[]{}|;':,.<>?/~`"
@@ -1190,7 +1276,7 @@ class ImageAddLabel:
             font_obj = ImageFont.load_default()
         return font_obj
 
-    def image_add_label(self, image, height_pad, font_size, invert_color, font, text, direction, input1=None, input2=None):
+    def image_add_label_v2(self, image, height_pad, font_size, invert_color, font, text, direction, input1=None, input2=None):
         # 设置颜色，根据invert_color决定黑白配色
         if invert_color:
             font_color = "black"
@@ -1202,11 +1288,12 @@ class ImageAddLabel:
         result = []
         total_batches = len(image)
         
-        # 加载字体
-        font_obj = self._load_font(font, font_size)
-        
         # 预处理所有文本，获取每张图片对应的文本
         all_current_texts = []
+        all_scale_factors = []
+        all_font_sizes = []
+        all_height_pads = []
+        all_selected_modes = []
         
         for i in range(total_batches):
             # 为每个批次解析文本，包含 {range} 替换
@@ -1216,14 +1303,37 @@ class ImageAddLabel:
             text_lines = self.parse_text_list(parsed_text)
             current_text = text_lines[i % len(text_lines)] if text_lines else ""
             all_current_texts.append(current_text)
+            
+            # 获取当前图像尺寸并计算缩放因子
+            img_data = 255. * image[i].cpu().numpy()
+            img_pil = Image.fromarray(np.clip(img_data, 0, 255).astype(np.uint8))
+            width, height = img_pil.size
+            
+            # 自动选择最佳缩放模式并计算缩放因子（传入direction参数）
+            selected_mode = self.auto_select_scale_mode(width, height, direction)
+            scale_factor = self.calculate_scale_factor(width, height, font_size, selected_mode, direction)
+            all_scale_factors.append(scale_factor)
+            all_selected_modes.append(selected_mode)
+            
+            # 计算缩放后的字体大小和高度填充
+            scaled_font_size = max(8, int(font_size * scale_factor))
+            scaled_height_pad = max(4, int(height_pad * scale_factor))
+            
+            all_font_sizes.append(scaled_font_size)
+            all_height_pads.append(scaled_height_pad)
         
         # 处理每张图片
         for i, img in enumerate(image):
             current_text = all_current_texts[i]
+            scaled_font_size = all_font_sizes[i]
+            scaled_height_pad = all_height_pads[i]
+            
+            # 加载缩放后的字体
+            font_obj = self._load_font(font, scaled_font_size)
             
             # 计算当前文本的标签尺寸（支持多行文本，使用固定行高）
             text_width, text_height, text_top_offset, line_heights = self._calculate_text_size(current_text, font_obj)
-            min_padding = max(height_pad, 4)
+            min_padding = max(scaled_height_pad, 4)
             label_height = text_height + min_padding
             
             # 将图像转换为PIL格式
@@ -1237,8 +1347,8 @@ class ImageAddLabel:
                 label_img = Image.new("RGB", (width, label_height), label_color)
                 draw = ImageDraw.Draw(label_img)
     
-                # 计算文本位置 - 左对齐，空出10像素，确保文本完全在标签区域内
-                text_x = 10
+                # 计算文本位置 - 左对齐，空出比例化的边距
+                text_x = max(10, int(10 * all_scale_factors[i]))
                 text_y = min_padding // 2 + text_top_offset
     
                 # 绘制多行文本
@@ -1259,8 +1369,8 @@ class ImageAddLabel:
                     temp_label_img = Image.new("RGB", (orig_height, label_height), label_color)
                     draw = ImageDraw.Draw(temp_label_img)
     
-                    # 计算文本位置 - 左对齐，空出10像素，确保文本完全显示
-                    text_x = 10
+                    # 计算文本位置 - 左对齐，空出比例化的边距
+                    text_x = max(10, int(10 * all_scale_factors[i]))
                     text_y = min_padding // 2 + text_top_offset
     
                     # 绘制多行文本（保持一致性）
@@ -1278,8 +1388,8 @@ class ImageAddLabel:
                     temp_label_img = Image.new("RGB", (orig_height, label_height), label_color)
                     draw = ImageDraw.Draw(temp_label_img)
     
-                    # 计算文本位置 - 左对齐，空出10像素
-                    text_x = 10
+                    # 计算文本位置 - 左对齐，空出比例化的边距
+                    text_x = max(10, int(10 * all_scale_factors[i]))
                     text_y = min_padding // 2 + text_top_offset
     
                     # 绘制多行文本（保持一致性）
@@ -1591,7 +1701,7 @@ class ImageBBoxOverlayByMask:
                 "image": ("IMAGE",),
                 "mask": ("MASK",),
                 "bbox_color": (["red", "green", "blue", "yellow", "cyan", "magenta", "white", "black"], 
-                              {"default": "red"}),
+                              {"default": "green"}),
                 "stroke_width": ("INT", {"default": 4, "min": 1, "max": 100, "step": 1}),
                 "fill": ("BOOLEAN", {"default": True}),
                 "padding": ("INT", {"default": 0, "min": 0, "max": 1000, "step": 1}),
@@ -1604,7 +1714,7 @@ class ImageBBoxOverlayByMask:
     FUNCTION = "overlay_bbox"
     CATEGORY = "1hewNodes/image"
 
-    def overlay_bbox(self, image, mask, bbox_color="red", stroke_width=3, fill=False, padding=0, output_mode="separate"):
+    def overlay_bbox(self, image, mask, bbox_color="green", stroke_width=3, fill=False, padding=0, output_mode="separate"):
         # 确保输入是正确的维度
         if image.dim() == 3:
             image = image.unsqueeze(0)

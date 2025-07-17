@@ -21,6 +21,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.15**
+- feat(text): 添加 `Text Join Multi` 节点，支持多个文本输入的连接和动态变量引用
+- feat(image_crop): 添加 `Image Edge Crop Pad` 节点，支持智能边缘裁剪和填充，提供遮罩输出功能
+- feat(image_blend): 增强 `Image Luma Matte` 节点，新增羽化和透明度输出功能，支持多种颜色格式和边缘处理
+
 **v1.2.13**
 - feat(text): 添加 `Text Load Local` 节点，支持从prompt目录加载JSON格式提示词文件，提供中英文双语输出
 
@@ -131,7 +136,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎨 图像混合节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Image Luma Matte | 基于亮度的图像蒙版合成 |
+| Image Luma Matte | 基于亮度的图像蒙版合成，支持羽化、透明度输出和多种颜色格式 |
 | Image Blend Modes by Alpha | 基于透明度的图像混合，支持多种Photoshop风格混合模式 |
 | Image Blend Modes by CSS | CSS标准混合模式，基于Pilgram库实现 |
 
@@ -139,10 +144,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Image Crop Square | 方形裁剪，支持遮罩引导和缩放 |
-| Image Crop Edge | 边缘裁剪，支持四边独立设置 |
 | Image Crop with BBox Mask| 智能边界框裁剪，支持精确比例控制和缩放强度调节 |
 | Image Crop by Mask Alpha | 基于遮罩的批量裁剪，支持RGB/RGBA双输出模式和智能通道处理 |
 | Image Paste by BBox Mask | 裁剪图像回贴，支持多种混合模式 |
+| Image Edge Crop Pad | 智能边缘裁剪和填充，支持多种填充模式和遮罩输出 |
 
 ### 🧩 图像分块节点
 | 节点名称 | 功能描述 |
@@ -189,6 +194,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📝 文本处理节点
 | 节点名称 | 功能描述 |
 |---------|----------|
+| Text Join Multi | 文本连接多输入器，支持多个文本输入的连接和动态变量引用，可自定义分隔符 |
 | Text Load Local | 本地文本加载器，从prompt目录加载JSON格式提示词文件，支持中英文双语输出和键顺序保持 |
 | Text Format | 文本格式化器，支持通配符输入的灵活数据格式化，可自定义前缀、后缀和分隔符 |
 | Text Custom Extract | 文本自定义提取器，从JSON中提取指定键值 |

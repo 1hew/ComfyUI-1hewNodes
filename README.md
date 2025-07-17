@@ -21,6 +21,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.15**
+- feat(text): Added `Text Join Multi` node for concatenating multiple text inputs with dynamic variable referencing
+- feat(image_crop): Added `Image Edge Crop Pad` node with smart edge cropping and padding capabilities, featuring mask output functionality
+- feat(image_blend): Enhanced `Image Luma Matte` node with feathering and alpha output features, supporting multiple color formats and edge processing
+
 **v1.2.13**
 - feat(text): Added `Text Load Local` node for loading JSON format prompt files from prompt directory with bilingual Chinese and English output
 
@@ -131,7 +136,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎨 Image Blending Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Image Luma Matte | Luminance-based image mask compositing |
+| Image Luma Matte | Luminance-based image mask compositing with feathering, alpha output, and multiple color format support |
 | Image Blend Modes by Alpha | Alpha-based image blending with multiple Photoshop-style blend modes |
 | Image Blend Modes by CSS | CSS standard blend modes based on Pilgram library |
 
@@ -139,10 +144,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|-------------|
 | Image Crop Square | Square cropping with mask guidance and scaling support |
-| Image Crop Edge | Edge cropping with independent settings for four sides |
 | Image Crop with BBox Mask | Smart bounding box cropping with precise aspect ratio control and scale strength adjustment |
 | Image Crop by Mask Alpha | Batch mask-based cropping with RGB/RGBA dual output modes and smart channel processing |
 | Image Paste by BBox Mask | Paste cropped images back with multiple blend modes |
+| Image Edge Crop Pad | Smart edge cropping and padding with multiple padding modes and mask output |
 
 ### 🧩 Image Tiling Nodes
 | Node Name | Description |
@@ -189,6 +194,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📝 Text Processing Nodes
 | Node Name | Description |
 |-----------|-------------|
+| Text Join Multi | Multi-input text concatenator supporting multiple text inputs with dynamic variable referencing and custom separators |
 | Text Load Local | Local text loader for loading JSON format prompt files from prompt directory with bilingual Chinese and English output and key order preservation |
 | Text Format | Text formatter with wildcard input support for flexible data formatting with custom prefix, suffix, and separator |
 | Text Custom Extract | Text custom extractor for extracting specified key values from JSON |

@@ -8,7 +8,7 @@
 | --------- | -------- | --------- | ------- | ----- | ----------- |
 | `image` | Required | IMAGE | - | - | Image to overlay bounding boxes on |
 | `mask` | Required | MASK | - | - | Mask used to generate bounding boxes |
-| `bbox_color` | - | COMBO[STRING] | red | red, green, blue, yellow, cyan, magenta, white, black | Bounding box color |
+| `bbox_color` | - | COMBO[STRING] | green | red, green, blue, yellow, cyan, magenta, white, black | Bounding box color |
 | `line_width` | - | INT | 3 | 1-20 | Bounding box line width |
 | `padding` | - | INT | 0 | 0-50 | Bounding box padding pixels |
 | `output_mode` | - | COMBO[STRING] | separate | separate, merge | Output mode: separate (independent mode), merge (merge mode) |
