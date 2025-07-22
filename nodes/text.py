@@ -130,9 +130,12 @@ class TextJoinMulti:
     def text_join_multi(self, text1, text2, text3, text4, text5, separator="\n", input=None):
 
         try:
-            # 处理特殊的换行符表示
-            if separator == "\\n":
-                separator = "\n"
+            # 处理转义字符 - 使用更通用的方法
+            # 将字符串中的转义序列转换为实际字符
+            separator = separator.replace("\\n", "\n")
+            separator = separator.replace("\\t", "\t")
+            separator = separator.replace("\\r", "\r")
+            separator = separator.replace("\\\\", "\\")
             
             # 收集所有非空文本，并处理 {input} 引用和注释过滤
             text_list = []
