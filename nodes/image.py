@@ -1288,6 +1288,11 @@ class ImageAddLabel:
         result = []
         total_batches = len(image)
         
+        # 缓存字体对象和文本尺寸
+        font_cache = {}
+        text_size_cache = {}
+        scale_factor_cache = {}
+        
         # 预处理所有文本，获取每张图片对应的文本
         all_current_texts = []
         all_scale_factors = []
@@ -1309,9 +1314,15 @@ class ImageAddLabel:
             img_pil = Image.fromarray(np.clip(img_data, 0, 255).astype(np.uint8))
             width, height = img_pil.size
             
-            # 自动选择最佳缩放模式并计算缩放因子（传入direction参数）
-            selected_mode = self.auto_select_scale_mode(width, height, direction)
-            scale_factor = self.calculate_scale_factor(width, height, font_size, selected_mode, direction)
+            # 使用缓存的缩放因子计算
+            size_key = (width, height, direction)
+            if size_key not in scale_factor_cache:
+                selected_mode = self.auto_select_scale_mode(width, height, direction)
+                scale_factor = self.calculate_scale_factor(width, height, font_size, selected_mode, direction)
+                scale_factor_cache[size_key] = (selected_mode, scale_factor)
+            else:
+                selected_mode, scale_factor = scale_factor_cache[size_key]
+                
             all_scale_factors.append(scale_factor)
             all_selected_modes.append(selected_mode)
             
@@ -1322,23 +1333,34 @@ class ImageAddLabel:
             all_font_sizes.append(scaled_font_size)
             all_height_pads.append(scaled_height_pad)
         
-        # 处理每张图片
+        # 批量转换图像为PIL格式，减少重复转换
+        pil_images = []
         for i, img in enumerate(image):
+            img_data = 255. * img.cpu().numpy()
+            img_pil = Image.fromarray(np.clip(img_data, 0, 255).astype(np.uint8))
+            pil_images.append(img_pil)
+        
+        # 处理每张图片
+        for i, img_pil in enumerate(pil_images):
             current_text = all_current_texts[i]
             scaled_font_size = all_font_sizes[i]
             scaled_height_pad = all_height_pads[i]
             
-            # 加载缩放后的字体
-            font_obj = self._load_font(font, scaled_font_size)
+            # 使用缓存的字体对象
+            font_key = (font, scaled_font_size)
+            if font_key not in font_cache:
+                font_cache[font_key] = self._load_font(font, scaled_font_size)
+            font_obj = font_cache[font_key]
             
-            # 计算当前文本的标签尺寸（支持多行文本，使用固定行高）
-            text_width, text_height, text_top_offset, line_heights = self._calculate_text_size(current_text, font_obj)
+            # 使用缓存的文本尺寸计算
+            text_key = (current_text, font_key)
+            if text_key not in text_size_cache:
+                text_size_cache[text_key] = self._calculate_text_size(current_text, font_obj)
+            text_width, text_height, text_top_offset, line_heights = text_size_cache[text_key]
+            
             min_padding = max(scaled_height_pad, 4)
             label_height = text_height + min_padding
             
-            # 将图像转换为PIL格式
-            img_data = 255. * img.cpu().numpy()
-            img_pil = Image.fromarray(np.clip(img_data, 0, 255).astype(np.uint8))
             width, orig_height = img_pil.size
     
             # 创建标签区域
