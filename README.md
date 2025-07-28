@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.17**
+- feat(image_crop): Optimized `Image Crop with BBox Mask` node
+
 **v1.2.15**
 - feat(text): Added `Text Join Multi` node for concatenating multiple text inputs with dynamic variable referencing
 - feat(image_crop): Added `Image Edge Crop Pad` node with smart edge cropping and padding capabilities, featuring mask output functionality

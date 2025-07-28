@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.17**
+- feat(image_crop): 优化 `Image Crop with BBox Mask` 节点
+
 **v1.2.15**
 - feat(text): 添加 `Text Join Multi` 节点，支持多个文本输入的连接和动态变量引用
 - feat(image_crop): 添加 `Image Edge Crop Pad` 节点，支持智能边缘裁剪和填充，提供遮罩输出功能
