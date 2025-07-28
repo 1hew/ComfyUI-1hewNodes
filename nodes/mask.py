@@ -2,7 +2,6 @@ import torch
 import numpy as np
 from PIL import Image, ImageOps
 from scipy import ndimage
-from skimage import morphology
 
 class MaskFillHole:
     """
