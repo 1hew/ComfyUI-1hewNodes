@@ -458,9 +458,9 @@ class ImageCropWithBBoxMask:
             "required": {
                 "image": ("IMAGE",),
                 "mask": ("MASK",),
-                "preset_ratio": (["mask_ratio", "image_ratio", "1:1", "3:2", "4:3", "16:9", "21:9", "2:3", "3:4", "9:16", "9:21"], {"default": "mask_ratio"}),
+                "preset_ratio": (["mask", "image", "1:1", "3:2", "4:3", "16:9", "21:9", "2:3", "3:4", "9:16", "9:21"], {"default": "mask"}),
                 "scale_strength": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "divisible_by": ("INT", {"default": 8, "min": 1, "max": 64, "step": 1}),
+                "divisible_by": ("INT", {"default": 8, "min": 1, "max": 1024, "step": 1}),
             }
         }
 
@@ -469,245 +469,411 @@ class ImageCropWithBBoxMask:
     FUNCTION = "image_crop_with_bbox_mask"
     CATEGORY = "1hewNodes/image/crop"
 
-    @staticmethod
-    def gcd_of_two(a, b):
-        """计算两个数的最大公约数"""
-        while b:
-            a, b = b, a % b
-        return a
-    
-    @staticmethod
-    def get_simplified_ratio(width, height):
-        """计算图像的最简比例"""
-        gcd = ImageCropWithBBoxMask.gcd_of_two(width, height)
-        return width // gcd, height // gcd
-    
     def get_bbox(self, mask_pil):
-        """从遮罩中获取边界框"""
-        try:
-            mask_np = np.array(mask_pil)
-            if mask_np.size == 0:
-                return None
-                
-            rows = np.any(mask_np > 10, axis=1)
-            cols = np.any(mask_np > 10, axis=0)
-
-            if not np.any(rows) or not np.any(cols):
-                return None
-
-            y_indices = np.where(rows)[0]
-            x_indices = np.where(cols)[0]
-            
-            if len(y_indices) == 0 or len(x_indices) == 0:
-                return None
-                
-            y_min, y_max = int(y_indices[0]), int(y_indices[-1])
-            x_min, x_max = int(x_indices[0]), int(x_indices[-1])
-
-            return (x_min, y_min, x_max + 1, y_max + 1)
-        except Exception as e:
-            print(f"Error in get_bbox: {e}")
+        """获取遮罩的边界框"""
+        bbox = mask_pil.getbbox()
+        if bbox is None:
             return None
-    
-    def parse_ratio_exact(self, preset_ratio, img_width, img_height, mask_width, mask_height):
-        """精确解析比例设置"""
-        if preset_ratio == "mask_ratio":
+        return bbox
 
-            if mask_height > 0:
-                # 计算mask的原始比例
-                original_ratio = mask_width / mask_height
+    def preprocess_mask_dimensions_flexible(self, mask_width, mask_height, divisible_by):
+        """灵活预处理 mask 尺寸，提供更大的选择范围"""
+        original_ratio = mask_width / mask_height
+        
+        # 生成多种可能的调整方案，不局限于最小误差
+        candidates = []
+        
+        # 基础调整方案
+        for width_factor in [0.8, 0.9, 1.0, 1.1, 1.2]:  # 宽度调整范围
+            for height_factor in [0.8, 0.9, 1.0, 1.1, 1.2]:  # 高度调整范围
+                adjusted_width = max(divisible_by, round(mask_width * width_factor))
+                adjusted_height = max(divisible_by, round(mask_height * height_factor))
                 
-                # 简化为最简分数
-                simplified_w, simplified_h = self.get_simplified_ratio(mask_width, mask_height)
+                # 调整到 divisible_by 的倍数
+                adjusted_width = ((adjusted_width + divisible_by - 1) // divisible_by) * divisible_by
+                adjusted_height = ((adjusted_height + divisible_by - 1) // divisible_by) * divisible_by
                 
-                # 如果简化后的分子分母过大，则调整为接近的标准比例
-                if simplified_w > 21 or simplified_h > 21:
-                    # 寻找最接近的标准比例
-                    standard_ratios = [
-                        (1, 1), (3, 2), (4, 3), (16, 9), (21, 9),
-                        (2, 3), (3, 4), (9, 16), (9, 21)
-                    ]
+                ratio = adjusted_width / adjusted_height
+                error = abs(ratio - original_ratio)
+                
+                # 只要误差在合理范围内就加入候选
+                if error < 0.3:  # 30% 的误差范围，比较宽松
+                    candidates.append((adjusted_width, adjusted_height, ratio, error))
+        
+        # 去重并排序
+        unique_candidates = []
+        seen = set()
+        for w, h, r, e in candidates:
+            if (w, h) not in seen:
+                seen.add((w, h))
+                unique_candidates.append((w, h, r, e))
+        
+        # 按面积排序，提供从小到大的选择范围
+        unique_candidates.sort(key=lambda x: x[0] * x[1])
+        
+        print(f"Mask尺寸灵活预处理: {mask_width}x{mask_height}")
+        print(f"原始比例: {original_ratio:.6f}")
+        print(f"生成候选方案数量: {len(unique_candidates)}")
+        
+        if unique_candidates:
+            # 显示前几个和后几个候选方案
+            print("候选方案 (前5个):")
+            for i, (w, h, r, e) in enumerate(unique_candidates[:5]):
+                print(f"  {i+1}. {w}x{h}, 比例: {r:.6f}, 误差: {e:.6f}")
+            
+            if len(unique_candidates) > 5:
+                print("候选方案 (后5个):")
+                for i, (w, h, r, e) in enumerate(unique_candidates[-5:]):
+                    idx = len(unique_candidates) - 5 + i + 1
+                    print(f"  {idx}. {w}x{h}, 比例: {r:.6f}, 误差: {e:.6f}")
+        
+        return unique_candidates
+
+    def generate_flexible_valid_sizes(self, candidates, divisible_by, min_size=8, max_size=4096):
+        """基于候选方案生成灵活的有效尺寸范围"""
+        all_valid_sizes = set()
+        
+        for base_width, base_height, ratio, error in candidates:
+            # 为每个候选方案生成尺寸序列
+            multiplier = 1
+            while True:
+                width = base_width * multiplier
+                height = base_height * multiplier
+                
+                if width > max_size or height > max_size:
+                    break
                     
-                    best_ratio = (1, 1)
-                    min_diff = float('inf')
-                    
-                    for w, h in standard_ratios:
-                        ratio_diff = abs(w/h - original_ratio)
-                        if ratio_diff < min_diff:
-                            min_diff = ratio_diff
-                            best_ratio = (w, h)
-                    
-                    return Fraction(best_ratio[0], best_ratio[1])
+                if width >= min_size and height >= min_size:
+                    all_valid_sizes.add((width, height))
+                
+                multiplier += 1
+        
+        # 转换为排序列表
+        valid_sizes = sorted(list(all_valid_sizes), key=lambda x: x[0] * x[1])
+        
+        print(f"灵活方案生成的总有效尺寸数量: {len(valid_sizes)}")
+        
+        return valid_sizes
+
+    def parse_ratio_exact(self, preset_ratio, img_width, img_height, mask_width, mask_height, divisible_by=8):
+        """解析比例设置，返回精确的宽高比值"""
+        if preset_ratio == "mask":
+            # 对于 mask，我们仍然返回一个比例值，但会在后续处理中使用灵活的方式
+            # 这里返回原始的 mask 比例作为参考
+            return mask_width / mask_height
+        elif preset_ratio == "image":
+            return img_width / img_height
+        else:
+            # 解析标准比例格式 "width:height"
+            try:
+                parts = preset_ratio.split(":")
+                if len(parts) == 2:
+                    w, h = float(parts[0]), float(parts[1])
+                    return w / h
+            except:
+                pass
+            # 默认返回mask比例
+            return mask_width / mask_height
+
+    def generate_flexible_mask_sizes(self, mask_width, mask_height, divisible_by, min_size=8, max_size=4096):
+        """专门为 mask 生成灵活的有效尺寸"""
+        print(f"使用灵活的 mask 处理: {mask_width}x{mask_height}")
+        
+        # 使用灵活的预处理方式
+        candidates = self.preprocess_mask_dimensions_flexible(mask_width, mask_height, divisible_by)
+        
+        if not candidates:
+            print("警告: 无法生成有效的候选方案，回退到原始尺寸")
+            # 回退方案
+            adjusted_width = ((mask_width + divisible_by - 1) // divisible_by) * divisible_by
+            adjusted_height = ((mask_height + divisible_by - 1) // divisible_by) * divisible_by
+            candidates = [(adjusted_width, adjusted_height, adjusted_width/adjusted_height, 0)]
+        
+        # 生成灵活的有效尺寸
+        valid_sizes = self.generate_flexible_valid_sizes(candidates, divisible_by, min_size, max_size)
+        
+        if not valid_sizes:
+            print("警告: 无法生成有效尺寸，使用默认尺寸")
+            return [(divisible_by, divisible_by)]
+        
+        print(f"最终生成有效尺寸数量: {len(valid_sizes)}")
+        print(f"尺寸范围: {valid_sizes[0]} 到 {valid_sizes[-1]}")
+        
+        return valid_sizes
+
+    def generate_valid_sizes(self, target_ratio, divisible_by, min_size=8, max_size=4096):
+        """生成所有满足比例和divisible_by要求的有效尺寸"""
+        valid_sizes = set()  # 使用set避免重复
+        
+        # 解析目标比例为分数形式
+        if isinstance(target_ratio, str) and ":" in target_ratio:
+            parts = target_ratio.split(":")
+            ratio_w, ratio_h = int(parts[0]), int(parts[1])
+        else:
+            # 对于预处理后的 mask，直接使用简化的分数转换
+            ratio_w, ratio_h = self._simple_float_to_fraction(target_ratio, divisible_by)
+        
+        # 计算最大公约数，简化比例
+        from math import gcd
+        g = gcd(ratio_w, ratio_h)
+        ratio_w //= g
+        ratio_h //= g
+        
+        print(f"简化后的比例: {ratio_w}:{ratio_h}")
+        
+        # 由于比例已经预处理过，基础尺寸就是比例本身乘以 divisible_by
+        base_width = ratio_w * divisible_by
+        base_height = ratio_h * divisible_by
+        
+        print(f"基础尺寸: {base_width}x{base_height}")
+        
+        # 生成所有有效尺寸
+        multiplier = 1
+        while True:
+            width = base_width * multiplier
+            height = base_height * multiplier
+            
+            if width > max_size or height > max_size:
+                break
+                
+            if width >= min_size and height >= min_size:
+                valid_sizes.add((width, height))
+            
+            multiplier += 1
+        
+        # 转换为排序列表
+        valid_sizes = sorted(list(valid_sizes), key=lambda x: x[0] * x[1])
+        
+        return valid_sizes
+    
+    def _simple_float_to_fraction(self, ratio, divisible_by):
+        """为预处理后的比例提供简单的分数转换"""
+        # 由于比例已经是基于 divisible_by 调整的，我们可以直接使用简单的方法
+        # 将比例乘以一个合适的因子来得到整数
+        
+        # 尝试不同的分母，找到最接近的整数比例
+        for denominator in range(1, 101):  # 限制在合理范围内
+            numerator = round(ratio * denominator)
+            if numerator > 0:
+                actual_ratio = numerator / denominator
+                if abs(actual_ratio - ratio) < 0.001:  # 精度足够
+                    return numerator, denominator
+        
+        # 如果找不到合适的，使用默认方法
+        from fractions import Fraction
+        frac = Fraction(ratio).limit_denominator(100)
+        return frac.numerator, frac.denominator
+    
+    def _float_to_fraction(self, ratio):
+        """将浮点比例转换为整数分数"""
+        # 对于常见的比例，直接映射
+        common_ratios = {
+            1.0: (1, 1),
+            0.75: (3, 4),
+            1.333333: (4, 3),
+            0.5625: (9, 16),
+            1.777778: (16, 9),
+            0.428571: (9, 21),
+            2.333333: (21, 9),
+        }
+        
+        # 检查是否是常见比例（允许小误差）
+        for known_ratio, fraction in common_ratios.items():
+            if abs(ratio - known_ratio) < 0.001:
+                return fraction
+        
+        # 对于其他比例，使用更智能的分数逼近
+        from fractions import Fraction
+        
+        # 首先尝试较小的分母限制，逐步增加
+        for max_denominator in [10, 20, 50, 100, 200, 500]:
+            frac = Fraction(ratio).limit_denominator(max_denominator)
+            # 检查精度是否足够好
+            if abs(float(frac) - ratio) < 0.001:
+                return frac.numerator, frac.denominator
+        
+        # 如果仍然无法找到合适的分数，使用更大的分母限制
+        frac = Fraction(ratio).limit_denominator(1000)
+        
+        # 如果分数仍然太大，进行缩放处理
+        num, den = frac.numerator, frac.denominator
+        if max(num, den) > 100:
+            # 找到一个合适的缩放因子
+            scale = max(num, den) / 50  # 目标是让最大值约为50
+            num = max(1, round(num / scale))
+            den = max(1, round(den / scale))
+            
+            # 验证缩放后的比例是否仍然接近原始比例
+            scaled_ratio = num / den
+            if abs(scaled_ratio - ratio) > 0.01:  # 如果误差太大，使用简单的近似
+                if ratio < 1:
+                    # 对于小于1的比例，使用 1:n 的形式
+                    den = max(1, round(1 / ratio))
+                    num = 1
                 else:
-                    return Fraction(simplified_w, simplified_h)
-            else:
-                return Fraction(1, 1)
-        elif preset_ratio == "image_ratio":
-            simplified_w, simplified_h = self.get_simplified_ratio(img_width, img_height)
-            return Fraction(simplified_w, simplified_h)
-        else:
-            ratio_map = {
-                "1:1": Fraction(1, 1), "3:2": Fraction(3, 2), "4:3": Fraction(4, 3), 
-                "16:9": Fraction(16, 9), "21:9": Fraction(21, 9),
-                "2:3": Fraction(2, 3), "3:4": Fraction(3, 4), 
-                "9:16": Fraction(9, 16), "9:21": Fraction(9, 21)
-            }
-            return ratio_map.get(preset_ratio, Fraction(1, 1))
-    
-    def calculate_exact_dimensions(self, target_ratio, divisible_by, base_width=None, base_height=None):
-        """计算精确符合比例和divisible_by约束的尺寸"""
-        ratio_w = target_ratio.numerator
-        ratio_h = target_ratio.denominator
+                    # 对于大于1的比例，使用 n:1 的形式
+                    num = max(1, round(ratio))
+                    den = 1
         
-        if base_width is not None:
-            # 基于宽度计算
-            unit = math.ceil(base_width / (ratio_w * divisible_by))
-            final_width = unit * ratio_w * divisible_by
-            final_height = unit * ratio_h * divisible_by
-        elif base_height is not None:
-            # 基于高度计算
-            unit = math.ceil(base_height / (ratio_h * divisible_by))
-            final_width = unit * ratio_w * divisible_by
-            final_height = unit * ratio_h * divisible_by
-        else:
-            # 默认最小尺寸
-            final_width = ratio_w * divisible_by
-            final_height = ratio_h * divisible_by
-        
-        return int(final_width), int(final_height)
+        return num, den
     
-    def calculate_padding_size(self, mask_bbox, target_ratio, divisible_by):
-        """计算基于mask bbox的padding尺寸以满足目标比例和divisible_by"""
+    def find_valid_size_range(self, valid_sizes, mask_bbox, img_width, img_height, preset_ratio="mask"):
+        """在有效尺寸中找到满足约束的范围"""
         x_min, y_min, x_max, y_max = mask_bbox
         mask_width = x_max - x_min
         mask_height = y_max - y_min
         mask_center_x = (x_min + x_max) / 2.0
         mask_center_y = (y_min + y_max) / 2.0
         
-        # 方案1：基于mask宽度计算精确尺寸
-        width_1, height_1 = self.calculate_exact_dimensions(target_ratio, divisible_by, base_width=mask_width)
+        min_valid_size = None
+        max_valid_size = None
         
-        # 方案2：基于mask高度计算精确尺寸
-        width_2, height_2 = self.calculate_exact_dimensions(target_ratio, divisible_by, base_height=mask_height)
+        # 根据模式选择不同的检查策略
+        use_flexible_bounds = (preset_ratio == "mask")
         
-        # 选择能包含mask的最小尺寸方案
-        if width_1 >= mask_width and height_1 >= mask_height:
-            if width_2 >= mask_width and height_2 >= mask_height:
-                # 两个方案都可行，选择面积更小的
-                if width_1 * height_1 <= width_2 * height_2:
-                    final_width, final_height = width_1, height_1
-                else:
-                    final_width, final_height = width_2, height_2
+        for width, height in valid_sizes:
+            # 检查是否能包含mask
+            can_contain_mask = width >= mask_width and height >= mask_height
+            
+            if not can_contain_mask:
+                continue
+            
+            if use_flexible_bounds:
+                # mask模式：使用灵活的边界检查，允许更大的裁剪范围
+                # 计算以mask为中心时的裁剪区域
+                crop_x1 = mask_center_x - width / 2
+                crop_y1 = mask_center_y - height / 2
+                crop_x2 = crop_x1 + width
+                crop_y2 = crop_y1 + height
+                
+                # 检查是否可以通过调整来适应图像边界
+                can_fit_with_adjustment = True
+                
+                # 水平方向检查
+                if crop_x1 < 0:
+                    # 需要向右调整
+                    required_shift = -crop_x1
+                    new_crop_x2 = crop_x2 + required_shift
+                    if new_crop_x2 > img_width:
+                        can_fit_with_adjustment = False
+                elif crop_x2 > img_width:
+                    # 需要向左调整
+                    required_shift = crop_x2 - img_width
+                    new_crop_x1 = crop_x1 - required_shift
+                    if new_crop_x1 < 0:
+                        can_fit_with_adjustment = False
+                
+                # 垂直方向检查
+                if can_fit_with_adjustment:
+                    if crop_y1 < 0:
+                        # 需要向下调整
+                        required_shift = -crop_y1
+                        new_crop_y2 = crop_y2 + required_shift
+                        if new_crop_y2 > img_height:
+                            can_fit_with_adjustment = False
+                    elif crop_y2 > img_height:
+                        # 需要向上调整
+                        required_shift = crop_y2 - img_height
+                        new_crop_y1 = crop_y1 - required_shift
+                        if new_crop_y1 < 0:
+                            can_fit_with_adjustment = False
+                
+                # 最终检查：裁剪尺寸不能超过图像尺寸
+                if width > img_width or height > img_height:
+                    can_fit_with_adjustment = False
+                
+                if can_fit_with_adjustment:
+                    if min_valid_size is None:
+                        min_valid_size = (width, height)
+                    max_valid_size = (width, height)
             else:
-                final_width, final_height = width_1, height_1
-        elif width_2 >= mask_width and height_2 >= mask_height:
-            final_width, final_height = width_2, height_2
+                # 其他模式：使用严格的边界检查，保持原有的严格性
+                # 简单检查：裁剪尺寸必须能完全放入图像
+                if width <= img_width and height <= img_height:
+                    if min_valid_size is None:
+                        min_valid_size = (width, height)
+                    max_valid_size = (width, height)
+        
+        if use_flexible_bounds:
+            print(f"有效尺寸范围优化(mask): mask({mask_width}x{mask_height}) 在 image({img_width}x{img_height}) 中")
+            print(f"  Mask中心: ({mask_center_x:.1f}, {mask_center_y:.1f})")
+            print(f"  有效范围: {min_valid_size} 到 {max_valid_size}")
         else:
-            # 两个方案都不够，选择面积更大的
-            if width_1 * height_1 >= width_2 * height_2:
-                final_width, final_height = width_1, height_1
-            else:
-                final_width, final_height = width_2, height_2
+            print(f"有效尺寸范围严格模式({preset_ratio}): mask({mask_width}x{mask_height}) 在 image({img_width}x{img_height}) 中")
+            print(f"  有效范围: {min_valid_size} 到 {max_valid_size}")
         
-        return final_width, final_height, mask_center_x, mask_center_y
-    
-    def calculate_max_size_in_image(self, center_x, center_y, target_ratio, img_width, img_height, divisible_by):
-        """计算在图像内以给定中心点能达到的最大尺寸"""
-        ratio_w = target_ratio.numerator
-        ratio_h = target_ratio.denominator
+        return min_valid_size, max_valid_size
+
+    def calculate_target_size_from_range(self, min_size, max_size, scale_strength, valid_sizes):
+        """根据scale_strength在有效尺寸范围内进行映射"""
+        if min_size is None or max_size is None or not valid_sizes:
+            return None
         
-        # 计算从中心点到边界的距离
-        max_half_width = min(center_x, img_width - center_x)
-        max_half_height = min(center_y, img_height - center_y)
+        # 找到min_size和max_size在valid_sizes中的索引
+        min_index = None
+        max_index = None
         
-        # 基于边界约束计算最大可能的单位数
-        max_unit_from_width = int((max_half_width * 2) / (ratio_w * divisible_by))
-        max_unit_from_height = int((max_half_height * 2) / (ratio_h * divisible_by))
+        for i, size in enumerate(valid_sizes):
+            if size == min_size:
+                min_index = i
+            if size == max_size:
+                max_index = i
         
-        # 选择较小的单位数以确保不超出边界
-        max_unit = min(max_unit_from_width, max_unit_from_height)
-        max_unit = max(1, max_unit)  # 确保至少为1
+        if min_index is None or max_index is None:
+            return None
         
-        final_width = max_unit * ratio_w * divisible_by
-        final_height = max_unit * ratio_h * divisible_by
+        # 如果min和max是同一个尺寸，直接返回
+        if min_index == max_index:
+            return min_size
         
-        return final_width, final_height
-    
-    def calculate_interpolated_size(self, padding_size, max_size, scale_strength, target_ratio, divisible_by):
-        """计算插值后的尺寸"""
-        padding_width, padding_height = padding_size
-        max_width, max_height = max_size
+        # 根据scale_strength在索引范围内进行插值
+        target_index = min_index + (max_index - min_index) * scale_strength
+        target_index = int(round(target_index))
         
-        # 线性插值
-        interp_width = padding_width + (max_width - padding_width) * scale_strength
-        interp_height = padding_height + (max_height - padding_height) * scale_strength
+        # 确保索引在有效范围内
+        target_index = max(min_index, min(max_index, target_index))
         
-        # 基于插值结果计算精确尺寸
-        ratio_w = target_ratio.numerator
-        ratio_h = target_ratio.denominator
+        return valid_sizes[target_index]
+
+    def calculate_flexible_crop_region(self, center_x, center_y, target_width, target_height, img_width, img_height):
+        """使用灵活边界计算裁剪区域"""
+        target_width = int(target_width)
+        target_height = int(target_height)
         
-        # 计算单位数（基于面积插值）
-        padding_area = padding_width * padding_height
-        max_area = max_width * max_height
-        interp_area = padding_area + (max_area - padding_area) * scale_strength
-        
-        # 根据目标比例和面积计算尺寸
-        unit_area = ratio_w * ratio_h * divisible_by * divisible_by
-        target_unit = max(1, int(math.sqrt(interp_area / unit_area)))
-        
-        final_width = target_unit * ratio_w * divisible_by
-        final_height = target_unit * ratio_h * divisible_by
-        
-        return final_width, final_height
-    
-    def can_fit_in_image(self, center_x, center_y, width, height, img_width, img_height):
-        """检查给定尺寸是否能在图像内以指定中心点放置"""
-        half_w = width / 2
-        half_h = height / 2
-        
-        return (center_x - half_w >= 0 and center_x + half_w <= img_width and
-                center_y - half_h >= 0 and center_y + half_h <= img_height)
-    
-    def crop_from_center(self, center_x, center_y, target_ratio, img_width, img_height, divisible_by):
-        """以mask中心为基准裁剪原图以符合比例和divisible_by需求"""
-        # 计算能在图像内放置的最大尺寸
-        max_width, max_height = self.calculate_max_size_in_image(
-            center_x, center_y, target_ratio, img_width, img_height, divisible_by
-        )
-        
-        return max_width, max_height
-    
-    def calculate_crop_region(self, center_x, center_y, target_width, target_height, img_width, img_height):
-        """计算裁剪区域，确保不超出图像边界"""
-        # 计算初始裁剪区域
-        crop_x1 = int(center_x - target_width // 2)
-        crop_y1 = int(center_y - target_height // 2)
+        # 初始位置（居中）
+        crop_x1 = int(center_x - target_width / 2)
+        crop_y1 = int(center_y - target_height / 2)
         crop_x2 = crop_x1 + target_width
         crop_y2 = crop_y1 + target_height
         
-        # 边界调整
+        # 灵活边界调整
         if crop_x1 < 0:
-            crop_x2 -= crop_x1
-            crop_x1 = 0
-        if crop_y1 < 0:
-            crop_y2 -= crop_y1
-            crop_y1 = 0
-        if crop_x2 > img_width:
-            crop_x1 -= (crop_x2 - img_width)
-            crop_x2 = img_width
-        if crop_y2 > img_height:
-            crop_y1 -= (crop_y2 - img_height)
-            crop_y2 = img_height
+            shift = -crop_x1
+            crop_x1 += shift
+            crop_x2 += shift
+        elif crop_x2 > img_width:
+            shift = crop_x2 - img_width
+            crop_x1 -= shift
+            crop_x2 -= shift
         
-        # 最终边界检查
-        crop_x1 = max(0, crop_x1)
-        crop_y1 = max(0, crop_y1)
-        crop_x2 = min(img_width, crop_x2)
-        crop_y2 = min(img_height, crop_y2)
+        if crop_y1 < 0:
+            shift = -crop_y1
+            crop_y1 += shift
+            crop_y2 += shift
+        elif crop_y2 > img_height:
+            shift = crop_y2 - img_height
+            crop_y1 -= shift
+            crop_y2 -= shift
+        
+        # 最终边界检查，确保不超出图像范围
+        crop_x1 = max(0, min(crop_x1, img_width - target_width))
+        crop_y1 = max(0, min(crop_y1, img_height - target_height))
+        crop_x2 = crop_x1 + target_width
+        crop_y2 = crop_y1 + target_height
         
         return crop_x1, crop_y1, crop_x2, crop_y2
 
-    def image_crop_with_bbox_mask(self, image, mask, preset_ratio="mask_ratio", scale_strength=0.0, divisible_by=8):
+    def image_crop_with_bbox_mask(self, image, mask, preset_ratio="mask", scale_strength=0.0, divisible_by=8):
         batch_size, img_height, img_width, channels = image.shape
         mask_batch_size = mask.shape[0]
         
@@ -750,27 +916,30 @@ class ImageCropWithBBoxMask:
                     mask_np = (mask[b].numpy() * 255).astype(np.uint8)
                 
                 # 确保数组形状正确
-                if len(img_np.shape) != 3:
-                    print(f"Warning: Unexpected image shape {img_np.shape}, skipping batch {b}")
+                if len(img_np.shape) != 3 or img_np.shape[2] not in [3, 4]:
+                    print(f"Warning: Unexpected image shape {img_np.shape}, using original image")
+                    cropped_images.append(image[b])
+                    cropped_masks.append(mask[b])
+                    bbox_mask = torch.ones((img_height, img_width), dtype=torch.float32, device=image.device)
+                    bbox_masks.append(bbox_mask)
                     continue
                 
-                # 处理 4 通道 RGBA 图像，转换为 3 通道 RGB
+                # 处理 4 通道 RGBA 图像
                 if img_np.shape[2] == 4:
-                    print(f"Converting 4-channel RGBA image to 3-channel RGB for batch {b}")
-                    img_np = img_np[:, :, :3]  # 去除 alpha 通道
-                elif img_np.shape[2] != 3:
-                    print(f"Warning: Unexpected image channels {img_np.shape[2]}, skipping batch {b}")
-                    continue
+                    img_np = img_np[:, :, :3]
                     
                 if len(mask_np.shape) != 2:
-                    print(f"Warning: Unexpected mask shape {mask_np.shape}, skipping batch {b}")
+                    print(f"Warning: Unexpected mask shape {mask_np.shape}, using original image")
+                    cropped_images.append(image[b])
+                    cropped_masks.append(mask[b])
+                    bbox_mask = torch.ones((img_height, img_width), dtype=torch.float32, device=image.device)
+                    bbox_masks.append(bbox_mask)
                     continue
                 
                 img_pil = Image.fromarray(img_np)
                 mask_pil = Image.fromarray(mask_np).convert("L")
             except Exception as e:
-                print(f"Error processing batch {b}: {e}")
-                # 使用原始图像作为fallback
+                print(f"Error processing batch {b}: {e}, using original image")
                 cropped_images.append(image[b])
                 cropped_masks.append(mask[b])
                 bbox_mask = torch.ones((img_height, img_width), dtype=torch.float32, device=image.device)
@@ -788,7 +957,7 @@ class ImageCropWithBBoxMask:
             # 获取遮罩边界框
             bbox = self.get_bbox(mask_pil)
             if bbox is None:
-                # 如果没有有效遮罩，使用整个图像
+                print(f"No valid mask found for batch {b}, using original image")
                 cropped_images.append(image[b])
                 cropped_masks.append(mask[b])
                 bbox_mask = torch.ones((img_height, img_width), dtype=torch.float32, device=image.device)
@@ -804,86 +973,83 @@ class ImageCropWithBBoxMask:
             try:
                 # 解析目标比例
                 target_ratio = self.parse_ratio_exact(
-                    preset_ratio, img_width, img_height, mask_width, mask_height
+                    preset_ratio, img_width, img_height, mask_width, mask_height, divisible_by
                 )
                 
-                # 核心逻辑：根据scale_strength决定裁剪策略
-                if scale_strength == 0.0:
-                    # scale_strength=0: 基于mask bbox进行padding以满足比例和divisible_by
-                    target_width, target_height, center_x, center_y = self.calculate_padding_size(
-                        bbox, target_ratio, divisible_by
-                    )
-                    
-                    # 检查是否能在图像内放置
-                    if not self.can_fit_in_image(center_x, center_y, target_width, target_height, img_width, img_height):
-                        # 如果padding后的尺寸超出图像，则以mask中心进行原图裁剪
-                        print(f"Padding size {target_width}x{target_height} exceeds image bounds, cropping from center")
-                        target_width, target_height = self.crop_from_center(
-                            mask_center_x, mask_center_y, target_ratio, img_width, img_height, divisible_by
-                        )
-                        center_x, center_y = mask_center_x, mask_center_y
-                    
-                elif scale_strength == 1.0:
-                    # scale_strength=1: 获取最大符合条件的区域
-                    target_width, target_height = self.calculate_max_size_in_image(
-                        mask_center_x, mask_center_y, target_ratio, img_width, img_height, divisible_by
-                    )
-                    center_x, center_y = mask_center_x, mask_center_y
-                    
+                # 生成所有有效尺寸 - 对 mask 使用灵活方法
+                if preset_ratio == "mask":
+                    valid_sizes = self.generate_flexible_mask_sizes(mask_width, mask_height, divisible_by)
                 else:
-                    # scale_strength在0-1之间：在padding尺寸和最大尺寸之间插值
-                    # 计算padding尺寸
-                    padding_width, padding_height, _, _ = self.calculate_padding_size(
-                        bbox, target_ratio, divisible_by
-                    )
-                    
-                    # 计算最大尺寸
-                    max_width, max_height = self.calculate_max_size_in_image(
-                        mask_center_x, mask_center_y, target_ratio, img_width, img_height, divisible_by
-                    )
-                    
-                    # 检查padding尺寸是否能在图像内放置
-                    if self.can_fit_in_image(mask_center_x, mask_center_y, padding_width, padding_height, img_width, img_height):
-                        # padding尺寸可行，进行插值
-                        target_width, target_height = self.calculate_interpolated_size(
-                            (padding_width, padding_height), (max_width, max_height), 
-                            scale_strength, target_ratio, divisible_by
-                        )
-                    else:
-                        # padding尺寸不可行，使用裁剪模式的插值
-                        crop_width, crop_height = self.crop_from_center(
-                            mask_center_x, mask_center_y, target_ratio, img_width, img_height, divisible_by
-                        )
-                        target_width, target_height = self.calculate_interpolated_size(
-                            (crop_width, crop_height), (max_width, max_height), 
-                            scale_strength, target_ratio, divisible_by
-                        )
-                    
-                    center_x, center_y = mask_center_x, mask_center_y
+                    valid_sizes = self.generate_valid_sizes(target_ratio, divisible_by)
+                
+                # 提前检查是否有任何有效尺寸
+                if not valid_sizes:
+                    print(f"No valid sizes generated for preset_ratio {preset_ratio} and divisible_by {divisible_by}")
+                    cropped_images.append(image[b])
+                    cropped_masks.append(mask[b])
+                    bbox_mask = torch.ones((img_height, img_width), dtype=torch.float32, device=image.device)
+                    bbox_masks.append(bbox_mask)
+                    continue
+                
+                # 在有效尺寸中找到满足约束的范围
+                min_valid_size, max_valid_size = self.find_valid_size_range(
+                    valid_sizes, bbox, img_width, img_height, preset_ratio
+                )
+                
+                if min_valid_size is None or max_valid_size is None:
+                    print(f"No valid size found for batch {b} (mask: {mask_width}x{mask_height}, image: {img_width}x{img_height})")
+                    cropped_images.append(image[b])
+                    cropped_masks.append(mask[b])
+                    bbox_mask = torch.ones((img_height, img_width), dtype=torch.float32, device=image.device)
+                    bbox_masks.append(bbox_mask)
+                    continue
+                
+                # 根据scale_strength在有效范围内映射目标尺寸
+                target_size = self.calculate_target_size_from_range(
+                    min_valid_size, max_valid_size, scale_strength, valid_sizes
+                )
+                
+                if target_size is None:
+                    print(f"Failed to calculate target size for batch {b}, using original image")
+                    cropped_images.append(image[b])
+                    cropped_masks.append(mask[b])
+                    bbox_mask = torch.ones((img_height, img_width), dtype=torch.float32, device=image.device)
+                    bbox_masks.append(bbox_mask)
+                    continue
+                
+                target_width, target_height = target_size
+                center_x, center_y = mask_center_x, mask_center_y
+                
+                # 验证计算出的比例
+                actual_ratio = target_width / target_height
+                print(f"Batch {b}: Target ratio: {target_ratio:.6f}, Actual ratio: {actual_ratio:.6f}, Size: {target_width}x{target_height}")
+                print(f"  Valid range: {min_valid_size} to {max_valid_size}, scale_strength: {scale_strength}")
                 
             except Exception as e:
-                print(f"Error calculating target size: {e}")
-                # 使用默认尺寸
-                target_width, target_height = self.calculate_exact_dimensions(
-                    target_ratio, divisible_by, base_width=mask_width
-                )
-                center_x, center_y = mask_center_x, mask_center_y
+                print(f"Error calculating target size for batch {b}: {e}, using original image")
+                cropped_images.append(image[b])
+                cropped_masks.append(mask[b])
+                bbox_mask = torch.ones((img_height, img_width), dtype=torch.float32, device=image.device)
+                bbox_masks.append(bbox_mask)
+                continue
             
-            # 计算裁剪区域（基于计算出的中心点，不超出原图）
-            crop_x1, crop_y1, crop_x2, crop_y2 = self.calculate_crop_region(
+            # 使用灵活边界计算裁剪区域
+            crop_x1, crop_y1, crop_x2, crop_y2 = self.calculate_flexible_crop_region(
                 center_x, center_y, target_width, target_height, img_width, img_height
             )
             
             # 确保裁剪区域有效
             if crop_x2 <= crop_x1 or crop_y2 <= crop_y1:
-                print(f"Warning: Invalid crop region, using full image")
-                crop_x1, crop_y1 = 0, 0
-                crop_x2, crop_y2 = img_width, img_height
+                print(f"Warning: Invalid crop region for batch {b}, using original image")
+                cropped_images.append(image[b])
+                cropped_masks.append(mask[b])
+                bbox_mask = torch.ones((img_height, img_width), dtype=torch.float32, device=image.device)
+                bbox_masks.append(bbox_mask)
+                continue
             
             # 创建bbox_mask（记录裁剪区域在原图中的位置）
             bbox_mask = torch.zeros((img_height, img_width), dtype=torch.float32, device=image.device)
-            if crop_x1 < crop_x2 and crop_y1 < crop_y2:
-                bbox_mask[crop_y1:crop_y2, crop_x1:crop_x2] = 1.0
+            bbox_mask[crop_y1:crop_y2, crop_x1:crop_x2] = 1.0
             
             # 裁剪图像和mask
             cropped_img = image[b][crop_y1:crop_y2, crop_x1:crop_x2]
@@ -892,42 +1058,6 @@ class ImageCropWithBBoxMask:
             cropped_images.append(cropped_img)
             bbox_masks.append(bbox_mask)
             cropped_masks.append(cropped_msk)
-        
-        # 处理尺寸不一致的情况
-        if len(cropped_images) > 0:
-            # 找到最大的有效尺寸
-            max_height = max(img.shape[0] for img in cropped_images)
-            max_width = max(img.shape[1] for img in cropped_images)
-            
-            # 确保尺寸不超过原图
-            max_height = min(max_height, img_height)
-            max_width = min(max_width, img_width)
-            
-            padded_images = []
-            padded_masks = []
-            
-            for img, msk in zip(cropped_images, cropped_masks):
-                h, w = img.shape[:2]
-                if h != max_height or w != max_width:
-                    # 创建统一尺寸的张量
-                    padded_img = torch.zeros((max_height, max_width, img.shape[2]), dtype=img.dtype, device=img.device)
-                    padded_msk = torch.zeros((max_height, max_width), dtype=msk.dtype, device=msk.device)
-                    
-                    # 居中放置
-                    start_y = (max_height - h) // 2
-                    start_x = (max_width - w) // 2
-                    
-                    padded_img[start_y:start_y+h, start_x:start_x+w] = img
-                    padded_msk[start_y:start_y+h, start_x:start_x+w] = msk
-                    
-                    padded_images.append(padded_img)
-                    padded_masks.append(padded_msk)
-                else:
-                    padded_images.append(img)
-                    padded_masks.append(msk)
-            
-            cropped_images = padded_images
-            cropped_masks = padded_masks
         
         # 转换为批次张量
         if len(cropped_images) == 0:
