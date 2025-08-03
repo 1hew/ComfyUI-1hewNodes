@@ -237,7 +237,7 @@ class ImageResizeUniversal:
                     target_height = scale_to_length
                     target_width = int(target_height * ratio)
                 elif scale_to_side == 'mega_pixels_k':
-                    target_width = math.sqrt(ratio * scale_to_length * 1000)
+                    target_width = math.sqrt(ratio * scale_to_length * 1024)
                     target_height = target_width / ratio
                     target_width = int(target_width)
                     target_height = int(target_height)
@@ -258,7 +258,7 @@ class ImageResizeUniversal:
                     target_height = scale_to_length
                     target_width = int(target_height * ratio)
                 elif scale_to_side == 'mega_pixels_k':
-                    target_width = math.sqrt(ratio * scale_to_length * 1000)
+                    target_width = math.sqrt(ratio * scale_to_length * 1024)
                     target_height = target_width / ratio
                     target_width = int(target_width)
                     target_height = int(target_height)

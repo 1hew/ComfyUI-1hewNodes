@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.18**
+- feat(sample): Added `Step Split` node for high-low frequency sampling step separation with support for percentage and integer input modes
+
 **v1.2.17**
 - feat(image_crop): Optimized `Image Crop with BBox Mask` node
 
@@ -176,6 +179,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🔧 Utility Nodes
 | Node Name | Description |
 |-----------|-------------|
+| Image Get Size | Extract image dimensions (width and height) from input images with automatic batch processing support |
+| Step Split | High-low frequency sampling step separator supporting percentage (0.0-1.0) and integer input modes for precise sampling control |
 | Range Mapping | Value range mapping tool supporting linear transformation and precision control for slider values |
 | Path Build | Path builder supporting preset paths and custom extensions |
 
