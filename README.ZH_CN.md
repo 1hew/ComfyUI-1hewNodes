@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.18**
+- feat(sample): 添加 `Step Split` 节点，用于高低频采样步数分离，支持百分比和整数输入模式
+
 **v1.2.17**
 - feat(image_crop): 优化 `Image Crop with BBox Mask` 节点
 
@@ -176,6 +179,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🔧 工具节点
 | 节点名称 | 功能描述 |
 |---------|----------|
+| Image Get Size | 图像尺寸获取器，从输入图像中提取宽度和高度信息，支持自动批处理 |
+| Step Split | 高低频采样步数分离器，支持百分比(0.0-1.0)和整数输入模式，用于精确采样控制 |
 | Range Mapping | 数值范围映射工具，支持滑块值的线性变换和精度控制 |
 | Path Build | 路径构建器，支持预设路径和自定义扩展 |
 
