@@ -1,6 +1,6 @@
-# Text Format
+# Text Prefix Suffix
 
-**Node Function:** The `Text Format` node is used to format any input data into text strings with customizable prefix, suffix, and separator, supporting wildcard input types for flexible text processing and formatting.
+**Node Function:** The `Text Prefix Suffix` node is used to format any input data into text strings with customizable prefix, suffix, and separator, supporting wildcard input types for flexible text processing and formatting.
 
 ## Inputs
 
