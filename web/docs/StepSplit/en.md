@@ -6,8 +6,8 @@
 
 | Parameter | Required | Data Type | Default | Range | Description |
 |--|--|--|--|--|--|
-| `steps` | Required | INT | 10 | 1-10000 | Total sampling steps |
-| `step_split` | Required | FLOAT | 0.6 | 0.0-10000.0 | Split step position, supports percentage mode (0.0-1.0) and integer mode (>1.0) |
+| `steps` | Required | INT | 8 | 1-10000 | Total sampling steps |
+| `step_split` | Required | FLOAT | 0.5 | 0.0-10000.0 | Split step position, supports percentage mode (0.0-1.0) and integer mode (>1.0) |
 
 ## Outputs
 
