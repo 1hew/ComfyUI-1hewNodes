@@ -14,24 +14,3 @@
 |-------------|-----------|-------------|
 | `width` | INT | The width of the image in pixels |
 | `height` | INT | The height of the image in pixels |
-
-## Features
-
-### Automatic Processing
-- **Dimension Handling**: Automatically handles both 3D and 4D image tensors
-- **Batch Processing**: Works with batched images, extracting dimensions from the first image in the batch
-- **Integer Output**: Returns precise integer values for width and height
-- **Error-Free Processing**: Robust handling of different image tensor formats
-
-### Technical Details
-- Supports image tensors in format (batch, height, width, channels)
-- Automatically adds batch dimension if input is 3D
-- Returns dimensions as integer values for compatibility with other nodes
-- Processes the first image in batch for dimension extraction
-
-### Application Scenarios
-- **Image Analysis**: Get image dimensions for analysis workflows
-- **Conditional Processing**: Branch workflows based on image size
-- **Dynamic Scaling**: Calculate scaling factors based on original dimensions
-- **Layout Planning**: Plan image layouts based on dimensions
-- **Quality Control**: Verify image dimensions meet requirements

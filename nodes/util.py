@@ -48,14 +48,14 @@ class StepSplit:
         return {
             "required": {
                 "steps": ("INT", {
-                    "default": 00,
+                    "default": 20,
                     "min": 1,
                     "max": 10000,
                     "step": 1,
                     "display": "number"
                 }),
                 "step_split": ("FLOAT", {
-                    "default": 0.6,
+                    "default": 0.5,
                     "min": 0.0,
                     "max": 10000.0,
                     "step": 0.01,
