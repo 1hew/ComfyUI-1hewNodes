@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.23**
+- fix(image): 增强 `Image Stroke by Mask` 节点颜色解析逻辑，支持RGB字符串格式并改进默认兜底为白色
+- fix(image): 增强 `Image Paste by BBox Mask` 节点旋转参数
+
 **v1.2.21**
 - feat(text): 添加 `Text Filter Comment` 节点，支持过滤单行注释（#开头）和多行注释（三引号包裹），保留非注释空行
 - feat(text): 添加 `Text Join by Text List` 节点，支持将任意类型列表合并为字符串，支持前缀、后缀和自定义分隔符
@@ -142,6 +146,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Edit Stitch | 图像拼接与缝合，支持多种拼接模式 |
 | Image Add Label | 为图像添加文本标签 |
 | Image Plot | 图像绘制和可视化工具 |
+| Image Stroke by Mask | 对遮罩区域应用描边效果，支持自定义宽度和颜色 |
 | Image BBox Overlay by Mask | 基于遮罩的图像边界框叠加，支持独立和合并模式 |
 
 ### 🎨 图像混合节点

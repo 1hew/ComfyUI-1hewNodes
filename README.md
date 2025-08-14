@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.23**
+- fix(image): Enhanced `Image Stroke by Mask` node color parsing logic, supporting RGB string formats and improved default fallback to white color
+- fix(image): Enhanced `Image Paste by BBox Mask` node rotation parameter
+
 **v1.2.21**
 - feat(text): Added `Text Filter Comment` node for filtering single-line comments (starting with #) and multi-line comments (wrapped in triple quotes), preserving non-comment blank lines
 - feat(text): Added `Text Join by Text List` node for merging any type of list into a string with support for prefix, suffix, and custom separators
@@ -142,6 +146,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Edit Stitch | Image stitching and merging with multiple stitching modes |
 | Image Add Label | Add text labels to images |
 | Image Plot | Image plotting and visualization tools |
+| Image Stroke by Mask | Apply stroke effects to mask regions with customizable width and color |
 | Image BBox Overlay by Mask | Mask-based image bounding box overlay with independent and merge modes |
 
 ### 🎨 Image Blending Nodes

@@ -1,20 +1,23 @@
 # Image Paste by BBox Mask
 
-**Node Function:** The `Image Paste by BBox Mask` node is used to paste processed cropped images back to their original positions in base images based on bounding box mask information, supporting multiple blend modes and opacity control.
+## Description
+The `Image Paste by BBox Mask` node pastes processed cropped images back to their original positions in base images based on bounding box mask information, with advanced transformation capabilities including position adjustment, scaling, and rotation.
 
 ## Inputs
 
 | Parameter | Required | Data Type | Default | Range | Description |
 | --------- | -------- | --------- | ------- | ----- | ----------- |
+| `paste_image` | Required | IMAGE | - | - | Image to be pasted |
 | `base_image` | Required | IMAGE | - | - | Base image to paste onto |
-| `cropped_image` | Required | IMAGE | - | - | Cropped image to be pasted |
 | `bbox_mask` | Required | MASK | - | - | Bounding box mask indicating paste position |
-| `blend_mode` | - | COMBO[STRING] | normal | normal, multiply, screen, overlay, soft_light, difference | Blending mode for pasting |
-| `opacity` | - | FLOAT | 1.0 | 0.0-1.0 | Opacity level for pasting |
-| `cropped_mask` | Optional | MASK | - | - | Optional mask for the cropped image |
+| `position_x` | Required | INT | 0 | -1000 to 1000 | Horizontal position offset |
+| `position_y` | Required | INT | 0 | -1000 to 1000 | Vertical position offset (inverted) |
+| `scale` | Required | FLOAT | 1.0 | 0.1 to 5.0 | Scale factor for the pasted image |
+| `rotation` | Required | FLOAT | 0.0 | -3600 to 3600 | Rotation angle in degrees |
+| `paste_mask` | Optional | MASK | - | - | Optional mask for the paste image |
 
 ## Outputs
 
 | Output Name | Data Type | Description |
 |-------------|-----------|-------------|
-| `image` | IMAGE | Final image with cropped content pasted back |
+| `image` | IMAGE | Final image with transformed content pasted back |

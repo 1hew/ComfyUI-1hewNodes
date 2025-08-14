@@ -4,6 +4,7 @@ from PIL import Image, ImageOps, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 import torch.nn.functional as F
 import os
 import math
+import cv2
 from skimage.measure import label, regionprops
 import comfy.utils
 
@@ -1710,6 +1711,192 @@ class ImagePlot:
         return (255, 255, 255)
 
 
+class ImageStrokeByMask:
+    """
+    图像遮罩描边节点
+    对输入图像的指定遮罩区域进行描边处理
+    """
+    
+    def __init__(self):
+        self.NODE_NAME = 'ImageStrokeByMask'
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),  # 输入图像
+                "mask": ("MASK",),   # 输入遮罩
+                "stroke_width": ("INT", {"default": 8, "min": 1, "max": 100, "step": 1}),  # 描边宽度
+                "stroke_color": ("STRING", {"default": "1.0"}),  # 白色
+            }
+        }
+    
+    RETURN_TYPES = ("IMAGE", "MASK")
+    RETURN_NAMES = ("image", "mask")
+    FUNCTION = "apply_stroke_mask"
+    CATEGORY = "1hewNodes/image"
+    
+    def tensor_to_pil(self, tensor):
+        """将tensor转换为PIL图像"""
+        if tensor.dim() == 4:
+            tensor = tensor.squeeze(0)
+        
+        if tensor.dim() == 3:
+            if tensor.shape[2] == 3:
+                # RGB图像
+                np_img = (tensor.numpy() * 255).astype(np.uint8)
+                return Image.fromarray(np_img, 'RGB')
+            elif tensor.shape[0] == 1:
+                # 批次维度的遮罩 [1, H, W]
+                tensor = tensor.squeeze(0)
+                np_img = (tensor.numpy() * 255).astype(np.uint8)
+                return Image.fromarray(np_img, 'L')
+            else:
+                # 可能是 [H, W, 1] 格式的遮罩
+                if tensor.shape[2] == 1:
+                    tensor = tensor.squeeze(2)
+                    np_img = (tensor.numpy() * 255).astype(np.uint8)
+                    return Image.fromarray(np_img, 'L')
+                else:
+                    raise ValueError(f"不支持的3维tensor形状: {tensor.shape}")
+        elif tensor.dim() == 2:
+            # 灰度图像/遮罩
+            np_img = (tensor.numpy() * 255).astype(np.uint8)
+            return Image.fromarray(np_img, 'L')
+        else:
+            raise ValueError(f"不支持的tensor维度: {tensor.shape}")
+    
+    def pil_to_tensor(self, pil_img):
+        """将PIL图像转换为tensor"""
+        if pil_img.mode == 'RGB':
+            np_img = np.array(pil_img).astype(np.float32) / 255.0
+            return torch.from_numpy(np_img).unsqueeze(0)
+        elif pil_img.mode == 'L':
+            np_img = np.array(pil_img).astype(np.float32) / 255.0
+            return torch.from_numpy(np_img)
+        else:
+            raise ValueError(f"不支持的PIL图像模式: {pil_img.mode}")
+    
+    def parse_color(self, color_str):
+        """解析颜色字符串，支持多种格式"""
+        color_str = color_str.strip()
+        
+        # 移除括号（如果存在）
+        if color_str.startswith('(') and color_str.endswith(')'):
+            color_str = color_str[1:-1].strip()
+        
+        # 尝试解析为浮点数（灰度值）
+        try:
+            gray_value = float(color_str)
+            if 0.0 <= gray_value <= 1.0:
+                # 0-1范围的灰度值
+                gray_int = int(gray_value * 255)
+                return (gray_int, gray_int, gray_int)
+            elif gray_value > 1.0 and gray_value <= 255:
+                # 可能是0-255范围的灰度值
+                gray_int = int(gray_value)
+                gray_int = max(0, min(255, gray_int))
+                return (gray_int, gray_int, gray_int)
+        except ValueError:
+            pass
+        
+        # 尝试解析为 RGB 格式 (如 "0.5,0.7,0.9" 或 "128,192,255")
+        if ',' in color_str:
+            try:
+                # 分割并清理每个部分
+                parts = [part.strip() for part in color_str.split(',')]
+                if len(parts) >= 3:
+                    r, g, b = [float(parts[i]) for i in range(3)]
+                    # 判断是否为 0-1 范围
+                    if max(r, g, b) <= 1.0:
+                        return (int(r * 255), int(g * 255), int(b * 255))
+                    else:
+                        return (int(r), int(g), int(b))
+            except (ValueError, IndexError):
+                pass
+        
+        # 尝试使用 PIL.ImageColor 解析（支持 HEX、RGB、颜色名称等）
+        try:
+            return ImageColor.getrgb(color_str)
+        except ValueError:
+            pass
+        
+        # 颜色映射
+        color_map = {
+            "red": (255, 0, 0),
+            "green": (0, 255, 0),
+            "blue": (0, 0, 255),
+            "yellow": (255, 255, 0),
+            "cyan": (0, 255, 255),
+            "magenta": (255, 0, 255),
+            "white": (255, 255, 255),
+            "black": (0, 0, 0)
+        }
+        
+        return color_map.get(color_str.lower(), (255, 255, 255))
+    
+    def create_stroke_mask(self, mask_pil, stroke_width):
+        """创建描边遮罩"""
+        # 将PIL遮罩转换为numpy数组
+        mask_np = np.array(mask_pil)
+        
+        # 使用形态学操作创建描边
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (stroke_width*2+1, stroke_width*2+1))
+        
+        # 膨胀操作创建外边界
+        dilated = cv2.dilate(mask_np, kernel, iterations=1)
+        
+        # 描边区域 = 膨胀后的区域 - 原始区域
+        stroke_mask = dilated - mask_np
+        
+        # 确保值在0-255范围内
+        stroke_mask = np.clip(stroke_mask, 0, 255)
+        
+        return Image.fromarray(stroke_mask.astype(np.uint8), 'L')
+    
+    def apply_stroke_mask(self, image, mask, stroke_width, stroke_color):
+        """应用描边遮罩效果"""
+        # 转换输入
+        image_pil = self.tensor_to_pil(image)
+        mask_pil = self.tensor_to_pil(mask)
+        
+        # 确保图像和遮罩尺寸一致
+        if image_pil.size != mask_pil.size:
+            mask_pil = mask_pil.resize(image_pil.size, Image.LANCZOS)
+        
+        # 解析描边颜色
+        stroke_rgb = self.parse_color(stroke_color)
+        
+        # 创建描边遮罩
+        stroke_mask_pil = self.create_stroke_mask(mask_pil, stroke_width)
+        
+        # 创建输出图像（黑色背景）
+        output_image = Image.new('RGB', image_pil.size, (0, 0, 0))
+        
+        # 创建描边颜色图像
+        stroke_color_image = Image.new('RGB', image_pil.size, stroke_rgb)
+        
+        # 首先粘贴描边
+        output_image.paste(stroke_color_image, mask=stroke_mask_pil)
+        
+        # 然后粘贴原始图像内容（在原始遮罩区域内）
+        output_image.paste(image_pil, mask=mask_pil)
+        
+        # 创建输出遮罩（原始遮罩 + 描边遮罩）
+        mask_np = np.array(mask_pil)
+        stroke_mask_np = np.array(stroke_mask_pil)
+        
+        # 合并遮罩
+        combined_mask_np = np.maximum(mask_np, stroke_mask_np)
+        output_mask_pil = Image.fromarray(combined_mask_np.astype(np.uint8), 'L')
+        
+        # 转换回tensor
+        output_image_tensor = self.pil_to_tensor(output_image)
+        output_mask_tensor = self.pil_to_tensor(output_mask_pil)
+        
+        return (output_image_tensor, output_mask_tensor)
+
+
 class ImageBBoxOverlayByMask:
     """
     基于遮罩的图像边界框叠加节点 - 根据遮罩生成检测框并以描边或填充形式叠加到图像上
@@ -1925,6 +2112,8 @@ NODE_CLASS_MAPPINGS = {
     "ImageEditStitch": ImageEditStitch,
     "ImageAddLabel": ImageAddLabel,
     "ImagePlot": ImagePlot,
+    "ImageStrokeByMask": ImageStrokeByMask,
+
     "ImageBBoxOverlayByMask": ImageBBoxOverlayByMask,
 }
 
@@ -1935,5 +2124,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ImageEditStitch": "Image Edit Stitch",
     "ImageAddLabel": "Image Add Label",
     "ImagePlot": "Image Plot",
+    "ImageStrokeByMask": "Image Stroke by Mask",
     "ImageBBoxOverlayByMask": "Image BBox Overlay by Mask",
 }
