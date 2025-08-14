@@ -105,6 +105,9 @@ class TextFilterComment:
 
     def filter_comments(self, text):
         try:
+            # 处理转义字符，支持 \n 换行
+            text = text.replace('\\n', '\n')
+            
             # 过滤注释
             filtered_text = self.parse_text_and_filter_comments(text)
             

@@ -1282,17 +1282,16 @@ class ImagePasteByBBoxMask:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "cropped_image": ("IMAGE",),
+                "paste_image": ("IMAGE",),
                 "base_image": ("IMAGE",),
                 "bbox_mask": ("MASK",),
-                "blend_mode": (
-                    ["normal", "multiply", "screen", "overlay", "soft_light", "difference"],
-                    {"default": "normal"}
-                ),
-                "opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "position_x": ("INT", {"default": 0, "min": -1000, "max": 1000, "step": 1}),
+                "position_y": ("INT", {"default": 0, "min": -1000, "max": 1000, "step": 1}),
+                "scale": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 5.0, "step": 0.01}),
+                "rotation": ("FLOAT", {"default": 0.0, "min": -3600.0, "max": 3600.0, "step": 0.01}),
             },
             "optional": {
-                "cropped_mask": ("MASK",),
+                "paste_mask": ("MASK",),
             }
         }
 
@@ -1301,17 +1300,18 @@ class ImagePasteByBBoxMask:
     FUNCTION = "image_paste_by_bbox_mask"
     CATEGORY = "1hewNodes/image/crop"
 
-    def image_paste_by_bbox_mask(self, base_image, cropped_image, bbox_mask, blend_mode="normal", opacity=1.0, cropped_mask=None):
+    def image_paste_by_bbox_mask(self, paste_image, base_image, bbox_mask, position_x=0, 
+                                 position_y=0, scale=1.0, rotation=0.0, paste_mask=None):
         # 获取各输入的批次大小
         base_batch_size = base_image.shape[0]
-        cropped_batch_size = cropped_image.shape[0]
+        paste_batch_size = paste_image.shape[0]
         bbox_mask_batch_size = bbox_mask.shape[0]
         
         # 获取遮罩批次大小（如果存在）
-        mask_batch_size = cropped_mask.shape[0] if cropped_mask is not None else 1
+        mask_batch_size = paste_mask.shape[0] if paste_mask is not None else 1
         
         # 确定最大批次大小
-        max_batch_size = max(base_batch_size, cropped_batch_size, bbox_mask_batch_size, mask_batch_size)
+        max_batch_size = max(base_batch_size, paste_batch_size, bbox_mask_batch_size, mask_batch_size)
         
         # 创建输出图像列表
         output_images = []
@@ -1319,9 +1319,9 @@ class ImagePasteByBBoxMask:
         for b in range(max_batch_size):
             # 使用循环索引获取对应的输入
             base_idx = b % base_batch_size
-            cropped_idx = b % cropped_batch_size
+            paste_idx = b % paste_batch_size
             bbox_idx = b % bbox_mask_batch_size
-            mask_idx = b % mask_batch_size if cropped_mask is not None else 0
+            mask_idx = b % mask_batch_size if paste_mask is not None else 0
             
             # 将图像转换为PIL格式
             if base_image.is_cuda:
@@ -1329,10 +1329,10 @@ class ImagePasteByBBoxMask:
             else:
                 base_np = (base_image[base_idx].numpy() * 255).astype(np.uint8)
             
-            if cropped_image.is_cuda:
-                cropped_np = (cropped_image[cropped_idx].cpu().numpy() * 255).astype(np.uint8)
+            if paste_image.is_cuda:
+                paste_np = (paste_image[paste_idx].cpu().numpy() * 255).astype(np.uint8)
             else:
-                cropped_np = (cropped_image[cropped_idx].numpy() * 255).astype(np.uint8)
+                paste_np = (paste_image[paste_idx].numpy() * 255).astype(np.uint8)
             
             if bbox_mask.is_cuda:
                 bbox_np = (bbox_mask[bbox_idx].cpu().numpy() * 255).astype(np.uint8)
@@ -1342,11 +1342,11 @@ class ImagePasteByBBoxMask:
             base_pil = Image.fromarray(base_np)
             bbox_pil = Image.fromarray(bbox_np).convert("L")
             
-            # 检查裁剪图像是否有alpha通道
-            if cropped_np.shape[2] == 4:  # RGBA
-                cropped_pil = Image.fromarray(cropped_np, "RGBA")
+            # 检查粘贴图像是否有alpha通道
+            if paste_np.shape[2] == 4:  # RGBA
+                paste_pil = Image.fromarray(paste_np, "RGBA")
             else:  # RGB
-                cropped_pil = Image.fromarray(cropped_np)
+                paste_pil = Image.fromarray(paste_np)
             
             # 从边界框遮罩获取边界框
             bbox = self.get_bbox_from_mask(bbox_pil)
@@ -1356,24 +1356,22 @@ class ImagePasteByBBoxMask:
                 output_images.append(base_image[base_idx])
                 continue
             
-            # 处理裁剪遮罩
+            # 处理粘贴遮罩
             mask_pil = None
-            if cropped_mask is not None:
-                if cropped_mask.is_cuda:
-                    mask_np = (cropped_mask[mask_idx].cpu().numpy() * 255).astype(np.uint8)
+            if paste_mask is not None:
+                if paste_mask.is_cuda:
+                    mask_np = (paste_mask[mask_idx].cpu().numpy() * 255).astype(np.uint8)
                 else:
-                    mask_np = (cropped_mask[mask_idx].numpy() * 255).astype(np.uint8)
+                    mask_np = (paste_mask[mask_idx].numpy() * 255).astype(np.uint8)
                 mask_pil = Image.fromarray(mask_np).convert("L")
-                
-                # 调整遮罩大小以匹配处理后的图像
-                if mask_pil.size != cropped_pil.size:
-                    mask_pil = mask_pil.resize(cropped_pil.size, Image.LANCZOS)
-            elif cropped_pil.mode == "RGBA":
-                # 如果裁剪图像有alpha通道，使用它作为遮罩
-                mask_pil = cropped_pil.split()[-1]  # 获取alpha通道
+            elif paste_pil.mode == "RGBA":
+                # 如果粘贴图像有alpha通道，使用它作为遮罩
+                mask_pil = paste_pil.split()[-1]  # 获取alpha通道
             
-            # 执行粘贴操作
-            result_pil = self.paste_image(base_pil, cropped_pil, bbox, blend_mode, opacity, mask_pil)
+            # 执行粘贴变换
+            result_pil = self.paste_image_with_transform(
+                base_pil, paste_pil, bbox, position_x, position_y, scale, rotation, mask_pil
+            )
             
             # 转换回tensor
             result_np = np.array(result_pil).astype(np.float32) / 255.0
@@ -1397,96 +1395,141 @@ class ImagePasteByBBoxMask:
 
         return (x_min, y_min, x_max + 1, y_max + 1)
     
-    def paste_image(self, base_pil, cropped_pil, bbox, blend_mode, opacity, mask_pil=None):
-        """将裁剪图像粘贴到基础图像上"""
+    def paste_image_with_transform(self, base_pil, paste_pil, bbox, position_x, position_y, scale, rotation, mask_pil=None):
+        """将粘贴图像应用变换后粘贴到基础图像上"""
         x_min, y_min, x_max, y_max = bbox
         
-        # 调整裁剪图像大小以匹配边界框
-        target_width = x_max - x_min
-        target_height = y_max - y_min
+        # 计算原始边界框的中心点和尺寸
+        bbox_width = x_max - x_min
+        bbox_height = y_max - y_min
+        bbox_center_x = x_min + bbox_width // 2
+        bbox_center_y = y_min + bbox_height // 2
         
-        if cropped_pil.size != (target_width, target_height):
-            cropped_pil = cropped_pil.resize((target_width, target_height), Image.LANCZOS)
+        # 处理paste_mask逻辑：获取有效内容区域
+        if mask_pil is not None:
+            # 当有paste_mask时，获取paste_image在paste_mask白色区域的内容
+            # 首先确保paste_image和paste_mask尺寸一致
+            if paste_pil.size != mask_pil.size:
+                mask_pil = mask_pil.resize(paste_pil.size, Image.LANCZOS)
+            
+            # 获取mask的边界框来确定有效内容区域
+            mask_bbox = mask_pil.getbbox()
+            if mask_bbox is None:
+                # 如果mask完全为空，使用整个图像
+                effective_paste_pil = paste_pil
+                effective_mask_pil = mask_pil
+            else:
+                # 裁剪到mask的有效区域
+                effective_paste_pil = paste_pil.crop(mask_bbox)
+                effective_mask_pil = mask_pil.crop(mask_bbox)
+        else:
+            # 当未使用paste_mask时，使用纯白mask获取paste_image的完整尺寸内容
+            effective_paste_pil = paste_pil
+            effective_mask_pil = Image.new('L', paste_pil.size, 255)  # 纯白mask
+        
+        # 使用处理后的有效内容尺寸进行智能缩放计算
+        reference_width, reference_height = effective_paste_pil.size
+        
+        # 等比例缩放，最大限度匹配bbox（保持宽高比，完全包含在bbox内）
+        reference_ratio = reference_width / reference_height
+        bbox_ratio = bbox_width / bbox_height
+        
+        if reference_ratio > bbox_ratio:
+            # 基准图像更宽，以bbox宽度为准
+            fitted_width = bbox_width
+            fitted_height = int(bbox_width / reference_ratio)
+        else:
+            # 基准图像更高，以bbox高度为准
+            fitted_height = bbox_height
+            fitted_width = int(bbox_height * reference_ratio)
+        
+        # 再应用scale进行额外缩放
+        new_width = int(fitted_width * scale)
+        new_height = int(fitted_height * scale)
+        
+        # 调整粘贴图像大小
+        if effective_paste_pil.size != (new_width, new_height):
+            paste_pil = effective_paste_pil.resize((new_width, new_height), Image.LANCZOS)
+            mask_pil = effective_mask_pil.resize((new_width, new_height), Image.LANCZOS)
+        else:
+            paste_pil = effective_paste_pil
+            mask_pil = effective_mask_pil
+        
+        # 应用旋转变换
+        if rotation != 0.0:
+            paste_pil, mask_pil = self.apply_rotation(paste_pil, rotation, mask_pil)
+            # 旋转后重新获取尺寸
+            new_width, new_height = paste_pil.size
+        
+        # 计算新的粘贴位置（考虑偏移，position_y反转）
+        new_x = bbox_center_x - new_width // 2 + position_x
+        new_y = bbox_center_y - new_height // 2 - position_y
+        
+        # 确保粘贴位置在基础图像范围内
+        base_width, base_height = base_pil.size
+        
+        # 计算实际可粘贴的区域
+        paste_x = max(0, new_x)
+        paste_y = max(0, new_y)
+        paste_x_end = min(base_width, new_x + new_width)
+        paste_y_end = min(base_height, new_y + new_height)
+        
+        # 如果完全超出边界，返回原图
+        if paste_x >= paste_x_end or paste_y >= paste_y_end:
+            return base_pil
+        
+        # 计算需要裁剪的粘贴图像区域
+        crop_x = paste_x - new_x
+        crop_y = paste_y - new_y
+        crop_x_end = crop_x + (paste_x_end - paste_x)
+        crop_y_end = crop_y + (paste_y_end - paste_y)
+        
+        # 裁剪粘贴图像和遮罩
+        if crop_x > 0 or crop_y > 0 or crop_x_end < new_width or crop_y_end < new_height:
+            paste_pil = paste_pil.crop((crop_x, crop_y, crop_x_end, crop_y_end))
             if mask_pil is not None:
-                mask_pil = mask_pil.resize((target_width, target_height), Image.LANCZOS)
+                mask_pil = mask_pil.crop((crop_x, crop_y, crop_x_end, crop_y_end))
         
         # 创建结果图像的副本
         result_pil = base_pil.copy()
         
-        if blend_mode == "normal":
-            # 普通混合模式
-            if mask_pil is not None:
-                # 应用不透明度到遮罩
-                if opacity < 1.0:
-                    mask_array = np.array(mask_pil).astype(np.float32)
-                    mask_array = (mask_array * opacity).astype(np.uint8)
-                    mask_pil = Image.fromarray(mask_array)
-                
-                result_pil.paste(cropped_pil, (x_min, y_min), mask_pil)
-            else:
-                # 如果没有遮罩但有不透明度
-                if opacity < 1.0:
-                    # 创建基于不透明度的遮罩
-                    alpha_mask = Image.new("L", cropped_pil.size, int(255 * opacity))
-                    result_pil.paste(cropped_pil, (x_min, y_min), alpha_mask)
-                else:
-                    result_pil.paste(cropped_pil, (x_min, y_min))
+        # 粘贴图像（普通模式）
+        if mask_pil is not None:
+            result_pil.paste(paste_pil, (paste_x, paste_y), mask_pil)
         else:
-            # 其他混合模式
-            # 提取要混合的区域
-            base_region = base_pil.crop((x_min, y_min, x_max, y_max))
-            
-            # 应用混合模式
-            blended_region = self.apply_blend_mode(base_region, cropped_pil, blend_mode)
-            
-            # 应用不透明度和遮罩
-            if mask_pil is not None or opacity < 1.0:
-                # 创建最终遮罩
-                final_mask = mask_pil if mask_pil is not None else Image.new("L", cropped_pil.size, 255)
-                
-                if opacity < 1.0:
-                    mask_array = np.array(final_mask).astype(np.float32)
-                    mask_array = (mask_array * opacity).astype(np.uint8)
-                    final_mask = Image.fromarray(mask_array)
-                
-                result_pil.paste(blended_region, (x_min, y_min), final_mask)
-            else:
-                result_pil.paste(blended_region, (x_min, y_min))
+            result_pil.paste(paste_pil, (paste_x, paste_y))
         
         return result_pil
     
-    def apply_blend_mode(self, base, overlay, mode):
-        """应用混合模式"""
-        base_array = np.array(base).astype(np.float32) / 255.0
-        overlay_array = np.array(overlay).astype(np.float32) / 255.0
+    def apply_rotation(self, paste_pil, rotation_angle, mask_pil=None):
+        """应用旋转变换到粘贴图像和遮罩"""
+        # 修正旋转方向：负数为顺时针旋转（符合用户习惯）
+        actual_angle = -rotation_angle
         
-        if mode == "multiply":
-            result = base_array * overlay_array
-        elif mode == "screen":
-            result = 1 - (1 - base_array) * (1 - overlay_array)
-        elif mode == "overlay":
-            result = np.where(
-                base_array < 0.5,
-                2 * base_array * overlay_array,
-                1 - 2 * (1 - base_array) * (1 - overlay_array)
-            )
-        elif mode == "soft_light":
-            result = np.where(
-                overlay_array < 0.5,
-                2 * base_array * overlay_array + base_array**2 * (1 - 2 * overlay_array),
-                2 * base_array * (1 - overlay_array) + np.sqrt(base_array) * (2 * overlay_array - 1)
-            )
-        elif mode == "difference":
-            result = np.abs(base_array - overlay_array)
-        else:  # normal
-            result = overlay_array
+        # 旋转粘贴图像
+        if paste_pil.mode == "RGBA":
+            # 对于RGBA图像，使用透明背景旋转
+            rotated_paste = paste_pil.rotate(actual_angle, expand=True, fillcolor=(0, 0, 0, 0))
+        else:
+            # 对于RGB图像，先转换为RGBA避免填充背景色问题
+            paste_rgba = paste_pil.convert("RGBA")
+            # 创建alpha遮罩（原图区域为不透明）
+            alpha_mask = Image.new("L", paste_pil.size, 255)
+            paste_rgba.putalpha(alpha_mask)
+            # 使用透明背景旋转
+            rotated_paste = paste_rgba.rotate(actual_angle, expand=True, fillcolor=(0, 0, 0, 0))
         
-        # 确保结果在有效范围内
-        result = np.clip(result, 0, 1)
+        # 旋转遮罩（如果存在）
+        rotated_mask = None
+        if mask_pil is not None:
+            rotated_mask = mask_pil.rotate(actual_angle, expand=True, fillcolor=0)
+        elif rotated_paste.mode == "RGBA":
+            # 如果没有提供遮罩但图像有alpha通道，使用alpha通道作为遮罩
+            rotated_mask = rotated_paste.split()[-1]
         
-        # 转换回PIL图像
-        result_array = (result * 255).astype(np.uint8)
-        return Image.fromarray(result_array)
+        return rotated_paste, rotated_mask
+    
+
 
 
 class ImageEdgeCropPad:
