@@ -1726,24 +1726,29 @@ class ImageStrokeByMask:
             "required": {
                 "image": ("IMAGE",),  # 输入图像
                 "mask": ("MASK",),   # 输入遮罩
-                "stroke_width": ("INT", {"default": 8, "min": 1, "max": 100, "step": 1}),  # 描边宽度
-                "stroke_color": ("STRING", {"default": "1.0"}),  # 白色
+                "stroke_width": ("INT", {"default": 20, "min": 0, "max": 1000, "step": 1}),  # 描边宽度
+                "stroke_color": ("STRING", {"default": "1.0"}),  # 描边颜色
             }
         }
     
     RETURN_TYPES = ("IMAGE", "MASK")
     RETURN_NAMES = ("image", "mask")
-    FUNCTION = "apply_stroke_mask"
+    FUNCTION = "stroke_by_mask"
     CATEGORY = "1hewNodes/image"
     
     def tensor_to_pil(self, tensor):
-        """将tensor转换为PIL图像"""
+        """将tensor转换为PIL图像，自动处理alpha通道"""
         if tensor.dim() == 4:
             tensor = tensor.squeeze(0)
         
         if tensor.dim() == 3:
             if tensor.shape[2] == 3:
                 # RGB图像
+                np_img = (tensor.numpy() * 255).astype(np.uint8)
+                return Image.fromarray(np_img, 'RGB')
+            elif tensor.shape[2] == 4:
+                # RGBA图像，去除alpha通道
+                tensor = tensor[:, :, :3]  # 只保留RGB通道
                 np_img = (tensor.numpy() * 255).astype(np.uint8)
                 return Image.fromarray(np_img, 'RGB')
             elif tensor.shape[0] == 1:
@@ -1773,7 +1778,7 @@ class ImageStrokeByMask:
             return torch.from_numpy(np_img).unsqueeze(0)
         elif pil_img.mode == 'L':
             np_img = np.array(pil_img).astype(np.float32) / 255.0
-            return torch.from_numpy(np_img)
+            return torch.from_numpy(np_img).unsqueeze(0)  # 添加批次维度 [1, H, W]
         else:
             raise ValueError(f"不支持的PIL图像模式: {pil_img.mode}")
     
@@ -1836,65 +1841,99 @@ class ImageStrokeByMask:
         return color_map.get(color_str.lower(), (255, 255, 255))
     
     def create_stroke_mask(self, mask_pil, stroke_width):
-        """创建描边遮罩"""
+        """创建描边遮罩 - 简化逻辑：直接对原始遮罩膨胀创建描边区域"""
         # 将PIL遮罩转换为numpy数组
         mask_np = np.array(mask_pil)
         
         # 使用形态学操作创建描边
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (stroke_width*2+1, stroke_width*2+1))
+        stroke_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (stroke_width*2+1, stroke_width*2+1))
         
-        # 膨胀操作创建外边界
-        dilated = cv2.dilate(mask_np, kernel, iterations=1)
+        # 膨胀原始遮罩创建描边外边界
+        dilated_mask = cv2.dilate(mask_np, stroke_kernel, iterations=1)
         
-        # 描边区域 = 膨胀后的区域 - 原始区域
-        stroke_mask = dilated - mask_np
+        # 描边区域 = 膨胀后的遮罩 - 原始遮罩
+        stroke_mask = dilated_mask - mask_np
         
         # 确保值在0-255范围内
         stroke_mask = np.clip(stroke_mask, 0, 255)
         
-        return Image.fromarray(stroke_mask.astype(np.uint8), 'L')
+        # 返回描边遮罩
+        stroke_mask_pil = Image.fromarray(stroke_mask.astype(np.uint8), 'L')
+        
+        return stroke_mask_pil
     
     def apply_stroke_mask(self, image, mask, stroke_width, stroke_color):
-        """应用描边遮罩效果"""
-        # 转换输入
-        image_pil = self.tensor_to_pil(image)
-        mask_pil = self.tensor_to_pil(mask)
+        """应用描边遮罩效果 - 支持批处理，简化逻辑"""
+        # 获取批次大小
+        batch_size = image.shape[0]
+        mask_batch_size = mask.shape[0]
         
-        # 确保图像和遮罩尺寸一致
-        if image_pil.size != mask_pil.size:
-            mask_pil = mask_pil.resize(image_pil.size, Image.LANCZOS)
+        # 确定最大批次大小
+        max_batch_size = max(batch_size, mask_batch_size)
         
-        # 解析描边颜色
-        stroke_rgb = self.parse_color(stroke_color)
+        output_images = []
+        output_masks = []
         
-        # 创建描边遮罩
-        stroke_mask_pil = self.create_stroke_mask(mask_pil, stroke_width)
+        for i in range(max_batch_size):
+            # 使用循环索引获取对应的输入
+            img_idx = i % batch_size
+            mask_idx = i % mask_batch_size
+            
+            # 转换当前批次的输入
+            current_image = image[img_idx:img_idx+1]  # 保持4D格式
+            current_mask = mask[mask_idx:mask_idx+1]   # 保持3D格式
+            
+            image_pil = self.tensor_to_pil(current_image)
+            mask_pil = self.tensor_to_pil(current_mask)
+            
+            # 确保图像和遮罩尺寸一致
+            if image_pil.size != mask_pil.size:
+                mask_pil = mask_pil.resize(image_pil.size, Image.LANCZOS)
+            
+            # 解析描边颜色
+            stroke_rgb = self.parse_color(stroke_color)
+            
+            # 创建描边遮罩
+            stroke_mask_pil = self.create_stroke_mask(mask_pil, stroke_width)
+            
+            # 创建输出图像（黑色背景）
+            output_image = Image.new('RGB', image_pil.size, (0, 0, 0))
+            
+            # 先填充描边区域为指定颜色
+            stroke_color_image = Image.new('RGB', image_pil.size, stroke_rgb)
+            output_image.paste(stroke_color_image, mask=stroke_mask_pil)
+            
+            # 再粘贴原始图像内容到原始遮罩区域
+            output_image.paste(image_pil, mask=mask_pil)
+            
+            # 创建输出遮罩（先填充描边，然后在描边mask基础上直接填充，确保满fill）
+            stroke_mask_np = np.array(stroke_mask_pil)
+            mask_np = np.array(mask_pil)
+            
+            # 先创建描边遮罩作为基础
+            output_mask_np = stroke_mask_np.copy()
+            
+            # 在描边mask基础上直接填充原始mask区域为满值（255）
+            output_mask_np[mask_np > 0] = 255
+            
+            output_mask_pil = Image.fromarray(output_mask_np.astype(np.uint8), 'L')
+            
+            # 转换回tensor并添加到列表
+            output_image_tensor = self.pil_to_tensor(output_image)
+            output_mask_tensor = self.pil_to_tensor(output_mask_pil)
+            
+            output_images.append(output_image_tensor)
+            output_masks.append(output_mask_tensor)
         
-        # 创建输出图像（黑色背景）
-        output_image = Image.new('RGB', image_pil.size, (0, 0, 0))
+        # 合并批次
+        final_images = torch.cat(output_images, dim=0)
+        final_masks = torch.cat(output_masks, dim=0)
         
-        # 创建描边颜色图像
-        stroke_color_image = Image.new('RGB', image_pil.size, stroke_rgb)
-        
-        # 首先粘贴描边
-        output_image.paste(stroke_color_image, mask=stroke_mask_pil)
-        
-        # 然后粘贴原始图像内容（在原始遮罩区域内）
-        output_image.paste(image_pil, mask=mask_pil)
-        
-        # 创建输出遮罩（原始遮罩 + 描边遮罩）
-        mask_np = np.array(mask_pil)
-        stroke_mask_np = np.array(stroke_mask_pil)
-        
-        # 合并遮罩
-        combined_mask_np = np.maximum(mask_np, stroke_mask_np)
-        output_mask_pil = Image.fromarray(combined_mask_np.astype(np.uint8), 'L')
-        
-        # 转换回tensor
-        output_image_tensor = self.pil_to_tensor(output_image)
-        output_mask_tensor = self.pil_to_tensor(output_mask_pil)
-        
-        return (output_image_tensor, output_mask_tensor)
+        return (final_images, final_masks)
+    
+    def stroke_by_mask(self, image, mask, stroke_width, stroke_color):
+        """主函数：对图像进行遮罩描边处理"""
+        return self.apply_stroke_mask(image, mask, stroke_width, stroke_color)
 
 
 class ImageBBoxOverlayByMask:
