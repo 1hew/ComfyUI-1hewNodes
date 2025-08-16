@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.24**
+- feat(image_crop): Added `opacity` parameter to `Image Paste by BBox Mask` node for controlling paste image transparency
+- feat(image): Enhanced `Image Stroke by Mask` node with batch processing support for handling multiple images and masks
+
 **v1.2.23**
 - fix(image): Enhanced `Image Stroke by Mask` node color parsing logic, supporting RGB string formats and improved default fallback to white color
 - fix(image): Enhanced `Image Paste by BBox Mask` node rotation parameter

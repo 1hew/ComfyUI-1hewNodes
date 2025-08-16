@@ -1289,19 +1289,20 @@ class ImagePasteByBBoxMask:
                 "position_y": ("INT", {"default": 0, "min": -1000, "max": 1000, "step": 1}),
                 "scale": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 5.0, "step": 0.01}),
                 "rotation": ("FLOAT", {"default": 0.0, "min": -3600.0, "max": 3600.0, "step": 0.01}),
+                "opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
             },
             "optional": {
                 "paste_mask": ("MASK",),
             }
         }
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
+    RETURN_TYPES = ("IMAGE", "MASK")
+    RETURN_NAMES = ("image", "mask")
     FUNCTION = "image_paste_by_bbox_mask"
     CATEGORY = "1hewNodes/image/crop"
 
     def image_paste_by_bbox_mask(self, paste_image, base_image, bbox_mask, position_x=0, 
-                                 position_y=0, scale=1.0, rotation=0.0, paste_mask=None):
+                                 position_y=0, scale=1.0, rotation=0.0, opacity=1.0, paste_mask=None):
         # 获取各输入的批次大小
         base_batch_size = base_image.shape[0]
         paste_batch_size = paste_image.shape[0]
@@ -1313,8 +1314,9 @@ class ImagePasteByBBoxMask:
         # 确定最大批次大小
         max_batch_size = max(base_batch_size, paste_batch_size, bbox_mask_batch_size, mask_batch_size)
         
-        # 创建输出图像列表
+        # 创建输出图像和遮罩列表
         output_images = []
+        output_masks = []
         
         for b in range(max_batch_size):
             # 使用循环索引获取对应的输入
@@ -1352,8 +1354,11 @@ class ImagePasteByBBoxMask:
             bbox = self.get_bbox_from_mask(bbox_pil)
             
             if bbox is None:
-                # 如果没有找到有效位置，返回原始图像
+                # 如果没有找到有效位置，返回原始图像和空遮罩
                 output_images.append(base_image[base_idx])
+                # 创建与base_image尺寸相同的空遮罩（全黑）
+                empty_mask = np.zeros((base_np.shape[0], base_np.shape[1]), dtype=np.float32)
+                output_masks.append(torch.from_numpy(empty_mask))
                 continue
             
             # 处理粘贴遮罩
@@ -1369,17 +1374,22 @@ class ImagePasteByBBoxMask:
                 mask_pil = paste_pil.split()[-1]  # 获取alpha通道
             
             # 执行粘贴变换
-            result_pil = self.paste_image_with_transform(
-                base_pil, paste_pil, bbox, position_x, position_y, scale, rotation, mask_pil
+            result_pil, result_mask_pil = self.paste_image_with_transform(
+                base_pil, paste_pil, bbox, position_x, position_y, scale, rotation, mask_pil, opacity
             )
             
             # 转换回tensor
             result_np = np.array(result_pil).astype(np.float32) / 255.0
             output_images.append(torch.from_numpy(result_np))
+            
+            # 转换遮罩为tensor
+            result_mask_np = np.array(result_mask_pil).astype(np.float32) / 255.0
+            output_masks.append(torch.from_numpy(result_mask_np))
         
         # 合并批次
         output_image_tensor = torch.stack(output_images)
-        return (output_image_tensor,)
+        output_mask_tensor = torch.stack(output_masks)
+        return (output_image_tensor, output_mask_tensor)
     
     def get_bbox_from_mask(self, mask_pil):
         """从遮罩中获取边界框"""
@@ -1395,8 +1405,8 @@ class ImagePasteByBBoxMask:
 
         return (x_min, y_min, x_max + 1, y_max + 1)
     
-    def paste_image_with_transform(self, base_pil, paste_pil, bbox, position_x, position_y, scale, rotation, mask_pil=None):
-        """将粘贴图像应用变换后粘贴到基础图像上"""
+    def paste_image_with_transform(self, base_pil, paste_pil, bbox, position_x, position_y, scale, rotation, mask_pil=None, opacity=1.0):
+        """将粘贴图像应用变换后粘贴到基础图像上，并返回处理区域的遮罩"""
         x_min, y_min, x_max, y_max = bbox
         
         # 计算原始边界框的中心点和尺寸
@@ -1461,6 +1471,24 @@ class ImagePasteByBBoxMask:
             # 旋转后重新获取尺寸
             new_width, new_height = paste_pil.size
         
+        # 应用透明度控制
+        if opacity < 1.0:
+            # 确保粘贴图像有alpha通道
+            if paste_pil.mode != "RGBA":
+                paste_pil = paste_pil.convert("RGBA")
+            
+            # 调整alpha通道以实现透明度控制
+            alpha = paste_pil.split()[-1]
+            alpha = alpha.point(lambda p: int(p * opacity))
+            paste_pil.putalpha(alpha)
+            
+            # 如果有遮罩，也需要相应调整
+            if mask_pil is not None:
+                mask_pil = mask_pil.point(lambda p: int(p * opacity))
+            else:
+                # 使用调整后的alpha通道作为遮罩
+                mask_pil = alpha
+        
         # 计算新的粘贴位置（考虑偏移，position_y反转）
         new_x = bbox_center_x - new_width // 2 + position_x
         new_y = bbox_center_y - new_height // 2 - position_y
@@ -1493,13 +1521,32 @@ class ImagePasteByBBoxMask:
         # 创建结果图像的副本
         result_pil = base_pil.copy()
         
-        # 粘贴图像（普通模式）
-        if mask_pil is not None:
+        # 创建与base_image尺寸相同的输出遮罩（全黑背景）
+        base_width, base_height = base_pil.size
+        output_mask_pil = Image.new('L', (base_width, base_height), 0)
+        
+        # 粘贴图像（考虑透明度）
+        if opacity < 1.0 or mask_pil is not None:
+            # 使用alpha合成模式粘贴
+            if paste_pil.mode != "RGBA":
+                paste_pil = paste_pil.convert("RGBA")
             result_pil.paste(paste_pil, (paste_x, paste_y), mask_pil)
+            
+            # 在输出遮罩上标记处理区域
+            if mask_pil is not None:
+                # 使用实际的粘贴遮罩
+                output_mask_pil.paste(mask_pil, (paste_x, paste_y))
+            else:
+                # 使用白色矩形标记整个粘贴区域
+                paste_area_mask = Image.new('L', (paste_x_end - paste_x, paste_y_end - paste_y), 255)
+                output_mask_pil.paste(paste_area_mask, (paste_x, paste_y))
         else:
             result_pil.paste(paste_pil, (paste_x, paste_y))
+            # 在输出遮罩上标记处理区域（白色矩形）
+            paste_area_mask = Image.new('L', (paste_x_end - paste_x, paste_y_end - paste_y), 255)
+            output_mask_pil.paste(paste_area_mask, (paste_x, paste_y))
         
-        return result_pil
+        return result_pil, output_mask_pil
     
     def apply_rotation(self, paste_pil, rotation_angle, mask_pil=None):
         """应用旋转变换到粘贴图像和遮罩"""

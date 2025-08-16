@@ -9,7 +9,7 @@ The `Image Stroke by Mask` node applies stroke effects to specified mask regions
 | -------------- | --------------- | --------- | ------------- | ----------- | ----------- |
 | `image` | Required | IMAGE | - | - | Input image for stroke processing |
 | `mask` | Required | MASK | - | - | Input mask defining stroke regions |
-| `stroke_width` | - | INT | 8 | 1-100 | Stroke border width in pixels |
+| `stroke_width` | - | INT | 20 | 0-1000 | Stroke border width in pixels |
 | `stroke_color` | - | STRING | "1.0" | Multiple formats | Stroke color specification |
 
 ## Outputs
