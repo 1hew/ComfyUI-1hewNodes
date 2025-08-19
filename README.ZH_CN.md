@@ -22,6 +22,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ## 📜 更新
 
 **v1.2.25**
+- feat(image_crop): 为 `Image Paste by BBox Mask` 节点添加 `apply_paste_mask` 参数，用于控制智能缩放行为
+
+**v1.2.24**
 - feat(image_crop): 为 `Image Paste by BBox Mask` 节点添加 `opacity` 透明度参数，用于控制粘贴图像的透明度
 - feat(image): 增强 `Image Stroke by Mask` 节点，添加批处理支持，可处理多个图像和遮罩
 

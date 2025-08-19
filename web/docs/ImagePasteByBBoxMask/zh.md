@@ -15,6 +15,7 @@
 | `scale` | 必选 | FLOAT | 1.0 | 0.1 到 5.0 | 粘贴图像的缩放因子 |
 | `rotation` | 必选 | FLOAT | 0.0 | -3600 到 3600 | 旋转角度 |
 | `opacity` | 必选 | FLOAT | 1.0 | 0.0 到 1.0 | 粘贴图像的不透明度/透明度 |
+| `apply_paste_mask` | 必选 | BOOLEAN | False | - | 是否应用paste_mask进行智能缩放 |
 | `paste_mask` | 可选 | MASK | - | - | 粘贴图像的可选遮罩 |
 
 ## 输出

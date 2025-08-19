@@ -15,6 +15,7 @@ The `Image Paste by BBox Mask` node pastes processed cropped images back to thei
 | `scale` | Required | FLOAT | 1.0 | 0.1 to 5.0 | Scale factor for the pasted image |
 | `rotation` | Required | FLOAT | 0.0 | -3600 to 3600 | Rotation angle in degrees |
 | `opacity` | Required | FLOAT | 1.0 | 0.0 to 1.0 | Opacity/transparency of the pasted image |
+| `apply_paste_mask` | Required | BOOLEAN | False | - | Whether to apply paste_mask for intelligent scaling |
 | `paste_mask` | Optional | MASK | - | - | Optional mask for the paste image |
 
 ## Outputs

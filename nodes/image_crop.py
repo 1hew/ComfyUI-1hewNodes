@@ -1285,11 +1285,12 @@ class ImagePasteByBBoxMask:
                 "paste_image": ("IMAGE",),
                 "base_image": ("IMAGE",),
                 "bbox_mask": ("MASK",),
-                "position_x": ("INT", {"default": 0, "min": -1000, "max": 1000, "step": 1}),
-                "position_y": ("INT", {"default": 0, "min": -1000, "max": 1000, "step": 1}),
-                "scale": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 5.0, "step": 0.01}),
+                "position_x": ("INT", {"default": 0, "min": -4096, "max": 4096, "step": 1}),
+                "position_y": ("INT", {"default": 0, "min": -4096, "max": 4096, "step": 1}),
+                "scale": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 10.0, "step": 0.01}),
                 "rotation": ("FLOAT", {"default": 0.0, "min": -3600.0, "max": 3600.0, "step": 0.01}),
                 "opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "apply_paste_mask": ("BOOLEAN", {"default": False}),
             },
             "optional": {
                 "paste_mask": ("MASK",),
@@ -1302,7 +1303,7 @@ class ImagePasteByBBoxMask:
     CATEGORY = "1hewNodes/image/crop"
 
     def image_paste_by_bbox_mask(self, paste_image, base_image, bbox_mask, position_x=0, 
-                                 position_y=0, scale=1.0, rotation=0.0, opacity=1.0, paste_mask=None):
+                                 position_y=0, scale=1.0, rotation=0.0, opacity=1.0, apply_paste_mask=False, paste_mask=None):
         # 获取各输入的批次大小
         base_batch_size = base_image.shape[0]
         paste_batch_size = paste_image.shape[0]
@@ -1375,7 +1376,7 @@ class ImagePasteByBBoxMask:
             
             # 执行粘贴变换
             result_pil, result_mask_pil = self.paste_image_with_transform(
-                base_pil, paste_pil, bbox, position_x, position_y, scale, rotation, mask_pil, opacity
+                base_pil, paste_pil, bbox, position_x, position_y, scale, rotation, mask_pil, opacity, apply_paste_mask
             )
             
             # 转换回tensor
@@ -1405,7 +1406,8 @@ class ImagePasteByBBoxMask:
 
         return (x_min, y_min, x_max + 1, y_max + 1)
     
-    def paste_image_with_transform(self, base_pil, paste_pil, bbox, position_x, position_y, scale, rotation, mask_pil=None, opacity=1.0):
+    def paste_image_with_transform(self, base_pil, paste_pil, bbox, position_x, position_y, scale, rotation, mask_pil=None, opacity=1.0, apply_paste_mask=False):
+
         """将粘贴图像应用变换后粘贴到基础图像上，并返回处理区域的遮罩"""
         x_min, y_min, x_max, y_max = bbox
         
@@ -1415,9 +1417,9 @@ class ImagePasteByBBoxMask:
         bbox_center_x = x_min + bbox_width // 2
         bbox_center_y = y_min + bbox_height // 2
         
-        # 处理paste_mask逻辑：获取有效内容区域
-        if mask_pil is not None:
-            # 当有paste_mask时，获取paste_image在paste_mask白色区域的内容
+        # 根据 apply_paste_mask 参数决定使用什么尺寸作为智能缩放的参考
+        if apply_paste_mask and mask_pil is not None:
+            # apply_paste_mask=True 且有paste_mask时：使用paste_mask处理后的图像尺寸作为参考
             # 首先确保paste_image和paste_mask尺寸一致
             if paste_pil.size != mask_pil.size:
                 mask_pil = mask_pil.resize(paste_pil.size, Image.LANCZOS)
@@ -1425,31 +1427,38 @@ class ImagePasteByBBoxMask:
             # 获取mask的边界框来确定有效内容区域
             mask_bbox = mask_pil.getbbox()
             if mask_bbox is None:
-                # 如果mask完全为空，使用整个图像
+                # 如果mask完全为空，使用整个图像尺寸作为参考
+                reference_width, reference_height = paste_pil.size
                 effective_paste_pil = paste_pil
                 effective_mask_pil = mask_pil
             else:
-                # 裁剪到mask的有效区域
+                # 裁剪到mask的有效区域，使用裁剪后的尺寸作为参考
                 effective_paste_pil = paste_pil.crop(mask_bbox)
                 effective_mask_pil = mask_pil.crop(mask_bbox)
+                reference_width, reference_height = effective_paste_pil.size
         else:
-            # 当未使用paste_mask时，使用纯白mask获取paste_image的完整尺寸内容
+            # apply_paste_mask=False 或 paste_mask未接入时：始终使用paste_image原始尺寸作为参考
+            reference_width, reference_height = paste_pil.size
             effective_paste_pil = paste_pil
-            effective_mask_pil = Image.new('L', paste_pil.size, 255)  # 纯白mask
+            if mask_pil is not None:
+                # 确保mask尺寸一致
+                if paste_pil.size != mask_pil.size:
+                    mask_pil = mask_pil.resize(paste_pil.size, Image.LANCZOS)
+                effective_mask_pil = mask_pil
+            else:
+                # 当未使用paste_mask时，创建纯白mask
+                effective_mask_pil = Image.new('L', paste_pil.size, 255)
         
-        # 使用处理后的有效内容尺寸进行智能缩放计算
-        reference_width, reference_height = effective_paste_pil.size
-        
-        # 等比例缩放，最大限度匹配bbox（保持宽高比，完全包含在bbox内）
+        # 使用参考尺寸进行智能缩放计算（等比例缩放，最大限度匹配bbox）
         reference_ratio = reference_width / reference_height
         bbox_ratio = bbox_width / bbox_height
         
         if reference_ratio > bbox_ratio:
-            # 基准图像更宽，以bbox宽度为准
+            # 参考图像更宽，以bbox宽度为准
             fitted_width = bbox_width
             fitted_height = int(bbox_width / reference_ratio)
         else:
-            # 基准图像更高，以bbox高度为准
+            # 参考图像更高，以bbox高度为准
             fitted_height = bbox_height
             fitted_width = int(bbox_height * reference_ratio)
         
