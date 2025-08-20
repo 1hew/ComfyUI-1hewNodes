@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.26**
+- feat(image_crop): 增强 `Image Crop with BBox Mask` 节点，添加精确尺寸控制功能，新增 `crop_to_side` 和 `crop_to_length` 参数
+
 **v1.2.25**
 - feat(image_crop): 为 `Image Paste by BBox Mask` 节点添加 `apply_paste_mask` 参数，用于控制智能缩放行为
 

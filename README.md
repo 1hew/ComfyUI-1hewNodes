@@ -21,8 +21,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.26**
+- feat(image_crop): Enhanced `Image Crop with BBox Mask` node with precise dimension control, added `crop_to_side` and `crop_to_length` parameters
+
 **v1.2.25**
-- feat(image_crop): Added `apply_paste_mask` parameter to `Image Paste by BBox Mask` node for controlling intelligent scaling behavior
+- feat(image_crop): Added `apply_paste_mask` parameter to `Image Paste by BBox Mask` node for controlling smart scaling behavior
 
 **v1.2.24**
 - feat(image_crop): Added `opacity` parameter to `Image Paste by BBox Mask` node for controlling paste image transparency
