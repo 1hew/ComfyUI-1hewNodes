@@ -11,6 +11,8 @@
 | `preset_ratio` | - | COMBO[STRING] | mask | mask, image, 1:1, 3:2, 4:3, 16:9, 21:9, 2:3, 3:4, 9:16, 9:21 | 目标预设比例 |
 | `scale_strength` | - | FLOAT | 0.0 | 0.0-1.0 | 缩放强度：0.0为基于遮罩的最小裁剪，1.0为图像内最大裁剪 |
 | `divisible_by` | - | INT | 8 | 1-1024 | 确保输出尺寸能被此值整除 |
+| `crop_to_side` | - | COMBO[STRING] | None | None, longest, shortest, width, height | 精确尺寸控制：None保持原有行为，其他选项启用精确尺寸控制 |
+| `crop_to_length` | - | INT | 512 | 8-4096 | 指定crop_to_side对应边的目标长度（仅在crop_to_side不为'None'时生效） |
 
 ## 输出
 
