@@ -313,15 +313,12 @@ class TextJoinByTextList:
             if isinstance(separator, list):
                 separator = separator[0] if separator else "\\n"
             
-            # 处理转义字符
-            if separator == "\\n":
-                separator = "\n"
-            elif separator == "\\t":
-                separator = "\t"
-            elif separator == "\\r":
-                separator = "\r"
-            elif separator == "\\\\":
-                separator = "\\"
+            # 处理转义字符 - 使用更通用的方法
+            # 将字符串中的转义序列转换为实际字符
+            separator = separator.replace("\\n", "\n")
+            separator = separator.replace("\\t", "\t")
+            separator = separator.replace("\\r", "\r")
+            separator = separator.replace("\\\\", "\\")
             
             # text_list应该已经是列表了
             if not isinstance(text_list, (list, tuple)):
