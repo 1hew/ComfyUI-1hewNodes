@@ -423,6 +423,11 @@ class TextLoadLocal:
         return {
             "required": {
                 "file": (cls.get_available_json_files(), {"default": ""}),
+                "user_prompt": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "prompt"
+                }),
             }
         }
     
@@ -431,7 +436,7 @@ class TextLoadLocal:
     FUNCTION = "load_json_prompt"
     CATEGORY = "1hewNodes/text"
     
-    def load_json_prompt(self, file):
+    def load_json_prompt(self, file, user_prompt=""):
         if file == "No JSON files found":
             return ("Please add JSON files to the prompt folder", "请在prompt文件夹中添加JSON文件")
         
@@ -445,8 +450,8 @@ class TextLoadLocal:
                 # 使用object_pairs_hook保持键的顺序
                 data = json.load(f, object_pairs_hook=OrderedDict)
             
-            en_result = self._build_prompt_from_json(data, "en")
-            zh_result = self._build_prompt_from_json(data, "zh")
+            en_result = self._build_prompt_from_json(data, "en", user_prompt)
+            zh_result = self._build_prompt_from_json(data, "zh", user_prompt)
             
             return (en_result[0], zh_result[0])
                 
@@ -455,7 +460,7 @@ class TextLoadLocal:
         except Exception as e:
             return (f"File reading error: {str(e)}", f"读取文件错误: {str(e)}")
     
-    def _build_prompt_from_json(self, data, language):
+    def _build_prompt_from_json(self, data, language, user_prompt=""):
         """从JSON数据中根据语言构建完整的提示词"""
         if not isinstance(data, dict):
             return ("JSON file format is incorrect, should be object format",) if language == "en" else ("JSON文件格式不正确，应为对象格式",)
@@ -502,6 +507,10 @@ class TextLoadLocal:
         
         # 用双换行符连接所有部分
         full_prompt = '\n\n'.join(prompt_parts)
+        
+        # 如果有用户提示词，直接追加到最后
+        if user_prompt and user_prompt.strip():
+            full_prompt = full_prompt + '\n\n' + user_prompt.strip()
         
         return (full_prompt,)
 
