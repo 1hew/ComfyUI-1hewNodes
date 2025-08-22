@@ -21,6 +21,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.28**
+- feat(mask): Added `Mask Paste by BBox Mask` node for simplified mask pasting with automatic base mask creation and bounding box detection
+- feat(image_tile): Added `Image Tile Split Preset` node with predefined resolution presets and intelligent tile size selection
+- feat(image): Added `Image Rotate with Mask` node for advanced image rotation with mask support and multiple fill modes
+- feat(text): Enhanced `Text Load Local` node with `user_prompt` parameter for combining JSON content with additional user prompts
+
 **v1.2.26**
 - feat(image_crop): Enhanced `Image Crop with BBox Mask` node with precise dimension control, added `crop_to_side` and `crop_to_length` parameters
 
@@ -158,6 +164,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Plot | Image plotting and visualization tools |
 | Image Stroke by Mask | Apply stroke effects to mask regions with customizable width and color |
 | Image BBox Overlay by Mask | Mask-based image bounding box overlay with independent and merge modes |
+| Image Rotate with Mask | Advanced image rotation with mask support, multiple fill modes, and mask center rotation options |
 
 ### 🎨 Image Blending Nodes
 | Node Name | Description |
@@ -179,6 +186,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|-------------|
 | Image Tile Split | Image tile splitting with overlap and custom grid support |
+| Image Tile Split Preset | Image tile splitting with predefined resolution presets and intelligent tile size selection |
 | Image Tile Merge | Image tile merging with intelligent stitching |
 
 ### 🌊 High-Low Frequency Separation Nodes
@@ -195,6 +203,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Mask Math Ops | Mask mathematical operations (intersection, union, difference, XOR) |
 | Mask Batch Math Ops | Batch mask mathematical operations |
 | Mask Crop by BBox Mask | Mask bounding box cropping based on mask regions |
+| Mask Paste by BBox Mask | Simplified mask pasting with automatic base mask creation and bounding box detection |
 
 ### 🔧 Utility Nodes
 | Node Name | Description |

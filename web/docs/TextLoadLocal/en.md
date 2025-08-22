@@ -6,7 +6,8 @@
 
 | Parameter | Required | Data Type | Default | Range | Description |
 |--|--|--|--|--|--|
-| `file` | - | COMBO[STRING] | - | JSON file list | Select JSON file to load, automatically scans prompt directory and subdirectories |
+| `file` | Required | COMBO[STRING] | - | JSON file list | Select JSON file to load, automatically scans prompt directory and subdirectories |
+| `user_prompt` | Required | STRING | "" | Multiline text | Additional user prompt to be combined with JSON content |
 
 ## Outputs
 

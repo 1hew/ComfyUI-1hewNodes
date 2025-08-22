@@ -646,6 +646,438 @@ class ImageResizeFluxKontext:
         return (scaled_image, scaled_mask)
 
 
+class ImageRotateWithMask:
+    """
+    图像旋转节点 - 支持任意角度旋转和多种填充模式
+    当传入mask时，mask与image进行相同的变换操作
+    支持以mask白色区域为中心进行旋转
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "angle": ("FLOAT", {"default": 0.0, "min": -3600.0, "max": 3600.0, "step": 0.01}),
+                "fill_mode": (["color", "edge_extend", "mirror"], {"default": "color"}),
+                "fill_color": ("STRING", {"default": "0.0"}),
+                "expand": ("BOOLEAN", {"default": True}),
+                "use_mask_center": ("BOOLEAN", {"default": False}),
+            },
+            "optional": {
+                "mask": ("MASK",),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "MASK")
+    RETURN_NAMES = ("image", "mask")
+    FUNCTION = "rotate_image"
+    CATEGORY = "1hewNodes/image"
+
+    def rotate_image(self, image, angle, expand=True, fill_mode="color", use_mask_center=False, mask=None, fill_color="0.0"):
+        """
+        旋转图像
+        
+        Args:
+            image: 输入图像张量
+            angle: 旋转角度（度）
+            expand: 是否扩展画布以包含完整旋转后的图像
+            fill_mode: 填充模式（color, edge_extend, mirror）
+            use_mask_center: 是否以mask的白色区域为中心进行旋转
+            mask: 可选的遮罩，与image进行相同的变换操作
+            fill_color: 填充颜色（仅在color模式下使用）
+        """
+        # 修正角度方向
+        angle = -angle
+        
+        batch_size = image.shape[0]
+        output_images = []
+        output_masks = []
+        
+        for i in range(batch_size):
+            # 转换为PIL图像
+            img_tensor = image[i]
+            img_np = (img_tensor.cpu().numpy() * 255).astype(np.uint8)
+            pil_img = Image.fromarray(img_np)
+            
+            # 处理mask（如果提供）
+            if mask is not None:
+                mask_tensor = mask[i % mask.shape[0]]
+                mask_np = (mask_tensor.cpu().numpy() * 255).astype(np.uint8)
+                mask_pil = Image.fromarray(mask_np).convert("L")
+                
+                # 调整mask尺寸以匹配图像
+                if pil_img.size != mask_pil.size:
+                    mask_pil = mask_pil.resize(pil_img.size, Image.NEAREST)
+            else:
+                mask_pil = None
+            
+            # 获取图像尺寸和旋转中心
+            width, height = pil_img.size
+            
+            # 根据use_mask_center参数确定旋转中心
+            if use_mask_center and mask_pil is not None:
+                center = self._calculate_mask_center(mask_pil)
+            else:
+                center = (width // 2, height // 2)
+            
+            # 处理填充模式
+            if fill_mode == "color":
+                # 解析填充颜色
+                fill_rgb = self._parse_color_advanced(fill_color, img_tensor)
+                fill_color_rgba = tuple(fill_rgb)
+                
+                # 执行旋转
+                rotated_img = pil_img.rotate(
+                    angle, 
+                    resample=Image.BILINEAR, 
+                    expand=expand, 
+                    center=center, 
+                    fillcolor=fill_color_rgba
+                )
+                
+                # 对mask执行相同的旋转操作
+                if mask_pil is not None:
+                    rotated_mask = mask_pil.rotate(
+                        angle,
+                        resample=Image.BILINEAR,
+                        expand=expand,
+                        center=center,
+                        fillcolor=0  # mask填充区域为黑色
+                    )
+                else:
+                    # 创建旋转区域遮罩
+                    rotated_mask = self._create_rotation_mask(pil_img.size, angle, center, expand)
+                
+            elif fill_mode in ["edge_extend", "mirror"]:
+                # 使用高级填充模式
+                rotated_img, rotated_mask = self._rotate_with_advanced_fill(
+                    pil_img, mask_pil, angle, center, expand, fill_mode
+                )
+            else:
+                # 默认使用color模式
+                rotated_img = pil_img.rotate(
+                    angle, 
+                    resample=Image.BILINEAR, 
+                    expand=expand, 
+                    center=center, 
+                    fillcolor=(0, 0, 0)
+                )
+                
+                # 对mask执行相同的旋转操作
+                if mask_pil is not None:
+                    rotated_mask = mask_pil.rotate(
+                        angle,
+                        resample=Image.BILINEAR,
+                        expand=expand,
+                        center=center,
+                        fillcolor=0
+                    )
+                else:
+                    rotated_mask = self._create_rotation_mask(pil_img.size, angle, center, expand)
+            
+            # 确保图像为RGB模式
+            if rotated_img.mode == "RGBA":
+                # 创建白色背景
+                background = Image.new("RGB", rotated_img.size, (255, 255, 255))
+                background.paste(rotated_img, mask=rotated_img.split()[-1])
+                rotated_img = background
+            elif rotated_img.mode != "RGB":
+                rotated_img = rotated_img.convert("RGB")
+            
+            # 转换图像为张量
+            img_np = np.array(rotated_img).astype(np.float32) / 255.0
+            img_tensor = torch.from_numpy(img_np)
+            output_images.append(img_tensor)
+            
+            # 处理遮罩
+            if rotated_mask is not None:
+                mask_np = np.array(rotated_mask).astype(np.float32) / 255.0
+                mask_tensor = torch.from_numpy(mask_np)
+            else:
+                # 创建全白遮罩（表示整个图像都是有效的）
+                mask_tensor = torch.ones((img_tensor.shape[0], img_tensor.shape[1]), dtype=torch.float32)
+            
+            output_masks.append(mask_tensor)
+        
+        # 堆叠为批次
+        result_images = torch.stack(output_images, dim=0)
+        result_masks = torch.stack(output_masks, dim=0)
+        
+        return (result_images, result_masks)
+    
+    def _calculate_mask_center(self, mask_pil):
+        """
+        计算mask白色区域的加权重心
+        
+        Args:
+            mask_pil: PIL格式的mask图像
+            
+        Returns:
+            tuple: (center_x, center_y) 重心坐标
+        """
+        # 转换为numpy数组
+        mask_array = np.array(mask_pil, dtype=np.float32)
+        
+        # 获取图像尺寸
+        height, width = mask_array.shape
+        
+        # 计算总权重（所有白色像素的强度总和）
+        total_weight = np.sum(mask_array)
+        
+        # 如果没有白色区域，返回图像中心
+        if total_weight == 0:
+            return (width // 2, height // 2)
+        
+        # 创建坐标网格
+        y_coords, x_coords = np.mgrid[0:height, 0:width]
+        
+        # 计算加权重心
+        center_x = np.sum(x_coords * mask_array) / total_weight
+        center_y = np.sum(y_coords * mask_array) / total_weight
+        
+        # 返回整数坐标
+        return (int(center_x), int(center_y))
+    
+    def _create_rotation_mask(self, original_size, angle, center, expand):
+        """
+        创建旋转区域遮罩，标识哪些区域是原始图像，哪些是填充区域
+        """
+        width, height = original_size
+        
+        # 创建原始图像的遮罩（全白）
+        mask = Image.new("L", (width, height), 255)
+        
+        # 旋转遮罩
+        rotated_mask = mask.rotate(
+            angle,
+            resample=Image.BILINEAR,
+            expand=expand,
+            center=center,
+            fillcolor=0  # 填充区域为黑色
+        )
+        
+        return rotated_mask
+    
+    def _create_rotation_mask_cv(self, original_size, angle, center, expand, target_size):
+        """
+        使用OpenCV创建与旋转图像尺寸一致的遮罩
+        """
+        width, height = original_size
+        target_width, target_height = target_size
+        
+        # 创建原始图像的遮罩（全白）
+        mask_cv = np.ones((height, width), dtype=np.uint8) * 255
+        
+        # 计算旋转矩阵
+        rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+        
+        # 如果需要扩展，调整旋转矩阵
+        if expand:
+            rotation_matrix[0, 2] += (target_width / 2) - center[0]
+            rotation_matrix[1, 2] += (target_height / 2) - center[1]
+        
+        # 执行旋转
+        rotated_mask_cv = cv2.warpAffine(
+            mask_cv,
+            rotation_matrix,
+            (target_width, target_height),
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=0
+        )
+        
+        # 转换为PIL格式
+        rotated_mask = Image.fromarray(rotated_mask_cv, mode='L')
+        
+        return rotated_mask
+    
+    def _rotate_with_advanced_fill(self, pil_img, mask_pil, angle, center, expand, fill_mode):
+        """
+        使用高级填充模式进行旋转，同时处理mask
+        """
+        # 转换为OpenCV格式
+        img_cv = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+        height, width = img_cv.shape[:2]
+        
+        # 计算旋转矩阵
+        rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+        
+        # 计算新的边界框尺寸
+        if expand:
+            cos_val = abs(rotation_matrix[0, 0])
+            sin_val = abs(rotation_matrix[0, 1])
+            new_width = int((height * sin_val) + (width * cos_val))
+            new_height = int((height * cos_val) + (width * sin_val))
+            
+            # 调整旋转矩阵以居中图像
+            rotation_matrix[0, 2] += (new_width / 2) - center[0]
+            rotation_matrix[1, 2] += (new_height / 2) - center[1]
+        else:
+            new_width, new_height = width, height
+        
+        # 设置边界填充模式
+        if fill_mode == "edge_extend":
+            border_mode = cv2.BORDER_REPLICATE
+        elif fill_mode == "mirror":
+            border_mode = cv2.BORDER_REFLECT
+        else:
+            border_mode = cv2.BORDER_CONSTANT
+        
+        # 执行图像旋转
+        rotated_cv = cv2.warpAffine(
+            img_cv, 
+            rotation_matrix, 
+            (new_width, new_height),
+            borderMode=border_mode
+        )
+        
+        # 转换回PIL格式
+        rotated_pil = Image.fromarray(cv2.cvtColor(rotated_cv, cv2.COLOR_BGR2RGB))
+        
+        # 处理mask旋转
+        if mask_pil is not None:
+            # 将mask转换为OpenCV格式
+            mask_cv = np.array(mask_pil)
+            
+            # 对mask执行相同的旋转操作
+            rotated_mask_cv = cv2.warpAffine(
+                mask_cv,
+                rotation_matrix,
+                (new_width, new_height),
+                borderMode=cv2.BORDER_CONSTANT,
+                borderValue=0
+            )
+            
+            # 转换回PIL格式
+            rotated_mask = Image.fromarray(rotated_mask_cv, mode='L')
+        else:
+            # 创建与旋转图像尺寸一致的遮罩
+            rotated_mask = self._create_rotation_mask_cv(pil_img.size, angle, center, expand, (new_width, new_height))
+        
+        return rotated_pil, rotated_mask
+    
+    def _parse_color_advanced(self, color_str, img_tensor=None):
+        """
+        高级颜色解析，参考ImageEdgeCropPad的实现
+        支持多种格式：灰度值、HEX、RGB、颜色名称、特殊值
+        """
+        if not color_str:
+            return (0, 0, 0)
+        
+        # 检查特殊值
+        color_lower = color_str.lower().strip()
+        
+        # 检查是否为 average 或其缩写
+        if color_lower in ['average', 'avg', 'a', 'av', 'aver']:
+            if img_tensor is not None:
+                return self._get_average_color_tensor(img_tensor)
+            return (128, 128, 128)  # 默认灰色
+        
+        # 检查是否为 edge 或其缩写
+        if color_lower in ['edge', 'e', 'ed']:
+            if img_tensor is not None:
+                return self._get_edge_color_tensor(img_tensor)
+            return (128, 128, 128)  # 默认灰色
+        
+        # 移除括号（如果存在）
+        color_str = color_str.strip()
+        if color_str.startswith('(') and color_str.endswith(')'):
+            color_str = color_str[1:-1].strip()
+        
+        # 尝试解析为灰度值 (0.0-1.0)
+        try:
+            gray = float(color_str)
+            if 0.0 <= gray <= 1.0:
+                gray_int = int(gray * 255)
+                return (gray_int, gray_int, gray_int)
+        except ValueError:
+            pass
+        
+        # 尝试解析为HEX格式
+        if color_str.startswith('#'):
+            color_str = color_str[1:]
+        
+        if len(color_str) == 6 and all(c in '0123456789ABCDEFabcdef' for c in color_str):
+            try:
+                r = int(color_str[0:2], 16)
+                g = int(color_str[2:4], 16)
+                b = int(color_str[4:6], 16)
+                return (r, g, b)
+            except ValueError:
+                pass
+        
+        # 尝试解析为RGB格式 "255,0,0" 或 "1.0,0.0,0.0"
+        try:
+            rgb_values = color_str.split(',')
+            if len(rgb_values) == 3:
+                r, g, b = [float(v.strip()) for v in rgb_values]
+                
+                # 检查是否为0-1范围的浮点数
+                if all(0.0 <= v <= 1.0 for v in [r, g, b]):
+                    return (int(r * 255), int(g * 255), int(b * 255))
+                # 检查是否为0-255范围的整数
+                elif all(0 <= v <= 255 for v in [r, g, b]):
+                    return (int(r), int(g), int(b))
+        except ValueError:
+            pass
+        
+        # 颜色名称映射
+        color_names = {
+            'black': (0, 0, 0),
+            'white': (255, 255, 255),
+            'red': (255, 0, 0),
+            'green': (0, 255, 0),
+            'blue': (0, 0, 255),
+            'yellow': (255, 255, 0),
+            'cyan': (0, 255, 255),
+            'magenta': (255, 0, 255),
+            'gray': (128, 128, 128),
+            'grey': (128, 128, 128),
+        }
+        
+        if color_lower in color_names:
+            return color_names[color_lower]
+        
+        # 默认返回黑色
+        return (0, 0, 0)
+    
+    def _get_average_color_tensor(self, img_tensor):
+        """
+        获取图像张量的平均颜色
+        """
+        # img_tensor shape: [H, W, C]
+        mean_color = img_tensor.mean(dim=(0, 1))  # [C]
+        mean_color_255 = (mean_color * 255).int().tolist()
+        return tuple(mean_color_255)
+    
+    def _get_edge_color_tensor(self, img_tensor):
+        """
+        获取图像张量边缘的平均颜色
+        """
+        # img_tensor shape: [H, W, C]
+        h, w, c = img_tensor.shape
+        
+        # 收集边缘像素
+        edge_pixels = []
+        
+        # 上边缘和下边缘
+        edge_pixels.append(img_tensor[0, :, :])  # 上边缘
+        edge_pixels.append(img_tensor[-1, :, :])  # 下边缘
+        
+        # 左边缘和右边缘（排除角落避免重复）
+        if h > 2:
+            edge_pixels.append(img_tensor[1:-1, 0, :])  # 左边缘
+            edge_pixels.append(img_tensor[1:-1, -1, :])  # 右边缘
+        
+        # 合并所有边缘像素
+        all_edge_pixels = torch.cat([p.reshape(-1, c) for p in edge_pixels], dim=0)
+        
+        # 计算平均颜色
+        mean_color = all_edge_pixels.mean(dim=0)
+        mean_color_255 = (mean_color * 255).int().tolist()
+        return tuple(mean_color_255)
+
+
 class ImageEditStitch:
     """
         图像编辑缝合 - 将参考图像和编辑图像拼接在一起，支持上下左右四种拼接方式
@@ -2148,6 +2580,7 @@ NODE_CLASS_MAPPINGS = {
     "ImageSolid": ImageSolid,
     "ImageResizeUniversal": ImageResizeUniversal,
     "ImageResizeFluxKontext": ImageResizeFluxKontext,
+    "ImageRotateWithMask": ImageRotateWithMask,
     "ImageEditStitch": ImageEditStitch,
     "ImageAddLabel": ImageAddLabel,
     "ImagePlot": ImagePlot,
@@ -2160,6 +2593,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ImageSolid": "Image Solid",
     "ImageResizeUniversal": "Image Resize Universal",
     "ImageResizeFluxKontext": "Image Resize Flux Kontext",
+    "ImageRotateWithMask": "Image Rotate with Mask",
     "ImageEditStitch": "Image Edit Stitch",
     "ImageAddLabel": "Image Add Label",
     "ImagePlot": "Image Plot",
