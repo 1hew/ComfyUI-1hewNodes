@@ -339,12 +339,131 @@ class MaskCropByBBoxMask:
         return padded_masks
 
 
+class MaskPasteByBBoxMask:
+    """
+    遮罩粘贴器 - 将处理后的裁剪遮罩根据边界框遮罩粘贴回原始遮罩的位置
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "paste_mask": ("MASK",),
+                "bbox_mask": ("MASK",),
+            },
+            "optional": {
+                "base_mask": ("MASK",),
+            }
+        }
+
+    RETURN_TYPES = ("MASK",)
+    RETURN_NAMES = ("mask",)
+    FUNCTION = "mask_paste_by_bbox_mask"
+    CATEGORY = "1hewNodes/mask"
+
+    def mask_paste_by_bbox_mask(self, paste_mask, bbox_mask, base_mask=None):
+        # 如果没有提供 base_mask，创建与 bbox_mask 同尺寸的全黑遮罩
+        if base_mask is None:
+            base_mask = torch.zeros_like(bbox_mask)
+        
+        # 获取各输入的批次大小
+        base_batch_size = base_mask.shape[0]
+        paste_batch_size = paste_mask.shape[0]
+        bbox_mask_batch_size = bbox_mask.shape[0]
+        
+        # 确定最大批次大小
+        max_batch_size = max(base_batch_size, paste_batch_size, bbox_mask_batch_size)
+        
+        # 创建输出遮罩列表
+        output_masks = []
+        
+        for b in range(max_batch_size):
+            # 使用循环索引获取对应的输入
+            base_idx = b % base_batch_size
+            paste_idx = b % paste_batch_size
+            bbox_idx = b % bbox_mask_batch_size
+            
+            # 将遮罩转换为PIL格式
+            if base_mask.is_cuda:
+                base_np = (base_mask[base_idx].cpu().numpy() * 255).astype(np.uint8)
+            else:
+                base_np = (base_mask[base_idx].numpy() * 255).astype(np.uint8)
+            
+            if paste_mask.is_cuda:
+                paste_np = (paste_mask[paste_idx].cpu().numpy() * 255).astype(np.uint8)
+            else:
+                paste_np = (paste_mask[paste_idx].numpy() * 255).astype(np.uint8)
+            
+            if bbox_mask.is_cuda:
+                bbox_np = (bbox_mask[bbox_idx].cpu().numpy() * 255).astype(np.uint8)
+            else:
+                bbox_np = (bbox_mask[bbox_idx].numpy() * 255).astype(np.uint8)
+            
+            base_pil = Image.fromarray(base_np).convert("L")
+            paste_pil = Image.fromarray(paste_np).convert("L")
+            bbox_pil = Image.fromarray(bbox_np).convert("L")
+            
+            # 从边界框遮罩获取边界框
+            bbox = self.get_bbox_from_mask(bbox_pil)
+            
+            if bbox is None:
+                # 如果没有找到有效位置，返回原始遮罩
+                output_masks.append(base_mask[base_idx])
+                continue
+            
+            # 执行简化的粘贴操作
+            result_pil = self.paste_mask_simple(base_pil, paste_pil, bbox)
+            
+            # 转换回tensor
+            result_np = np.array(result_pil).astype(np.float32) / 255.0
+            output_masks.append(torch.from_numpy(result_np))
+        
+        # 合并批次
+        output_mask_tensor = torch.stack(output_masks)
+        return (output_mask_tensor,)
+    
+    def get_bbox_from_mask(self, mask_pil):
+        """从遮罩中获取边界框"""
+        mask_np = np.array(mask_pil)
+        rows = np.any(mask_np > 10, axis=1)
+        cols = np.any(mask_np > 10, axis=0)
+
+        if not np.any(rows) or not np.any(cols):
+            return None
+
+        y_min, y_max = np.where(rows)[0][[0, -1]]
+        x_min, x_max = np.where(cols)[0][[0, -1]]
+
+        return (x_min, y_min, x_max + 1, y_max + 1)
+    
+    def paste_mask_simple(self, base_pil, paste_pil, bbox):
+        """简化的遮罩粘贴操作"""
+        x_min, y_min, x_max, y_max = bbox
+        bbox_width = x_max - x_min
+        bbox_height = y_max - y_min
+        
+        # 将粘贴遮罩缩放到边界框大小
+        if paste_pil.size != (bbox_width, bbox_height):
+            paste_pil = paste_pil.resize((bbox_width, bbox_height), Image.LANCZOS)
+        
+        # 创建结果遮罩的副本
+        result_pil = base_pil.copy()
+        
+        # 直接在边界框区域粘贴遮罩
+        result_pil.paste(paste_pil, (x_min, y_min))
+        
+        return result_pil
+    
+
+
+
 # 节点类映射
 NODE_CLASS_MAPPINGS = {
     "MaskFillHole": MaskFillHole,
     "MaskMathOps": MaskMathOps,
     "MaskBatchMathOps": MaskBatchMathOps,
     "MaskCropByBBoxMask": MaskCropByBBoxMask,
+    "MaskPasteByBBoxMask": MaskPasteByBBoxMask,
 }
 
 # 节点显示名称
@@ -353,4 +472,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "MaskMathOps": "Mask Math Ops",
     "MaskBatchMathOps": "Mask Batch Math Ops",
     "MaskCropByBBoxMask": "Mask Crop by BBox Mask",
+    "MaskPasteByBBoxMask": "Mask Paste by BBox Mask",
 }
