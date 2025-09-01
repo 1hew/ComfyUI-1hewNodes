@@ -3,6 +3,8 @@ import re
 import random
 import time
 import os
+import sys
+import importlib.util
 from collections import OrderedDict
 
 
@@ -404,25 +406,27 @@ class TextLoadLocal:
             os.makedirs(self.prompt_dir)
     
     @classmethod
-    def get_available_json_files(cls):
+    def get_available_files(cls):
         instance = cls()
         files = []
         
-        # 扫描prompt目录及其子目录中的JSON文件
+        # 扫描prompt目录及其子目录中的JSON和Python文件
         for root, dirs, filenames in os.walk(instance.prompt_dir):
             for filename in filenames:
-                if filename.endswith('.json'):
+                if filename.endswith('.json') or filename.endswith('.py'):
                     # 获取相对于prompt目录的路径
                     rel_path = os.path.relpath(os.path.join(root, filename), instance.prompt_dir)
-                    files.append(rel_path.replace('\\', '/'))
+                    # 去掉文件后缀，使显示更友好
+                    display_name = rel_path.replace('\\', '/').replace('.json', '').replace('.py', '')
+                    files.append(display_name)
         
-        return files if files else ["No JSON files found"]
+        return files if files else ["No files found"]
     
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "file": (cls.get_available_json_files(), {"default": ""}),
+                "file": (cls.get_available_files(), {"default": ""}),
                 "user_prompt": ("STRING", {
                     "multiline": True,
                     "default": "",
@@ -437,46 +441,101 @@ class TextLoadLocal:
     CATEGORY = "1hewNodes/text"
     
     def load_json_prompt(self, file, user_prompt=""):
-        if file == "No JSON files found":
-            return ("Please add JSON files to the prompt folder", "请在prompt文件夹中添加JSON文件")
+        if file == "No files found":
+            return ("Please add JSON or Python files to the prompt folder", "请在prompt文件夹中添加JSON或Python文件")
         
-        file_path = os.path.join(self.prompt_dir, file.replace('/', os.sep))
+        # 检查是否存在.json或.py文件
+        json_path = os.path.join(self.prompt_dir, (file + '.json').replace('/', os.sep))
+        py_path = os.path.join(self.prompt_dir, (file + '.py').replace('/', os.sep))
         
-        if not os.path.exists(file_path):
+        file_path = None
+        file_type = None
+        
+        if os.path.exists(json_path):
+            file_path = json_path
+            file_type = 'json'
+        elif os.path.exists(py_path):
+            file_path = py_path
+            file_type = 'python'
+        else:
             return (f"File not found: {file}", f"文件不存在: {file}")
         
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                # 使用object_pairs_hook保持键的顺序
-                data = json.load(f, object_pairs_hook=OrderedDict)
+            if file_type == 'json':
+                # 读取JSON文件
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+            else:
+                # 读取Python文件
+                data = self._load_python_prompt_data(file_path)
             
-            en_result = self._build_prompt_from_json(data, "en", user_prompt)
-            zh_result = self._build_prompt_from_json(data, "zh", user_prompt)
+            # 构建英文和中文提示词
+            en_result = self._build_prompt_from_data(data, 'en', user_prompt)
+            zh_result = self._build_prompt_from_data(data, 'zh', user_prompt)
             
-            return (en_result[0], zh_result[0])
+            return (en_result, zh_result)
                 
         except json.JSONDecodeError as e:
-            return (f"JSON format error: {str(e)}", f"JSON格式错误: {str(e)}")
+            return (f"JSON parsing error: {str(e)}", f"JSON解析错误: {str(e)}")
         except Exception as e:
-            return (f"File reading error: {str(e)}", f"读取文件错误: {str(e)}")
+            return (f"File loading error: {str(e)}", f"文件加载错误: {str(e)}")
     
-    def _build_prompt_from_json(self, data, language, user_prompt=""):
-        """从JSON数据中根据语言构建完整的提示词"""
+    def _load_python_prompt_data(self, file_path):
+        """从Python文件中加载PROMPT_DATA"""
+        try:
+            # 直接读取文件内容并执行，确保使用UTF-8编码
+            with open(file_path, 'r', encoding='utf-8') as f:
+                code = f.read()
+            
+            # 创建一个新的命名空间来执行代码
+            namespace = {}
+            exec(code, namespace)
+            
+            # 尝试获取PROMPT_DATA
+            if 'PROMPT_DATA' in namespace:
+                data = namespace['PROMPT_DATA']
+            elif 'get_data' in namespace:
+                data = namespace['get_data']()
+            else:
+                # 如果没有PROMPT_DATA，尝试构建一个
+                data = {}
+                if 'EN_PROMPT' in namespace:
+                    data['en'] = namespace['EN_PROMPT']
+                if 'ZH_PROMPT' in namespace:
+                    data['zh'] = namespace['ZH_PROMPT']
+            
+            return data
+        except Exception as e:
+            raise Exception(f"Failed to load Python prompt data: {str(e)}")
+    
+    def _build_prompt_from_data(self, data, language, user_prompt=""):
+        """从数据中根据语言构建完整的提示词"""
         if not isinstance(data, dict):
-            return ("JSON file format is incorrect, should be object format",) if language == "en" else ("JSON文件格式不正确，应为对象格式",)
+            return ("Data format is incorrect, should be object format",) if language == "en" else ("数据格式不正确，应为对象格式",)
         
         # 检查是否有语言特定的数据
         lang_data = data.get(language, {})
         if not lang_data:
             return (f"No data found for language '{language}'",) if language == "en" else (f"未找到语言 '{language}' 的数据",)
         
-        if not isinstance(lang_data, dict):
-            return (str(lang_data),)
+        # 如果lang_data是字符串，直接使用
+        if isinstance(lang_data, str):
+            full_prompt = lang_data.strip()
+            if user_prompt and user_prompt.strip():
+                full_prompt = full_prompt + '\n\n' + user_prompt.strip()
+            return full_prompt
         
-        # 构建完整的提示词 - 按照JSON中键的原始顺序
+        # 如果lang_data不是字典，转换为字符串
+        if not isinstance(lang_data, dict):
+            full_prompt = str(lang_data)
+            if user_prompt and user_prompt.strip():
+                full_prompt = full_prompt + '\n\n' + user_prompt.strip()
+            return full_prompt
+        
+        # 构建完整的提示词 - 按照数据中键的原始顺序
         prompt_parts = []
         
-        # 遍历所有键，按照它们在JSON中的顺序
+        # 遍历所有键，按照它们在数据中的顺序
         for key, value in lang_data.items():
             # 跳过以#开头的键（注释键）
             if key.startswith('#'):

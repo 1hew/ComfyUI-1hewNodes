@@ -7,7 +7,13 @@ import colorsys
 
 class ImageLumaMatte:
     """
-    亮度蒙版 - 支持批量处理图像，增强的背景颜色支持
+    亮度蒙版 - 完全支持批量处理图像和遮罩，增强的背景颜色支持
+    
+    批量处理逻辑：
+    - 当图像和遮罩数量不同时，按最大数量输出，较少的批次会循环复制
+    - 例如：5张图片 + 2个遮罩 = 输出5张处理结果（遮罩按[1,2,1,2,1]循环使用）
+    - 例如：2张图片 + 5个遮罩 = 输出5张处理结果（图片按[1,2,1,2,1]循环使用）
+    
     支持多种颜色格式：灰度值、HEX、RGB、颜色名称、edge（边缘色）、average（平均色）
     """
     
@@ -29,28 +35,32 @@ class ImageLumaMatte:
 
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
-    FUNCTION = "image_luma_matte_v2"
+    FUNCTION = "image_luma_matte"
     CATEGORY = "1hewNodes/image/blend"
 
-    def image_luma_matte_v2(self, image, mask, invert_mask=False, feather=0, background_add=True, 
+    def image_luma_matte(self, image, mask, invert_mask=False, feather=0, background_add=True, 
                            background_color="1.0", out_alpha=False):
-        # 获取图像尺寸
-        batch_size, height, width, channels = image.shape
+        # 获取图像和遮罩的批次尺寸
+        image_batch_size = image.shape[0]
         mask_batch_size = mask.shape[0]
+        
+        # 确定最大批次数量，输出将按照最大批次数量处理
+        max_batch_size = max(image_batch_size, mask_batch_size)
         
         # 创建输出图像
         output_images = []
         
-        for b in range(batch_size):
+        for b in range(max_batch_size):
+            # 确定使用哪个图像和遮罩（循环使用较少的批次）
+            image_index = b % image_batch_size
+            mask_index = b % mask_batch_size
+            
             # 将图像转换为PIL格式
             if image.is_cuda:
-                img_np = (image[b].cpu().numpy() * 255).astype(np.uint8)
+                img_np = (image[image_index].cpu().numpy() * 255).astype(np.uint8)
             else:
-                img_np = (image[b].numpy() * 255).astype(np.uint8)
+                img_np = (image[image_index].numpy() * 255).astype(np.uint8)
             img_pil = Image.fromarray(img_np)
-
-            # 确定使用哪个遮罩（如果遮罩数量少于图像数量，则循环使用）
-            mask_index = b % mask_batch_size
             
             # 将遮罩转换为PIL格式
             if mask.is_cuda:

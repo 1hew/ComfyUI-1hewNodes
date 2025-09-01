@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.29**
+- fix: Fixed various bugs and improved stability
+
 **v1.2.28**
 - feat(mask): Added `Mask Paste by BBox Mask` node for simplified mask pasting with automatic base mask creation and bounding box detection
 - feat(image_tile): Added `Image Tile Split Preset` node with predefined resolution presets and intelligent tile size selection
@@ -235,7 +238,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Text Join Multi | Multi-input text concatenator supporting multiple text inputs with dynamic variable referencing and custom separators |
 | Text Join by Text List | Text list joiner for merging any type of list into a string with support for prefix, suffix, and custom separators |
 | Text Prefix Suffix | Text prefix suffix formatter with wildcard input support for flexible data formatting with custom prefix, suffix, and separator |
-| Text Load Local | Local text loader for loading JSON format prompt files from prompt directory with bilingual Chinese and English output and key order preservation |
+| Text Load Local | Local text loader for loading Python format prompt files from prompt directory with bilingual Chinese and English output and key order preservation |
 | Text Custom Extract | Text custom extractor for extracting specified key values from JSON |
 | List Custom Int | Custom integer list generator with dash separator and multiple delimiter support |
 | List Custom Float | Custom float list generator with dash separator and multiple delimiter support |

@@ -1426,7 +1426,7 @@ class ImageAddLabel:
 
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
-    FUNCTION = "image_add_label_v2"
+    FUNCTION = "image_add_label"
     CATEGORY = "1hewNodes/image"
 
     def auto_select_scale_mode(self, image_width, image_height, direction="top"):
@@ -1709,7 +1709,7 @@ class ImageAddLabel:
             font_obj = ImageFont.load_default()
         return font_obj
 
-    def image_add_label_v2(self, image, height_pad, font_size, invert_color, font, text, direction, input1=None, input2=None):
+    def image_add_label(self, image, height_pad, font_size, invert_color, font, text, direction, input1=None, input2=None):
         # 设置颜色，根据invert_color决定黑白配色
         if invert_color:
             font_color = "black"

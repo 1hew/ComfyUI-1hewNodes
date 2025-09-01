@@ -1,13 +1,13 @@
 # Text Load Local
 
-**Node Function:** The `Text Load Local` node is used to load JSON format prompt files from the prompt directory and its subdirectories, supporting bilingual output in Chinese and English, building complete prompts according to the original order of keys in JSON, commonly used for prompt management and multilingual text processing.
+**Node Function:** The `Text Load Local` node is used to load Python format prompt files from the prompt directory and its subdirectories, supporting bilingual output in Chinese and English, by calling the get_prompt function in Python files to retrieve prompt content, commonly used for prompt management and multilingual text processing.
 
 ## Inputs
 
 | Parameter | Required | Data Type | Default | Range | Description |
 |--|--|--|--|--|--|
-| `file` | Required | COMBO[STRING] | - | JSON file list | Select JSON file to load, automatically scans prompt directory and subdirectories |
-| `user_prompt` | Required | STRING | "" | Multiline text | Additional user prompt to be combined with JSON content |
+| `file` | Required | COMBO[STRING] | - | Python file list | Select Python file to load, automatically scans prompt directory and subdirectories |
+| `user_prompt` | Required | STRING | "" | Multiline text | Additional user prompt to be combined with Python file content |
 
 ## Outputs
 
