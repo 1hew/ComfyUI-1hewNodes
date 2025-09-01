@@ -3,6 +3,5 @@ __pycache__/
 *.pyo
 *.pyd
 .DS_Store
-
 # Ignore Ruff cache
 .ruff_cache

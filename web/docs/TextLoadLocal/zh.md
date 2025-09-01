@@ -1,13 +1,13 @@
 # Text Load Local - 本地文本加载器
 
-**节点功能：** `Text Load Local`节点用于从prompt目录及其子目录中加载JSON格式的提示词文件，支持中英文双语输出，按照JSON中键的原始顺序构建完整的提示词，常用于提示词管理和多语言文本处理。
+**节点功能：** `Text Load Local`节点用于从prompt目录及其子目录中加载Python格式的提示词文件，支持中英文双语输出，通过调用Python文件中的get_prompt函数获取提示词内容，常用于提示词管理和多语言文本处理。
 
 ## 输入
 
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
-| `file` | 必选 | COMBO[STRING] | - | JSON文件列表 | 选择要加载的JSON文件，自动扫描prompt目录及其子目录 |
-| `user_prompt` | 必选 | STRING | "" | 多行文本 | 与JSON内容结合的额外用户提示词 |
+| `file` | 必选 | COMBO[STRING] | - | Python文件列表 | 选择要加载的Python文件，自动扫描prompt目录及其子目录 |
+| `user_prompt` | 必选 | STRING | "" | 多行文本 | 与Python文件内容结合的额外用户提示词 |
 
 ## 输出
 

@@ -468,7 +468,7 @@ class ImageCropWithBBoxMask:
 
     RETURN_TYPES = ("IMAGE", "MASK", "MASK")
     RETURN_NAMES = ("cropped_image", "bbox_mask", "cropped_mask")
-    FUNCTION = "image_crop_with_bbox_mask_v2"
+    FUNCTION = "image_crop_with_bbox_mask"
     CATEGORY = "1hewNodes/image/crop"
 
     def get_bbox(self, mask_pil):
@@ -864,7 +864,7 @@ class ImageCropWithBBoxMask:
         
         return crop_x1, crop_y1, crop_x2, crop_y2
 
-    def image_crop_with_bbox_mask_v2(self, image, mask, preset_ratio="mask", scale_strength=0.0, divisible_by=8, crop_to_side="None", crop_to_length=512):
+    def image_crop_with_bbox_mask(self, image, mask, preset_ratio="mask", scale_strength=0.0, divisible_by=8, crop_to_side="None", crop_to_length=512):
         batch_size, img_height, img_width, channels = image.shape
         mask_batch_size = mask.shape[0]
         

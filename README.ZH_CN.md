@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.29**
+- fix: 修复相关bug，提升稳定性
+
 **v1.2.28**
 - feat(mask): 添加 `Mask Paste by BBox Mask` 节点，支持简化遮罩粘贴，具有自动基础遮罩创建和边界框检测功能
 - feat(image_tile): 添加 `Image Tile Split Preset` 节点，提供预定义分辨率预设和智能瓦片尺寸选择
@@ -235,7 +238,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Text Join Multi | 文本连接多输入器，支持多个文本输入的连接和动态变量引用，可自定义分隔符 |
 | Text Join by Text List | 文本列表连接器，支持将任意类型列表合并为字符串，支持前缀、后缀和自定义分隔符 |
 | Text Prefix Suffix | 文本前缀后缀器，支持通配符输入的灵活数据格式化，可自定义前缀、后缀和分隔符 |
-| Text Load Local | 本地文本加载器，从prompt目录加载JSON格式提示词文件，支持中英文双语输出和键顺序保持 |
+| Text Load Local | 本地文本加载器，从prompt目录加载Python格式提示词文件，支持中英文双语输出和键顺序保持 |
 | Text Custom Extract | 文本自定义提取器，从JSON中提取指定键值 |
 | List Custom Int | 自定义整数列表生成器，支持连字符分割和多种分隔符 |
 | List Custom Float | 自定义浮点数列表生成器，支持连字符分割和多种分隔符 |
