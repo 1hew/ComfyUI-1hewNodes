@@ -21,7 +21,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
-**v1.2.30**
+**v1.2.31**
 - fix: Fixed various bugs and improved stability
 
 **v1.2.28**
