@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.32**
+- feat(image): 添加 `Image Solid Flux Kontext` 节点，支持基于 Flux Kontext 尺寸预设生成纯色图像
+- feat(image): 添加 `Image Solid Qwen Image` 节点，支持基于 QwenImage 尺寸预设生成纯色图像
+
 **v1.2.31**
 - fix: 修复相关bug，提升稳定性
 
@@ -160,6 +164,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Image Solid | 生成纯色图像，支持多种尺寸和颜色格式 |
+| Image Solid Flux Kontext | 基于 Flux Kontext 尺寸预设生成纯色图像，支持灵活的颜色输入格式 |
+| Image Solid Qwen Image | 基于 QwenImage 尺寸预设生成纯色图像，支持灵活的颜色输入格式 |
 | Image Resize Universal | 通用图像尺寸调整，支持多种算法和约束 |
 | Image Resize Flux Kontext | 图像尺寸调整为FluxKontext尺寸，支持图像和遮罩的尺寸自动选择和手动选择 |
 | Image Edit Stitch | 图像拼接与缝合，支持多种拼接模式 |
