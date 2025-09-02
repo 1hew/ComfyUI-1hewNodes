@@ -22,17 +22,3 @@
 |-------------|-----------|-------------|
 | `image` | IMAGE | Generated solid color image |
 | `mask` | MASK | Corresponding mask image |
-
-## Function Description
-
-### Size Settings
-- **Preset sizes**: Provides multiple common ratio preset sizes like 1:1, 3:2, 4:3, 16:9, 21:9, etc.
-- **Custom dimensions**: When selecting "custom", can freely set width and height
-- **Reference image**: If reference image is provided, will use reference image dimensions
-- **Divisibility constraint**: Ensures output dimensions are divisible by specified number for easier subsequent processing
-
-### Color Control
-- **Color selection**: Supports standard color picker, default is white
-- **Brightness adjustment**: Adjust image brightness through alpha parameter
-- **Color inversion**: Can invert selected color
-- **Mask transparency**: Independent control of mask opacity
