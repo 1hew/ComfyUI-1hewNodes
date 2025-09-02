@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.32**
+- feat(image): Added `Image Solid Flux Kontext` node for generating solid color images with Flux Kontext dimension presets
+- feat(image): Added `Image Solid Qwen Image` node for generating solid color images with QwenImage dimension presets
+
 **v1.2.31**
 - fix: Fixed various bugs and improved stability
 
@@ -160,6 +164,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|--------------|
 | Image Solid | Generate solid color images with multiple size and color format support |
+| Image Solid Flux Kontext | Generate solid color images with Flux Kontext dimension presets and flexible color input formats |
+| Image Solid Qwen Image | Generate solid color images with QwenImage dimension presets and flexible color input formats |
 | Image Resize Universal | Universal image resizing with multiple algorithms and constraints |
 | Image Resize Flux Kontext | Resize images to FluxKontext dimensions with support for automatic and manual size selection for images and masks |
 | Image Edit Stitch | Image stitching and merging with multiple stitching modes |

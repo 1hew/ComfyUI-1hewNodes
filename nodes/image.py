@@ -9,6 +9,196 @@ from skimage.measure import label, regionprops
 import comfy.utils
 
 
+class ImageSolidFluxKontext:
+    """
+    根据 FluxKontext 尺寸预设生成纯色图像
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "preset_size": (["672×1568 [1:2.33] (3:7)", "688×1504 [1:2.19]", "720×1456 [1:2.00] (1:2)",
+                                "752×1392 [1:1.85]", "800×1328 [1:1.66]", "832×1248 [1:1.50] (2:3)",
+                                "880×1184 [1:1.35]", "944×1104 [1:1.17]", "1024×1024 [1:1.00] (1:1)",
+                                "1104×944 [1.17:1]", "1184×880 [1.35:1]", "1248×832 [1.50:1] (3:2)",
+                                "1328×800 [1.66:1]", "1392×752 [1.85:1]", "1456×720 [2.00:1] (2:1)",
+                                "1504×688 [2.19:1]", "1568×672 [2.33:1] (7:3)"],
+                              {"default": "1024×1024 [1:1.00] (1:1)"}),
+                "color": ("STRING", {"default": "1.0"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "MASK")
+    RETURN_NAMES = ("image", "mask")
+    FUNCTION = "image_solid_flux_kontext"
+    CATEGORY = "1hewNodes/image"
+
+    def _parse_color(self, color_str):
+        """解析不同格式的颜色输入"""
+        color_str = color_str.strip()
+        
+        # 尝试解析为灰度值 (0.0-1.0)
+        try:
+            gray_value = float(color_str)
+            if 0.0 <= gray_value <= 1.0:
+                # 灰度值转换为RGB
+                return (gray_value, gray_value, gray_value)
+        except ValueError:
+            pass
+        
+        # 尝试解析为十六进制颜色 (#RRGGBB 或 RRGGBB)
+        if color_str.startswith('#'):
+            hex_color = color_str[1:]
+        else:
+            hex_color = color_str
+            
+        if len(hex_color) == 6:
+            try:
+                r = int(hex_color[0:2], 16) / 255.0
+                g = int(hex_color[2:4], 16) / 255.0
+                b = int(hex_color[4:6], 16) / 255.0
+                return (r, g, b)
+            except ValueError:
+                pass
+        
+        # 尝试解析为RGB格式 (R,G,B)
+        try:
+            rgb = color_str.split(',')
+            if len(rgb) == 3:
+                r = float(rgb[0].strip())
+                g = float(rgb[1].strip())
+                b = float(rgb[2].strip())
+                # 如果值大于1，假设是0-255范围，转换为0-1范围
+                if r > 1.0 or g > 1.0 or b > 1.0:
+                    r /= 255.0
+                    g /= 255.0
+                    b /= 255.0
+                return (r, g, b)
+        except ValueError:
+            pass
+        
+        # 默认返回白色
+        return (1.0, 1.0, 1.0)
+
+    def image_solid_flux_kontext(self, preset_size, color):
+        # 从预设尺寸中提取宽度和高度（去掉比例部分）
+        dimensions = preset_size.split(" ")[0].split("×")
+        img_width = int(dimensions[0])
+        img_height = int(dimensions[1])
+
+        # 解析颜色值
+        r, g, b = self._parse_color(color)
+
+        # 创建纯色图像
+        image = np.zeros((img_height, img_width, 3), dtype=np.float32)
+        image[:, :, 0] = r
+        image[:, :, 1] = g
+        image[:, :, 2] = b
+
+        # 创建透明度蒙版
+        mask = np.ones((img_height, img_width), dtype=np.float32)
+
+        # 转换为ComfyUI需要的格式 (批次, 高度, 宽度, 通道)
+        image = torch.from_numpy(image).unsqueeze(0)
+        mask = torch.from_numpy(mask).unsqueeze(0)
+
+        return (image, mask)
+
+
+class ImageSolidQwenImage:
+    """
+    根据 QwenImage 尺寸预设生成纯色图像
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "preset_size": (["928×1664 (9:16)", "1056×1584 (2:3)", "1140×1472 (3:4)", 
+                                "1328×1328 (1:1)", "1472×1140 (4:3)", "1584×1056 (3:2)", "1664×928 (16:9)"],
+                              {"default": "1328×1328 (1:1)"}),
+                "color": ("STRING", {"default": "1.0"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "MASK")
+    RETURN_NAMES = ("image", "mask")
+    FUNCTION = "image_solid_qwen_image"
+    CATEGORY = "1hewNodes/image"
+
+    def _parse_color(self, color_str):
+        """解析不同格式的颜色输入"""
+        color_str = color_str.strip()
+        
+        # 尝试解析为灰度值 (0.0-1.0)
+        try:
+            gray_value = float(color_str)
+            if 0.0 <= gray_value <= 1.0:
+                # 灰度值转换为RGB
+                return (gray_value, gray_value, gray_value)
+        except ValueError:
+            pass
+        
+        # 尝试解析为十六进制颜色 (#RRGGBB 或 RRGGBB)
+        if color_str.startswith('#'):
+            hex_color = color_str[1:]
+        else:
+            hex_color = color_str
+            
+        if len(hex_color) == 6:
+            try:
+                r = int(hex_color[0:2], 16) / 255.0
+                g = int(hex_color[2:4], 16) / 255.0
+                b = int(hex_color[4:6], 16) / 255.0
+                return (r, g, b)
+            except ValueError:
+                pass
+        
+        # 尝试解析为RGB格式 (R,G,B)
+        try:
+            rgb = color_str.split(',')
+            if len(rgb) == 3:
+                r = float(rgb[0].strip())
+                g = float(rgb[1].strip())
+                b = float(rgb[2].strip())
+                # 如果值大于1，假设是0-255范围，转换为0-1范围
+                if r > 1.0 or g > 1.0 or b > 1.0:
+                    r /= 255.0
+                    g /= 255.0
+                    b /= 255.0
+                return (r, g, b)
+        except ValueError:
+            pass
+        
+        # 默认返回白色
+        return (1.0, 1.0, 1.0)
+
+    def image_solid_qwen_image(self, preset_size, color):
+        # 从预设尺寸中提取宽度和高度（去掉比例部分）
+        dimensions = preset_size.split(" ")[0].split("×")
+        img_width = int(dimensions[0])
+        img_height = int(dimensions[1])
+
+        # 解析颜色值
+        r, g, b = self._parse_color(color)
+
+        # 创建纯色图像
+        image = np.zeros((img_height, img_width, 3), dtype=np.float32)
+        image[:, :, 0] = r
+        image[:, :, 1] = g
+        image[:, :, 2] = b
+
+        # 创建透明度蒙版
+        mask = np.ones((img_height, img_width), dtype=np.float32)
+
+        # 转换为ComfyUI需要的格式 (批次, 高度, 宽度, 通道)
+        image = torch.from_numpy(image).unsqueeze(0)
+        mask = torch.from_numpy(mask).unsqueeze(0)
+
+        return (image, mask)
+
+
 class ImageSolid:
     """
     根据输入的颜色和尺寸生成纯色图像
@@ -2577,6 +2767,8 @@ class ImageBBoxOverlayByMask:
 
 
 NODE_CLASS_MAPPINGS = {
+    "ImageSolidFluxKontext": ImageSolidFluxKontext,
+    "ImageSolidQwenImage": ImageSolidQwenImage,
     "ImageSolid": ImageSolid,
     "ImageResizeUniversal": ImageResizeUniversal,
     "ImageResizeFluxKontext": ImageResizeFluxKontext,
@@ -2585,11 +2777,12 @@ NODE_CLASS_MAPPINGS = {
     "ImageAddLabel": ImageAddLabel,
     "ImagePlot": ImagePlot,
     "ImageStrokeByMask": ImageStrokeByMask,
-
     "ImageBBoxOverlayByMask": ImageBBoxOverlayByMask,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    "ImageSolidFluxKontext": "Image Solid Flux Kontext",
+    "ImageSolidQwenImage": "Image Solid Qwen Image",
     "ImageSolid": "Image Solid",
     "ImageResizeUniversal": "Image Resize Universal",
     "ImageResizeFluxKontext": "Image Resize Flux Kontext",
