@@ -1,6 +1,6 @@
-# Image Solid Flux Kontext
+# Image Solid FluxKontext
 
-**Node Function:** The `Image Solid Flux Kontext` node generates solid color images based on Flux Kontext dimension presets, supporting multiple aspect ratios optimized for Flux model workflows.
+**Node Function:** The `Image Solid FluxKontext` node generates solid color images based on Flux Kontext dimension presets, supporting multiple aspect ratios optimized for Flux model workflows.
 
 ## Inputs
 
