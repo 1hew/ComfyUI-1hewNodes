@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.35**
+- feat(image): 添加 `Image Resize Qwen Image` 节点，专为 Qwen 视觉模型优化的图像缩放器，提供 7 种预设分辨率和自动宽高比选择
+
 **v1.2.32**
 - feat(image): 添加 `Image Solid Flux Kontext` 节点，支持基于 Flux Kontext 尺寸预设生成纯色图像
 - feat(image): 添加 `Image Solid Qwen Image` 节点，支持基于 QwenImage 尺寸预设生成纯色图像
@@ -164,10 +167,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Image Solid | 生成纯色图像，支持多种尺寸和颜色格式 |
-| Image Solid Flux Kontext | 基于 Flux Kontext 尺寸预设生成纯色图像，支持灵活的颜色输入格式 |
-| Image Solid Qwen Image | 基于 QwenImage 尺寸预设生成纯色图像，支持灵活的颜色输入格式 |
+| Image Solid FluxKontext | 基于 Flux Kontext 尺寸预设生成纯色图像，支持灵活的颜色输入格式 |
+| Image Solid QwenImage | 基于 QwenImage 尺寸预设生成纯色图像，支持灵活的颜色输入格式 |
 | Image Resize Universal | 通用图像尺寸调整，支持多种算法和约束 |
-| Image Resize Flux Kontext | 图像尺寸调整为FluxKontext尺寸，支持图像和遮罩的尺寸自动选择和手动选择 |
+| Image Resize FluxKontext | 图像尺寸调整为FluxKontext尺寸，支持图像和遮罩的尺寸自动选择和手动选择 |
+| Image Resize Qwen Image | 专为 Qwen 视觉模型优化的图像尺寸调整，提供 7 种预设分辨率和自动宽高比选择 |
 | Image Edit Stitch | 图像拼接与缝合，支持多种拼接模式 |
 | Image Add Label | 为图像添加文本标签 |
 | Image Plot | 图像绘制和可视化工具 |

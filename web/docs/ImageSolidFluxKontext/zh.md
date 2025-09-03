@@ -1,6 +1,6 @@
-# Image Solid Flux Kontext - 图像纯色 Flux Kontext
+# Image Solid FluxKontext - 图像纯色 FluxKontext
 
-**节点功能：** `Image Solid Flux Kontext` 节点基于 Flux Kontext 尺寸预设生成纯色图像，支持为 Flux 模型工作流优化的多种宽高比。
+**节点功能：** `Image Solid FluxKontext` 节点基于 Flux Kontext 尺寸预设生成纯色图像，支持为 Flux 模型工作流优化的多种宽高比。
 
 ## 输入
 

@@ -312,6 +312,230 @@ class ImageSolid:
         return (final_images, final_masks)
 
 
+class ImageResizeFluxKontext:
+    """
+    Flux预设图像缩放器 - 支持预设分辨率和自动最优选择
+    """
+    
+    # 将PRESET_RESOLUTIONS移到类内部
+    PRESET_RESOLUTIONS = [
+        ("672×1568 [1:2.33] (3:7)", 672, 1568),
+        ("688×1504 [1:2.19]", 688, 1504),
+        ("720×1456 [1:2.00] (1:2)", 720, 1456),
+        ("752×1392 [1:1.85]", 752, 1392),
+        ("800×1328 [1:1.66]", 800, 1328),
+        ("832×1248 [1:1.50] (2:3)", 832, 1248),
+        ("880×1184 [1:1.35]", 880, 1184),
+        ("944×1104 [1:1.17]", 944, 1104),
+        ("1024×1024 [1:1.00] (1:1)", 1024, 1024),
+        ("1104×944 [1.17:1]", 1104, 944),
+        ("1184×880 [1.35:1]", 1184, 880),
+        ("1248×832 [1.50:1] (3:2)", 1248, 832),
+        ("1328×800 [1.66:1]", 1328, 800),
+        ("1392×752 [1.85:1]", 1392, 752),
+        ("1456×720 [2.00:1] (2:1)", 1456, 720),
+        ("1504×688 [2.19:1]", 1504, 688),
+        ("1568×672 [2.33:1] (7:3)", 1568, 672),
+    ]
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        preset_options = ["auto"] + [preset[0] for preset in cls.PRESET_RESOLUTIONS]
+        return {
+            "required": {
+                "preset_size": (preset_options, {"default": "auto"}),
+            },
+            "optional": {
+                "image": ("IMAGE",),
+                "mask": ("MASK",),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "MASK")
+    RETURN_NAMES = ("image", "mask")
+    FUNCTION = "image_resize_flux_kontext"
+    CATEGORY = "1hewNodes/image"
+
+    def image_resize_flux_kontext(self, preset_size, image=None, mask=None):
+        # 确定目标尺寸
+        if preset_size == "auto":
+            if image is not None:
+                # 根据输入图像的宽高比选择最合适的尺寸（类似FluxKontextImageScale的逻辑）
+                input_width = image.shape[2]
+                input_height = image.shape[1]
+                aspect_ratio = input_width / input_height
+                
+                # 找到最接近的宽高比
+                _, width, height = min((abs(aspect_ratio - w / h), w, h) for _, w, h in self.PRESET_RESOLUTIONS)
+            elif mask is not None:
+                # 根据输入mask的宽高比选择最合适的尺寸
+                input_width = mask.shape[2]
+                input_height = mask.shape[1]
+                aspect_ratio = input_width / input_height
+                
+                # 找到最接近的宽高比
+                _, width, height = min((abs(aspect_ratio - w / h), w, h) for _, w, h in self.PRESET_RESOLUTIONS)
+            else:
+                # 如果没有输入图像和mask，使用默认尺寸
+                width, height = 1024, 1024
+        else:
+            # 查找对应的预设尺寸
+            for preset in self.PRESET_RESOLUTIONS:
+                if preset[0] == preset_size:
+                    width, height = preset[1], preset[2]
+                    break
+            else:
+                # 如果没找到，使用默认尺寸
+                width, height = 1024, 1024
+        
+        # 处理图像
+        if image is not None:
+            # 缩放图像到目标尺寸
+            scaled_image = comfy.utils.common_upscale(image.movedim(-1, 1), width, height, "lanczos", "center").movedim(1, -1)
+        else:
+            # 创建纯色图像（黑色）
+            scaled_image = torch.zeros((1, height, width, 3), dtype=torch.float32)
+        
+        # 处理遮罩
+        if mask is not None:
+            # 确保mask是正确的格式
+            if len(mask.shape) == 3:
+                # mask形状为 (batch, height, width)
+                batch_size, mask_height, mask_width = mask.shape
+            elif len(mask.shape) == 4:
+                # mask形状为 (batch, channel, height, width)
+                batch_size, channels, mask_height, mask_width = mask.shape
+                if channels == 1:
+                    mask = mask.squeeze(1)  # 移除通道维度
+                else:
+                    mask = mask[:, 0, :, :]  # 取第一个通道
+            
+            # 使用torch.nn.functional.interpolate来缩放mask
+            import torch.nn.functional as F
+            
+            # 添加batch和channel维度进行插值
+            mask_for_resize = mask.unsqueeze(1)  # 添加channel维度
+            scaled_mask = F.interpolate(
+                mask_for_resize, 
+                size=(height, width), 
+                mode='bilinear', 
+                align_corners=False
+            )
+            scaled_mask = scaled_mask.squeeze(1)  # 移除channel维度
+        else:
+            # 创建全白遮罩
+            scaled_mask = torch.ones((1, height, width), dtype=torch.float32)
+        
+        return (scaled_image, scaled_mask)
+
+
+class ImageResizeQwenImage:
+    """
+    Qwen图像预设缩放器 - 支持Qwen视觉模型优化的预设分辨率和自动最优选择
+    """
+    
+    # Qwen图像预设分辨率
+    PRESET_RESOLUTIONS = [
+        ("928×1664 [1:1.79]", 928, 1664),
+        ("1056×1584 [1:1.50] (2:3)", 1056, 1584),
+        ("1140×1472 [1:1.29]", 1140, 1472),
+        ("1328×1328 [1:1.00] (1:1)", 1328, 1328),
+        ("1472×1140 [1.29:1]", 1472, 1140),
+        ("1584×1056 [1.50:1] (3:2)", 1584, 1056),
+        ("1664×928 [1.79:1]", 1664, 928),
+    ]
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        preset_options = ["auto"] + [preset[0] for preset in cls.PRESET_RESOLUTIONS]
+        return {
+            "required": {
+                "preset_size": (preset_options, {"default": "auto"}),
+            },
+            "optional": {
+                "image": ("IMAGE",),
+                "mask": ("MASK",),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "MASK")
+    RETURN_NAMES = ("image", "mask")
+    FUNCTION = "image_resize_qwen_image"
+    CATEGORY = "1hewNodes/image"
+
+    def image_resize_qwen_image(self, preset_size, image=None, mask=None):
+        # 确定目标尺寸
+        if preset_size == "auto":
+            if image is not None:
+                # 根据输入图像的宽高比选择最合适的尺寸
+                input_width = image.shape[2]
+                input_height = image.shape[1]
+                aspect_ratio = input_width / input_height
+                
+                # 找到最接近的宽高比
+                _, width, height = min((abs(aspect_ratio - w / h), w, h) for _, w, h in self.PRESET_RESOLUTIONS)
+            elif mask is not None:
+                # 根据输入mask的宽高比选择最合适的尺寸
+                input_width = mask.shape[2]
+                input_height = mask.shape[1]
+                aspect_ratio = input_width / input_height
+                
+                # 找到最接近的宽高比
+                _, width, height = min((abs(aspect_ratio - w / h), w, h) for _, w, h in self.PRESET_RESOLUTIONS)
+            else:
+                # 如果没有输入图像和mask，使用默认尺寸
+                width, height = 1328, 1328
+        else:
+            # 查找对应的预设尺寸
+            for preset in self.PRESET_RESOLUTIONS:
+                if preset[0] == preset_size:
+                    width, height = preset[1], preset[2]
+                    break
+            else:
+                # 如果没找到，使用默认尺寸
+                width, height = 1328, 1328
+        
+        # 处理图像
+        if image is not None:
+            # 缩放图像到目标尺寸
+            scaled_image = comfy.utils.common_upscale(image.movedim(-1, 1), width, height, "lanczos", "center").movedim(1, -1)
+        else:
+            # 创建纯色图像（黑色）
+            scaled_image = torch.zeros((1, height, width, 3), dtype=torch.float32)
+        
+        # 处理遮罩
+        if mask is not None:
+            # 确保mask是正确的格式
+            if len(mask.shape) == 3:
+                # mask形状为 (batch, height, width)
+                batch_size, mask_height, mask_width = mask.shape
+            elif len(mask.shape) == 4:
+                # mask形状为 (batch, channel, height, width)
+                batch_size, channels, mask_height, mask_width = mask.shape
+                if channels == 1:
+                    mask = mask.squeeze(1)  # 移除通道维度
+                else:
+                    mask = mask[:, 0, :, :]  # 取第一个通道
+            
+            # 使用torch.nn.functional.interpolate来缩放mask
+            import torch.nn.functional as F
+            
+            # 添加batch和channel维度进行插值
+            mask_for_resize = mask.unsqueeze(1)  # 添加channel维度
+            scaled_mask = F.interpolate(
+                mask_for_resize, 
+                size=(height, width), 
+                mode='bilinear', 
+                align_corners=False
+            )
+            scaled_mask = scaled_mask.squeeze(1)  # 移除channel维度
+        else:
+            # 创建全白遮罩
+            scaled_mask = torch.ones((1, height, width), dtype=torch.float32)
+        
+        return (scaled_image, scaled_mask)
+
+
 class ImageResizeUniversal:
     """
     图像通用缩放器 - 支持多种纵横比和缩放模式，可以按照不同方式调整图像大小
@@ -717,123 +941,6 @@ class ImageResizeUniversal:
     def log(message, message_type='info'):
         """输出日志信息"""
         print(f"[{message_type.upper()}] {message}")
-
-
-class ImageResizeFluxKontext:
-    """
-    Flux预设图像缩放器 - 支持预设分辨率和自动最优选择
-    """
-    
-    # 将PRESET_RESOLUTIONS移到类内部
-    PRESET_RESOLUTIONS = [
-        ("672×1568 [1:2.33] (3:7)", 672, 1568),
-        ("688×1504 [1:2.19]", 688, 1504),
-        ("720×1456 [1:2.00] (1:2)", 720, 1456),
-        ("752×1392 [1:1.85]", 752, 1392),
-        ("800×1328 [1:1.66]", 800, 1328),
-        ("832×1248 [1:1.50] (2:3)", 832, 1248),
-        ("880×1184 [1:1.35]", 880, 1184),
-        ("944×1104 [1:1.17]", 944, 1104),
-        ("1024×1024 [1:1.00] (1:1)", 1024, 1024),
-        ("1104×944 [1.17:1]", 1104, 944),
-        ("1184×880 [1.35:1]", 1184, 880),
-        ("1248×832 [1.50:1] (3:2)", 1248, 832),
-        ("1328×800 [1.66:1]", 1328, 800),
-        ("1392×752 [1.85:1]", 1392, 752),
-        ("1456×720 [2.00:1] (2:1)", 1456, 720),
-        ("1504×688 [2.19:1]", 1504, 688),
-        ("1568×672 [2.33:1] (7:3)", 1568, 672),
-    ]
-    
-    @classmethod
-    def INPUT_TYPES(cls):
-        preset_options = ["auto"] + [preset[0] for preset in cls.PRESET_RESOLUTIONS]
-        return {
-            "required": {
-                "preset_size": (preset_options, {"default": "auto"}),
-            },
-            "optional": {
-                "image": ("IMAGE",),
-                "mask": ("MASK",),
-            }
-        }
-
-    RETURN_TYPES = ("IMAGE", "MASK")
-    RETURN_NAMES = ("image", "mask")
-    FUNCTION = "image_resize_flux_kontext"
-    CATEGORY = "1hewNodes/image"
-
-    def image_resize_flux_kontext(self, preset_size, image=None, mask=None):
-        # 确定目标尺寸
-        if preset_size == "auto":
-            if image is not None:
-                # 根据输入图像的宽高比选择最合适的尺寸（类似FluxKontextImageScale的逻辑）
-                input_width = image.shape[2]
-                input_height = image.shape[1]
-                aspect_ratio = input_width / input_height
-                
-                # 找到最接近的宽高比
-                _, width, height = min((abs(aspect_ratio - w / h), w, h) for _, w, h in self.PRESET_RESOLUTIONS)
-            elif mask is not None:
-                # 根据输入mask的宽高比选择最合适的尺寸
-                input_width = mask.shape[2]
-                input_height = mask.shape[1]
-                aspect_ratio = input_width / input_height
-                
-                # 找到最接近的宽高比
-                _, width, height = min((abs(aspect_ratio - w / h), w, h) for _, w, h in self.PRESET_RESOLUTIONS)
-            else:
-                # 如果没有输入图像和mask，使用默认尺寸
-                width, height = 1024, 1024
-        else:
-            # 查找对应的预设尺寸
-            for preset in self.PRESET_RESOLUTIONS:
-                if preset[0] == preset_size:
-                    width, height = preset[1], preset[2]
-                    break
-            else:
-                # 如果没找到，使用默认尺寸
-                width, height = 1024, 1024
-        
-        # 处理图像
-        if image is not None:
-            # 缩放图像到目标尺寸
-            scaled_image = comfy.utils.common_upscale(image.movedim(-1, 1), width, height, "lanczos", "center").movedim(1, -1)
-        else:
-            # 创建纯色图像（黑色）
-            scaled_image = torch.zeros((1, height, width, 3), dtype=torch.float32)
-        
-        # 处理遮罩
-        if mask is not None:
-            # 确保mask是正确的格式
-            if len(mask.shape) == 3:
-                # mask形状为 (batch, height, width)
-                batch_size, mask_height, mask_width = mask.shape
-            elif len(mask.shape) == 4:
-                # mask形状为 (batch, channel, height, width)
-                batch_size, channels, mask_height, mask_width = mask.shape
-                if channels == 1:
-                    mask = mask.squeeze(1)  # 移除通道维度
-                else:
-                    mask = mask[:, 0, :, :]  # 取第一个通道
-            
-            # 使用torch.nn.functional.interpolate来缩放mask
-            import torch.nn.functional as F
-            
-            # 添加batch和channel维度进行插值
-            mask_for_resize = mask.unsqueeze(1)  # 添加channel维度
-            scaled_mask = F.interpolate(
-                mask_for_resize, 
-                size=(height, width), 
-                mode='bilinear', 
-                align_corners=False
-            )
-            scaled_mask = scaled_mask.squeeze(1)  # 移除channel维度
-        else:
-            # 创建全白遮罩
-            scaled_mask = torch.ones((1, height, width), dtype=torch.float32)
-        
-        return (scaled_image, scaled_mask)
 
 
 class ImageRotateWithMask:
@@ -2770,8 +2877,9 @@ NODE_CLASS_MAPPINGS = {
     "ImageSolidFluxKontext": ImageSolidFluxKontext,
     "ImageSolidQwenImage": ImageSolidQwenImage,
     "ImageSolid": ImageSolid,
-    "ImageResizeUniversal": ImageResizeUniversal,
     "ImageResizeFluxKontext": ImageResizeFluxKontext,
+    "ImageResizeQwenImage": ImageResizeQwenImage,
+    "ImageResizeUniversal": ImageResizeUniversal,
     "ImageRotateWithMask": ImageRotateWithMask,
     "ImageEditStitch": ImageEditStitch,
     "ImageAddLabel": ImageAddLabel,
@@ -2781,11 +2889,12 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ImageSolidFluxKontext": "Image Solid Flux Kontext",
-    "ImageSolidQwenImage": "Image Solid Qwen Image",
+    "ImageSolidFluxKontext": "Image Solid FluxKontext",
+    "ImageSolidQwenImage": "Image Solid QwenImage",
     "ImageSolid": "Image Solid",
+    "ImageResizeFluxKontext": "Image Resize FluxKontext",
+    "ImageResizeQwenImage": "Image Resize QwenImage",
     "ImageResizeUniversal": "Image Resize Universal",
-    "ImageResizeFluxKontext": "Image Resize Flux Kontext",
     "ImageRotateWithMask": "Image Rotate with Mask",
     "ImageEditStitch": "Image Edit Stitch",
     "ImageAddLabel": "Image Add Label",

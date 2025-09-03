@@ -1,6 +1,6 @@
-# Image Solid Qwen Image
+# Image Solid QwenImage
 
-**Node Function:** The `Image Solid Qwen Image` node generates solid color images based on QwenImage dimension presets, supporting multiple aspect ratios optimized for Qwen vision model workflows.
+**Node Function:** The `Image Solid QwenImage` node generates solid color images based on QwenImage dimension presets, supporting multiple aspect ratios optimized for Qwen vision model workflows.
 
 ## Inputs
 

@@ -1,6 +1,6 @@
-# Image Solid Qwen Image - 图像纯色 Qwen Image
+# Image Solid QwenImage - 图像纯色 QwenImage
 
-**节点功能：** `Image Solid Qwen Image` 节点基于 QwenImage 尺寸预设生成纯色图像，支持为 Qwen 视觉模型工作流优化的多种宽高比。
+**节点功能：** `Image Solid QwenImage` 节点基于 QwenImage 尺寸预设生成纯色图像，支持为 Qwen 视觉模型工作流优化的多种宽高比。
 
 ## 输入
 

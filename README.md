@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.35**
+- feat(image): Added `Image Resize Qwen Image` node for Qwen vision model optimized image resizing with 7 preset resolutions and automatic aspect ratio selection
+
 **v1.2.32**
 - feat(image): Added `Image Solid Flux Kontext` node for generating solid color images with Flux Kontext dimension presets
 - feat(image): Added `Image Solid Qwen Image` node for generating solid color images with QwenImage dimension presets
@@ -164,10 +167,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|--------------|
 | Image Solid | Generate solid color images with multiple size and color format support |
-| Image Solid Flux Kontext | Generate solid color images with Flux Kontext dimension presets and flexible color input formats |
-| Image Solid Qwen Image | Generate solid color images with QwenImage dimension presets and flexible color input formats |
+| Image Solid FluxKontext | Generate solid color images with Flux Kontext dimension presets and flexible color input formats |
+| Image Solid QwenImage | Generate solid color images with QwenImage dimension presets and flexible color input formats |
+| Image Resize FluxKontext | Resize images to FluxKontext dimensions with support for automatic and manual size selection for images and masks |
+| Image Resize Qwen Image | Resize images to Qwen vision model optimized dimensions with 7 preset resolutions and automatic aspect ratio selection |
 | Image Resize Universal | Universal image resizing with multiple algorithms and constraints |
-| Image Resize Flux Kontext | Resize images to FluxKontext dimensions with support for automatic and manual size selection for images and masks |
 | Image Edit Stitch | Image stitching and merging with multiple stitching modes |
 | Image Add Label | Add text labels to images |
 | Image Plot | Image plotting and visualization tools |
