@@ -2,7 +2,164 @@ import json
 import ast
 import re
 import torch
-from typing import List, Dict, Any, Union
+import io
+import asyncio
+import aiohttp
+import requests
+import logging
+from typing import List, Dict, Any, Union, Optional
+
+# 尝试导入ComfyUI VIDEO类型
+try:
+    from comfy_api.input_impl import VideoFromFile
+    from comfy_api.latest import io as comfy_io
+    COMFYUI_VIDEO_AVAILABLE = True
+except ImportError:
+    try:
+        from comfy_api.input_impl.video_types import VideoFromFile
+        COMFYUI_VIDEO_AVAILABLE = True
+    except ImportError:
+        COMFYUI_VIDEO_AVAILABLE = False
+        logging.warning("ComfyUI VIDEO types not available, using fallback implementation")
+
+
+class URLToVideo:
+    """
+    将视频URL转换为ComfyUI VIDEO对象
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "video_url": ("STRING", {
+                    "default": "",
+                    "multiline": False,
+                    "tooltip": "视频文件的URL地址"
+                }),
+            },
+            "optional": {
+                "timeout": ("INT", {
+                    "default": 30,
+                    "min": 5,
+                    "max": 300,
+                    "step": 1,
+                    "tooltip": "下载超时时间（秒）"
+                }),
+                "use_async": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "是否使用异步下载（推荐用于大文件）"
+                }),
+            }
+        }
+    
+    RETURN_TYPES = ("VIDEO",) if COMFYUI_VIDEO_AVAILABLE else ("STRING",)
+    RETURN_NAMES = ("video",) if COMFYUI_VIDEO_AVAILABLE else ("error_message",)
+    FUNCTION = "convert_url_to_video"
+    CATEGORY = "1hewNodes/conversion"
+    
+    def download_video_from_url_sync(self, video_url: str, timeout: int = 30) -> Optional[io.BytesIO]:
+        """同步下载视频文件"""
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            
+            response = requests.get(video_url, headers=headers, timeout=timeout, stream=True)
+            response.raise_for_status()
+            
+            video_data = io.BytesIO()
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    video_data.write(chunk)
+            
+            video_data.seek(0)
+            return video_data
+            
+        except Exception as e:
+            logging.error(f"同步下载视频失败: {str(e)}")
+            return None
+    
+    async def download_video_from_url_async(self, video_url: str, timeout: int = 30) -> Optional[io.BytesIO]:
+        """异步下载视频文件"""
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            
+            timeout_config = aiohttp.ClientTimeout(total=timeout)
+            async with aiohttp.ClientSession(timeout=timeout_config) as session:
+                async with session.get(video_url, headers=headers) as response:
+                    response.raise_for_status()
+                    
+                    video_data = io.BytesIO()
+                    async for chunk in response.content.iter_chunked(8192):
+                        video_data.write(chunk)
+                    
+                    video_data.seek(0)
+                    return video_data
+                    
+        except Exception as e:
+            logging.error(f"异步下载视频失败: {str(e)}")
+            return None
+    
+    def convert_url_to_video(self, video_url: str, timeout: int = 30, use_async: bool = False):
+        """将视频URL转换为ComfyUI VIDEO对象"""
+        if not video_url or not video_url.strip():
+            error_msg = "视频URL不能为空"
+            if COMFYUI_VIDEO_AVAILABLE:
+                raise ValueError(error_msg)
+            else:
+                return (error_msg,)
+        
+        # 验证URL格式
+        if not video_url.startswith(('http://', 'https://')):
+            error_msg = "无效的URL格式，必须以http://或https://开头"
+            if COMFYUI_VIDEO_AVAILABLE:
+                raise ValueError(error_msg)
+            else:
+                return (error_msg,)
+        
+        try:
+            # 下载视频数据
+            if use_async:
+                # 在同步环境中运行异步函数
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    video_data = loop.run_until_complete(
+                        self.download_video_from_url_async(video_url, timeout)
+                    )
+                finally:
+                    loop.close()
+            else:
+                video_data = self.download_video_from_url_sync(video_url, timeout)
+            
+            if video_data is None:
+                error_msg = "视频下载失败"
+                if COMFYUI_VIDEO_AVAILABLE:
+                    raise RuntimeError(error_msg)
+                else:
+                    return (error_msg,)
+            
+            # 如果ComfyUI VIDEO类型不可用，返回成功消息
+            if not COMFYUI_VIDEO_AVAILABLE:
+                return ("视频下载成功，但ComfyUI VIDEO类型不可用",)
+            
+            # 创建ComfyUI VIDEO对象
+            try:
+                video_object = VideoFromFile(video_data)
+                return (video_object,)
+            except Exception as e:
+                raise RuntimeError(f"创建VIDEO对象失败: {str(e)}")
+                
+        except Exception as e:
+            error_msg = f"URL转换视频失败: {str(e)}"
+            logging.error(error_msg)
+            if COMFYUI_VIDEO_AVAILABLE:
+                raise RuntimeError(error_msg)
+            else:
+                return (error_msg,)
 
 
 class ImageBatchToList:
@@ -357,6 +514,7 @@ class StringCoordinateToBBoxMask:
 
 # 节点映射
 NODE_CLASS_MAPPINGS = {
+    "URLToVideo": URLToVideo,
     "ImageBatchToList": ImageBatchToList,
     "ImageListToBatch": ImageListToBatch,
     "MaskBatchToList": MaskBatchToList,
@@ -366,6 +524,7 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    "URLToVideo": "URL to Video",
     "ImageBatchToList": "Image Batch to List",
     "ImageListToBatch": "Image List to Batch",
     "MaskBatchToList": "Mask Batch to List",
