@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.36**
+- feat(conversion): Enhanced `URL to Video` node
+
 **v1.2.35**
 - feat(image): Added `Image Resize Qwen Image` node for Qwen vision model optimized image resizing with 7 preset resolutions and automatic aspect ratio selection
 
@@ -233,8 +236,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image List to Batch | Convert image lists to batch images with automatic size normalization |
 | Mask Batch to List | Convert batch masks to mask lists for individual processing |
 | Mask List to Batch | Convert mask lists to batch masks with automatic size normalization |
-| String Coordinate to BBoxes | Convert string format coordinates to BBOXES format with multiple input format support |
+| String Coordinate to BBoxes | Convert string format coordinates to BBOXES format with enhanced format support and improved SAM2 compatibility |
 | String Coordinate to BBox Mask | Convert string format coordinates to BBoxMask format with image dimension support and flexible output modes |
+| URL to Video | Convert video URLs to ComfyUI VIDEO objects with improved error handling, timeout control, and support for both synchronous and asynchronous download methods |
 
 ### 🧠 Logic Nodes
 | Node Name | Description |

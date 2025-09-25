@@ -21,6 +21,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.36**
+- feat(conversion): 增强 `URL to Video` 节点
 **v1.2.35**
 - feat(image): 添加 `Image Resize Qwen Image` 节点，专为 Qwen 视觉模型优化的图像缩放器，提供 7 种预设分辨率和自动宽高比选择
 
@@ -233,8 +235,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image List to Batch | 将图像列表转换为批量图像，自动进行尺寸标准化 |
 | Mask Batch to List | 将批量遮罩转换为遮罩列表，用于单独处理 |
 | Mask List to Batch | 将遮罩列表转换为批量遮罩，自动进行尺寸标准化 |
-| String Coordinate to BBoxes | 将字符串格式坐标转换为BBOXES格式，支持多种输入格式 |
+| String Coordinate to BBoxes | 将字符串格式坐标转换为BBOXES格式，增强格式支持并改进SAM2兼容性 |
 | String Coordinate to BBox Mask | 将字符串格式坐标转换为BBoxMask格式，支持图像尺寸获取和灵活的输出模式 |
+| URL to Video | 将视频URL转换为ComfyUI VIDEO对象，改进错误处理、超时控制，支持同步和异步下载方法 |
 
 ### 🧠 逻辑节点
 | 节点名称 | 功能描述 |

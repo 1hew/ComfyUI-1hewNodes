@@ -1,15 +1,15 @@
 # String Coordinate to BBoxes - 字符串坐标转边界框
 
-**节点功能：** `String Coordinate to BBoxes`节点将字符串格式的坐标列表转换为BBOXES格式，支持多种输入格式如"x1,y1,x2,y2"或"[x1,y1,x2,y2]"或多行坐标，常用于坐标数据转换和SAM2兼容性处理。
+**节点功能：** `String Coordinate to BBoxes`节点将字符串格式的坐标列表转换为BBOXES格式，支持多种输入格式包括"[x1,y1,x2,y2]"或多行坐标，用于SAM2兼容性。
 
 ## 输入
 
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
-| `coordinates_string` | 必选 | STRING | "" | 多行文本 | 坐标字符串输入，支持"[x1,y1,x2,y2]"或多行坐标格式 |
+| `coordinates_string` | 必选 | STRING | "" | 多行文本 | 字符串格式坐标，支持"[x1,y1,x2,y2]"或多行坐标 |
 
 ## 输出
 
 | 输出名称 | 数据类型 | 描述 |
 |---------|----------|------|
-| `bboxes` | BBOXES | 转换后的SAM2兼容格式边界框 |
+| `bboxes` | BBOXES | SAM2兼容的边界框格式 |
