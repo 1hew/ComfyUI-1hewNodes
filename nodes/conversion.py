@@ -3,8 +3,6 @@ import ast
 import re
 import torch
 import io
-import asyncio
-import aiohttp
 import requests
 import logging
 from typing import List, Dict, Any, Union, Optional
@@ -32,24 +30,10 @@ class URLToVideo:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "video_url": ("STRING", {
-                    "default": "",
-                    "multiline": False,
-                    "tooltip": "视频文件的URL地址"
-                }),
+                "video_url": ("STRING", {"default": "", "multiline": False, "tooltip": "视频文件的URL地址"}),
             },
             "optional": {
-                "timeout": ("INT", {
-                    "default": 30,
-                    "min": 5,
-                    "max": 300,
-                    "step": 1,
-                    "tooltip": "下载超时时间（秒）"
-                }),
-                "use_async": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": "是否使用异步下载（推荐用于大文件）"
-                }),
+                "timeout": ("INT", {"default": 30, "min": 5, "max": 300, "step": 1, "tooltip": "下载超时时间（秒）"}),
             }
         }
     
@@ -58,8 +42,8 @@ class URLToVideo:
     FUNCTION = "convert_url_to_video"
     CATEGORY = "1hewNodes/conversion"
     
-    def download_video_from_url_sync(self, video_url: str, timeout: int = 30) -> Optional[io.BytesIO]:
-        """同步下载视频文件"""
+    def download_video_from_url(self, video_url: str, timeout: int = 30) -> Optional[io.BytesIO]:
+        """下载视频文件"""
         try:
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -77,33 +61,10 @@ class URLToVideo:
             return video_data
             
         except Exception as e:
-            logging.error(f"同步下载视频失败: {str(e)}")
+            logging.error(f"下载视频失败: {str(e)}")
             return None
     
-    async def download_video_from_url_async(self, video_url: str, timeout: int = 30) -> Optional[io.BytesIO]:
-        """异步下载视频文件"""
-        try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-            
-            timeout_config = aiohttp.ClientTimeout(total=timeout)
-            async with aiohttp.ClientSession(timeout=timeout_config) as session:
-                async with session.get(video_url, headers=headers) as response:
-                    response.raise_for_status()
-                    
-                    video_data = io.BytesIO()
-                    async for chunk in response.content.iter_chunked(8192):
-                        video_data.write(chunk)
-                    
-                    video_data.seek(0)
-                    return video_data
-                    
-        except Exception as e:
-            logging.error(f"异步下载视频失败: {str(e)}")
-            return None
-    
-    def convert_url_to_video(self, video_url: str, timeout: int = 30, use_async: bool = False):
+    def convert_url_to_video(self, video_url: str, timeout: int = 30):
         """将视频URL转换为ComfyUI VIDEO对象"""
         if not video_url or not video_url.strip():
             error_msg = "视频URL不能为空"
@@ -122,18 +83,7 @@ class URLToVideo:
         
         try:
             # 下载视频数据
-            if use_async:
-                # 在同步环境中运行异步函数
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    video_data = loop.run_until_complete(
-                        self.download_video_from_url_async(video_url, timeout)
-                    )
-                finally:
-                    loop.close()
-            else:
-                video_data = self.download_video_from_url_sync(video_url, timeout)
+            video_data = self.download_video_from_url(video_url, timeout)
             
             if video_data is None:
                 error_msg = "视频下载失败"

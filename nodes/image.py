@@ -223,7 +223,7 @@ class ImageSolid:
             },
             "optional": {
                 "reference_image": ("IMAGE", ),
-                "color": ("COLOR", {"default": "#FFFFFF"}),
+                "color": ("STRING", {"default": "1.0"}),
                 "alpha": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "invert": ("BOOLEAN", {"default": False}),
                 "mask_opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
@@ -236,7 +236,57 @@ class ImageSolid:
     FUNCTION = "image_solid"
     CATEGORY = "1hewNodes/image"
 
-    def image_solid(self, preset_size, width, height, divisible_by, color="#FFFFFF", alpha=1.0, invert=False, mask_opacity=1.0, reference_image=None):
+    def parse_color(self, color_str):
+        """解析不同格式的颜色输入，支持多种颜色格式"""
+        if not color_str:
+            return (0, 0, 0)
+        
+        # 移除括号（如果存在）
+        color_str = color_str.strip()
+        if color_str.startswith('(') and color_str.endswith(')'):
+            color_str = color_str[1:-1].strip()
+        
+        # 支持单字母颜色缩写
+        color_shortcuts = {
+            'r': 'red', 'g': 'green', 'b': 'blue', 'c': 'cyan', 
+            'm': 'magenta', 'y': 'yellow', 'k': 'black', 'w': 'white'
+        }
+        
+        # 检查是否为单字母缩写
+        if len(color_str) == 1 and color_str.lower() in color_shortcuts:
+            color_str = color_shortcuts[color_str.lower()]
+        
+        # 尝试解析为灰度值 (0.0-1.0)
+        try:
+            gray = float(color_str)
+            if 0.0 <= gray <= 1.0:
+                return (int(gray * 255), int(gray * 255), int(gray * 255))
+        except ValueError:
+            pass
+        
+        # 尝试解析为 RGB 格式 (如 "0.5,0.7,0.9" 或 "128,192,255")
+        if ',' in color_str:
+            try:
+                # 分割并清理每个部分
+                parts = [part.strip() for part in color_str.split(',')]
+                if len(parts) >= 3:
+                    r, g, b = [float(parts[i]) for i in range(3)]
+                    # 判断是否为 0-1 范围
+                    if max(r, g, b) <= 1.0:
+                        return (int(r * 255), int(g * 255), int(b * 255))
+                    else:
+                        return (int(r), int(g), int(b))
+            except (ValueError, IndexError):
+                pass
+        
+        # 尝试解析为十六进制或颜色名称
+        try:
+            return ImageColor.getrgb(color_str)
+        except ValueError:
+            # 默认返回白色
+            return (255, 255, 255)
+
+    def image_solid(self, preset_size, width, height, divisible_by, color="1.0", alpha=1.0, invert=False, mask_opacity=1.0, reference_image=None):
         images = []
         masks = []
 
@@ -267,12 +317,11 @@ class ImageSolid:
             num_images = 1
             reference_image = [None] * num_images
 
-        # 解析颜色值
-        if color.startswith("#"):
-            color = color[1:]
-        r = int(color[0:2], 16) / 255.0
-        g = int(color[2:4], 16) / 255.0
-        b = int(color[4:6], 16) / 255.0
+        # 使用新的 parse_color 方法解析颜色
+        rgb_color = self.parse_color(color)
+        r = rgb_color[0] / 255.0
+        g = rgb_color[1] / 255.0
+        b = rgb_color[2] / 255.0
 
         # 如果需要反转颜色
         if invert:
@@ -2872,6 +2921,129 @@ class ImageBBoxOverlayByMask:
         return bboxes
 
 
+class ImageGridSplit:
+    """
+    图片宫格分割器 - 将图片按指定行列分割成多个子图片
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "rows": ("INT", {"default": 2, "min": 1, "max": 10, "step": 1}),
+                "columns": ("INT", {"default": 2, "min": 1, "max": 10, "step": 1}),
+                "output_index": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "image_grid_split"
+    CATEGORY = "1hewNodes/image"
+
+    def image_grid_split(self, image, rows, columns, output_index):
+        """
+        将图片按宫格分割
+        
+        Args:
+            image: 输入图片张量 (batch, height, width, channels)
+            rows: 分割行数
+            columns: 分割列数
+            output_index: 输出索引，0表示所有分割后的图片按批次输出，
+                         1表示第1张，2表示第2张，以此类推（横向优先）
+        
+        Returns:
+            分割后的图片张量
+        """
+        batch_size, height, width, channels = image.shape
+        
+        # 计算每个网格的尺寸
+        grid_height = height // rows
+        grid_width = width // columns
+        
+        # 总的网格数量
+        total_grids = rows * columns
+        
+        # 验证输出索引
+        if output_index > total_grids:
+            raise ValueError(f"输出索引 {output_index} 超出范围，最大值为 {total_grids}")
+        
+        # 存储所有分割后的图片
+        all_split_images = []
+        
+        for batch_idx in range(batch_size):
+            current_image = image[batch_idx]
+            
+            # 按行列分割图片
+            for row in range(rows):
+                for col in range(columns):
+                    # 计算当前网格的坐标
+                    start_y = row * grid_height
+                    end_y = start_y + grid_height
+                    start_x = col * grid_width
+                    end_x = start_x + grid_width
+                    
+                    # 裁剪当前网格
+                    grid_image = current_image[start_y:end_y, start_x:end_x, :]
+                    all_split_images.append(grid_image)
+        
+        # 根据输出索引返回结果
+        if output_index == 0:
+            # 返回所有分割后的图片作为批次
+            result = torch.stack(all_split_images, dim=0)
+        else:
+            # 返回指定索引的图片
+            selected_images = []
+            for batch_idx in range(batch_size):
+                # 计算在当前批次中的索引
+                grid_idx = (output_index - 1) % total_grids
+                actual_idx = batch_idx * total_grids + grid_idx
+                
+                if actual_idx < len(all_split_images):
+                    selected_images.append(all_split_images[actual_idx])
+                else:
+                    # 如果索引超出范围，使用第一个图片
+                    selected_images.append(all_split_images[0])
+            
+            result = torch.stack(selected_images, dim=0)
+        
+        return (result,)
+
+    @staticmethod
+    def tensor_to_pil(tensor):
+        """将张量转换为PIL图像"""
+        if tensor.dim() == 4:
+            tensor = tensor.squeeze(0)
+        
+        # 确保值在0-1范围内
+        tensor = torch.clamp(tensor, 0, 1)
+        
+        # 转换为numpy数组
+        np_image = (tensor.cpu().numpy() * 255).astype(np.uint8)
+        
+        return Image.fromarray(np_image)
+
+    @staticmethod
+    def pil_to_tensor(pil_image):
+        """将PIL图像转换为张量"""
+        np_image = np.array(pil_image).astype(np.float32) / 255.0
+        
+        # 确保是RGB格式
+        if len(np_image.shape) == 2:
+            np_image = np.stack([np_image] * 3, axis=-1)
+        elif np_image.shape[-1] == 4:
+            np_image = np_image[:, :, :3]
+        
+        tensor = torch.from_numpy(np_image)
+        
+        # 添加批次维度
+        if tensor.dim() == 3:
+            tensor = tensor.unsqueeze(0)
+        
+        return tensor
+
+
 
 NODE_CLASS_MAPPINGS = {
     "ImageSolidFluxKontext": ImageSolidFluxKontext,
@@ -2886,6 +3058,7 @@ NODE_CLASS_MAPPINGS = {
     "ImagePlot": ImagePlot,
     "ImageStrokeByMask": ImageStrokeByMask,
     "ImageBBoxOverlayByMask": ImageBBoxOverlayByMask,
+    "ImageGridSplit": ImageGridSplit,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -2901,4 +3074,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ImagePlot": "Image Plot",
     "ImageStrokeByMask": "Image Stroke by Mask",
     "ImageBBoxOverlayByMask": "Image BBox Overlay by Mask",
+    "ImageGridSplit": "Image Grid Split",
 }

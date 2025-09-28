@@ -21,8 +21,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.37**
+- feat(image): 增强 `Image Solid` 节点，新增高级颜色参数
+- feat(image): 添加 `ImageGridSplit` 节点，支持将图像分割为网格布局，提供灵活的输出选项
+
 **v1.2.36**
 - feat(conversion): 增强 `URL to Video` 节点
+
 **v1.2.35**
 - feat(image): 添加 `Image Resize Qwen Image` 节点，专为 Qwen 视觉模型优化的图像缩放器，提供 7 种预设分辨率和自动宽高比选择
 
@@ -168,7 +173,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🖼️ 图像处理节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Image Solid | 生成纯色图像，支持多种尺寸和颜色格式 |
+| Image Solid | 生成纯色图像，增强颜色参数支持多种输入格式（灰度值、RGB元组、十六进制颜色、颜色名称、单字母快捷方式）和多种尺寸预设 |
 | Image Solid FluxKontext | 基于 Flux Kontext 尺寸预设生成纯色图像，支持灵活的颜色输入格式 |
 | Image Solid QwenImage | 基于 QwenImage 尺寸预设生成纯色图像，支持灵活的颜色输入格式 |
 | Image Resize Universal | 通用图像尺寸调整，支持多种算法和约束 |
@@ -180,6 +185,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Stroke by Mask | 对遮罩区域应用描边效果，支持自定义宽度和颜色 |
 | Image BBox Overlay by Mask | 基于遮罩的图像边界框叠加，支持独立和合并模式 |
 | Image Rotate with Mask | 高级图像旋转，支持遮罩集成、多种填充模式和遮罩中心旋转选项 |
+| Image Grid Split | 将图像分割为网格布局，支持灵活的行列配置和选择性输出选项 |
 
 ### 🎨 图像混合节点
 | 节点名称 | 功能描述 |
