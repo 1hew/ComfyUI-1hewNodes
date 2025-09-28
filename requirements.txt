@@ -1,0 +1,15 @@
+# ComfyUI-1hewNodes Dependencies
+# Core dependencies for image processing and computer vision
+torch>=1.9.0
+numpy>=1.21.0
+Pillow>=8.3.0
+opencv-python>=4.5.0
+scikit-image>=0.18.0
+
+# Additional dependencies for specific features
+scipy>=1.7.0
+colorsys-python>=0.1.0
+requests>=2.25.0
+
+# Optional dependencies for enhanced functionality
+fractions  # Built-in Python module, included for clarity

@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.37**
+- feat(image): Enhanced `Image Solid` node with advanced color parameter
+- feat(image): Added the `ImageGridSplit` node for splitting images into grid layouts with flexible output options
+
 **v1.2.36**
 - feat(conversion): Enhanced `URL to Video` node
 
@@ -169,7 +173,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🖼️ Image Processing Nodes
 | Node Name | Description |
 |-----------|--------------|
-| Image Solid | Generate solid color images with multiple size and color format support |
+| Image Solid | Generate solid color images with enhanced color parameter supporting multiple input formats (grayscale, RGB tuples, hex colors, color names, single-letter shortcuts) and multiple size presets |
 | Image Solid FluxKontext | Generate solid color images with Flux Kontext dimension presets and flexible color input formats |
 | Image Solid QwenImage | Generate solid color images with QwenImage dimension presets and flexible color input formats |
 | Image Resize FluxKontext | Resize images to FluxKontext dimensions with support for automatic and manual size selection for images and masks |
@@ -181,6 +185,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Stroke by Mask | Apply stroke effects to mask regions with customizable width and color |
 | Image BBox Overlay by Mask | Mask-based image bounding box overlay with independent and merge modes |
 | Image Rotate with Mask | Advanced image rotation with mask support, multiple fill modes, and mask center rotation options |
+| Image Grid Split | Split images into grid layouts with flexible row/column configuration and selective output options |
 
 ### 🎨 Image Blending Nodes
 | Node Name | Description |
