@@ -587,16 +587,21 @@ class ImageResizeQwenImage:
 
 class ImageResizeUniversal:
     """
-    图像通用缩放器 - 支持多种纵横比和缩放模式，可以按照不同方式调整图像大小
+    图像通用缩放器 - 支持多种纵横比和缩放模式，完整的 mask 处理逻辑
+    
+    主要功能：
+    1. mask 输出端在没有输入时也能正常输出
+    2. pad 模式下原图区域为白色，填充区域为黑色
+    3. 其他模式下 mask 尺寸与图片一致
     """
     
     NODE_NAME = "ImageResizeUniversal"
     
     @classmethod
     def INPUT_TYPES(cls):
-        ratio_list = ['origin', 'custom', '1:1', '3:2', '4:3', '16:9', '21:9', '2:3', '3:4', '9:16', '9:21',]
+        ratio_list = ['origin', 'custom', '1:1', '3:2', '4:3', '16:9', '21:9', '2:3', '3:4', '9:16', '9:21']
         fit_mode = ['stretch', 'crop', 'pad']
-        method_mode = ['nearest', 'bilinear', 'lanczos', 'bicubic', 'hamming',  'box']
+        method_mode = ['nearest', 'bilinear', 'lanczos', 'bicubic', 'hamming', 'box']
         scale_to_list = ['None', 'longest', 'shortest', 'width', 'height', 'mega_pixels_k']
         return {
             "required": {
@@ -651,7 +656,7 @@ class ImageResizeUniversal:
                 mask = torch.unsqueeze(mask, 0)
             for m in mask:
                 m = torch.unsqueeze(m, 0)
-                if not self.is_valid_mask(m) and m.shape==torch.Size([1,64,64]):
+                if not self.is_valid_mask(m) and m.shape == torch.Size([1, 64, 64]):
                     self.log(f"警告: {self.NODE_NAME} 输入遮罩为空，已忽略。", message_type='warning')
                 else:
                     orig_masks.append(m)
@@ -735,10 +740,6 @@ class ImageResizeUniversal:
             target_width = self.num_round_up_to_multiple(target_width, divisible_by)
             target_height = self.num_round_up_to_multiple(target_height, divisible_by)
 
-        # 创建默认图像和遮罩
-        _mask = Image.new('L', size=(target_width, target_height), color='black')
-        _image = Image.new('RGB', size=(target_width, target_height), color='black')
-
         # 设置缩放采样方法
         resize_sampler = Image.LANCZOS
         if method == "bicubic":
@@ -759,18 +760,30 @@ class ImageResizeUniversal:
                 _image = self.fit_resize_image(_image, target_width, target_height, fit, resize_sampler, pad_color)
                 ret_images.append(self.pil2tensor(_image))
                 
-        # 处理遮罩缩放
+        # 处理遮罩缩放逻辑
         if len(orig_masks) > 0:
+            # 有输入 mask 的情况
             for m in orig_masks:
                 _mask = self.tensor2pil(m).convert('L')
-                _mask = self.fit_resize_image(_mask, target_width, target_height, fit, resize_sampler).convert('L')
+                _mask = self.fit_resize_mask(_mask, target_width, target_height, fit, resize_sampler, orig_width, orig_height)
+                ret_masks.append(self.image2mask(_mask))
+        else:
+            # 没有输入 mask 时，根据图像数量生成对应的 mask
+            if len(orig_images) > 0:
+                for _ in orig_images:
+                    _mask = self.generate_default_mask(target_width, target_height, fit, orig_width, orig_height)
+                    ret_masks.append(self.image2mask(_mask))
+            else:
+                # 只有尺寸信息，生成一个默认 mask
+                _mask = self.generate_default_mask(target_width, target_height, fit, orig_width, orig_height)
                 ret_masks.append(self.image2mask(_mask))
                 
-        # 返回结果
+        # 返回结果 - 确保总是返回 mask
         if len(ret_images) > 0 and len(ret_masks) > 0:
-            self.log(f"{self.NODE_NAME} 已处理 {len(ret_images)} 张图像。", message_type='finish')
+            self.log(f"{self.NODE_NAME} 已处理 {len(ret_images)} 张图像和 {len(ret_masks)} 张遮罩。", message_type='finish')
             return (torch.cat(ret_images, dim=0), torch.cat(ret_masks, dim=0))
         elif len(ret_images) > 0 and len(ret_masks) == 0:
+            # 这种情况通常不会发生，但保留兼容性
             self.log(f"{self.NODE_NAME} 已处理 {len(ret_images)} 张图像。", message_type='finish')
             return (torch.cat(ret_images, dim=0), None)
         elif len(ret_images) == 0 and len(ret_masks) > 0:
@@ -779,6 +792,76 @@ class ImageResizeUniversal:
         else:
             self.log(f"错误: {self.NODE_NAME} 跳过，因为没有找到可用的图像或遮罩。", message_type='error')
             return (None, None)
+
+    def generate_default_mask(self, target_width, target_height, fit_mode, orig_width, orig_height):
+        """
+        生成默认 mask
+        - pad 模式：原图区域为白色，填充区域为黑色
+        - 其他模式：全白 mask
+        """
+        if fit_mode == 'pad':
+            # 计算原图在目标尺寸中的位置和大小
+            orig_ratio = orig_width / orig_height
+            target_ratio = target_width / target_height
+            
+            # 创建黑色背景
+            mask = Image.new('L', (target_width, target_height), 0)
+            
+            if orig_ratio > target_ratio:
+                # 原图更宽，按宽度缩放
+                new_width = target_width
+                new_height = int(new_width / orig_ratio)
+                pad_top = (target_height - new_height) // 2
+                
+                # 在原图区域填充白色
+                white_region = Image.new('L', (new_width, new_height), 255)
+                mask.paste(white_region, (0, pad_top))
+            else:
+                # 原图更高，按高度缩放
+                new_height = target_height
+                new_width = int(new_height * orig_ratio)
+                pad_left = (target_width - new_width) // 2
+                
+                # 在原图区域填充白色
+                white_region = Image.new('L', (new_width, new_height), 255)
+                mask.paste(white_region, (pad_left, 0))
+                
+            return mask
+        else:
+            # stretch 和 crop 模式：返回全白 mask
+            return Image.new('L', (target_width, target_height), 255)
+
+    def fit_resize_mask(self, mask, target_width, target_height, fit_mode, resize_sampler, orig_width, orig_height):
+        """
+        根据不同适应模式调整 mask 大小
+        """
+        if fit_mode == 'pad':
+            # pad 模式下的特殊处理
+            orig_ratio = orig_width / orig_height
+            target_ratio = target_width / target_height
+            
+            # 创建黑色背景
+            result_mask = Image.new('L', (target_width, target_height), 0)
+            
+            if orig_ratio > target_ratio:
+                # 原图更宽，按宽度缩放
+                new_width = target_width
+                new_height = int(new_width / orig_ratio)
+                resized_mask = mask.resize((new_width, new_height), resize_sampler)
+                pad_top = (target_height - new_height) // 2
+                result_mask.paste(resized_mask, (0, pad_top))
+            else:
+                # 原图更高，按高度缩放
+                new_height = target_height
+                new_width = int(new_height * orig_ratio)
+                resized_mask = mask.resize((new_width, new_height), resize_sampler)
+                pad_left = (target_width - new_width) // 2
+                result_mask.paste(resized_mask, (pad_left, 0))
+                
+            return result_mask
+        else:
+            # stretch 和 crop 模式：直接使用原有逻辑
+            return self.fit_resize_image(mask, target_width, target_height, fit_mode, resize_sampler).convert('L')
 
     def parse_color(self, color_str):
         """解析不同格式的颜色输入"""
@@ -793,6 +876,34 @@ class ImageResizeUniversal:
         color_str = color_str.strip()
         if color_str.startswith('(') and color_str.endswith(')'):
             color_str = color_str[1:-1].strip()
+        
+        # 单字母颜色缩写映射
+        single_letter_colors = {
+            'r': 'red',
+            'g': 'green', 
+            'b': 'blue',
+            'c': 'cyan',
+            'm': 'magenta',
+            'y': 'yellow',
+            'k': 'black',
+            'w': 'white',
+            'o': 'orange',
+            'p': 'purple',
+            'n': 'brown',
+            's': 'silver',
+            'l': 'lime',
+            'i': 'indigo',
+            'v': 'violet',
+            't': 'turquoise',
+            'a': 'aqua',
+            'f': 'fuchsia',
+            'h': 'hotpink',
+            'd': 'darkblue'
+        }
+        
+        # 检查是否为单字母颜色缩写
+        if len(color_str) == 1 and color_str.lower() in single_letter_colors:
+            color_str = single_letter_colors[color_str.lower()]
         
         # 尝试解析为灰度值
         try:
