@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.38**
+- refactor(image): Enhanced `ImageResizeUniversal` node with comprehensive mask processing logic
+
 **v1.2.37**
 - feat(image): Enhanced `Image Solid` node with advanced color parameter
 - feat(image): Added the `ImageGridSplit` node for splitting images into grid layouts with flexible output options

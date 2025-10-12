@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.38**
+- refactor(image): 增强 `ImageResizeUniversal` 节点，完善 mask 处理逻辑
+
 **v1.2.37**
 - feat(image): 增强 `Image Solid` 节点，新增高级颜色参数
 - feat(image): 添加 `ImageGridSplit` 节点，支持将图像分割为网格布局，提供灵活的输出选项
