@@ -138,6 +138,7 @@ class ImageLumaMatte:
         - HEX: "#FF0000", "FF0000"
         - RGB: "255,0,0", "1.0,0.0,0.0", "(255,128,64)"
         - 颜色名称: "red", "blue", "white"
+        - 单字母缩写: "r", "g", "b", "c", "m", "y", "k", "w"
         - 特殊值: "edge", "average"
         """
         if not color_str:
@@ -158,6 +159,16 @@ class ImageLumaMatte:
         color_str = color_str.strip()
         if color_str.startswith('(') and color_str.endswith(')'):
             color_str = color_str[1:-1].strip()
+        
+        # 支持单字母颜色缩写
+        color_shortcuts = {
+            'r': 'red', 'g': 'green', 'b': 'blue', 'c': 'cyan', 
+            'm': 'magenta', 'y': 'yellow', 'k': 'black', 'w': 'white'
+        }
+        
+        # 检查是否为单字母缩写（排除已经处理的特殊值）
+        if len(color_str) == 1 and color_str.lower() in color_shortcuts and color_str.lower() not in ['e', 'a']:
+            color_str = color_shortcuts[color_str.lower()]
         
         # 尝试解析为灰度值 (0.0-1.0)
         try:

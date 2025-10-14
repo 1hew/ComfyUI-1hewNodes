@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.39**
+- feat(logic): Added `Image Batch Group` node for intelligent image batch splitting with overlap support and flexible padding strategies
+
 **v1.2.38**
 - refactor(image): Enhanced `ImageResizeUniversal` node with comprehensive mask processing logic
 
@@ -251,6 +254,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🧠 Logic Nodes
 | Node Name | Description |
 |-----------|-------------|
+| Image Batch Group | Intelligent image batch splitter with configurable batch sizes, overlap handling |
 | Image List Append | Image list appender for intelligently merging images into lists |
 
 ### 📝 Text Processing Nodes
