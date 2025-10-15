@@ -7,6 +7,33 @@ import sys
 import importlib.util
 from collections import OrderedDict
 
+class IntWan:
+    """
+    支持 4n+1 序列：1, 5, 9, 13, 17...
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "value": ("INT", {"default": 1, "min": 1, "max": 10000, "step": 4, "display": "number"}),
+            }
+        }
+    
+    RETURN_TYPES = ("INT",)
+    RETURN_NAMES = ("value",)
+    FUNCTION = "calculate_wan_value"
+    CATEGORY = "1hewNodes/text"
+    
+    def calculate_wan_value(self, value):
+        try:
+            return (value,)
+            
+        except Exception as e:
+            print(f"Int Wan计算错误: {str(e)}")
+            # 返回默认值
+            return (1,)
+
 
 class TextFilterComment:
     """
@@ -21,11 +48,7 @@ class TextFilterComment:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "text": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": "text"
-                }),
+                "text": ("STRING", {"multiline": True, "default": "", "placeholder": "text"}),
             }
         }
 
@@ -133,31 +156,11 @@ class TextJoinMulti:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "text1": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": "text_1"
-                }),
-                "text2": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": "text_2"
-                }),
-                "text3": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": "text_3"
-                }),
-                "text4": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": "text_4"
-                }),
-                "text5": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": "text_5"
-                }),
+                "text1": ("STRING", {"multiline": True, "default": "", "placeholder": "text_1"}),
+                "text2": ("STRING", {"multiline": True, "default": "", "placeholder": "text_2"}),
+                "text3": ("STRING", {"multiline": True, "default": "", "placeholder": "text_3"}),
+                "text4": ("STRING", {"multiline": True, "default": "", "placeholder": "text_4"}),
+                "text5": ("STRING", {"multiline": True, "default": "", "placeholder": "text_5"}),
                 "separator": ("STRING", {"default": "\\n"}),
             },
             "optional": {
@@ -411,21 +414,12 @@ class TextCustomExtract:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "json_data": ("STRING", {
-                    "multiline": True,
-                    "placeholder": "Enter json object or array data"
-                }),
-                "key": ("STRING", {
-                    "default": "zh",
-                    "placeholder": "Key name to extract"
-                }),
+                "json_data": ("STRING", {"multiline": True, "placeholder": "Enter json object or array data"}),
+                "key": ("STRING", {"default": "zh", "placeholder": "Key name to extract"}),
                 "precision_match": (["disabled", "enabled"], {"default": "disabled"})
             },
             "optional": {
-                "label_filter": ("STRING", {
-                    "default": "",
-                    "placeholder": "Filter by label values (comma separated, supports partial match)"
-                })
+                "label_filter": ("STRING", {"default": "", "placeholder": "Filter by label values (comma separated, supports partial match)"})
             }
         }
     
@@ -759,11 +753,7 @@ class ListCustomInt:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "custom_text": ("STRING", {
-                    "default": "",
-                    "multiline": True,
-                    "placeholder": '-- splits override separator\nelse use "," ";" or newline.'
-                })
+                "custom_text": ("STRING", {"default": "", "multiline": True, "placeholder": '-- splits override separator\nelse use "," ";" or newline.'})
             }
         }
     
@@ -889,11 +879,7 @@ class ListCustomFloat:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "custom_text": ("STRING", {
-                    "default": "",
-                    "multiline": True,
-                    "placeholder": '-- splits override separator\nelse use "," ";" or newline.'
-                })
+                "custom_text": ("STRING", {"default": "", "multiline": True, "placeholder": '-- splits override separator\nelse use "," ";" or newline.'})
             }
         }
     
@@ -1007,11 +993,7 @@ class ListCustomString:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "custom_text": ("STRING", {
-                    "default": "",
-                    "multiline": True,
-                    "placeholder": '-- splits override separator\nelse use "," ";" or newline.'
-                })
+                "custom_text": ("STRING", {"default": "", "multiline": True, "placeholder": '-- splits override separator\nelse use "," ";" or newline.'})
             }
         }
     
@@ -1191,6 +1173,7 @@ class ListCustomSeed:
 
 # 节点映射
 NODE_CLASS_MAPPINGS = {
+    "IntWan": IntWan,
     "TextFilterComment": TextFilterComment,
     "TextJoinMulti": TextJoinMulti,
     "TextJoinByTextList": TextJoinByTextList,
@@ -1203,6 +1186,7 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    "IntWan": "Int Wan",
     "TextFilterComment": "Text Filter Comment",
     "TextJoinMulti": "Text Join Multi",
     "TextJoinByTextList": "Text Join by Text List",

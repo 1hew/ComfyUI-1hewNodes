@@ -47,20 +47,8 @@ class StepSplit:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "steps": ("INT", {
-                    "default": 20,
-                    "min": 1,
-                    "max": 10000,
-                    "step": 1,
-                    "display": "number"
-                }),
-                "step_split": ("FLOAT", {
-                    "default": 0.5,
-                    "min": 0.0,
-                    "max": 10000.0,
-                    "step": 0.01,
-                    "display": "number"
-                })
+                "steps": ("INT", {"default": 20, "min": 1, "max": 10000, "step": 1, "display": "number"}),
+                "step_split": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 10000.0, "step": 0.01, "display": "number"})
             }
         }
     
@@ -116,34 +104,10 @@ class RangeMapping:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
-                    "value": ("FLOAT", {
-                        "default": 1.0, 
-                        "min": 0.0,
-                        "max": 1.0,
-                        "step": 0.001,
-                        "display": "slider"
-                    }),
-                    "min": ("FLOAT", {
-                        "default": 0.0, 
-                        "min": -0xffffffffffffffff, 
-                        "max": 0xffffffffffffffff,
-                        "step": 0.001, 
-                        "display": "number"  
-                    }),
-                    "max": ("FLOAT", {
-                        "default": 1.0, 
-                        "min": -0xffffffffffffffff,
-                        "max": 0xffffffffffffffff,
-                        "step": 0.001, 
-                        "display": "number"  
-                    }),
-                    "rounding": ("INT", {
-                        "default": 3, 
-                        "min": 0,
-                        "max": 10,
-                        "step": 1, 
-                        "display": "number"  
-                    }),
+                    "value": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.001, "display": "slider"}),
+                    "min": ("FLOAT", {"default": 0.0, "min": -0xffffffffffffffff, "max": 0xffffffffffffffff, "step": 0.001, "display": "number"}),
+                    "max": ("FLOAT", {"default": 1.0, "min": -0xffffffffffffffff, "max": 0xffffffffffffffff, "step": 0.001, "display": "number"}),
+                    "rounding": ("INT", {"default": 3, "min": 0, "max": 10, "step": 1, "display": "number"}),
                 },
             }
     
