@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.40**
+- feat(text): 添加 `IntWan` 节点，支持生成4n+1等差数列序列，具有可配置步长控制和范围验证功能
+- refactor(logic): 增强 `Image Batch Split` 和 `Mask Batch Split` 节点，改进边界条件处理和全面错误恢复机制
+
 **v1.2.39**
 - feat(logic): 添加 `Image Batch Group` 节点，支持智能图像批次分组，具有重叠处理和灵活填充策略
 
@@ -254,12 +258,15 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🧠 逻辑节点
 | 节点名称 | 功能描述 |
 |---------|----------|
+| Image Batch Split | 智能图像批次拆分器，支持正向/反向拆分模式和增强的边界条件处理 |
+| Mask Batch Split | 智能遮罩批次拆分器，支持正向/反向拆分模式和增强的边界条件处理 |
 | Image Batch Group | 智能图像批次分组器，支持可配置的批次大小、重叠处理和灵活的填充策略 |
 | Image List Append | 图像列表追加器，智能合并图像到列表中 |
 
 ### 📝 文本处理节点
 | 节点名称 | 功能描述 |
 |---------|----------|
+| IntWan | 整数序列生成器，支持生成4n+1等差数列序列，具有可配置步长控制和范围验证功能 |
 | Text Filter Comment | 文本注释过滤器，支持过滤单行注释（#开头）和多行注释（三引号包裹），保留非注释空行 |
 | Text Join Multi | 文本连接多输入器，支持多个文本输入的连接和动态变量引用，可自定义分隔符 |
 | Text Join by Text List | 文本列表连接器，支持将任意类型列表合并为字符串，支持前缀、后缀和自定义分隔符 |
