@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.40**
+- feat(text): Added `IntWan` node for generating 4n+1 arithmetic progression sequences with configurable step control and range validation
+- refactor(logic): Enhanced `Image Batch Split` and `Mask Batch Split` nodes with improved boundary condition handling and comprehensive error recovery
+
 **v1.2.39**
 - feat(logic): Added `Image Batch Group` node for intelligent image batch splitting with overlap support and flexible padding strategies
 
@@ -254,12 +258,15 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🧠 Logic Nodes
 | Node Name | Description |
 |-----------|-------------|
+| Image Batch Split | Intelligent image batch splitter with forward/backward splitting modes and enhanced boundary condition handling |
+| Mask Batch Split | Intelligent mask batch splitter with forward/backward splitting modes and enhanced boundary condition handling |
 | Image Batch Group | Intelligent image batch splitter with configurable batch sizes, overlap handling |
 | Image List Append | Image list appender for intelligently merging images into lists |
 
 ### 📝 Text Processing Nodes
 | Node Name | Description |
 |-----------|-------------|
+| IntWan | Integer sequence generator for creating 4n+1 arithmetic progression sequences with configurable step control and range validation |
 | Text Filter Comment | Text comment filter for filtering single-line comments (starting with #) and multi-line comments (wrapped in triple quotes), preserving non-comment blank lines |
 | Text Join Multi | Multi-input text concatenator supporting multiple text inputs with dynamic variable referencing and custom separators |
 | Text Join by Text List | Text list joiner for merging any type of list into a string with support for prefix, suffix, and custom separators |
