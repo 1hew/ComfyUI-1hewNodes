@@ -17,12 +17,7 @@ class ImageHLFreqSeparate:
             "required": {
                 "image": ("IMAGE",),
                 "method": (["rgb", "hsv", "igbi"], {"default": "rgb"}),
-                "blur_radius": ("FLOAT", {
-                    "default": 10.0,
-                    "min": 0.0,
-                    "max": 100.0,
-                    "step": 0.01
-                })
+                "blur_radius": ("FLOAT", {"default": 10.0, "min": 0.0, "max": 100.0, "step": 0.01})
             }
         }
 
@@ -310,18 +305,8 @@ class ImageHLFreqCombine:
                 "high_freq": ("IMAGE",),
                 "low_freq": ("IMAGE",),
                 "method": (["rgb", "hsv", "igbi"], {"default": "rgb"}),
-                "high_strength": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.0,
-                    "max": 2.0,
-                    "step": 0.01
-                }),
-                "low_strength": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0.0,
-                    "max": 2.0,
-                    "step": 0.01
-                })
+                "high_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.01}),
+                "low_strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.01})
             }
         }
 
@@ -471,12 +456,7 @@ class ImageHLFreqTransform:
                 "generate_image": ("IMAGE",),
                 "detail_image": ("IMAGE",),
                 "method": (["rgb", "hsv", "igbi"], {"default": "igbi"}),
-                "blur_radius": ("FLOAT", {
-                    "default": 10.0,
-                    "min": 0.0,
-                    "max": 100.0,
-                    "step": 0.01
-                })
+                "blur_radius": ("FLOAT", {"default": 10.0, "min": 0.0, "max": 100.0, "step": 0.01})
             },
             "optional": {
                 "detail_mask": ("MASK",),
