@@ -3,6 +3,196 @@ import numpy as np
 from PIL import Image, ImageColor
 
 
+class ImageBatchExtract:
+    """
+    批量图像提取节点
+    支持多种提取模式：自定义索引、步长间隔、总帧数自动计算
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "mode": (["index", "step", "uniform"], {"default": "step"}),
+                "index": ("STRING", {"default": "0"}),
+                "step": ("INT", {"default": 4, "min": 1, "max": 8192, "step": 1}),
+                "uniform": ("INT", {"default": 4, "min": 0, "max": 8192, "step": 1}),
+                "max_keep": ("INT", {"default": 10, "min": 0, "max": 8192, "step": 1}),
+            }
+        }
+    
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "extract_batch"
+    CATEGORY = "1hewNodes/logic"
+    
+    def extract_batch(self, image, mode, index="", step=1, uniform=0, max_keep=1024):
+        try:
+            batch_size = image.shape[0]
+            print(f"[ImageBatchExtract] 输入批量图像信息: 形状={image.shape}, 总帧数={batch_size}")
+            print(f"[ImageBatchExtract] 提取参数: 模式={mode}, 索引='{index}', 步长={step}, 数量={uniform}, 最大保留={max_keep}")
+            
+            # 根据模式确定提取索引
+            extract_indices = self._get_extract_indices(batch_size, mode, index, step, uniform)
+            
+            if not extract_indices:
+                print(f"[ImageBatchExtract] 没有有效的提取索引，返回空结果")
+                empty_image = torch.empty((0,) + image.shape[1:], 
+                                        dtype=image.dtype, device=image.device)
+                return (empty_image,)
+            
+            # 提取图像
+            extracted_images = []
+            valid_indices = []
+            
+            for idx in extract_indices:
+                if 0 <= idx < batch_size:
+                    extracted_images.append(image[idx:idx+1])
+                    valid_indices.append(idx)
+                else:
+                    print(f"[ImageBatchExtract] 跳过超出范围的索引: {idx} (总帧数: {batch_size})")
+            
+            if not extracted_images:
+                print(f"[ImageBatchExtract] 所有索引都超出范围，返回空结果")
+                empty_image = torch.empty((0,) + image.shape[1:], 
+                                        dtype=image.dtype, device=image.device)
+                return (empty_image,)
+            
+            # 应用最大保留限制
+            if len(extracted_images) > max_keep:
+                print(f"[ImageBatchExtract] 应用最大保留限制: {len(extracted_images)} -> {max_keep}")
+                extracted_images = extracted_images[:max_keep]
+                valid_indices = valid_indices[:max_keep]
+            
+            # 合并提取的图像
+            result_images = torch.cat(extracted_images, dim=0)
+            source_indices_str = ",".join(map(str, valid_indices))
+            
+            print(f"[ImageBatchExtract] 提取完成: 提取了{len(valid_indices)}张图像，索引=[{source_indices_str}]")
+            print(f"[ImageBatchExtract] 输出形状: {result_images.shape}")
+            
+            return (result_images,)
+            
+        except Exception as e:
+            print(f"[ImageBatchExtract] 错误: {str(e)}")
+            # 出错时返回空结果
+            empty_image = torch.empty((0,) + image.shape[1:], 
+                                    dtype=image.dtype, device=image.device)
+            return (empty_image,)
+    
+    def _get_extract_indices(self, batch_size, mode, index, step, uniform):
+        """根据提取模式获取索引列表"""
+        extract_indices = []
+        
+        try:
+            if mode == "index":
+                 # 自定义索引模式：为空就输出空
+                 if not index.strip():
+                     print(f"[ImageBatchExtract] 自定义索引为空，返回空结果")
+                     return []
+                 print(f"[ImageBatchExtract] 使用自定义索引模式: '{index}'")
+                 extract_indices = self._parse_custom_indices(index, batch_size)
+                
+            elif mode == "step":
+                # 步长模式：step从1开始
+                if step < 1:
+                    print(f"[ImageBatchExtract] 步长小于1，返回空结果")
+                    return []
+                print(f"[ImageBatchExtract] 使用步长模式: 步长{step}")
+                extract_indices = self._calculate_step_indices(batch_size, step)
+                
+            elif mode == "uniform":
+                # 数量模式：uniform为0输出空，1首帧，2首尾帧，依次类推
+                if uniform <= 0:
+                    print(f"[ImageBatchExtract] 数量为0或负数，返回空结果")
+                    return []
+                print(f"[ImageBatchExtract] 使用数量模式: 数量{uniform}")
+                extract_indices = self._calculate_count_indices(batch_size, uniform)
+            
+            print(f"[ImageBatchExtract] 计算得到索引: {extract_indices}")
+            return extract_indices
+            
+        except Exception as e:
+            print(f"[ImageBatchExtract] 索引计算错误: {str(e)}")
+            return []
+    
+    def _parse_custom_indices(self, indices_str, batch_size=None):
+        """
+        解析自定义索引字符串，支持负数索引
+        支持格式: "1,3,5,20" 或 "1, 3, 5, 20" 或 "-1,-2,0" 或 "1，2，-1"（中文逗号）
+        保持输入顺序，支持中英文逗号分割，处理空格和空内容
+        """
+        indices = []
+        try:
+            # 替换中文逗号为英文逗号，然后分割
+            normalized_str = indices_str.replace('，', ',')
+            parts = normalized_str.split(',')
+            
+            for part in parts:
+                # 去除空格
+                part = part.strip()
+                # 跳过空内容
+                if not part:
+                    continue
+                    
+                try:
+                    idx = int(part)
+                    # 处理负数索引
+                    if batch_size is not None and idx < 0:
+                        idx = batch_size + idx
+                    indices.append(idx)
+                except ValueError:
+                    print(f"[ImageBatchExtract] 跳过无效索引: '{part}'")
+                    continue
+            
+            print(f"[ImageBatchExtract] 解析自定义索引: '{indices_str}' -> {indices}")
+            
+        except Exception as e:
+            print(f"[ImageBatchExtract] 自定义索引解析错误: {str(e)}")
+            indices = []
+        
+        return indices
+    
+    def _calculate_step_indices(self, batch_size, step):
+        """计算步长索引，从0开始，步长从1开始"""
+        indices = list(range(0, batch_size, step))
+        print(f"[ImageBatchExtract] 步长计算: 总帧数={batch_size}, 步长={step} -> {indices}")
+        return indices
+    
+    def _calculate_count_indices(self, batch_size, count):
+        """
+        根据数量计算索引
+        count=1: 首帧 [0]
+        count=2: 首尾帧 [0, batch_size-1]
+        count=3: 首中尾帧 [0, middle, batch_size-1]
+        依次类推
+        """
+        if count <= 0:
+            return []
+        
+        if count == 1:
+            # 只要首帧
+            indices = [0]
+        elif count == 2:
+            # 首尾帧
+            indices = [0, batch_size - 1] if batch_size > 1 else [0]
+        elif count >= batch_size:
+            # 数量大于等于总帧数，返回所有帧
+            indices = list(range(batch_size))
+        else:
+            # 均匀分布
+            step = (batch_size - 1) / (count - 1)
+            indices = [int(round(i * step)) for i in range(count)]
+            # 确保最后一帧是最后一个索引
+            indices[-1] = batch_size - 1
+            # 去重并排序
+            indices = sorted(list(set(indices)))
+        
+        print(f"[ImageBatchExtract] 数量计算: 总帧数={batch_size}, 数量={count} -> {indices}")
+        return indices
+  
+
 class ImageBatchSplit:
     
     @classmethod
@@ -277,7 +467,13 @@ class ImageBatchGroup:
     def _calculate_start_indices(self, total_images, batch_size, overlap, last_batch_mode):
         """统一计算所有批次的起始索引"""
         if total_images <= batch_size:
-            return [0]
+            # 边界情况：当输入张数 <= batch_size 时的特殊处理
+            if last_batch_mode == "drop_incomplete":
+                # drop_incomplete 模式：如果图像数量不足一个完整批次，返回空列表
+                return []
+            else:
+                # keep_remaining, backtrack_last, fill_color 模式：都从索引0开始
+                return [0]
         
         # 计算基础步长
         step_size = batch_size - overlap
@@ -349,21 +545,42 @@ class ImageBatchGroup:
         """根据起始索引和模式计算每批次的数量"""
         batch_counts = []
         
+        # 边界情况：当输入图像数量 <= batch_size 时的特殊处理
+        if total_images <= batch_size:
+            if len(start_indices) == 0:
+                # drop_incomplete 模式返回空列表
+                return []
+            elif last_batch_mode == "fill_color":
+                # fill_color 模式：batch_count 使用 batch_size
+                return [batch_size]
+            else:
+                # keep_remaining, backtrack_last 模式：batch_count 使用实际图像数量
+                return [total_images]
+        
         for i, start_idx in enumerate(start_indices):
+            remaining = total_images - start_idx
+            
             if i == len(start_indices) - 1:
                 # 最后一批
                 if last_batch_mode == "fill_color":
                     # 补充彩色图模式：总是保持批次大小
                     batch_counts.append(batch_size)
-                else:
-                    # 其他模式：根据剩余图片数量确定
-                    remaining = total_images - start_idx
-                    if last_batch_mode in ["backtrack_last", "drop_incomplete"]:
-                        # backtrack_last 和 drop_incomplete 模式：保持批次大小
-                        batch_counts.append(batch_size)
+                elif last_batch_mode == "drop_incomplete":
+                    # drop_incomplete 模式：保留的批次都是完整的
+                    batch_counts.append(batch_size)
+                elif last_batch_mode == "backtrack_last":
+                    # backtrack_last 模式：
+                    if len(start_indices) == 1:
+                        # 单批次：使用剩余数量，但不超过total_images
+                        batch_count = min(remaining, total_images)
+                        batch_counts.append(batch_count)
                     else:
-                        # keep_remaining 模式：使用实际剩余数量
-                        batch_counts.append(remaining)
+                        # 多批次：保持批次大小
+                        batch_counts.append(batch_size)
+                else:
+                    # keep_remaining 模式：使用实际剩余数量，但不超过total_images
+                    batch_count = min(remaining, total_images)
+                    batch_counts.append(batch_count)
             else:
                 # 非最后一批：总是使用批次大小
                 batch_counts.append(batch_size)
@@ -374,31 +591,38 @@ class ImageBatchGroup:
         """计算每批次的有效帧数"""
         valid_counts = []
         
-        for i, (start_idx, batch_count) in enumerate(zip(start_indices, batch_counts)):
-            if last_batch_mode == "fill_color":
-                # fill_color模式：每批次的有效数量等于step_size，最后一批特殊处理
-                if i == len(start_indices) - 1:
-                    # 最后一批：计算实际有效的原始图像数量
-                    if total_images is not None:
-                        original_images_in_last_batch = total_images - start_idx
-                        valid_counts.append(original_images_in_last_batch)
-                    else:
-                        # 如果没有传入total_images，使用batch_count
-                        valid_counts.append(batch_count)
-                else:
-                    # 非最后一批：有效数量等于step_size
-                    step_size = batch_counts[0] - overlap  # batch_size - overlap
-                    valid_counts.append(step_size)
+        # 边界情况：当输入图像数量 <= batch_size 时的特殊处理
+        if total_images is not None and len(start_indices) <= 1:
+            if len(start_indices) == 0:
+                # drop_incomplete 模式返回空列表
+                return []
             else:
-                # 其他模式的原有逻辑
-                if i == len(start_indices) - 1:
-                    # 最后一批：全部有效
-                    valid_counts.append(batch_count)
+                # keep_remaining, backtrack_last, fill_color 模式：valid_count 都是实际图像数量
+                return [total_images]
+        
+        for i, (start_idx, batch_count) in enumerate(zip(start_indices, batch_counts)):
+            # 统一的valid_count计算逻辑，适用于所有模式
+            if i == len(start_indices) - 1:
+                # 最后一批：对于单批次情况，使用实际图像数量
+                if (len(start_indices) == 1 and total_images is not None and 
+                    last_batch_mode != "drop_incomplete"):
+                    # drop_incomplete模式下，保留的批次都是完整的，使用batch_count
+                    actual_images_in_batch = total_images - start_idx
+                    valid_counts.append(actual_images_in_batch)
+                elif last_batch_mode == "fill_color" and total_images is not None:
+                    # fill_color模式最后一批：计算实际的原始图像数量
+                    remaining_images = total_images - start_idx
+                    actual_images_in_batch = min(remaining_images, batch_count)
+                    valid_counts.append(actual_images_in_batch)
                 else:
-                    # 非最后一批：有效数量 = 下一批的起始位置 - 当前批的起始位置
-                    next_start = start_indices[i + 1]
-                    valid_count = next_start - start_idx
-                    valid_counts.append(valid_count)
+                    # 多批次情况或drop_incomplete模式：全部有效
+                    valid_counts.append(batch_count)
+            else:
+                # 非最后一批：有效数量 = 下一批的起始位置 - 当前批的起始位置
+                # 这个逻辑适用于所有模式，包括fill_color
+                next_start = start_indices[i + 1]
+                valid_count = next_start - start_idx
+                valid_counts.append(valid_count)
         
         return valid_counts
     
@@ -426,7 +650,12 @@ class ImageBatchGroup:
         
         # 使用新的统一计算方法
         start_indices = self._calculate_start_indices(total_images, batch_size, overlap, last_batch_mode)
-        batch_counts = self._calculate_batch_counts(start_indices, total_images, batch_size, last_batch_mode)
+        
+        # 如果没有有效的批次（drop_incomplete模式下图像数量不足），返回空结果
+        if not start_indices:
+            return (image[:original_total], 0, [], [], [])
+        
+        batch_counts = self._calculate_batch_counts(start_indices, original_total, batch_size, last_batch_mode)
         
         # 处理 fill_color 模式的额外彩色图补充
         if last_batch_mode == "fill_color":
@@ -521,6 +750,7 @@ class ImageListAppend:
 
 
 NODE_CLASS_MAPPINGS = {
+    "ImageBatchExtract": ImageBatchExtract,
     "ImageBatchSplit": ImageBatchSplit,
     "MaskBatchSplit": MaskBatchSplit,
     "ImageBatchGroup": ImageBatchGroup,
@@ -528,6 +758,7 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    "ImageBatchExtract": "Image Batch Extract",
     "ImageBatchSplit": "Image Batch Split",
     "MaskBatchSplit": "Mask Batch Split",
     "ImageBatchGroup": "Image Batch Group",

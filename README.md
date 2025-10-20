@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.42**
+- feat(logic): Added `Image Batch Extract` node for extracting specific images from batches with multiple modes including custom indices, step intervals, and uniform distribution
+
 **v1.2.40**
 - feat(text): Added `IntWan` node for generating 4n+1 arithmetic progression sequences with configurable step control and range validation
 - refactor(logic): Enhanced `Image Batch Split` and `Mask Batch Split` nodes with improved boundary condition handling and comprehensive error recovery
@@ -258,6 +261,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🧠 Logic Nodes
 | Node Name | Description |
 |-----------|-------------|
+| Image Batch Extract | Intelligent image batch extractor supporting multiple extraction modes including custom indices, step intervals, and uniform distribution |
 | Image Batch Split | Intelligent image batch splitter with forward/backward splitting modes and enhanced boundary condition handling |
 | Mask Batch Split | Intelligent mask batch splitter with forward/backward splitting modes and enhanced boundary condition handling |
 | Image Batch Group | Intelligent image batch splitter with configurable batch sizes, overlap handling |
