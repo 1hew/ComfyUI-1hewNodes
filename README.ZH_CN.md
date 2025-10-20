@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新
 
+**v1.2.42**
+- feat(logic): 添加 `Image Batch Extract` 节点，支持从批量图像中提取特定图像，提供多种模式包括自定义索引、步长间隔和均匀分布
+
 **v1.2.40**
 - feat(text): 添加 `IntWan` 节点，支持生成4n+1等差数列序列，具有可配置步长控制和范围验证功能
 - refactor(logic): 增强 `Image Batch Split` 和 `Mask Batch Split` 节点，改进边界条件处理和全面错误恢复机制
@@ -258,6 +261,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🧠 逻辑节点
 | 节点名称 | 功能描述 |
 |---------|----------|
+| Image Batch Extract | 智能图像批次提取器，支持多种提取模式包括自定义索引、步长间隔和均匀分布 |
 | Image Batch Split | 智能图像批次拆分器，支持正向/反向拆分模式和增强的边界条件处理 |
 | Mask Batch Split | 智能遮罩批次拆分器，支持正向/反向拆分模式和增强的边界条件处理 |
 | Image Batch Group | 智能图像批次分组器，支持可配置的批次大小、重叠处理和灵活的填充策略 |
