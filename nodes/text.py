@@ -7,6 +7,7 @@ import sys
 import importlib.util
 from collections import OrderedDict
 
+
 class IntWan:
     """
     支持 4n+1 序列：1, 5, 9, 13, 17...
@@ -26,13 +27,66 @@ class IntWan:
     CATEGORY = "1hewNodes/text"
     
     def calculate_wan_value(self, value):
+        return (value,)
+
+
+class IntSplit:
+    """
+    整数分割节点 - 用于将总数值分割为两部分
+    支持百分比(0.0-1.0)和整数两种分割点输入方式
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "total": ("INT", {"default": 20, "min": 1, "max": 10000, "step": 1}),
+                "split_point": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 10000.0, "step": 0.01})
+            }
+        }
+    
+    RETURN_TYPES = ("INT", "INT")
+    RETURN_NAMES = ("int_total", "int_split")
+    FUNCTION = "split_integer"
+    CATEGORY = "1hewNodes/text"
+    
+    def split_integer(self, total, split_point):
+        """
+        分割整数
+        
+        Args:
+            total: 总数值
+            split_point: 分割点，支持百分比(0.0-1.0)或整数
+            
+        Returns:
+            tuple: (int_total, int_split) 总数值和分割值
+        """
         try:
-            return (value,)
+            total_value = int(total)
+            
+            # 判断split_point是百分比还是整数
+            if 0.0 <= split_point <= 1.0:
+                # 百分比模式，包括1.0的情况
+                if split_point == 1.0:
+                    split_value = 1  # 特殊处理：1.0输出1
+                else:
+                    split_value = int(total_value * split_point)
+            else:
+                # 整数模式
+                split_value = int(split_point)
+                # 确保不超过总数值
+                split_value = min(split_value, total_value)
+            
+            # 确保split_value不小于0
+            split_value = max(0, split_value)
+            
+            print(f"整数分割完成: 总数值={total_value}, 分割值={split_value}")
+            return (total_value, split_value)
             
         except Exception as e:
-            print(f"Int Wan计算错误: {str(e)}")
+            print(f"整数分割错误: {str(e)}")
             # 返回默认值
-            return (1,)
+            return (20, 10)
 
 
 class TextFilterComment:
@@ -1174,6 +1228,7 @@ class ListCustomSeed:
 # 节点映射
 NODE_CLASS_MAPPINGS = {
     "IntWan": IntWan,
+    "IntSplit": IntSplit,
     "TextFilterComment": TextFilterComment,
     "TextJoinMulti": TextJoinMulti,
     "TextJoinByTextList": TextJoinByTextList,
@@ -1187,6 +1242,7 @@ NODE_CLASS_MAPPINGS = {
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "IntWan": "Int Wan",
+    "IntSplit": "Int Split",
     "TextFilterComment": "Text Filter Comment",
     "TextJoinMulti": "Text Join Multi",
     "TextJoinByTextList": "Text Join by Text List",

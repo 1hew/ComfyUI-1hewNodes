@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.43**
+- feat(logic): Added `Video Cut Group` node 
+
 **v1.2.42**
 - feat(logic): Added `Image Batch Extract` node for extracting specific images from batches with multiple modes including custom indices, step intervals, and uniform distribution
 
@@ -28,101 +31,207 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(text): Added `IntWan` node for generating 4n+1 arithmetic progression sequences with configurable step control and range validation
 - refactor(logic): Enhanced `Image Batch Split` and `Mask Batch Split` nodes with improved boundary condition handling and comprehensive error recovery
 
-**v1.2.39**
+<details>
+<summary><b>v1.2.39</b></summary>
+
 - feat(logic): Added `Image Batch Group` node for intelligent image batch splitting with overlap support and flexible padding strategies
 
-**v1.2.38**
+​	</details>
+
+<details>
+<summary><b>v1.2.38</b></summary>
+
 - refactor(image): Enhanced `ImageResizeUniversal` node with comprehensive mask processing logic
 
-**v1.2.37**
+​	</details>
+
+<details>
+<summary><b>v1.2.37</b></summary>
+
 - feat(image): Enhanced `Image Solid` node with advanced color parameter
 - feat(image): Added the `ImageGridSplit` node for splitting images into grid layouts with flexible output options
 
-**v1.2.36**
+​	</details>
+
+<details>
+<summary><b>v1.2.36</b></summary>
+
 - feat(conversion): Enhanced `URL to Video` node
 
-**v1.2.35**
+​	</details>
+
+<details>
+<summary><b>v1.2.35</b></summary>
+
 - feat(image): Added `Image Resize Qwen Image` node for Qwen vision model optimized image resizing with 7 preset resolutions and automatic aspect ratio selection
 
-**v1.2.32**
+​	</details>
+
+<details>
+<summary><b>v1.2.32</b></summary>
+
 - feat(image): Added `Image Solid Flux Kontext` node for generating solid color images with Flux Kontext dimension presets
 - feat(image): Added `Image Solid Qwen Image` node for generating solid color images with QwenImage dimension presets
 
-**v1.2.31**
+​	</details>
+
+<details>
+<summary><b>v1.2.31</b></summary>
+
 - fix: Fixed various bugs and improved stability
 
-**v1.2.28**
+​	</details>
+
+<details>
+<summary><b>v1.2.28</b></summary>
+
 - feat(mask): Added `Mask Paste by BBox Mask` node for simplified mask pasting with automatic base mask creation and bounding box detection
 - feat(image_tile): Added `Image Tile Split Preset` node with predefined resolution presets and intelligent tile size selection
 - feat(image): Added `Image Rotate with Mask` node for advanced image rotation with mask support and multiple fill modes
 - feat(text): Enhanced `Text Load Local` node with `user_prompt` parameter for combining JSON content with additional user prompts
 
-**v1.2.26**
+​	</details>
+
+<details>
+<summary><b>v1.2.26</b></summary>
+
 - feat(image_crop): Enhanced `Image Crop with BBox Mask` node with precise dimension control, added `crop_to_side` and `crop_to_length` parameters
 
-**v1.2.25**
+​	</details>
+
+<details>
+<summary><b>v1.2.25</b></summary>
+
 - feat(image_crop): Added `apply_paste_mask` parameter to `Image Paste by BBox Mask` node for controlling smart scaling behavior
 
-**v1.2.24**
+​	</details>
+
+<details>
+<summary><b>v1.2.24</b></summary>
+
 - feat(image_crop): Added `opacity` parameter to `Image Paste by BBox Mask` node for controlling paste image transparency
 - feat(image): Enhanced `Image Stroke by Mask` node with batch processing support for handling multiple images and masks
 
-**v1.2.23**
+​	</details>
+
+<details>
+<summary><b>v1.2.23</b></summary>
+
 - fix(image): Enhanced `Image Stroke by Mask` node color parsing logic, supporting RGB string formats and improved default fallback to white color
 - fix(image): Enhanced `Image Paste by BBox Mask` node rotation parameter
 
-**v1.2.21**
+​	</details>
+
+<details>
+<summary><b>v1.2.21</b></summary>
+
 - feat(text): Added `Text Filter Comment` node for filtering single-line comments (starting with #) and multi-line comments (wrapped in triple quotes), preserving non-comment blank lines
 - feat(text): Added `Text Join by Text List` node for merging any type of list into a string with support for prefix, suffix, and custom separators
 - refactor(text): Refactored `Text Format` node to `Text Prefix Suffix`, optimizing wildcard input processing and formatting functionality
 
-**v1.2.18**
+​	</details>
+
+<details>
+<summary><b>v1.2.18</b></summary>
+
 - feat(sample): Added `Step Split` node for high-low frequency sampling step separation with support for percentage and integer input modes
 
-**v1.2.17**
+​	</details>
+
+<details>
+<summary><b>v1.2.17</b></summary>
+
 - feat(image_crop): Optimized `Image Crop with BBox Mask` node
 
-**v1.2.15**
+​	</details>
+
+<details>
+<summary><b>v1.2.15</b></summary>
+
 - feat(text): Added `Text Join Multi` node for concatenating multiple text inputs with dynamic variable referencing
 - feat(image_crop): Added `Image Edge Crop Pad` node with smart edge cropping and padding capabilities, featuring mask output functionality
 - feat(image_blend): Enhanced `Image Luma Matte` node with feathering and alpha output features, supporting multiple color formats and edge processing
 
-**v1.2.13**
+​	</details>
+
+<details>
+<summary><b>v1.2.13</b></summary>
+
 - feat(text): Added `Text Load Local` node for loading JSON format prompt files from prompt directory with bilingual Chinese and English output
 
-**v1.2.12**
+​	</details>
+
+<details>
+<summary><b>v1.2.12</b></summary>
+
 - feat(text): Added `Text Format` node for flexible text formatting with wildcard input support
 
-**v1.2.9**
- - feat(image_crop): Refactored `Image Crop with BBox Mask` node
- 
-**v1.2.8**
+​	</details>
+
+<details>
+<summary><b>v1.2.9</b></summary>
+
+- feat(image_crop): Refactored `Image Crop with BBox Mask` node
+
+​	</details>
+
+<details>
+<summary><b>v1.2.8</b></summary>
+
 - feat(image): Added `Image Resize Flux Kontext` node with support for automatic and manual size selection for images and masks
 - feat(image): Enhanced `Image Edit Stitch` node with improved stitching algorithms and parameter handling
 
-**v1.2.7**
+​	</details>
+
+<details>
+<summary><b>v1.2.7</b></summary>
+
 - feat(text): Added `List Custom Seed` node for creating unique random seed lists with control after generate functionality
 
-**v1.2.6**
+​	</details>
+
+<details>
+<summary><b>v1.2.6</b></summary>
+
 - feat(image_hlfreq): Added high-low frequency separation node group, including `Image HLFreq Separate`, `Image HLFreq Combine`, and `Image HLFreq Transform` nodes with support for RGB, HSV, and IGBI frequency separation methods
 
-**v1.2.5**
+​	</details>
+
+<details>
+<summary><b>v1.2.5</b></summary>
+
 - feat(mask): Added the `Mask Fill Hole` node, which fills holes in enclosed areas of masks with support for batch processing.
 
-**v1.2.3**
+​	</details>
+
+<details>
+<summary><b>v1.2.3</b></summary>
+
 - fix(image_blend): Fixed the issue of inconsistency between devices for the `Image Blend Modes by Alpha` node.
 
-**v1.2.2**
+​	</details>
+
+<details>
+<summary><b>v1.2.2</b></summary>
+
 - feat(image): Added the `Image BBox Overlay by Mask` node, which overlays the image bounding box based on a mask.
 
-**v1.2.1**
+​	</details>
+
+<details>
+<summary><b>v1.2.1</b></summary>
 
 - refactor(image/crop): Renamed node classes and updated related documentation
 - feat(image_crop): Enhanced the functionality and output options of the `ImageCropByMaskAlpha` node
 
-**v1.2.0**
+​	</details>
+
+<details>
+<summary><b>v1.2.0</b></summary>
 
 - feat: Added `conversion`, and restructured image mixing and masking processing
+
+​	</details>
 
 <details>
 <summary><b>v1.1.6</b></summary>
@@ -186,19 +295,19 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🖼️ Image Processing Nodes
 | Node Name | Description |
 |-----------|--------------|
-| Image Solid | Generate solid color images with enhanced color parameter supporting multiple input formats (grayscale, RGB tuples, hex colors, color names, single-letter shortcuts) and multiple size presets |
-| Image Solid FluxKontext | Generate solid color images with Flux Kontext dimension presets and flexible color input formats |
-| Image Solid QwenImage | Generate solid color images with QwenImage dimension presets and flexible color input formats |
+| Image Get Size | Image dimension extractor that extracts width and height information from input images with automatic batch processing support |
+| Image Solid FluxKontext | Generate solid color images based on Flux Kontext dimension presets with flexible color input format support |
+| Image Solid QwenImage | Generate solid color images based on QwenImage dimension presets with flexible color input format support |
+| Image Solid | Generate solid color images with enhanced color parameter supporting multiple input formats and multiple size presets |
 | Image Resize FluxKontext | Resize images to FluxKontext dimensions with support for automatic and manual size selection for images and masks |
-| Image Resize Qwen Image | Resize images to Qwen vision model optimized dimensions with 7 preset resolutions and automatic aspect ratio selection |
+| Image Resize Qwen Image | Image resizing optimized for Qwen vision models, providing 7 preset resolutions and automatic aspect ratio selection |
 | Image Resize Universal | Universal image resizing with multiple algorithms and constraints |
+| Image Rotate with Mask | Advanced image rotation with mask integration, multiple fill modes, and mask center rotation options |
 | Image Edit Stitch | Image stitching and merging with multiple stitching modes |
 | Image Add Label | Add text labels to images |
 | Image Plot | Image plotting and visualization tools |
 | Image Stroke by Mask | Apply stroke effects to mask regions with customizable width and color |
 | Image BBox Overlay by Mask | Mask-based image bounding box overlay with independent and merge modes |
-| Image Rotate with Mask | Advanced image rotation with mask support, multiple fill modes, and mask center rotation options |
-| Image Grid Split | Split images into grid layouts with flexible row/column configuration and selective output options |
 
 ### 🎨 Image Blending Nodes
 | Node Name | Description |
@@ -215,6 +324,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Crop by Mask Alpha | Batch mask-based cropping with RGB/RGBA dual output modes and smart channel processing |
 | Image Paste by BBox Mask | Paste cropped images back with multiple blend modes |
 | Image Edge Crop Pad | Smart edge cropping and padding with multiple padding modes and mask output |
+| Image Grid Split | Split images into grid layouts with flexible row/column configuration and selective output options |
 
 ### 🧩 Image Tiling Nodes
 | Node Name | Description |
@@ -242,35 +352,43 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🔧 Utility Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Image Get Size | Extract image dimensions (width and height) from input images with automatic batch processing support |
-| Step Split | High-low frequency sampling step separator supporting percentage (0.0-1.0) and integer input modes for precise sampling control |
 | Range Mapping | Value range mapping tool supporting linear transformation and precision control for slider values |
 | Path Build | Path builder supporting preset paths and custom extensions |
 
 ### 🔄 Conversion Nodes
 | Node Name | Description |
 |-----------|-------------|
+| URL to Video | Convert video URLs to ComfyUI VIDEO objects with improved error handling, timeout control, and support for both synchronous and asynchronous download methods |
 | Image Batch to List | Convert batch images to image lists for individual processing |
 | Image List to Batch | Convert image lists to batch images with automatic size normalization |
 | Mask Batch to List | Convert batch masks to mask lists for individual processing |
 | Mask List to Batch | Convert mask lists to batch masks with automatic size normalization |
 | String Coordinate to BBoxes | Convert string format coordinates to BBOXES format with enhanced format support and improved SAM2 compatibility |
 | String Coordinate to BBox Mask | Convert string format coordinates to BBoxMask format with image dimension support and flexible output modes |
-| URL to Video | Convert video URLs to ComfyUI VIDEO objects with improved error handling, timeout control, and support for both synchronous and asynchronous download methods |
 
 ### 🧠 Logic Nodes
 | Node Name | Description |
 |-----------|-------------|
+| Any Empty Bool | Universal empty value checker (boolean output version) that checks if any type of input is empty and returns a boolean value |
+| Any Empty Int | Universal empty value checker (integer output version) that checks if any type of input is empty and returns custom integer values |
+| Any Switch Bool | Universal boolean switch node supporting any type input with lazy evaluation, selecting output based on boolean condition |
+| Any Switch Int | Multi-way integer switch node supporting multiple input options, selecting corresponding input/output based on integer index (1-5) |
+
+### 📦 Batch Processing Nodes
+| Node Name | Description |
+|-----------|-------------|
 | Image Batch Extract | Intelligent image batch extractor supporting multiple extraction modes including custom indices, step intervals, and uniform distribution |
 | Image Batch Split | Intelligent image batch splitter with forward/backward splitting modes and enhanced boundary condition handling |
-| Mask Batch Split | Intelligent mask batch splitter with forward/backward splitting modes and enhanced boundary condition handling |
-| Image Batch Group | Intelligent image batch splitter with configurable batch sizes, overlap handling |
+| Image Batch Group | Intelligent image batch grouper with configurable batch sizes, overlap handling, and flexible padding strategies |
 | Image List Append | Image list appender for intelligently merging images into lists |
+| Mask Batch Split | Intelligent mask batch splitter with forward/backward splitting modes and enhanced boundary condition handling |
+| Video Cut Group | Video scene cut detector that identifies scene transitions by analyzing frame similarity, supporting both fast and precise modes |
 
 ### 📝 Text Processing Nodes
 | Node Name | Description |
 |-----------|-------------|
-| IntWan | Integer sequence generator for creating 4n+1 arithmetic progression sequences with configurable step control and range validation |
+| Int Wan | Integer sequence generator for creating 4n+1 arithmetic progression sequences with configurable step control and range validation |
+| Int Split | Integer splitter node for dividing total values into two parts, supporting both percentage (0.0-1.0) and integer split point input methods |
 | Text Filter Comment | Text comment filter for filtering single-line comments (starting with #) and multi-line comments (wrapped in triple quotes), preserving non-comment blank lines |
 | Text Join Multi | Multi-input text concatenator supporting multiple text inputs with dynamic variable referencing and custom separators |
 | Text Join by Text List | Text list joiner for merging any type of list into a string with support for prefix, suffix, and custom separators |
@@ -297,6 +415,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 [comfyUI_FrequencySeparation_RGB-HSV](https://github.com/risunobushi/comfyUI_FrequencySeparation_RGB-HSV)
 
+[comfyui_extractstoryboards](https://github.com/gitadmini/comfyui_extractstoryboards)
 
 
 ## 🌟 Star
