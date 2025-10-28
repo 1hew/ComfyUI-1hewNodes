@@ -9,6 +9,45 @@ from skimage.measure import label, regionprops
 import comfy.utils
 
 
+class ImageGetSize:
+    """
+    获取图像的宽度和高度信息
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+            }
+        }
+    
+    RETURN_TYPES = ("INT", "INT")
+    RETURN_NAMES = ("width", "height")
+    FUNCTION = "get_image_size"
+    CATEGORY = "1hewNodes/image"
+    
+    def get_image_size(self, image):
+        """
+        获取图像的宽度和高度
+        
+        Args:
+            image: 输入的图像张量，格式为 (batch, height, width, channels)
+            
+        Returns:
+            tuple: (width, height) 图像的宽度和高度
+        """
+        # 确保输入是正确的维度
+        if image.dim() == 3:
+            image = image.unsqueeze(0)
+        
+        # 获取图像尺寸 (batch, height, width, channels)
+        batch_size, height, width, channels = image.shape
+        
+        # 返回宽度和高度（整数类型）
+        return (int(width), int(height))
+
+
 class ImageSolidFluxKontext:
     """
     根据 FluxKontext 尺寸预设生成纯色图像
@@ -3032,131 +3071,8 @@ class ImageBBoxOverlayByMask:
         return bboxes
 
 
-class ImageGridSplit:
-    """
-    图片宫格分割器 - 将图片按指定行列分割成多个子图片
-    """
-
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "rows": ("INT", {"default": 2, "min": 1, "max": 10, "step": 1}),
-                "columns": ("INT", {"default": 2, "min": 1, "max": 10, "step": 1}),
-                "output_index": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1}),
-            }
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
-    FUNCTION = "image_grid_split"
-    CATEGORY = "1hewNodes/image"
-
-    def image_grid_split(self, image, rows, columns, output_index):
-        """
-        将图片按宫格分割
-        
-        Args:
-            image: 输入图片张量 (batch, height, width, channels)
-            rows: 分割行数
-            columns: 分割列数
-            output_index: 输出索引，0表示所有分割后的图片按批次输出，
-                         1表示第1张，2表示第2张，以此类推（横向优先）
-        
-        Returns:
-            分割后的图片张量
-        """
-        batch_size, height, width, channels = image.shape
-        
-        # 计算每个网格的尺寸
-        grid_height = height // rows
-        grid_width = width // columns
-        
-        # 总的网格数量
-        total_grids = rows * columns
-        
-        # 验证输出索引
-        if output_index > total_grids:
-            raise ValueError(f"输出索引 {output_index} 超出范围，最大值为 {total_grids}")
-        
-        # 存储所有分割后的图片
-        all_split_images = []
-        
-        for batch_idx in range(batch_size):
-            current_image = image[batch_idx]
-            
-            # 按行列分割图片
-            for row in range(rows):
-                for col in range(columns):
-                    # 计算当前网格的坐标
-                    start_y = row * grid_height
-                    end_y = start_y + grid_height
-                    start_x = col * grid_width
-                    end_x = start_x + grid_width
-                    
-                    # 裁剪当前网格
-                    grid_image = current_image[start_y:end_y, start_x:end_x, :]
-                    all_split_images.append(grid_image)
-        
-        # 根据输出索引返回结果
-        if output_index == 0:
-            # 返回所有分割后的图片作为批次
-            result = torch.stack(all_split_images, dim=0)
-        else:
-            # 返回指定索引的图片
-            selected_images = []
-            for batch_idx in range(batch_size):
-                # 计算在当前批次中的索引
-                grid_idx = (output_index - 1) % total_grids
-                actual_idx = batch_idx * total_grids + grid_idx
-                
-                if actual_idx < len(all_split_images):
-                    selected_images.append(all_split_images[actual_idx])
-                else:
-                    # 如果索引超出范围，使用第一个图片
-                    selected_images.append(all_split_images[0])
-            
-            result = torch.stack(selected_images, dim=0)
-        
-        return (result,)
-
-    @staticmethod
-    def tensor_to_pil(tensor):
-        """将张量转换为PIL图像"""
-        if tensor.dim() == 4:
-            tensor = tensor.squeeze(0)
-        
-        # 确保值在0-1范围内
-        tensor = torch.clamp(tensor, 0, 1)
-        
-        # 转换为numpy数组
-        np_image = (tensor.cpu().numpy() * 255).astype(np.uint8)
-        
-        return Image.fromarray(np_image)
-
-    @staticmethod
-    def pil_to_tensor(pil_image):
-        """将PIL图像转换为张量"""
-        np_image = np.array(pil_image).astype(np.float32) / 255.0
-        
-        # 确保是RGB格式
-        if len(np_image.shape) == 2:
-            np_image = np.stack([np_image] * 3, axis=-1)
-        elif np_image.shape[-1] == 4:
-            np_image = np_image[:, :, :3]
-        
-        tensor = torch.from_numpy(np_image)
-        
-        # 添加批次维度
-        if tensor.dim() == 3:
-            tensor = tensor.unsqueeze(0)
-        
-        return tensor
-
-
-
 NODE_CLASS_MAPPINGS = {
+    "ImageGetSize": ImageGetSize,
     "ImageSolidFluxKontext": ImageSolidFluxKontext,
     "ImageSolidQwenImage": ImageSolidQwenImage,
     "ImageSolid": ImageSolid,
@@ -3169,10 +3085,10 @@ NODE_CLASS_MAPPINGS = {
     "ImagePlot": ImagePlot,
     "ImageStrokeByMask": ImageStrokeByMask,
     "ImageBBoxOverlayByMask": ImageBBoxOverlayByMask,
-    "ImageGridSplit": ImageGridSplit,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    "ImageGetSize": "Image Get Size",
     "ImageSolidFluxKontext": "Image Solid FluxKontext",
     "ImageSolidQwenImage": "Image Solid QwenImage",
     "ImageSolid": "Image Solid",
@@ -3185,5 +3101,4 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ImagePlot": "Image Plot",
     "ImageStrokeByMask": "Image Stroke by Mask",
     "ImageBBoxOverlayByMask": "Image BBox Overlay by Mask",
-    "ImageGridSplit": "Image Grid Split",
 }
