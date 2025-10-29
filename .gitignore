@@ -5,3 +5,4 @@ __pycache__/
 .DS_Store
 # Ignore Ruff cache
 .ruff_cache
+current_workflow.tmp
