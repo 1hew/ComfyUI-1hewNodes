@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.44**
+- feat(util): Added `Workflow Name` node
+
 **v1.2.43**
 - feat(logic): Added `Video Cut Group` node 
 
@@ -352,6 +355,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🔧 Utility Nodes
 | Node Name | Description |
 |-----------|-------------|
+| Workflow Name | Automatically retrieves current workflow filename with path control, custom prefixes/suffixes, and date formatting |
 | Range Mapping | Value range mapping tool supporting linear transformation and precision control for slider values |
 | Path Build | Path builder supporting preset paths and custom extensions |
 

@@ -19,10 +19,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 
 
-## 📜 更新
+## 📜 更新日志
+
+**v1.2.44**
+- feat(util): 添加 `Workflow Name` 节点
 
 **v1.2.43**
-- feat(logic): 添加 `Video Cut Group` 等节点
+- feat(logic): 添加 `Video Cut Group` 节点
 
 **v1.2.42**
 - feat(logic): 添加 `Image Batch Extract` 节点，支持从批量图像中提取特定图像，提供多种模式包括自定义索引、步长间隔和均匀分布
@@ -352,6 +355,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🔧 工具节点
 | 节点名称 | 功能描述 |
 |---------|----------|
+| Workflow Name | 自动获取当前工作流文件名，支持路径控制、自定义前缀后缀和日期格式化 |
 | Range Mapping | 数值范围映射工具，支持滑块值的线性变换和精度控制 |
 | Path Build | 路径构建器，支持预设路径和自定义扩展 |
 
