@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v1.2.45**
+- feat(detection): Added `DetectYolo` node for YOLO model object detection
+
 **v1.2.44**
 - feat(util): Added `Workflow Name` node
 
@@ -351,6 +354,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Mask Batch Math Ops | Batch mask mathematical operations |
 | Mask Crop by BBox Mask | Mask bounding box cropping based on mask regions |
 | Mask Paste by BBox Mask | Simplified mask pasting with automatic base mask creation and bounding box detection |
+
+### 🔍 Detection Nodes
+| Node Name | Description |
+|-----------|-------------|
+| DetectYolo | YOLO model object detection with subfolder model support, customizable confidence thresholds, and optional label display control |
 
 ### 🔧 Utility Nodes
 | Node Name | Description |
