@@ -54,7 +54,6 @@ def _start_workflow_monitor():
         # 启动监控
         success = monitor.start_workflow_monitor()
         if success:
-            logging.info("[ComfyUI-1hewNodes] 工作流监控已自动启动")
             # 注册关闭钩子
             _register_shutdown_hooks()
         else:
@@ -68,7 +67,6 @@ def _stop_workflow_monitor():
     try:
         if _workflow_watcher and _workflow_watcher.is_monitoring():
             _workflow_watcher.stop_workflow_monitor()
-            logging.info("[ComfyUI-1hewNodes] 工作流监控已自动停止")
     except Exception as e:
         logging.error(f"[ComfyUI-1hewNodes] 停止工作流监控时出错：{str(e)}")
 

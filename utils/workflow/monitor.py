@@ -168,8 +168,6 @@ def _monitor_worker():
     try:
         _observer.start()
         _is_monitoring = True
-        logging.info(f"[ComfyUI-1hewNodes] 工作流监控已启动 | 目标目录：{workflow_root}")
-        logging.info(f"[ComfyUI-1hewNodes] 临时文件路径：{TEMP_FILE_PATH}")
         
         # 保持监控运行
         while _is_monitoring:
@@ -188,13 +186,11 @@ def start_workflow_monitor():
     global _monitor_thread, _is_monitoring
     
     if _is_monitoring:
-        logging.info("[ComfyUI-1hewNodes] 工作流监控已在运行中")
         return True
     
     try:
         _monitor_thread = threading.Thread(target=_monitor_worker, daemon=True)
         _monitor_thread.start()
-        logging.info("[ComfyUI-1hewNodes] 工作流监控线程已启动")
         return True
     except Exception as e:
         logging.error(f"[ComfyUI-1hewNodes] 启动工作流监控线程失败：{str(e)}")
@@ -229,8 +225,6 @@ def stop_workflow_monitor():
                 logging.warning(f"[ComfyUI-1hewNodes] 监控线程停止时出现异常：{str(e)}")
             _monitor_thread = None
         
-        logging.info("[ComfyUI-1hewNodes] 工作流监控已完全停止")
-        
     except Exception as e:
         logging.error(f"[ComfyUI-1hewNodes] 停止工作流监控时出错：{str(e)}")
         # 强制重置状态
@@ -258,7 +252,6 @@ def start_observer():
     try:
         observer.start()
         logging.info(f"监控已启动 | 目标目录：{workflow_root}")
-        logging.info(f"临时文件路径：{TEMP_FILE_PATH}")
         logging.info("按 Ctrl+C 停止监控...")
         while True:
             time.sleep(1)
