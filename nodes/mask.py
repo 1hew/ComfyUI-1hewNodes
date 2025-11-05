@@ -89,8 +89,7 @@ class MaskMathOps:
             "required": {
                 "mask_1": ("MASK",),
                 "mask_2": ("MASK",),
-                "operation": (["or", "and", "subtract (a-b)", "subtract (b-a)", "xor"], 
-                             {"default": "or"})
+                "operation": (["or", "and", "subtract (a-b)", "subtract (b-a)", "xor"], {"default": "or"})
             }
         }
 
@@ -156,65 +155,6 @@ class MaskMathOps:
         
         # 合并批次
         output_tensor = torch.stack(output_masks)
-        
-        return (output_tensor,)
-
-
-class MaskBatchMathOps:
-    """
-    蒙版批量数学运算节点 - 支持批量处理所有图层的OR和AND功能
-    """
-    
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "mask": ("MASK",),
-                "operation": (["or", "and"], {"default": "or"})
-            }
-        }
-
-    RETURN_TYPES = ("MASK",)
-    RETURN_NAMES = ("mask",)
-    FUNCTION = "batch_mask_math_ops"
-    CATEGORY = "1hewNodes/mask"
-
-    def batch_mask_math_ops(self, mask, operation):
-        # 获取批次大小
-        batch_size = mask.shape[0]
-        
-        # 如果批次大小为1，直接返回
-        if batch_size <= 1:
-            return (mask,)
-        
-        # 创建输出蒙版
-        output_mask = None
-        
-        # 对每个批次进行处理
-        for b in range(batch_size):
-            current_mask = mask[b]
-            
-            # 将蒙版转换为numpy数组
-            if mask.is_cuda:
-                mask_np = current_mask.cpu().numpy()
-            else:
-                mask_np = current_mask.numpy()
-            
-            # 初始化输出蒙版（使用第一个蒙版）
-            if output_mask is None:
-                output_mask = mask_np.copy()
-                continue
-            
-            # 应用选定的操作
-            if operation == "or":
-                # or操作（取最大值）
-                output_mask = np.maximum(output_mask, mask_np)
-            elif operation == "and":
-                # and操作（取最小值）
-                output_mask = np.minimum(output_mask, mask_np)
-        
-        # 转换回tensor
-        output_tensor = torch.from_numpy(output_mask).unsqueeze(0)
         
         return (output_tensor,)
 
@@ -455,22 +395,18 @@ class MaskPasteByBBoxMask:
         return result_pil
     
 
-
-
 # 节点类映射
 NODE_CLASS_MAPPINGS = {
-    "MaskFillHole": MaskFillHole,
-    "MaskMathOps": MaskMathOps,
-    "MaskBatchMathOps": MaskBatchMathOps,
-    "MaskCropByBBoxMask": MaskCropByBBoxMask,
-    "MaskPasteByBBoxMask": MaskPasteByBBoxMask,
+    "1hew_MaskFillHole": MaskFillHole,
+    "1hew_MaskMathOps": MaskMathOps,
+    "1hew_MaskCropByBBoxMask": MaskCropByBBoxMask,
+    "1hew_MaskPasteByBBoxMask": MaskPasteByBBoxMask,
 }
 
 # 节点显示名称
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "MaskFillHole": "Mask Fill Hole",
-    "MaskMathOps": "Mask Math Ops",
-    "MaskBatchMathOps": "Mask Batch Math Ops",
-    "MaskCropByBBoxMask": "Mask Crop by BBox Mask",
-    "MaskPasteByBBoxMask": "Mask Paste by BBox Mask",
+    "1hew_MaskFillHole": "Mask Fill Hole",
+    "1hew_MaskMathOps": "Mask Math Ops",
+    "1hew_MaskCropByBBoxMask": "Mask Crop by BBox Mask",
+    "1hew_MaskPasteByBBoxMask": "Mask Paste by BBox Mask",
 }

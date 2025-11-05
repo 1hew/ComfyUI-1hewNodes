@@ -386,11 +386,184 @@ class DetectYolo:
         return current_dir_path
 
 
+class DetectGuideLine:
+    """引导线检测"""
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "canny_low": ("FLOAT", {"default": 0.2, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "canny_high": ("FLOAT", {"default": 0.8, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "seg_min_len": ("INT", {"default": 40, "min": 1, "max": 300, "step": 1}),
+                "seg_max_gap": ("INT", {"default": 8, "min": 1, "max": 100, "step": 1}),
+                "guide_filter": ("FLOAT", {"default": 0.6, "min": 0.1, "max": 1.0, "step": 0.1}),
+                "guide_width": ("INT", {"default": 2, "min": 1, "max": 100, "step": 1}),
+                "cluster_eps": ("INT", {"default": 30, "min": 1, "max": 100, "step": 5}),
+            }
+        }
+    
+    RETURN_TYPES = ("IMAGE", "IMAGE", "MASK")
+    RETURN_NAMES = ("image", "line_image", "line_mask")
+    FUNCTION = "detect_guide_line"
+    CATEGORY = "1hewNodes/detect"
+
+    def detect_guide_line(self, image, canny_low, canny_high, seg_min_len, seg_max_gap, guide_filter, guide_width, cluster_eps):
+        # 1. 图像格式转换
+        img_np = (image[0].cpu().numpy() * 255).astype(np.uint8)
+        img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+        img_rgb = img_np.copy()
+        h, w = img_rgb.shape[:2]
+        lines_only = np.zeros((h, w, 3), dtype=np.uint8)
+        line_mask = np.zeros((h, w), dtype=np.uint8)
+        red = (255, 0, 0)
+        default_vp = (w//2, h//2)  # 默认消失点（图像中心）
+        
+        # 2. 边缘检测（带降噪，阈值采用0-1映射）
+        gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+        gray_blur = cv2.GaussianBlur(gray, (5, 5), 0)
+        low = int(np.clip(float(canny_low), 0.0, 1.0) * 255)
+        high = int(np.clip(float(canny_high), 0.0, 1.0) * 255)
+        high = max(high, low)  # 确保高阈值不低于低阈值
+        edges = cv2.Canny(gray_blur, low, high)
+        
+        # 3. 线段提取
+        lines = cv2.HoughLinesP(
+            edges,
+            rho=1,
+            theta=np.pi / 180,
+            threshold=40,
+            minLineLength=seg_min_len,
+            maxLineGap=seg_max_gap
+        )
+        
+        if lines is None:
+            return (
+                image,
+                torch.from_numpy(lines_only.astype(np.float32) / 255.0).unsqueeze(0),
+                torch.from_numpy(line_mask.astype(np.float32) / 255.0).unsqueeze(0),
+            )
+        
+        # 4. 计算延长线交点
+        intersections = []
+        for i in range(len(lines)):
+            x1, y1, x2, y2 = lines[i][0]
+            dx, dy = x2 - x1, y2 - y1
+            x1_ext = x1 - 0.1*dx
+            y1_ext = y1 - 0.1*dy
+            x2_ext = x2 + 0.1*dx
+            y2_ext = y2 + 0.1*dy
+            
+            for j in range(i + 1, len(lines)):
+                x3, y3, x4, y4 = lines[j][0]
+                dx2, dy2 = x4 - x3, y4 - y3
+                x3_ext = x3 - 0.1*dx2
+                y3_ext = y3 - 0.1*dy2
+                x4_ext = x4 + 0.1*dx2
+                y4_ext = y4 + 0.1*dy2
+                
+                den = (x1_ext - x2_ext) * (y3_ext - y4_ext) - (y1_ext - y2_ext) * (x3_ext - x4_ext)
+                if den != 0:
+                    t_num = (x1_ext - x3_ext) * (y3_ext - y4_ext) - (y1_ext - y3_ext) * (x3_ext - x4_ext)
+                    u_num = -((x1_ext - x2_ext) * (y1_ext - y3_ext) - (y1_ext - y2_ext) * (x1_ext - x3_ext))
+                    t = t_num / den
+                    u = u_num / den
+                    x = x1_ext + t * (x2_ext - x1_ext)
+                    y = y1_ext + t * (y2_ext - y1_ext)
+                    if (-w <= x <= 2*w) and (-h <= y <= 2*h):
+                        intersections.append((x, y))
+        
+        if not intersections:
+            return (
+                image,
+                torch.from_numpy(lines_only.astype(np.float32) / 255.0).unsqueeze(0),
+                torch.from_numpy(line_mask.astype(np.float32) / 255.0).unsqueeze(0),
+            )
+        
+        # 5. 聚类优化（核心修复部分）
+        intersections_np = np.array(intersections)
+        try:
+            dbscan = DBSCAN(eps=cluster_eps, min_samples=5)
+            clusters = dbscan.fit_predict(intersections_np)
+            
+            # 过滤噪声点（-1）
+            valid_clusters = clusters[clusters != -1]
+            if len(valid_clusters) == 0:  # 全是噪声点
+                vanishing_point = default_vp
+            else:
+                # 找到最大聚类
+                cluster_mode = mode(valid_clusters)
+                if len(cluster_mode) == 0 or len(cluster_mode[0]) == 0:
+                    largest_cluster_idx = 0
+                else:
+                    largest_cluster_idx = cluster_mode[0][0]
+                
+                # 确保聚类索引存在
+                if largest_cluster_idx not in clusters:
+                    vanishing_point = default_vp
+                else:
+                    cluster_points = intersections_np[clusters == largest_cluster_idx]
+                    if len(cluster_points) == 0:
+                        vanishing_point = default_vp
+                    else:
+                        vanishing_point = (int(np.mean(cluster_points[:,0])), int(np.mean(cluster_points[:,1])))
+        except:
+            # 任何异常都返回默认消失点
+            vanishing_point = default_vp
+        
+        # 6. 线条筛选
+        line_scores = []
+        vx, vy = vanishing_point
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            dir1 = np.array([x1 - vx, y1 - vy])
+            dir2 = np.array([x2 - vx, y2 - vy])
+            line_dir = np.array([x2 - x1, y2 - y1])
+            if np.linalg.norm(line_dir) < 1e-8:
+                line_scores.append(0.0)
+                continue
+            line_dir_norm = line_dir / np.linalg.norm(line_dir)
+            score1 = np.abs(np.dot(dir1 / (np.linalg.norm(dir1)+1e-8), line_dir_norm)) if np.linalg.norm(dir1) > 1e-8 else 0
+            score2 = np.abs(np.dot(dir2 / (np.linalg.norm(dir2)+1e-8), line_dir_norm)) if np.linalg.norm(dir2) > 1e-8 else 0
+            line_scores.append(max(score1, score2))
+        
+        # 避免空列表导致的percentile错误
+        if len(line_scores) == 0:
+            filtered_lines = []
+        else:
+            threshold = np.percentile(line_scores, 100 - (guide_filter * 60))
+            filtered_lines = [line for i, line in enumerate(lines) if line_scores[i] >= threshold]
+        
+        # 7. 绘制线条
+        for line in filtered_lines:
+            x1, y1, x2, y2 = line[0]
+            cv2.line(img_rgb, (x1, y1), vanishing_point, red, guide_width)
+            cv2.line(img_rgb, (x2, y2), vanishing_point, red, guide_width)
+            cv2.line(lines_only, (x1, y1), vanishing_point, red, guide_width)
+            cv2.line(lines_only, (x2, y2), vanishing_point, red, guide_width)
+            cv2.line(line_mask, (x1, y1), vanishing_point, 255, guide_width)
+        
+        # 标记消失点
+        cv2.circle(img_rgb, vanishing_point, max(5, guide_width), red, -1)
+        cv2.circle(lines_only, vanishing_point, max(5, guide_width), red, -1)
+        cv2.circle(line_mask, vanishing_point, max(5, guide_width), 255, -1)
+        
+        # 转换格式
+        result_with_lines = torch.from_numpy(img_rgb.astype(np.float32) / 255.0).unsqueeze(0)
+        result_lines_only = torch.from_numpy(lines_only.astype(np.float32) / 255.0).unsqueeze(0)
+        result_line_mask = torch.from_numpy(line_mask.astype(np.float32) / 255.0).unsqueeze(0)
+        
+        return (result_with_lines, result_lines_only, result_line_mask)
+
+
 # ComfyUI节点注册
 NODE_CLASS_MAPPINGS = {
-    "1hew_DetectYolo": DetectYolo
+    "1hew_DetectYolo": DetectYolo,
+    "1hew_DetectGuideLine": DetectGuideLine
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "1hew_DetectYolo": "Detect Yolo"
+    "1hew_DetectYolo": "Detect Yolo",
+    "1hew_DetectGuideLine": "Detect Guide Line"
 }

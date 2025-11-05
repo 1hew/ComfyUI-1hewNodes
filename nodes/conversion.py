@@ -464,21 +464,21 @@ class StringCoordinateToBBoxMask:
 
 # 节点映射
 NODE_CLASS_MAPPINGS = {
-    "URLToVideo": URLToVideo,
-    "ImageBatchToList": ImageBatchToList,
-    "ImageListToBatch": ImageListToBatch,
-    "MaskBatchToList": MaskBatchToList,
-    "MaskListToBatch": MaskListToBatch,
-    "StringCoordinateToBBoxes": StringCoordinateToBBoxes,
-    "StringCoordinateToBBoxMask": StringCoordinateToBBoxMask,
+    "1hew_URLToVideo": URLToVideo,
+    "1hew_ImageBatchToList": ImageBatchToList,
+    "1hew_ImageListToBatch": ImageListToBatch,
+    "1hew_MaskBatchToList": MaskBatchToList,
+    "1hew_MaskListToBatch": MaskListToBatch,
+    "1hew_StringCoordinateToBBoxes": StringCoordinateToBBoxes,
+    "1hew_StringCoordinateToBBoxMask": StringCoordinateToBBoxMask,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "URLToVideo": "URL to Video",
-    "ImageBatchToList": "Image Batch to List",
-    "ImageListToBatch": "Image List to Batch",
-    "MaskBatchToList": "Mask Batch to List",
-    "MaskListToBatch": "Mask List to Batch",
-    "StringCoordinateToBBoxes": "String Coordinate to BBoxes",
-    "StringCoordinateToBBoxMask": "String Coordinate to BBox Mask",
+    "1hew_URLToVideo": "URL to Video",
+    "1hew_ImageBatchToList": "Image Batch to List",
+    "1hew_ImageListToBatch": "Image List to Batch",
+    "1hew_MaskBatchToList": "Mask Batch to List",
+    "1hew_MaskListToBatch": "Mask List to Batch",
+    "1hew_StringCoordinateToBBoxes": "String Coordinate to BBoxes",
+    "1hew_StringCoordinateToBBoxMask": "String Coordinate to BBox Mask",
 }

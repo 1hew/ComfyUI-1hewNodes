@@ -7,6 +7,7 @@ import math
 import cv2
 from skimage.measure import label, regionprops
 import comfy.utils
+import re
 
 
 class ImageGetSize:
@@ -499,7 +500,6 @@ class ImageResizeFluxKontext:
                     mask = mask[:, 0, :, :]  # 取第一个通道
             
             # 使用torch.nn.functional.interpolate来缩放mask
-            import torch.nn.functional as F
             
             # 添加batch和channel维度进行插值
             mask_for_resize = mask.unsqueeze(1)  # 添加channel维度
@@ -606,7 +606,6 @@ class ImageResizeQwenImage:
                     mask = mask[:, 0, :, :]  # 取第一个通道
             
             # 使用torch.nn.functional.interpolate来缩放mask
-            import torch.nn.functional as F
             
             # 添加batch和channel维度进行插值
             mask_for_resize = mask.unsqueeze(1)  # 添加channel维度
@@ -1907,11 +1906,7 @@ class ImageAddLabel:
                 "font_size": ("INT", {"default": 36, "min": 1, "max": 256}),
                 "invert_color": ("BOOLEAN", {"default": True}),
                 "font": (font_files, {"default": "Alibaba-PuHuiTi-Regular.otf"}),
-                "text": ("STRING", {
-                    "default": "", 
-                    "multiline": True,
-                    "placeholder": "-- splits override separator\nelse use newline."
-                }),
+                "text": ("STRING", {"default": "", "multiline": True, "placeholder": "-- splits override separator\nelse use newline."}),
                 "direction": (["top", "bottom", "left", "right"], {"default": "top"})
             },
             "optional": {
@@ -2014,7 +2009,6 @@ class ImageAddLabel:
         """
         解析文本中的输入引用，支持变量和简单数学运算
         """
-        import re
         
         parsed_text = text
         
@@ -2084,7 +2078,6 @@ class ImageAddLabel:
         当有只包含连字符的行时，只按 -- 进行分割，其他分割方式失效
         否则按照换行符(\n) 分割
         """
-        import re
         
         if not text.strip():
             return [""]
@@ -2876,8 +2869,7 @@ class ImageBBoxOverlayByMask:
             "required": {
                 "image": ("IMAGE",),
                 "mask": ("MASK",),
-                "bbox_color": (["red", "green", "blue", "yellow", "cyan", "magenta", "white", "black"], 
-                              {"default": "green"}),
+                "bbox_color": (["red", "green", "blue", "yellow", "cyan", "magenta", "white", "black"], {"default": "green"}),
                 "stroke_width": ("INT", {"default": 4, "min": 1, "max": 100, "step": 1}),
                 "fill": ("BOOLEAN", {"default": True}),
                 "padding": ("INT", {"default": 0, "min": 0, "max": 1000, "step": 1}),
@@ -3072,33 +3064,33 @@ class ImageBBoxOverlayByMask:
 
 
 NODE_CLASS_MAPPINGS = {
-    "ImageGetSize": ImageGetSize,
-    "ImageSolidFluxKontext": ImageSolidFluxKontext,
-    "ImageSolidQwenImage": ImageSolidQwenImage,
-    "ImageSolid": ImageSolid,
-    "ImageResizeFluxKontext": ImageResizeFluxKontext,
-    "ImageResizeQwenImage": ImageResizeQwenImage,
-    "ImageResizeUniversal": ImageResizeUniversal,
-    "ImageRotateWithMask": ImageRotateWithMask,
-    "ImageEditStitch": ImageEditStitch,
-    "ImageAddLabel": ImageAddLabel,
-    "ImagePlot": ImagePlot,
-    "ImageStrokeByMask": ImageStrokeByMask,
-    "ImageBBoxOverlayByMask": ImageBBoxOverlayByMask,
+    "1hew_ImageGetSize": ImageGetSize,
+    "1hew_ImageSolidFluxKontext": ImageSolidFluxKontext,
+    "1hew_ImageSolidQwenImage": ImageSolidQwenImage,
+    "1hew_ImageSolid": ImageSolid,
+    "1hew_ImageResizeFluxKontext": ImageResizeFluxKontext,
+    "1hew_ImageResizeQwenImage": ImageResizeQwenImage,
+    "1hew_ImageResizeUniversal": ImageResizeUniversal,
+    "1hew_ImageRotateWithMask": ImageRotateWithMask,
+    "1hew_ImageEditStitch": ImageEditStitch,
+    "1hew_ImageAddLabel": ImageAddLabel,
+    "1hew_ImagePlot": ImagePlot,
+    "1hew_ImageStrokeByMask": ImageStrokeByMask,
+    "1hew_ImageBBoxOverlayByMask": ImageBBoxOverlayByMask,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ImageGetSize": "Image Get Size",
-    "ImageSolidFluxKontext": "Image Solid FluxKontext",
-    "ImageSolidQwenImage": "Image Solid QwenImage",
-    "ImageSolid": "Image Solid",
-    "ImageResizeFluxKontext": "Image Resize FluxKontext",
-    "ImageResizeQwenImage": "Image Resize QwenImage",
-    "ImageResizeUniversal": "Image Resize Universal",
-    "ImageRotateWithMask": "Image Rotate with Mask",
-    "ImageEditStitch": "Image Edit Stitch",
-    "ImageAddLabel": "Image Add Label",
-    "ImagePlot": "Image Plot",
-    "ImageStrokeByMask": "Image Stroke by Mask",
-    "ImageBBoxOverlayByMask": "Image BBox Overlay by Mask",
+    "1hew_ImageGetSize": "Image Get Size",
+    "1hew_ImageSolidFluxKontext": "Image Solid FluxKontext",
+    "1hew_ImageSolidQwenImage": "Image Solid QwenImage",
+    "1hew_ImageSolid": "Image Solid",
+    "1hew_ImageResizeFluxKontext": "Image Resize FluxKontext",
+    "1hew_ImageResizeQwenImage": "Image Resize QwenImage",
+    "1hew_ImageResizeUniversal": "Image Resize Universal",
+    "1hew_ImageRotateWithMask": "Image Rotate with Mask",
+    "1hew_ImageEditStitch": "Image Edit Stitch",
+    "1hew_ImageAddLabel": "Image Add Label",
+    "1hew_ImagePlot": "Image Plot",
+    "1hew_ImageStrokeByMask": "Image Stroke by Mask",
+    "1hew_ImageBBoxOverlayByMask": "Image BBox Overlay by Mask",
 }

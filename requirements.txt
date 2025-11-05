@@ -8,8 +8,5 @@ scikit-image>=0.18.0
 
 # Additional dependencies for specific features
 scipy>=1.7.0
-colorsys-python>=0.1.0
 requests>=2.25.0
-
-# Optional dependencies for enhanced functionality
-fractions  # Built-in Python module, included for clarity
+pilgram>=1.1.0

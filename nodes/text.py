@@ -1,11 +1,13 @@
-import json
-import re
-import random
-import time
-import os
-import sys
-import importlib.util
+import ast
 from collections import OrderedDict
+import importlib.util
+import json
+import os
+import random
+import re
+import sys
+import time
+import traceback
 
 
 class IntWan:
@@ -234,7 +236,6 @@ class TextJoinMulti:
         input_value = "" if input is None or input == "" else str(input)
         parsed_text = parsed_text.replace("{input}", input_value)
         
-        import re
         
         # 先按行分割文本
         lines = parsed_text.split('\n')
@@ -543,7 +544,6 @@ class TextCustomExtract:
             print(f"JSON解析失败: {e}")
             try:
                 # 尝试使用ast.literal_eval
-                import ast
                 data = ast.literal_eval(text)
                 print(f"ast.literal_eval解析成功，数据类型: {type(data)}")
                 return data
@@ -792,7 +792,6 @@ class TextCustomExtract:
             
         except Exception as e:
             print(f"提取过程中发生错误: {e}")
-            import traceback
             traceback.print_exc()
             return ("",)
 
@@ -1150,18 +1149,8 @@ class ListCustomSeed:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "seed": ("INT", {
-                    "default": 42,
-                    "min": 0,
-                    "max": 1125899906842624,
-                    "step": 1
-                }),
-                "count": ("INT", {
-                    "default": 3,
-                    "min": 1,
-                    "max": 1000,
-                    "step": 1
-                })
+                "seed": ("INT", {"default": 42, "min": 0, "max": 1125899906842624, "step": 1}),
+                "count": ("INT", {"default": 3, "min": 1, "max": 1000, "step": 1})
             }
         }
     
@@ -1227,29 +1216,29 @@ class ListCustomSeed:
 
 # 节点映射
 NODE_CLASS_MAPPINGS = {
-    "IntWan": IntWan,
-    "IntSplit": IntSplit,
-    "TextFilterComment": TextFilterComment,
-    "TextJoinMulti": TextJoinMulti,
-    "TextJoinByTextList": TextJoinByTextList,
-    "TextPrefixSuffix": TextPrefixSuffix,
-    "TextCustomExtract": TextCustomExtract,
-    "ListCustomInt": ListCustomInt,
-    "ListCustomFloat": ListCustomFloat,
-    "ListCustomString": ListCustomString,
-    "ListCustomSeed": ListCustomSeed,
+    "1hew_IntWan": IntWan,
+    "1hew_IntSplit": IntSplit,
+    "1hew_TextFilterComment": TextFilterComment,
+    "1hew_TextJoinMulti": TextJoinMulti,
+    "1hew_TextJoinByTextList": TextJoinByTextList,
+    "1hew_TextPrefixSuffix": TextPrefixSuffix,
+    "1hew_TextCustomExtract": TextCustomExtract,
+    "1hew_ListCustomInt": ListCustomInt,
+    "1hew_ListCustomFloat": ListCustomFloat,
+    "1hew_ListCustomString": ListCustomString,
+    "1hew_ListCustomSeed": ListCustomSeed,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "IntWan": "Int Wan",
-    "IntSplit": "Int Split",
-    "TextFilterComment": "Text Filter Comment",
-    "TextJoinMulti": "Text Join Multi",
-    "TextJoinByTextList": "Text Join by Text List",
-    "TextPrefixSuffix": "Text Prefix Suffix",
-    "TextCustomExtract": "Text Custom Extract",
-    "ListCustomInt": "List Custom Int", 
-    "ListCustomFloat": "List Custom Float",
-    "ListCustomString": "List Custom String",
-    "ListCustomSeed": "List Custom Seed",
+    "1hew_IntWan": "Int Wan",
+    "1hew_IntSplit": "Int Split",
+    "1hew_TextFilterComment": "Text Filter Comment",
+    "1hew_TextJoinMulti": "Text Join Multi",
+    "1hew_TextJoinByTextList": "Text Join by Text List",
+    "1hew_TextPrefixSuffix": "Text Prefix Suffix",
+    "1hew_TextCustomExtract": "Text Custom Extract",
+    "1hew_ListCustomInt": "List Custom Int", 
+    "1hew_ListCustomFloat": "List Custom Float",
+    "1hew_ListCustomString": "List Custom String",
+    "1hew_ListCustomSeed": "List Custom Seed",
 }

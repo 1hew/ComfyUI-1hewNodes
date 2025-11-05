@@ -679,14 +679,14 @@ class ImageTileMerge:
 
 
 NODE_CLASS_MAPPINGS = {
-    "ImageTileSplit": ImageTileSplit,
-    "ImageTileSplitPreset": ImageTileSplitPreset,
-    "ImageTileMerge": ImageTileMerge,
+    "1hew_ImageTileSplit": ImageTileSplit,
+    "1hew_ImageTileSplitPreset": ImageTileSplitPreset,
+    "1hew_ImageTileMerge": ImageTileMerge,
 
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ImageTileSplit": "Image Tile Split",
-    "ImageTileSplitPreset": "Image Tile Split Preset",
-    "ImageTileMerge": "Image Tile Merge",
+    "1hew_ImageTileSplit": "Image Tile Split",
+    "1hew_ImageTileSplitPreset": "Image Tile Split Preset",
+    "1hew_ImageTileMerge": "Image Tile Merge",
 }

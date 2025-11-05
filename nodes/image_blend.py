@@ -1,13 +1,22 @@
-import torch
+import colorsys
+import math
 import numpy as np
 from PIL import Image, ImageOps, ImageEnhance, ImageColor, ImageFilter
-import math
-import colorsys
+from scipy import ndimage
+import torch
+
+# 可选依赖：pilgram（用于 CSS 混合模式）
+try:
+    import pilgram.css.blending as blending
+    PILGRAM_AVAILABLE = True
+except ImportError:
+    PILGRAM_AVAILABLE = False
+    blending = None
 
 
-class ImageLumaMatte:
+class ImageMaskBlend:
     """
-    亮度蒙版 - 完全支持批量处理图像和遮罩，增强的背景颜色支持
+    遮罩混合 - 支持批量处理图像与遮罩，增强填充与扩展控制
     
     批量处理逻辑：
     - 当图像和遮罩数量不同时，按最大数量输出，较少的批次会循环复制
@@ -15,6 +24,8 @@ class ImageLumaMatte:
     - 例如：2张图片 + 5个遮罩 = 输出5张处理结果（图片按[1,2,1,2,1]循环使用）
     
     支持多种颜色格式：灰度值、HEX、RGB、颜色名称、edge（边缘色）、average（平均色）
+    
+    可选参数：fill_hole、invert、feather、expansion、opacity、background_color、background_opacity
     """
     
     @classmethod
@@ -25,21 +36,42 @@ class ImageLumaMatte:
                 "mask": ("MASK",)
             },
             "optional": {
-                "invert_mask": ("BOOLEAN", {"default": False}),
+                "fill_hole": ("BOOLEAN", {"default": True}),
+                "invert": ("BOOLEAN", {"default": False}),
                 "feather": ("INT", {"default": 0, "min": 0, "max": 50, "step": 1}),
-                "background_add": ("BOOLEAN", {"default": True}),
+                "opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "expansion": ("INT", {"default": 0, "min": -100, "max": 100, "step": 1}),
                 "background_color": ("STRING", {"default": "1.0"}),
-                "out_alpha": ("BOOLEAN", {"default": False}),
+                "background_opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
             }
         }
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
-    FUNCTION = "image_luma_matte"
+    RETURN_TYPES = ("IMAGE", "MASK")
+    RETURN_NAMES = ("image", "mask")
+    FUNCTION = "image_blend_mask"
     CATEGORY = "1hewNodes/image/blend"
 
-    def image_luma_matte(self, image, mask, invert_mask=False, feather=0, background_add=True, 
-                           background_color="1.0", out_alpha=False):
+    def image_blend_mask(self, image, mask, invert=False, feather=0,
+                         background_color="1.0", background_opacity=1.0,
+                         fill_hole=False, expansion=0,
+                         opacity=1.0):
+        """
+        AE 对齐的遮罩融合（无 alpha 分支，输出 image 与 mask）：
+        - fill_hole：填补遮罩孔洞，确保连续形状
+        - expansion：扩展/收缩遮罩（像素）
+        - feather：高斯羽化（像素半径）
+        - invert：形态/羽化完成后反转选择区域
+        - opacity：遮罩不透明度（0–1），缩放遮罩强度
+        - background_color：非遮罩区域底色；opacity<1 时遮罩区会按 (1-mask*opacity) 透出底色
+        - background_opacity：底色与原图在非遮罩区域的混合强度（0–1），
+          1 为完全底色，0.5 为半透明底色叠加到原图
+
+        顺序：尺寸对齐 → 填孔 → 扩展/收缩 → 羽化 → 反转 → 应用 opacity
+        输出：
+        - image：final = image*mask + mixed_bg*(1-mask)
+          其中 mixed_bg = (1-background_opacity)*image + background_opacity*background
+        - mask：处理后的遮罩张量（0–1），mask = mask_gray*opacity
+        """
         # 获取图像和遮罩的批次尺寸
         image_batch_size = image.shape[0]
         mask_batch_size = mask.shape[0]
@@ -47,8 +79,9 @@ class ImageLumaMatte:
         # 确定最大批次数量，输出将按照最大批次数量处理
         max_batch_size = max(image_batch_size, mask_batch_size)
         
-        # 创建输出图像
+        # 创建输出图像与遮罩
         output_images = []
+        output_masks = []
         
         for b in range(max_batch_size):
             # 确定使用哪个图像和遮罩（循环使用较少的批次）
@@ -67,69 +100,88 @@ class ImageLumaMatte:
                 mask_np = (mask[mask_index].cpu().numpy() * 255).astype(np.uint8)
             else:
                 mask_np = (mask[mask_index].numpy() * 255).astype(np.uint8)
-            mask_pil = Image.fromarray(mask_np)            
+            mask_pil = Image.fromarray(mask_np)
 
             # 调整遮罩大小以匹配图像
             if img_pil.size != mask_pil.size:
                 mask_pil = mask_pil.resize(img_pil.size, Image.Resampling.LANCZOS)
 
-            # 如果需要反转遮罩
-            if invert_mask:
-                mask_pil = ImageOps.invert(mask_pil)
+            # 1) 填孔（fill_hole）
+            if fill_hole:
+                mask_pil = self._fill_hole_pil(mask_pil)
 
-            # 羽化边缘处理
+            # 2) 形态学扩展/收缩（expansion，正扩展，负收缩）
+            if expansion != 0:
+                mask_pil = self._morph_adjust(mask_pil, expansion)
+
+            # 3) 羽化（feather）
             if feather > 0:
                 mask_pil = mask_pil.filter(ImageFilter.GaussianBlur(radius=feather))
 
-            # 解析背景颜色
+            # 4) 反转（invert）
+            if invert:
+                mask_pil = ImageOps.invert(mask_pil)
+
+            # 解析背景颜色（仅在非 alpha 输出时用于可见混合）
             bg_color = self._parse_color_advanced(background_color, img_pil, mask_pil)
 
-            if background_add:
-                # 创建背景图像
-                if bg_color == 'average':
-                    # 计算遮罩内的平均颜色
-                    bg_color = self._get_average_color(img_pil, mask_pil)
-                elif bg_color == 'edge':
-                    # 获取图像边缘的平均颜色
-                    bg_color = self._get_edge_color(img_pil)
-                
-                # 使用解析后的背景颜色创建背景
-                background = Image.new('RGB', img_pil.size, bg_color)
-                result = background.copy()
-                result.paste(img_pil, (0, 0), mask_pil)
+            # 底色解析与准备
+            if bg_color == 'average':
+                bg_color = self._get_average_color(img_pil, mask_pil)
+            elif bg_color == 'edge':
+                bg_color = self._get_edge_color(img_pil)
 
-                if out_alpha:
-                    # 转换为RGBA并保留alpha通道
-                    result = result.convert('RGBA')
-                    # 将遮罩应用到alpha通道
-                    alpha_channel = mask_pil.copy()
-                    result.putalpha(alpha_channel)
-                    # 转换回numpy格式，保留所有4个通道
-                    result_np = np.array(result).astype(np.float32) / 255.0
-                else:
-                    # 转换回numpy格式
-                    result_np = np.array(result).astype(np.float32) / 255.0
-                
-                output_images.append(torch.from_numpy(result_np))
-            else:
-                # 创建透明图像
-                if out_alpha:
-                    transparent = Image.new('RGBA', img_pil.size, (0, 0, 0, 0))
-                    transparent.paste(img_pil, (0, 0), mask_pil)
-                    # 转换回numpy格式，保留所有4个通道
-                    transparent_np = np.array(transparent).astype(np.float32) / 255.0
-                else:
-                    # 创建黑色背景的RGB图像
-                    transparent = Image.new('RGB', img_pil.size, (0, 0, 0))
-                    transparent.paste(img_pil, (0, 0), mask_pil)
-                    transparent_np = np.array(transparent).astype(np.float32) / 255.0
+            background = Image.new('RGB', img_pil.size, bg_color)
 
-                output_images.append(torch.from_numpy(transparent_np))
+            img_np_f = np.array(img_pil).astype(np.float32) / 255.0
+            bg_np_f = np.array(background).astype(np.float32) / 255.0
+            # 遮罩值，并应用 opacity（与 AE 的 Mask Opacity 一致）
+            mask_f = np.array(mask_pil).astype(np.float32) / 255.0
+            mask_f = np.clip(mask_f * float(opacity), 0.0, 1.0)
+
+            non_mask = 1.0 - mask_f
+            mask_3 = np.expand_dims(mask_f, axis=2)
+            non_mask_3 = np.expand_dims(non_mask, axis=2)
+
+            # 非遮罩区域的底色与原图混合（background_opacity 控制强度）
+            try:
+                bg_op = max(0.0, min(1.0, float(background_opacity)))
+            except Exception:
+                bg_op = 1.0
+            mixed_bg = (1.0 - bg_op) * img_np_f + bg_op * bg_np_f
+
+            # 最终图像：遮罩内显示原图，遮罩外显示混合后的底色
+            final_np = img_np_f * mask_3 + mixed_bg * non_mask_3
+            result_np = final_np.astype(np.float32)
+            output_images.append(torch.from_numpy(result_np))
+
+            # 遮罩输出（0–1）
+            output_masks.append(torch.from_numpy(mask_f.astype(np.float32)))
 
         # 合并批次
-        output_tensor = torch.stack(output_images)
+        output_images_tensor = torch.stack(output_images)
+        output_masks_tensor = torch.stack(output_masks)
         
-        return (output_tensor,)
+        return (output_images_tensor, output_masks_tensor)
+
+    def _fill_hole_pil(self, mask_pil):
+        mask_array = np.array(mask_pil)
+        binary_mask = mask_array > 127
+        structure = ndimage.generate_binary_structure(2, 2)
+        filled_mask = ndimage.binary_fill_holes(binary_mask, structure=structure)
+        filled_array = (filled_mask * 255).astype(np.uint8)
+        return Image.fromarray(filled_array, mode="L")
+
+    def _morph_adjust(self, mask_pil, expansion):
+        mask_array = np.array(mask_pil)
+        binary_mask = mask_array > 127
+        structure = ndimage.generate_binary_structure(2, 2)
+        if expansion > 0:
+            adjusted = ndimage.binary_dilation(binary_mask, structure=structure, iterations=expansion)
+        else:
+            adjusted = ndimage.binary_erosion(binary_mask, structure=structure, iterations=abs(expansion))
+        adjusted_array = (adjusted * 255).astype(np.uint8)
+        return Image.fromarray(adjusted_array, mode="L")
     
     def _parse_color_advanced(self, color_str, img_pil=None, mask_pil=None):
         """
@@ -283,7 +335,7 @@ class ImageLumaMatte:
         return tuple(np.mean(edge_array.reshape(-1, 3), axis=0).astype(int))
 
 
-class ImageBlendModesByAlpha:
+class ImageBlendModeByAlpha:
     """
     图层叠加模式 - 支持基础图层输入，控制叠加模式和透明度强度
     """
@@ -310,10 +362,10 @@ class ImageBlendModesByAlpha:
 
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
-    FUNCTION = "blend_modes"
+    FUNCTION = "blend_mode"
     CATEGORY = "1hewNodes/image/blend"
 
-    def blend_modes(self, base_image, overlay_image, blend_mode, opacity, overlay_mask=None, invert_mask=False):
+    def blend_mode(self, base_image, overlay_image, blend_mode, opacity, overlay_mask=None, invert_mask=False):
         # 检查并转换 RGBA 图像为 RGB
         base_image = self._convert_rgba_to_rgb(base_image)
         overlay_image = self._convert_rgba_to_rgb(overlay_image)
@@ -858,7 +910,7 @@ class ImageBlendModesByAlpha:
         return torch.stack([r, g, b], dim=-1)
 
 
-class ImageBlendModesByCSS:
+class ImageBlendModeByCSS:
     """
     CSS 图层叠加模式 - 基于 Pilgram 库实现的 CSS 混合模式
     """
@@ -883,15 +935,13 @@ class ImageBlendModesByCSS:
 
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("image",)
-    FUNCTION = "image_blend_modes_by_css"
+    FUNCTION = "image_blend_mode_by_css"
     CATEGORY = "1hewNodes/image/blend"
 
-    def image_blend_modes_by_css(self, base_image, overlay_image, blend_mode, blend_percentage, overlay_mask=None, invert_mask=False):
-        # 检查并安装 pilgram 库
-        if not self._check_pilgram():
-            raise ImportError("无法导入 pilgram 库，请确保已安装。可以使用 pip install pilgram 安装。")
-        
-        import pilgram.css.blending as blending
+    def image_blend_mode_by_css(self, base_image, overlay_image, blend_mode, blend_percentage, overlay_mask=None, invert_mask=False):
+        # 检查 pilgram 是否可用
+        if not PILGRAM_AVAILABLE:
+            raise ImportError("需要依赖 pilgram，请先安装：pip install pilgram")
         
         # 初始化结果为基础图层
         result = base_image.clone()
@@ -983,19 +1033,7 @@ class ImageBlendModesByCSS:
         
         return (result,)
     
-    def _check_pilgram(self):
-        """检查是否已安装 pilgram 库"""
-        try:
-            import pilgram
-            return True
-        except ImportError:
-            try:
-                import pip
-                pip.main(['install', 'pilgram'])
-                import pilgram
-                return True
-            except:
-                return False
+    
     
     def _convert_rgba_to_rgb(self, image):
         """将RGBA图像转换为RGB图像"""
@@ -1082,14 +1120,14 @@ class ImageBlendModesByCSS:
 
 
 NODE_CLASS_MAPPINGS = {
-    "ImageLumaMatte": ImageLumaMatte,
-    "ImageBlendModesByAlpha": ImageBlendModesByAlpha,
-    "ImageBlendModesByCSS": ImageBlendModesByCSS,
+    "1hew_ImageMaskBlend": ImageMaskBlend,
+    "1hew_ImageBlendModeByAlpha": ImageBlendModeByAlpha,
+    "1hew_ImageBlendModeByCSS": ImageBlendModeByCSS,
 }
 
 # 节点显示名称
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ImageLumaMatte": "Image Luma Matte",
-    "ImageBlendModesByAlpha": "Image Blend Modes by Alpha",
-    "ImageBlendModesByCSS": "Image Blend Modes by CSS",
+    "1hew_ImageMaskBlend": "Image Mask Blend",
+    "1hew_ImageBlendModeByAlpha": "Image Blend Mode by Alpha",
+    "1hew_ImageBlendModeByCSS": "Image Blend Mode by CSS",
 }

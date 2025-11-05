@@ -21,6 +21,15 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v2.0.0**
+- 重要变更：重大版本更新，升级到 2.0.0 后，已有 1.x 工作流需重新设置节点与参数方可正常运行，请谨慎更新。
+
+<details>
+<summary><b>历史版本（1.x）更新日志（已折叠）</b></summary>
+
+**v1.2.46**
+- feat(detection): 添加 `DetectGuideLine` 节点
+
 **v1.2.45**
 - feat(detection): 添加 `DetectYolo` 节点，支持YOLO模型目标检测
 
@@ -294,6 +303,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ​	</details>
 
+</details>
+
 
 
 ## 📋 节点列表
@@ -318,16 +329,16 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎨 图像混合节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Image Luma Matte | 基于亮度的图像蒙版合成，支持羽化、透明度输出和多种颜色格式 |
+| Image Mask Blend | 基于亮度的图像蒙版合成，支持羽化、透明度输出和多种颜色格式 |
 | Image Blend Modes by Alpha | 基于透明度的图像混合，支持多种Photoshop风格混合模式 |
 | Image Blend Modes by CSS | CSS标准混合模式，基于Pilgram库实现 |
 
 ### ✂️ 图像裁剪节点
 | 节点名称 | 功能描述 |
 |---------|----------|
+| Image Mask Crop | 基于遮罩的批量裁剪，支持RGB/RGBA双输出模式和智能通道处理 |
 | Image Crop Square | 方形裁剪，支持遮罩引导和缩放 |
 | Image Crop with BBox Mask| 智能边界框裁剪，支持精确比例控制和缩放强度调节 |
-| Image Crop by Mask Alpha | 基于遮罩的批量裁剪，支持RGB/RGBA双输出模式和智能通道处理 |
 | Image Paste by BBox Mask | 裁剪图像回贴，支持多种混合模式 |
 | Image Edge Crop Pad | 智能边缘裁剪和填充，支持多种填充模式和遮罩输出 |
 | Image Grid Split | 将图像分割为网格布局，支持灵活的行列配置和选择性输出选项 |
@@ -351,13 +362,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Mask Fill Hole | 填充遮罩中的封闭区域孔洞，支持批量处理 |
 | Mask Math Ops | 遮罩数学运算（交集、并集、差集、异或） |
-| Mask Batch Math Ops | 批量遮罩数学运算 |
 | Mask Crop by BBox Mask | 基于蒙版区域的遮罩边界框裁剪 |
 | Mask Paste by BBox Mask | 简化遮罩粘贴，支持自动基础遮罩创建和边界框检测 |
 
 ### 🔍 检测节点
 | 节点名称 | 功能描述 |
 |---------|----------|
+| DetectGuideLine | 引导线检测，融合 Canny、HoughLinesP 与 DBSCAN 消失点聚类 |
 | DetectYolo | YOLO模型目标检测，支持子文件夹模型、可自定义置信度阈值和可选标签显示控制 |
 
 ### 🔧 工具节点
@@ -393,6 +404,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Batch Split | 智能图像批次拆分器，支持正向/反向拆分模式和增强的边界条件处理 |
 | Image Batch Group | 智能图像批次分组器，支持可配置的批次大小、重叠处理和灵活的填充策略 |
 | Image List Append | 图像列表追加器，智能合并图像到列表中 |
+| Mask Batch Math Ops | 批量遮罩数学运算 |
 | Mask Batch Split | 智能遮罩批次拆分器，支持正向/反向拆分模式和增强的边界条件处理 |
 | Video Cut Group | 视频硬切检测器，通过分析相邻帧相似度识别场景切换点，支持快速和精确模式 |
 
