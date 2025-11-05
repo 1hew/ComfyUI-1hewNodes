@@ -25,7 +25,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - 重要变更：重大版本更新，升级到 2.0.0 后，已有 1.x 工作流需重新设置节点与参数方可正常运行，请谨慎更新。
 
 <details>
-<summary><b>历史版本（1.x）更新日志（已折叠）</b></summary>
+<summary><b>1.x 版本更新日志</b></summary>
 
 **v1.2.46**
 - feat(detection): 添加 `DetectGuideLine` 节点

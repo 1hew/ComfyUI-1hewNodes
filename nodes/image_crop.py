@@ -1,8 +1,9 @@
-import numpy as np
-import torch
-from PIL import Image, ImageDraw, ImageOps
-import math
 from fractions import Fraction
+import math
+from math import gcd
+import numpy as np
+from PIL import Image, ImageDraw, ImageOps
+import torch
 
 
 class ImageMaskCrop:
@@ -884,7 +885,6 @@ class ImageCropWithBBoxMask:
             ratio_w, ratio_h = self._simple_float_to_fraction(target_ratio, divisible_by)
         
         # 计算最大公约数，简化比例
-        from math import gcd
         g = gcd(ratio_w, ratio_h)
         ratio_w //= g
         ratio_h //= g
@@ -927,7 +927,6 @@ class ImageCropWithBBoxMask:
                     return numerator, denominator
         
         # 如果找不到合适的，使用默认方法
-        from fractions import Fraction
         frac = Fraction(ratio).limit_denominator(100)
         return frac.numerator, frac.denominator
     

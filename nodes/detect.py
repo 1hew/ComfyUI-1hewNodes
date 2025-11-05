@@ -1,26 +1,11 @@
-# YOLO目标检测独立节点 for ComfyUI
-# 支持YOLOv5, YOLOv8, YOLOv9, YOLOv10, YOLOv11等多个版本
-# 这是一个独立版本，可以在其他仓库中使用
-
-# 使用说明和要求
-"""
-要求:
-- 将YOLO模型文件(.pt)放置在 ComfyUI/models/yolo/ 目录中
-
-模型下载:
-您可以从以下位置下载YOLO模型:
-- https://github.com/ultralytics/assets/releases
-- 官方YOLO发布版本
-
-"""
-
 import copy
-import os
 import glob
+import os
+import cv2
 import numpy as np
 import torch
-import cv2
 from PIL import Image, ImageChops
+from ultralytics import YOLO
 import folder_paths
 
 
@@ -29,6 +14,8 @@ class DetectYolo:
     YOLO目标检测节点
     使用YOLO模型检测图像中的目标并生成遮罩
     支持YOLOv5, YOLOv8, YOLOv9, YOLOv10, YOLOv11等多个版本
+    - 将YOLO模型文件(.pt)放置在 ComfyUI/models/yolo/ 目录中
+    - https://github.com/ultralytics/assets/releases
     支持阈值控制、索引标注和遮罩选择功能
     """
     
@@ -81,11 +68,7 @@ class DetectYolo:
         ret_masks = []
         ret_plot_images = []
 
-        try:
-            from ultralytics import YOLO
-        except ImportError:
-            self.log("ultralytics package is required. Please install it with: pip install ultralytics", message_type='error')
-            raise ImportError("ultralytics package not found")
+        # ultralytics YOLO 已在模块顶部导入
 
         # 获取模型路径并加载YOLO模型
         model_path = self.get_model_path()

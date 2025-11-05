@@ -25,7 +25,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - breaking: Major update. Existing workflows built with previous nodes require reconfiguration after upgrading to function correctly. Please review nodes and parameters carefully.
 
 <details>
-<summary><b>Previous releases (1.x)</b> — collapsed</summary>
+<summary><b> 1.x releases</b></summary>
 
 **v1.2.46**
 - feat(detection): Added `DetectGuideLine` node 
