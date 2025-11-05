@@ -41,6 +41,8 @@ WEB_DIRECTORY = os.path.join(current_dir, "web")
 
 # 全局变量保存监控模块引用
 _workflow_watcher = None
+_prev_sigint_handler = None
+_prev_sigterm_handler = None
 
 # 自动启动工作流监控功能
 def _start_workflow_monitor():
@@ -77,9 +79,12 @@ def _register_shutdown_hooks():
     
     # 注册信号处理（仅在主线程中有效）
     try:
+        global _prev_sigint_handler, _prev_sigterm_handler
         if hasattr(signal, 'SIGINT'):
+            _prev_sigint_handler = signal.getsignal(signal.SIGINT)
             signal.signal(signal.SIGINT, _signal_handler)
         if hasattr(signal, 'SIGTERM'):
+            _prev_sigterm_handler = signal.getsignal(signal.SIGTERM)
             signal.signal(signal.SIGTERM, _signal_handler)
     except ValueError:
         # 在非主线程中注册信号处理会失败，这是正常的
@@ -89,6 +94,21 @@ def _signal_handler(signum, frame):
     """信号处理函数"""
     logging.info(f"[ComfyUI-1hewNodes] 接收到信号 {signum}，正在停止工作流监控...")
     _stop_workflow_monitor()
+    # 保持默认终止行为或链式调用原处理器
+    try:
+        if hasattr(signal, 'SIGINT') and signum == signal.SIGINT:
+            # 如果原处理器是默认或未设置，则触发默认 KeyboardInterrupt
+            if _prev_sigint_handler in (signal.SIG_DFL, None, signal.default_int_handler):
+                raise KeyboardInterrupt
+            # 如果原处理器不是忽略，则链式调用原处理器
+            if _prev_sigint_handler is not None and _prev_sigint_handler != signal.SIG_IGN:
+                _prev_sigint_handler(signum, frame)
+        elif hasattr(signal, 'SIGTERM') and signum == signal.SIGTERM:
+            if _prev_sigterm_handler not in (None, signal.SIG_IGN):
+                _prev_sigterm_handler(signum, frame)
+    except KeyboardInterrupt:
+        # 让上层按默认流程处理退出
+        raise
 
 # 自动启动工作流监控
 _start_workflow_monitor()
