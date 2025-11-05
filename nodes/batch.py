@@ -4,7 +4,9 @@ from PIL import Image, ImageColor
 import cv2
 import math
 import time
+import re
 from collections import defaultdict
+
 
 class ImageBatchExtract:
     """
@@ -685,6 +687,65 @@ class ImageListAppend:
         return (result,)
 
 
+class MaskBatchMathOps:
+    """
+    蒙版批量数学运算节点 - 支持批量处理所有图层的OR和AND功能
+    """
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "mask": ("MASK",),
+                "operation": (["or", "and"], {"default": "or"})
+            }
+        }
+
+    RETURN_TYPES = ("MASK",)
+    RETURN_NAMES = ("mask",)
+    FUNCTION = "batch_mask_math_ops"
+    CATEGORY = "1hewNodes/batch"
+
+    def batch_mask_math_ops(self, mask, operation):
+        # 获取批次大小
+        batch_size = mask.shape[0]
+        
+        # 如果批次大小为1，直接返回
+        if batch_size <= 1:
+            return (mask,)
+        
+        # 创建输出蒙版
+        output_mask = None
+        
+        # 对每个批次进行处理
+        for b in range(batch_size):
+            current_mask = mask[b]
+            
+            # 将蒙版转换为numpy数组
+            if mask.is_cuda:
+                mask_np = current_mask.cpu().numpy()
+            else:
+                mask_np = current_mask.numpy()
+            
+            # 初始化输出蒙版（使用第一个蒙版）
+            if output_mask is None:
+                output_mask = mask_np.copy()
+                continue
+            
+            # 应用选定的操作
+            if operation == "or":
+                # or操作（取最大值）
+                output_mask = np.maximum(output_mask, mask_np)
+            elif operation == "and":
+                # and操作（取最小值）
+                output_mask = np.minimum(output_mask, mask_np)
+        
+        # 转换回tensor
+        output_tensor = torch.from_numpy(output_mask).unsqueeze(0)
+        
+        return (output_tensor,)
+
+
 class MaskBatchSplit:
     
     @classmethod
@@ -813,7 +874,6 @@ class VideoCutGroup:
         """
         解析用户输入的帧索引字符串，支持逗号分隔，智能处理中英文逗号和空格
         """
-        import re
         if not frame_string or not frame_string.strip():
             return []
         
@@ -835,7 +895,6 @@ class VideoCutGroup:
         格式: "3,7,11" 或 "3,5,7,9,11,13,15"
         返回: [(kernel_size, sigma), ...] 格式的列表
         """
-        import re
         if not kernel_string or not kernel_string.strip():
             # 如果为空，返回默认配置
             return [(3, 0.6), (7, 1.0), (11, 1.5)]
@@ -1470,19 +1529,21 @@ class VideoCutGroup:
 
 
 NODE_CLASS_MAPPINGS = {
-    "ImageBatchExtract": ImageBatchExtract,
-    "ImageBatchSplit": ImageBatchSplit,
-    "ImageBatchGroup": ImageBatchGroup,
-    "ImageListAppend": ImageListAppend,
-    "MaskBatchSplit": MaskBatchSplit,
-    "VideoCutGroup": VideoCutGroup,
+    "1hew_ImageBatchExtract": ImageBatchExtract,
+    "1hew_ImageBatchSplit": ImageBatchSplit,
+    "1hew_ImageBatchGroup": ImageBatchGroup,
+    "1hew_ImageListAppend": ImageListAppend,
+    "1hew_MaskBatchMathOps": MaskBatchMathOps,
+    "1hew_MaskBatchSplit": MaskBatchSplit,
+    "1hew_VideoCutGroup": VideoCutGroup,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ImageBatchExtract": "Image Batch Extract",
-    "ImageBatchSplit": "Image Batch Split",
-    "ImageBatchGroup": "Image Batch Group",
-    "ImageListAppend": "Image List Append",
-    "MaskBatchSplit": "Mask Batch Split",
-    "VideoCutGroup": "Video Cut Group",
+    "1hew_ImageBatchExtract": "Image Batch Extract",
+    "1hew_ImageBatchSplit": "Image Batch Split",
+    "1hew_ImageBatchGroup": "Image Batch Group",
+    "1hew_ImageListAppend": "Image List Append",
+    "1hew_MaskBatchMathOps": "Mask Batch Math Ops",
+    "1hew_MaskBatchSplit": "Mask Batch Split",
+    "1hew_VideoCutGroup": "Video Cut Group",
 }

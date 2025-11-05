@@ -312,17 +312,16 @@ class AnySwitchInt:
             return (None,)
 
 
-
 NODE_CLASS_MAPPINGS = {
-    "AnyEmptyBool": AnyEmptyBool,
-    "AnyEmptyInt": AnyEmptyInt,
-    "AnySwitchBool": AnySwitchBool,
-    "AnySwitchInt": AnySwitchInt,
+    "1hew_AnyEmptyBool": AnyEmptyBool,
+    "1hew_AnyEmptyInt": AnyEmptyInt,
+    "1hew_AnySwitchBool": AnySwitchBool,
+    "1hew_AnySwitchInt": AnySwitchInt,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "AnyEmptyBool": "Any Empty Bool",
-    "AnyEmptyInt": "Any Empty Int",
-    "AnySwitchBool": "Any Switch Bool",
-    "AnySwitchInt": "Any Switch Int",
+    "1hew_AnyEmptyBool": "Any Empty Bool",
+    "1hew_AnyEmptyInt": "Any Empty Int",
+    "1hew_AnySwitchBool": "Any Switch Bool",
+    "1hew_AnySwitchInt": "Any Switch Int",
 }

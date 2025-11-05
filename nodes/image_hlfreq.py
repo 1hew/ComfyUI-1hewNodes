@@ -772,13 +772,13 @@ class ImageHLFreqTransform:
 
 # 更新节点注册
 NODE_CLASS_MAPPINGS = {
-    "ImageHLFreqSeparate": ImageHLFreqSeparate,
-    "ImageHLFreqCombine": ImageHLFreqCombine,
-    "ImageHLFreqTransform": ImageHLFreqTransform,
+    "1hew_ImageHLFreqSeparate": ImageHLFreqSeparate,
+    "1hew_ImageHLFreqCombine": ImageHLFreqCombine,
+    "1hew_ImageHLFreqTransform": ImageHLFreqTransform,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ImageHLFreqSeparate": "Image HL Freq Separate",
-    "ImageHLFreqCombine": "Image HL Freq Combine",
-    "ImageHLFreqTransform": "Image HL Freq Transform",
+    "1hew_ImageHLFreqSeparate": "Image HL Freq Separate",
+    "1hew_ImageHLFreqCombine": "Image HL Freq Combine",
+    "1hew_ImageHLFreqTransform": "Image HL Freq Transform",
 }

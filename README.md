@@ -21,6 +21,15 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v2.0.0**
+- breaking: Major update. Existing workflows built with previous nodes require reconfiguration after upgrading to function correctly. Please review nodes and parameters carefully.
+
+<details>
+<summary><b>Previous releases (1.x)</b> — collapsed</summary>
+
+**v1.2.46**
+- feat(detection): Added `DetectGuideLine` node 
+
 **v1.2.45**
 - feat(detection): Added `DetectYolo` node for YOLO model object detection
 
@@ -294,6 +303,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ​	</details>
 
+</details>
+
 
 
 ## 📋 Node List
@@ -318,16 +329,16 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎨 Image Blending Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Image Luma Matte | Luminance-based image mask compositing with feathering, alpha output, and multiple color format support |
+| Image Mask Blend | Luminance-based image mask compositing with feathering, alpha output, and multiple color format support |
 | Image Blend Modes by Alpha | Alpha-based image blending with multiple Photoshop-style blend modes |
 | Image Blend Modes by CSS | CSS standard blend modes based on Pilgram library |
 
 ### ✂️ Image Cropping Nodes
 | Node Name | Description |
 |-----------|-------------|
+| Image Mask Crop | Batch mask-based cropping with RGB/RGBA dual output modes and smart channel processing |
 | Image Crop Square | Square cropping with mask guidance and scaling support |
 | Image Crop with BBox Mask | Smart bounding box cropping with precise aspect ratio control and scale strength adjustment |
-| Image Crop by Mask Alpha | Batch mask-based cropping with RGB/RGBA dual output modes and smart channel processing |
 | Image Paste by BBox Mask | Paste cropped images back with multiple blend modes |
 | Image Edge Crop Pad | Smart edge cropping and padding with multiple padding modes and mask output |
 | Image Grid Split | Split images into grid layouts with flexible row/column configuration and selective output options |
@@ -351,7 +362,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Mask Fill Hole | Fill holes in enclosed areas of masks with batch processing support |
 | Mask Math Ops | Mask mathematical operations (intersection, union, difference, XOR) |
-| Mask Batch Math Ops | Batch mask mathematical operations |
 | Mask Crop by BBox Mask | Mask bounding box cropping based on mask regions |
 | Mask Paste by BBox Mask | Simplified mask pasting with automatic base mask creation and bounding box detection |
 
@@ -359,6 +369,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|-------------|
 | DetectYolo | YOLO model object detection with subfolder model support, customizable confidence thresholds, and optional label display control |
+| DetectGuideLine | Guide line detection combining Canny, HoughLinesP, and DBSCAN vanishing-point clustering |
 
 ### 🔧 Utility Nodes
 | Node Name | Description |
@@ -393,6 +404,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Batch Split | Intelligent image batch splitter with forward/backward splitting modes and enhanced boundary condition handling |
 | Image Batch Group | Intelligent image batch grouper with configurable batch sizes, overlap handling, and flexible padding strategies |
 | Image List Append | Image list appender for intelligently merging images into lists |
+| Mask Batch Math Ops | Batch mask mathematical operations |
 | Mask Batch Split | Intelligent mask batch splitter with forward/backward splitting modes and enhanced boundary condition handling |
 | Video Cut Group | Video scene cut detector that identifies scene transitions by analyzing frame similarity, supporting both fast and precise modes |
 

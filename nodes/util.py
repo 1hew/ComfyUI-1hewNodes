@@ -276,13 +276,13 @@ class PathBuild:
 
 # 在NODE_CLASS_MAPPINGS中更新节点映射
 NODE_CLASS_MAPPINGS = {
-    "WorkflowName": WorkflowName,
-    "RangeMapping": RangeMapping,
-    "PathBuild": PathBuild,
+    "1hew_WorkflowName": WorkflowName,
+    "1hew_RangeMapping": RangeMapping,
+    "1hew_PathBuild": PathBuild,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "WorkflowName": "Workflow Name",
-    "RangeMapping": "Range Mapping",
-    "PathBuild": "Path Build",
+    "1hew_WorkflowName": "Workflow Name",
+    "1hew_RangeMapping": "Range Mapping",
+    "1hew_PathBuild": "Path Build",
 }
