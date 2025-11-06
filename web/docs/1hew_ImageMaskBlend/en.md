@@ -10,6 +10,7 @@
 | `mask` | Required | MASK | - | - | Mask batch (grayscale 0–1) |
 | `fill_hole` | - | BOOLEAN | True | True/False | Fill holes in the mask to ensure continuity |
 | `invert` | - | BOOLEAN | False | True/False | Invert the selection after morphology/feathering |
+| `output_mask_invert` | - | BOOLEAN | False | True/False | Invert the mask only at output; does not affect blending |
 | `feather` | - | INT | 0 | 0–50 | Gaussian blur radius for feathering (pixels) |
 | `opacity` | - | FLOAT | 1.0 | 0.0–1.0 | Mask opacity scaling factor |
 | `expansion` | - | INT | 0 | -100–100 | Positive dilates, negative erodes (pixels) |
@@ -22,3 +23,4 @@
 |-------------|-----------|-------------|
 | `image` | IMAGE | Blended image: inside mask shows original, outside shows mixed background |
 | `mask` | MASK | Processed mask tensor (0–1), equals grayscale mask scaled by `opacity` |
+If `output_mask_invert` is enabled, the returned mask is inverted.

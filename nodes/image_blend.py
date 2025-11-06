@@ -43,6 +43,7 @@ class ImageMaskBlend:
                 "expansion": ("INT", {"default": 0, "min": -100, "max": 100, "step": 1}),
                 "background_color": ("STRING", {"default": "1.0"}),
                 "background_opacity": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "output_mask_invert": ("BOOLEAN", {"default": False}),
             }
         }
 
@@ -54,7 +55,7 @@ class ImageMaskBlend:
     def image_blend_mask(self, image, mask, invert=False, feather=0,
                          background_color="1.0", background_opacity=1.0,
                          fill_hole=False, expansion=0,
-                         opacity=1.0):
+                         opacity=1.0, output_mask_invert=False):
         """
         AE 对齐的遮罩融合（无 alpha 分支，输出 image 与 mask）：
         - fill_hole：填补遮罩孔洞，确保连续形状
@@ -63,8 +64,8 @@ class ImageMaskBlend:
         - invert：形态/羽化完成后反转选择区域
         - opacity：遮罩不透明度（0–1），缩放遮罩强度
         - background_color：非遮罩区域底色；opacity<1 时遮罩区会按 (1-mask*opacity) 透出底色
-        - background_opacity：底色与原图在非遮罩区域的混合强度（0–1），
-          1 为完全底色，0.5 为半透明底色叠加到原图
+        - background_opacity：底色与原图在非遮罩区域的混合强度（0–1），1 为完全底色，0.5 为半透明底色叠加到原图
+        - output_mask_invert：仅在输出端反转遮罩（不影响融合）
 
         顺序：尺寸对齐 → 填孔 → 扩展/收缩 → 羽化 → 反转 → 应用 opacity
         输出：
@@ -155,8 +156,9 @@ class ImageMaskBlend:
             result_np = final_np.astype(np.float32)
             output_images.append(torch.from_numpy(result_np))
 
-            # 遮罩输出（0–1）
-            output_masks.append(torch.from_numpy(mask_f.astype(np.float32)))
+            # 遮罩输出（0–1），可在输出端按需反转
+            mask_out = 1.0 - mask_f if output_mask_invert else mask_f
+            output_masks.append(torch.from_numpy(mask_out.astype(np.float32)))
 
         # 合并批次
         output_images_tensor = torch.stack(output_images)
