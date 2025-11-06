@@ -10,6 +10,7 @@
 | `mask` | 必选 | MASK | - | - | 遮罩批次（灰度 0–1） |
 | `fill_hole` | - | BOOLEAN | True | True/False | 填补遮罩孔洞，保证选区连续 |
 | `invert` | - | BOOLEAN | False | True/False | 在形态/羽化之后反转选择区域 |
+| `output_mask_invert` | - | BOOLEAN | False | True/False | 仅在输出端反转遮罩（不影响图像融合） |
 | `feather` | - | INT | 0 | 0–50 | 高斯羽化半径（像素） |
 | `opacity` | - | FLOAT | 1.0 | 0.0–1.0 | 遮罩不透明度缩放系数 |
 | `expansion` | - | INT | 0 | -100–100 | 形态学调整：正为膨胀，负为腐蚀（像素） |
@@ -22,3 +23,4 @@
 |---------|----------|------|
 | `image` | IMAGE | 融合后图像：遮罩内显示原图，遮罩外显示混合底色 |
 | `mask` | MASK | 处理后的遮罩张量（0–1），为灰度遮罩乘以 `opacity` |
+若启用 `output_mask_invert`，输出为反转后的遮罩。

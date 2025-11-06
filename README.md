@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v2.0.3**
+- feat(image_blend): Added `output_mask_invert` parameter to `Image Mask Blend` for output-only mask inversion
+
 **v2.0.0**
 - breaking: Major update. Existing workflows built with previous nodes require reconfiguration after upgrading to function correctly. Please review nodes and parameters carefully.
 
