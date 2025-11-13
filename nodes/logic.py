@@ -1,5 +1,10 @@
 
 
+import inspect
+import numpy as np
+import torch
+
+
 class AnyEmptyBool:
     """
     通用空值检查节点（布尔输出版本）
@@ -264,17 +269,41 @@ class AnySwitchInt:
     
     @classmethod
     def INPUT_TYPES(cls):
+        """
+        动态可选输入：初始仅声明 input_1，连接后由前端扩展实时追加。
+        通过 AllContainer 在前端查询阶段放宽校验，允许任意 input_N。
+        """
+        # 初始仅提供一个输入端口
+        dyn_inputs = {
+            "input_1": (cls.any, {"forceInput": True, "lazy": True}),
+        }
+
+        # 在前端通过 get_input_info 查询时，返回一个容器以接受任意 input_N
+        try:
+            stack = inspect.stack()
+            if len(stack) > 2 and stack[2].function == "get_input_info":
+                class AllContainer:
+                    def __contains__(self, item):
+                        return True
+
+                    def __getitem__(self, key):
+                        return cls.any, {"forceInput": True, "lazy": True}
+
+                dyn_inputs = AllContainer()
+        except Exception:
+            # 兼容早期或非标准调用栈环境，不影响功能
+            pass
+
         return {
             "required": {
-                "select": ("INT", {"default": 1, "min": 1, "max": 5, "step": 1}),
+                "select": ("INT", {
+                    "default": 1,
+                    "min": 1,
+                    "max": 999999,
+                    "step": 1,
+                }),
             },
-            "optional": {
-                "input_1": (cls.any, {"forceInput": True, "lazy": True}),
-                "input_2": (cls.any, {"forceInput": True, "lazy": True}),
-                "input_3": (cls.any, {"forceInput": True, "lazy": True}),
-                "input_4": (cls.any, {"forceInput": True, "lazy": True}),
-                "input_5": (cls.any, {"forceInput": True, "lazy": True}),
-            }
+            "optional": dyn_inputs,
         }
 
     @classmethod
@@ -292,7 +321,10 @@ class AnySwitchInt:
         惰性求值控制：只求值选中的输入
         """
         input_key = f"input_{select}"
-        return [input_key]
+        # 仅在选中的输入存在时进行惰性求值
+        if input_key in kwargs:
+            return [input_key]
+        return []
     
     def switch_multi(self, select, **kwargs):
         """
@@ -304,8 +336,8 @@ class AnySwitchInt:
             if input_key in kwargs:
                 return (kwargs[input_key],)
             else:
-                # 如果选中的输入不存在，返回 input_1 作为回退
-                return (kwargs.get("input_1", None),)
+                # 如果选中的输入不存在，返回 None（避免误回退）
+                return (None,)
                 
         except Exception as e:
             print(f"AnySwitchInt error: {e}")

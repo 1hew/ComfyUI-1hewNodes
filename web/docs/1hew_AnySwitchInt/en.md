@@ -1,26 +1,16 @@
 # Any Switch Int
 
-**Node Function:** The `Any Switch Int` node is a multi-way integer switcher that supports switching between multiple input options with lazy evaluation. It selects the corresponding input output based on integer index (1-5), computing only the selected branch to provide flexible multi-way data routing capabilities. Ideal for multi-option conditional control and complex data flow management.
+The `Any Switch Int` node is a multi-way integer switch with dynamic inputs and lazy evaluation. It selects the value from input_N according to an integer index, computing only the chosen branch. This is ideal for multi-option control and routing in complex graphs.
 
 ## Inputs
 
 | Parameter | Required | Data Type | Default | Range | Description |
 |--|--|--|--|--|--|
-| `select` | Required | INT | 1 | 1-5 | Index value for selecting input, step: 1 |
-| `input_1` | Optional | * | - | - | First input option (supports any type) |
-| `input_2` | Optional | * | - | - | Second input option (supports any type) |
-| `input_3` | Optional | * | - | - | Third input option (supports any type) |
-| `input_4` | Optional | * | - | - | Fourth input option (supports any type) |
-| `input_5` | Optional | * | - | - | Fifth input option (supports any type) |
+| `select` | Required | INT | 1 | 1–999999 | Index for selecting input_N (step: 1). |
+| `input_N` | Optional | * | - | - | Dynamic inputs named `input_1`, `input_2`, ... The UI automatically expands ports as you connect more. Supports any type. |
 
-## Outputs
+## Output
 
 | Output Name | Data Type | Description |
 |-------------|-----------|-------------|
-| `output` | * | Selected output value based on index (type matches selected input) |
-
-## Functionality
-
-### Lazy Evaluation Mechanism
-
-- **Smart Computation**: Only computes the input corresponding to the selected index, other inputs are not executed
+| `output` | * | Pass-through of the selected input value. Type matches the selected input. |

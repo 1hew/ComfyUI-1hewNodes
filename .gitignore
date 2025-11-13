@@ -6,3 +6,5 @@ __pycache__/
 # Ignore Ruff cache
 .ruff_cache
 current_workflow.tmp
+
+/cache/

@@ -203,86 +203,15 @@ class RangeMapping:
             actual_value = int(actual_value)
             
         return (actual_value, int(actual_value))
-
-
-class PathBuild:
-    """
-    路径构建 - 提供一个层级结构的路径选择下拉框，并允许添加自定义路径扩展
-    """
-    
-    @classmethod
-    def INPUT_TYPES(cls):
-        # 定义路径选项
-        paths = []
-        
-        # 一级字段
-        level1 = ["Wan_kijai", "Wan_org", "Flux"]
-        # 二级字段映射
-        level2_mapping = {
-            "Wan_kijai": ["FusionX_VACE",],
-            "Wan_org": ["VACE", "FLF2V", "Fun"],
-            "Flux": ["ACE_Redux", "ACE", "TTP"]
-        }
-        # 三级字段映射
-        level3_mapping = {
-            "Wan_kijai": ["FLFControl", "Control", "FLF", "Inpaint", "Outpaint"],
-            "Wan_org": ["FLFControl", "Control", "FLF", "Inpaint"],
-            "Flux": []  # Flux 使用 additional_path 作为三级字段，所以这里为空
-        }
-        
-        # 生成所有可能的路径组合（遍历模式）
-        for l1 in level1:
-            for l2 in level2_mapping[l1]:
-                if l1 == "Flux":
-                    # 对于 Flux，直接添加二级路径
-                    paths.append(f"{l1}/{l2}")
-                else:
-                    # 对于其他一级字段，添加三级路径
-                    for l3 in level3_mapping[l1]:
-                        paths.append(f"{l1}/{l2}/{l3}")
-        
-        # 添加固定的自定义路径（固定模式）
-        custom_paths = [
-            # 可以在这里添加更多固定路径
-            # "Custom/Path1",
-            "Wan_kijai/FusionX_Phantom",
-            # ... 方便后面补充更多固定路径
-        ]
-        
-        # 合并遍历生成的路径和固定路径
-        paths.extend(custom_paths)
-        
-        return {
-            "required": {
-                "preset_path": (paths, {"default": paths[0]}),
-                "additional_path": ("STRING", {"default": "", "multiline": False})
-            }
-        }
-
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("full_path",)
-    FUNCTION = "build_path"
-    CATEGORY = "1hewNodes/util"
-
-    def build_path(self, preset_path, additional_path):
-        # 如果提供了额外路径，则添加到预设路径中
-        if additional_path and additional_path.strip():
-            full_path = f"{preset_path}/{additional_path.strip()}"
-        else:
-            full_path = preset_path
-            
-        return (full_path,)
-  
+ 
 
 # 在NODE_CLASS_MAPPINGS中更新节点映射
 NODE_CLASS_MAPPINGS = {
     "1hew_WorkflowName": WorkflowName,
     "1hew_RangeMapping": RangeMapping,
-    "1hew_PathBuild": PathBuild,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "1hew_WorkflowName": "Workflow Name",
     "1hew_RangeMapping": "Range Mapping",
-    "1hew_PathBuild": "Path Build",
 }

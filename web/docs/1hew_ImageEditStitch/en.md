@@ -1,35 +1,24 @@
 # Image Edit Stitch
 
-**Node Function:** The `Image Edit Stitch` node is used to stitch reference images and edited images together, supporting four stitching directions (top, bottom, left, right), commonly used for comparison display of original and edited effects.
+Stitches a reference image with an edit image (optionally with an edit mask),with configurable placement, spacing strip, and color parsing. Returns the composited image and two masks aligned to the output.
 
 ## Inputs
 
-| Parameter Name | Input Selection | Data Type | Default Value | Value Range | Description |
-| -------------- | --------------- | --------- | ------------- | ----------- | ----------- |
-| `reference_image` | Required | IMAGE | - | - | Reference image (original image) |
-| `edit_image` | Required | IMAGE | - | - | Edited image |
-| `edit_mask` | Optional | MASK | - | - | Mask of edited area |
-| `edit_image_position` | - | COMBO[STRING] | right | top, bottom, left, right | Edit image stitch position: top, bottom, left, right |
-| `match_edit_size` | - | BOOLEAN | False | True/False | Whether to match edit image size, when enabled adjusts reference image size to match edit image, when disabled maintains reference image aspect ratio |
-| `spacing` | - | INT | 0 | 0-1000 | Stitch spacing, controls pixel spacing between two images |
-| `fill_color` | - | FLOAT | 1.0 | 0.0-1.0 | Fill color, range 0.0 (black) - 1.0 (white), used for filling when sizes don't match and spacing areas |
+| Name | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| reference_image | IMAGE | Yes | - | The base image to stitch against. Supports batches. |
+| edit_image | IMAGE | Yes | - | The image to attach to the reference. Supports batches. |
+| edit_image_position | STRING (enum) | Yes | right | Where the edit image is attached: right, left, top, bottom. |
+| match_edit_size | BOOLEAN | Yes | false | If true, reference is resized with padding to exactly match edit image size before stitching. If false, reference is resized keeping aspect ratio only along the relevant axis. |
+| spacing | INT | Yes | 0 | Pixel width/height of the spacing strip inserted between images. 0 means no spacing strip. |
+| spacing_color | STRING | Yes | "1.0" | Color of spacing strip. Supports advanced color strings (see below). |
+| pad_color | STRING | Yes | "1.0" | Fill color used when resizing with padding (only applies when match_edit_size is true). Supports advanced color strings. |
+| edit_mask | MASK | No | - | Optional edit mask aligned to edit_image. If omitted, a full-ones mask is assumed for the edit side. |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `image` | IMAGE | Stitched image |
-| `mask` | MASK | Merged mask |
-| `split_mask` | MASK | Split mask identifying reference and edit areas |
-
-## Function Description
-
-### Size Handling
-- **Size matching**: When enabled, automatically adjusts reference image size to match edit image size, when disabled maintains reference image aspect ratio with intelligent adjustment based on stitch direction
-- **Fill color**: Fill color used when image sizes don't match and for spacing area filling
-- **Smart adaptation**: Automatically matches corresponding dimensions based on stitch direction (horizontal or vertical) while maintaining image quality
-
-### Stitching Control
-- **Edit image position**: Controls the stitching position of edit image relative to reference image
-- **Stitch spacing**: Adds specified pixel width spacing between two images, filled with fill color
-- **Spacing effect**: When spacing > 0, inserts spacing strips between stitched images for clearer visual separation
+| Name | Type | Description |
+| --- | --- | --- |
+| image | IMAGE | The stitched image composed from reference and edit images, with optional spacing strip. Batch-safe. |
+| mask | MASK | A mask aligned to the output image highlighting the edit_image area (1 over the edit region, 0 elsewhere including spacing). Batch-safe. |
+| split_mask | MASK | A binary mask partitioning the output into reference (0) and edit (1) zones. Spacing strip area is 0. Batch-safe. |
