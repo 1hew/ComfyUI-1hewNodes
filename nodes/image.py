@@ -638,9 +638,9 @@ class ImageResizeUniversal:
     @classmethod
     def INPUT_TYPES(cls):
         ratio_list = ['origin', 'custom', '1:1', '3:2', '4:3', '16:9', '21:9', '2:3', '3:4', '9:16', '9:21']
-        fit_mode = ['stretch', 'crop', 'pad']
+        fit_mode = ['crop', 'pad', 'stretch']
         method_mode = ['nearest', 'bilinear', 'lanczos', 'bicubic', 'hamming', 'box']
-        scale_to_list = ['None', 'longest', 'shortest', 'width', 'height', 'mega_pixels_k']
+        scale_to_list = ['None', 'longest', 'shortest', 'width', 'height', 'length_to_sq_area']
         return {
             "required": {
                 "preset_ratio": (ratio_list,),
@@ -743,8 +743,8 @@ class ImageResizeUniversal:
                 elif scale_to_side == 'height':
                     target_height = scale_to_length
                     target_width = int(target_height * ratio)
-                elif scale_to_side == 'mega_pixels_k':
-                    target_width = math.sqrt(ratio * scale_to_length * 1024)
+                elif scale_to_side == 'length_to_sq_area':
+                    target_width = math.sqrt(ratio) * scale_to_length
                     target_height = target_width / ratio
                     target_width = int(target_width)
                     target_height = int(target_height)
@@ -764,8 +764,8 @@ class ImageResizeUniversal:
                 elif scale_to_side == 'height':
                     target_height = scale_to_length
                     target_width = int(target_height * ratio)
-                elif scale_to_side == 'mega_pixels_k':
-                    target_width = math.sqrt(ratio * scale_to_length * 1024)
+                elif scale_to_side == 'length_to_sq_area':
+                    target_width = math.sqrt(ratio) * scale_to_length
                     target_height = target_width / ratio
                     target_width = int(target_width)
                     target_height = int(target_height)
@@ -1588,7 +1588,8 @@ class ImageEditStitch:
                 "edit_image_position": (["top", "bottom", "left", "right"], {"default": "right"}),
                 "match_edit_size": ("BOOLEAN", {"default": False}),
                 "spacing": ("INT", {"default": 0, "min": 0, "max": 1000, "step": 1}),
-                "fill_color": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01})
+                "spacing_color": ("STRING", {"default": "1.0"}),
+                "pad_color": ("STRING", {"default": "1.0"})
             },
             "optional": {
                 "edit_mask": ("MASK",)
@@ -1600,8 +1601,17 @@ class ImageEditStitch:
     FUNCTION = "image_edit_stitch"
     CATEGORY = "1hewNodes/image"
 
-    def image_edit_stitch(self, reference_image, edit_image, edit_mask=None, edit_image_position='right', match_edit_size=True,
-                        fill_color=1.0, spacing=0):
+    def image_edit_stitch(
+        self,
+        reference_image,
+        edit_image,
+        edit_mask=None,
+        edit_image_position='right',
+        match_edit_size=True,
+        spacing=0,
+        spacing_color="1.0",
+        pad_color="1.0",
+    ):
         # 检查输入
         if reference_image is None and edit_image is None:
             # 如果两个图像都为空，创建默认图像
@@ -1611,9 +1621,16 @@ class ImageEditStitch:
 
         # 如果只有一个图像存在，直接返回该图像
         if reference_image is None:
-            # 如果没有编辑遮罩，创建全白遮罩
+            # 规范遮罩形状，并按图像批次广播
+            bs = edit_image.shape[0]
+            edit_mask = self._ensure_mask_3d(edit_mask)
             if edit_mask is None:
-                edit_mask = torch.ones((1, edit_image.shape[1], edit_image.shape[2]), dtype=torch.float32)
+                edit_mask = torch.ones(
+                    (bs, edit_image.shape[1], edit_image.shape[2]),
+                    dtype=torch.float32,
+                )
+            else:
+                edit_mask = self._broadcast_mask(edit_mask, bs)
             # 创建分离遮罩（全黑，表示全部是编辑区域）
             split_mask = torch.zeros_like(edit_mask)
             return edit_image, edit_mask, split_mask
@@ -1621,55 +1638,86 @@ class ImageEditStitch:
         if edit_image is None:
             # 创建与参考图像相同尺寸的空白图像
             edit_image = torch.zeros_like(reference_image)
-            # 创建全白遮罩
-            white_mask = torch.ones((1, reference_image.shape[1], reference_image.shape[2]), dtype=torch.float32)
+            # 创建全白遮罩，批次与参考图像一致
+            bs = reference_image.shape[0]
+            white_mask = torch.ones(
+                (bs, reference_image.shape[1], reference_image.shape[2]),
+                dtype=torch.float32,
+            )
             # 创建分离遮罩（全白，表示全部是参考区域）
             split_mask = torch.ones_like(white_mask)
             return reference_image, white_mask, split_mask
 
         # 确保编辑遮罩存在，如果不存在则创建全白遮罩
+        edit_mask = self._ensure_mask_3d(edit_mask)
         if edit_mask is None:
-            edit_mask = torch.ones((1, edit_image.shape[1], edit_image.shape[2]), dtype=torch.float32)
+            edit_mask = torch.ones(
+                (edit_image.shape[0], edit_image.shape[1], edit_image.shape[2]),
+                dtype=torch.float32,
+            )
+
+        # 统一批量尺寸（广播到最大批次）
+        bs = max(reference_image.shape[0], edit_image.shape[0], edit_mask.shape[0])
+        reference_image = self._broadcast_image(reference_image, bs)
+        edit_image = self._broadcast_image(edit_image, bs)
+        edit_mask = self._broadcast_mask(edit_mask, bs)
 
         # 获取图像尺寸
-        ref_batch, ref_height, ref_width, ref_channels = reference_image.shape
-        edit_batch, edit_height, edit_width, edit_channels = edit_image.shape
+        ref_batch, ref_height, ref_width, _ = reference_image.shape
+        edit_batch, edit_height, edit_width, _ = edit_image.shape
 
-        # 处理尺寸调整逻辑
+        # 遮罩尺寸与编辑图像对齐（最近邻），避免拼接时高度/宽度不一致
+        edit_mask = self._resize_mask_to_image(edit_mask, edit_image)
+
+        # 处理尺寸调整逻辑（批量按样本处理）
         if match_edit_size:
-            # 原有逻辑：将reference_image调整为edit_image的尺寸，使用pad填充
             if ref_height != edit_height or ref_width != edit_width:
-                reference_image = self._resize_with_padding(reference_image, edit_width, edit_height, fill_color)
-                ref_height, ref_width = edit_height, edit_width
+                reference_image = self._resize_with_padding(
+                    reference_image, edit_width, edit_height, pad_color
+                )
+                ref_batch, ref_height, ref_width, _ = reference_image.shape
         else:
-            # 新优化逻辑：保持reference_image的原始比例，根据拼接方向调整尺寸
-            reference_image = self._resize_keeping_aspect_ratio(reference_image, edit_image, edit_image_position)
-            ref_batch, ref_height, ref_width, ref_channels = reference_image.shape
+            reference_image = self._resize_keeping_aspect_ratio(
+                reference_image, edit_image, edit_image_position
+            )
+            ref_batch, ref_height, ref_width, _ = reference_image.shape
 
-        # 创建间距填充（如果spacing > 0）
-        spacing_color = torch.full((1, 1, 1, 3), fill_color, dtype=torch.float32)
+        # 间隔条颜色解析（丰富字符串 -> 0..1 RGB）
+        try:
+            ctx = reference_image[0] if reference_image is not None else None
+        except Exception:
+            ctx = None
+        rgb255 = self._parse_color_advanced(spacing_color, ctx)
+        space_rgb = (
+            rgb255[0] / 255.0,
+            rgb255[1] / 255.0,
+            rgb255[2] / 255.0,
+        )
+        spacing_color_tensor = torch.tensor(
+            space_rgb, dtype=torch.float32
+        ).view(1, 1, 1, 3)
         
         # 根据编辑图像位置拼接图像
         if edit_image_position == "right":
             # 参考图像在左，编辑图像在右
             if spacing > 0:
                 # 创建垂直间距条
-                spacing_strip = spacing_color.expand(1, ref_height, spacing, 3)
+                spacing_strip = spacing_color_tensor.expand(bs, ref_height, spacing, 3)
                 combined_image = torch.cat([
                     reference_image,
                     spacing_strip,
                     edit_image
                 ], dim=2)  # 水平拼接
-                
+
                 # 拼接遮罩（参考区域为0，间距区域为0，编辑区域保持原样）
-                zero_mask_ref = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
-                zero_mask_spacing = torch.zeros((1, ref_height, spacing), dtype=torch.float32)
+                zero_mask_ref = torch.zeros((bs, ref_height, ref_width), dtype=torch.float32)
+                zero_mask_spacing = torch.zeros((bs, ref_height, spacing), dtype=torch.float32)
                 combined_mask = torch.cat([zero_mask_ref, zero_mask_spacing, edit_mask], dim=2)
                 
                 # 创建分离遮罩（参考区域为黑色，间距区域为黑色，编辑区域为白色）
-                split_mask_left = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
-                split_mask_spacing = torch.zeros((1, ref_height, spacing), dtype=torch.float32)
-                split_mask_right = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
+                split_mask_left = torch.zeros((bs, ref_height, ref_width), dtype=torch.float32)
+                split_mask_spacing = torch.zeros((bs, ref_height, spacing), dtype=torch.float32)
+                split_mask_right = torch.ones((bs, edit_height, edit_width), dtype=torch.float32)
                 split_mask = torch.cat([split_mask_left, split_mask_spacing, split_mask_right], dim=2)
             else:
                 combined_image = torch.cat([
@@ -1678,19 +1726,19 @@ class ImageEditStitch:
                 ], dim=2)  # 水平拼接
                 
                 # 拼接遮罩（参考区域为0，编辑区域保持原样）
-                zero_mask = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                zero_mask = torch.zeros((bs, ref_height, ref_width), dtype=torch.float32)
                 combined_mask = torch.cat([zero_mask, edit_mask], dim=2)
                 
                 # 创建分离遮罩（参考区域为黑色，编辑区域为白色）
-                split_mask_left = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
-                split_mask_right = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
+                split_mask_left = torch.zeros((bs, ref_height, ref_width), dtype=torch.float32)
+                split_mask_right = torch.ones((bs, edit_height, edit_width), dtype=torch.float32)
                 split_mask = torch.cat([split_mask_left, split_mask_right], dim=2)
 
         elif edit_image_position == "left":
             # 编辑图像在左，参考图像在右
             if spacing > 0:
                 # 创建垂直间距条
-                spacing_strip = spacing_color.expand(1, edit_height, spacing, 3)
+                spacing_strip = spacing_color_tensor.expand(bs, edit_height, spacing, 3)
                 combined_image = torch.cat([
                     edit_image,
                     spacing_strip,
@@ -1698,14 +1746,14 @@ class ImageEditStitch:
                 ], dim=2)  # 水平拼接
                 
                 # 拼接遮罩（编辑区域保持原样，间距区域为0，参考区域为0）
-                zero_mask_spacing = torch.zeros((1, edit_height, spacing), dtype=torch.float32)
-                zero_mask_ref = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                zero_mask_spacing = torch.zeros((bs, edit_height, spacing), dtype=torch.float32)
+                zero_mask_ref = torch.zeros((bs, ref_height, ref_width), dtype=torch.float32)
                 combined_mask = torch.cat([edit_mask, zero_mask_spacing, zero_mask_ref], dim=2)
                 
                 # 创建分离遮罩（编辑区域为白色，间距区域为黑色，参考区域为黑色）
-                split_mask_left = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
-                split_mask_spacing = torch.zeros((1, edit_height, spacing), dtype=torch.float32)
-                split_mask_right = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                split_mask_left = torch.ones((bs, edit_height, edit_width), dtype=torch.float32)
+                split_mask_spacing = torch.zeros((bs, edit_height, spacing), dtype=torch.float32)
+                split_mask_right = torch.zeros((bs, ref_height, ref_width), dtype=torch.float32)
                 split_mask = torch.cat([split_mask_left, split_mask_spacing, split_mask_right], dim=2)
             else:
                 combined_image = torch.cat([
@@ -1714,19 +1762,19 @@ class ImageEditStitch:
                 ], dim=2)  # 水平拼接
                 
                 # 拼接遮罩（编辑区域保持原样，参考区域为0）
-                zero_mask = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                zero_mask = torch.zeros((bs, ref_height, ref_width), dtype=torch.float32)
                 combined_mask = torch.cat([edit_mask, zero_mask], dim=2)
                 
                 # 创建分离遮罩（编辑区域为白色，参考区域为黑色）
-                split_mask_left = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
-                split_mask_right = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                split_mask_left = torch.ones((bs, edit_height, edit_width), dtype=torch.float32)
+                split_mask_right = torch.zeros((bs, ref_height, ref_width), dtype=torch.float32)
                 split_mask = torch.cat([split_mask_left, split_mask_right], dim=2)
 
         elif edit_image_position == "bottom":
             # 参考图像在上，编辑图像在下
             if spacing > 0:
                 # 创建水平间距条
-                spacing_strip = spacing_color.expand(1, spacing, ref_width, 3)
+                spacing_strip = spacing_color_tensor.expand(bs, spacing, ref_width, 3)
                 combined_image = torch.cat([
                     reference_image,
                     spacing_strip,
@@ -1734,14 +1782,14 @@ class ImageEditStitch:
                 ], dim=1)  # 垂直拼接
                 
                 # 拼接遮罩（参考区域为0，间距区域为0，编辑区域保持原样）
-                zero_mask_ref = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
-                zero_mask_spacing = torch.zeros((1, spacing, ref_width), dtype=torch.float32)
+                zero_mask_ref = torch.zeros((bs, ref_height, ref_width), dtype=torch.float32)
+                zero_mask_spacing = torch.zeros((bs, spacing, ref_width), dtype=torch.float32)
                 combined_mask = torch.cat([zero_mask_ref, zero_mask_spacing, edit_mask], dim=1)
                 
                 # 创建分离遮罩（参考区域为黑色，间距区域为黑色，编辑区域为白色）
-                split_mask_top = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
-                split_mask_spacing = torch.zeros((1, spacing, ref_width), dtype=torch.float32)
-                split_mask_bottom = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
+                split_mask_top = torch.zeros((bs, ref_height, ref_width), dtype=torch.float32)
+                split_mask_spacing = torch.zeros((bs, spacing, ref_width), dtype=torch.float32)
+                split_mask_bottom = torch.ones((bs, edit_height, edit_width), dtype=torch.float32)
                 split_mask = torch.cat([split_mask_top, split_mask_spacing, split_mask_bottom], dim=1)
             else:
                 combined_image = torch.cat([
@@ -1750,19 +1798,19 @@ class ImageEditStitch:
                 ], dim=1)  # 垂直拼接
                 
                 # 拼接遮罩（参考区域为0，编辑区域保持原样）
-                zero_mask = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                zero_mask = torch.zeros((bs, ref_height, ref_width), dtype=torch.float32)
                 combined_mask = torch.cat([zero_mask, edit_mask], dim=1)
                 
                 # 创建分离遮罩（参考区域为黑色，编辑区域为白色）
-                split_mask_top = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
-                split_mask_bottom = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
+                split_mask_top = torch.zeros((bs, ref_height, ref_width), dtype=torch.float32)
+                split_mask_bottom = torch.ones((bs, edit_height, edit_width), dtype=torch.float32)
                 split_mask = torch.cat([split_mask_top, split_mask_bottom], dim=1)
 
         elif edit_image_position == "top":
             # 编辑图像在上，参考图像在下
             if spacing > 0:
                 # 创建水平间距条
-                spacing_strip = spacing_color.expand(1, spacing, edit_width, 3)
+                spacing_strip = spacing_color_tensor.expand(bs, spacing, edit_width, 3)
                 combined_image = torch.cat([
                     edit_image,
                     spacing_strip,
@@ -1770,14 +1818,14 @@ class ImageEditStitch:
                 ], dim=1)  # 垂直拼接
                 
                 # 拼接遮罩（编辑区域保持原样，间距区域为0，参考区域为0）
-                zero_mask_spacing = torch.zeros((1, spacing, edit_width), dtype=torch.float32)
-                zero_mask_ref = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                zero_mask_spacing = torch.zeros((bs, spacing, edit_width), dtype=torch.float32)
+                zero_mask_ref = torch.zeros((bs, ref_height, ref_width), dtype=torch.float32)
                 combined_mask = torch.cat([edit_mask, zero_mask_spacing, zero_mask_ref], dim=1)
                 
                 # 创建分离遮罩（编辑区域为白色，间距区域为黑色，参考区域为黑色）
-                split_mask_top = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
-                split_mask_spacing = torch.zeros((1, spacing, edit_width), dtype=torch.float32)
-                split_mask_bottom = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                split_mask_top = torch.ones((bs, edit_height, edit_width), dtype=torch.float32)
+                split_mask_spacing = torch.zeros((bs, spacing, edit_width), dtype=torch.float32)
+                split_mask_bottom = torch.zeros((bs, ref_height, ref_width), dtype=torch.float32)
                 split_mask = torch.cat([split_mask_top, split_mask_spacing, split_mask_bottom], dim=1)
             else:
                 combined_image = torch.cat([
@@ -1786,95 +1834,552 @@ class ImageEditStitch:
                 ], dim=1)  # 垂直拼接
                 
                 # 拼接遮罩（编辑区域保持原样，参考区域为0）
-                zero_mask = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                zero_mask = torch.zeros((bs, ref_height, ref_width), dtype=torch.float32)
                 combined_mask = torch.cat([edit_mask, zero_mask], dim=1)
                 
                 # 创建分离遮罩（编辑区域为白色，参考区域为黑色）
-                split_mask_top = torch.ones((1, edit_height, edit_width), dtype=torch.float32)
-                split_mask_bottom = torch.zeros((1, ref_height, ref_width), dtype=torch.float32)
+                split_mask_top = torch.ones((bs, edit_height, edit_width), dtype=torch.float32)
+                split_mask_bottom = torch.zeros((bs, ref_height, ref_width), dtype=torch.float32)
                 split_mask = torch.cat([split_mask_top, split_mask_bottom], dim=1)
 
         return combined_image, combined_mask, split_mask
 
-    def _resize_with_padding(self, image, target_width, target_height, fill_color):
+    def _resize_with_padding(self, image, target_width, target_height, pad_color):
         """
-        原有的resize逻辑：使用padding填充到目标尺寸
+        原有的resize逻辑：使用padding填充到目标尺寸（pad_color 控制颜色）
         """
-        # 将图像转换为PIL格式以便于处理
-        if image.is_cuda:
-            img_np = (image[0].cpu().numpy() * 255).astype(np.uint8)
-        else:
-            img_np = (image[0].numpy() * 255).astype(np.uint8)
+        bs = image.shape[0]
+        out = []
+        for i in range(bs):
+            # 针对每个样本按上下文计算填充颜色，支持 average/edge
+            fill_rgb = self._parse_color_advanced(pad_color, image[i])
+            img_np = (image[i].cpu().numpy() * 255).astype(np.uint8)
+            img_pil = Image.fromarray(img_np)
 
-        img_pil = Image.fromarray(img_np)
-        
-        # 计算等比例缩放的尺寸
-        img_width, img_height = img_pil.size
-        img_aspect = img_width / img_height
-        target_aspect = target_width / target_height
+            img_width, img_height = img_pil.size
+            img_aspect = img_width / max(img_height, 1)
+            target_aspect = target_width / max(target_height, 1)
 
-        # 等比例缩放图像以适应目标尺寸
-        if img_aspect > target_aspect:
-            # 宽度优先
-            new_width = target_width
-            new_height = int(target_width / img_aspect)
-        else:
-            # 高度优先
-            new_height = target_height
-            new_width = int(target_height * img_aspect)
+            if img_aspect > target_aspect:
+                new_width = target_width
+                new_height = int(target_width / img_aspect)
+            else:
+                new_height = target_height
+                new_width = int(target_height * img_aspect)
 
-        # 调整图像大小，保持纵横比
-        img_pil = img_pil.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            img_pil = img_pil.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
-        # 创建一个目标尺寸的填充颜色图像
-        fill_color_rgb = int(fill_color * 255)
-        new_img_pil = Image.new("RGB", (target_width, target_height), (fill_color_rgb, fill_color_rgb, fill_color_rgb))
+            new_img_pil = Image.new("RGB", (target_width, target_height), fill_rgb)
+            paste_x = (target_width - new_width) // 2
+            paste_y = (target_height - new_height) // 2
+            new_img_pil.paste(img_pil, (paste_x, paste_y))
 
-        # 将调整大小后的图像粘贴到中心位置
-        paste_x = (target_width - new_width) // 2
-        paste_y = (target_height - new_height) // 2
-        new_img_pil.paste(img_pil, (paste_x, paste_y))
+            arr = np.array(new_img_pil).astype(np.float32) / 255.0
+            out.append(torch.from_numpy(arr))
 
-        # 转换回tensor
-        img_np = np.array(new_img_pil).astype(np.float32) / 255.0
-        return torch.from_numpy(img_np).unsqueeze(0)
+        return torch.stack(out, dim=0)
+
+    def _parse_color_string(self, color_str):
+        """解析任意颜色字符串为 0..1 RGB，复用 ImageSolid.parse_color。"""
+        try:
+            parser = ImageSolid()
+            r, g, b = parser.parse_color(color_str)
+            return (r / 255.0, g / 255.0, b / 255.0)
+        except Exception:
+            return (1.0, 1.0, 1.0)
+
+    def _parse_color_advanced(self, color_str, img_tensor=None):
+        """
+        高级颜色解析：支持灰度、HEX、RGB、颜色名以及特殊值。
+        - 灰度："0.0".."1.0"
+        - HEX："#RRGGBB" 或 "RRGGBB"
+        - RGB："r,g,b"，可为 0..1 或 0..255
+        - 名称：black/white/red/green/blue/yellow/cyan/magenta/gray/grey
+        - 特殊：average/edge（需要参考图像张量）
+        """
+        if not color_str:
+            return (0, 0, 0)
+
+        color_lower = color_str.lower().strip()
+
+        # 特殊值：平均色与边缘平均色
+        if color_lower in ["average", "avg", "a", "av", "aver"]:
+            if img_tensor is not None:
+                return self._get_average_color_tensor(img_tensor)
+            return (128, 128, 128)
+        if color_lower in ["edge", "e", "ed"]:
+            if img_tensor is not None:
+                return self._get_edge_color_tensor(img_tensor)
+            return (128, 128, 128)
+
+        # 去除包裹括号
+        text = color_str.strip()
+        if text.startswith("(") and text.endswith(")"):
+            text = text[1:-1].strip()
+
+        # 灰度值（0..1）
+        try:
+            gray = float(text)
+            if 0.0 <= gray <= 1.0:
+                g8 = int(gray * 255)
+                return (g8, g8, g8)
+        except ValueError:
+            pass
+
+        # HEX 解析
+        hex_text = text[1:] if text.startswith("#") else text
+        if (len(hex_text) == 6 and
+                all(c in "0123456789ABCDEFabcdef" for c in hex_text)):
+            try:
+                r = int(hex_text[0:2], 16)
+                g = int(hex_text[2:4], 16)
+                b = int(hex_text[4:6], 16)
+                return (r, g, b)
+            except ValueError:
+                pass
+
+        # RGB（"r,g,b"），支持 0..1 或 0..255
+        try:
+            parts = [p.strip() for p in text.split(",")]
+            if len(parts) == 3:
+                r_f, g_f, b_f = [float(p) for p in parts]
+                if all(0.0 <= v <= 1.0 for v in [r_f, g_f, b_f]):
+                    return (int(r_f * 255), int(g_f * 255), int(b_f * 255))
+                if all(0 <= v <= 255 for v in [r_f, g_f, b_f]):
+                    return (int(r_f), int(g_f), int(b_f))
+        except ValueError:
+            pass
+
+        # 颜色名称
+        name_map = {
+            "black": (0, 0, 0),
+            "white": (255, 255, 255),
+            "red": (255, 0, 0),
+            "green": (0, 255, 0),
+            "blue": (0, 0, 255),
+            "yellow": (255, 255, 0),
+            "cyan": (0, 255, 255),
+            "magenta": (255, 0, 255),
+            "gray": (128, 128, 128),
+            "grey": (128, 128, 128),
+        }
+        if color_lower in name_map:
+            return name_map[color_lower]
+
+        return (0, 0, 0)
+
+    def _get_average_color_tensor(self, img_tensor):
+        """返回图像张量的平均颜色（0..255 RGB 元组）。"""
+        mean_color = img_tensor.mean(dim=(0, 1))
+        mean_255 = (mean_color * 255).int().tolist()
+        return tuple(mean_255)
+
+    def _get_edge_color_tensor(self, img_tensor):
+        """返回图像张量边缘像素的平均颜色（0..255）。"""
+        h, w, c = img_tensor.shape
+        edge_pixels = []
+        edge_pixels.append(img_tensor[0, :, :])
+        edge_pixels.append(img_tensor[-1, :, :])
+        if h > 2:
+            edge_pixels.append(img_tensor[1:-1, 0, :])
+            edge_pixels.append(img_tensor[1:-1, -1, :])
+        all_edge = torch.cat([p.reshape(-1, c) for p in edge_pixels], dim=0)
+        mean_color = all_edge.mean(dim=0)
+        mean_255 = (mean_color * 255).int().tolist()
+        return tuple(mean_255)
 
     def _resize_keeping_aspect_ratio(self, reference_image, edit_image, edit_image_position):
         """
         新的resize逻辑：保持reference_image的原始比例，根据拼接方向调整尺寸
         """
-        # 获取图像尺寸
-        ref_batch, ref_height, ref_width, ref_channels = reference_image.shape
-        edit_batch, edit_height, edit_width, edit_channels = edit_image.shape
-        
-        # 将图像转换为PIL格式以便于处理
-        if reference_image.is_cuda:
-            ref_np = (reference_image[0].cpu().numpy() * 255).astype(np.uint8)
-        else:
-            ref_np = (reference_image[0].numpy() * 255).astype(np.uint8)
+        bs = max(reference_image.shape[0], edit_image.shape[0])
+        out = []
+        for i in range(bs):
+            # 单样本 (H, W, C)
+            ref_arr = (reference_image[i].cpu().numpy() * 255).astype(np.uint8)
+            ref_pil = Image.fromarray(ref_arr)
 
-        ref_pil = Image.fromarray(ref_np)
-        
-        # 根据拼接方向确定需要匹配的维度
-        if edit_image_position in ["left", "right"]:
-            # 水平拼接：匹配高度
-            target_height = edit_height
-            # 保持原始比例计算新宽度
-            aspect_ratio = ref_width / ref_height
-            target_width = int(target_height * aspect_ratio)
-        else:  # top, bottom
-            # 垂直拼接：匹配宽度
-            target_width = edit_width
-            # 保持原始比例计算新高度
-            aspect_ratio = ref_height / ref_width
-            target_height = int(target_width * aspect_ratio)
-        
-        # 调整参考图像大小，保持纵横比
-        ref_pil = ref_pil.resize((target_width, target_height), Image.Resampling.LANCZOS)
-        
-        # 转换回tensor
-        ref_np = np.array(ref_pil).astype(np.float32) / 255.0
-        return torch.from_numpy(ref_np).unsqueeze(0)
+            edit_h = int(edit_image[i].shape[0])
+            edit_w = int(edit_image[i].shape[1])
+            ref_h = int(reference_image[i].shape[0])
+            ref_w = int(reference_image[i].shape[1])
+
+            if edit_image_position in ["left", "right"]:
+                target_height = max(edit_h, 1)
+                aspect_ratio = ref_w / max(ref_h, 1)
+                target_width = max(int(round(target_height * aspect_ratio)), 1)
+            else:
+                target_width = max(edit_w, 1)
+                aspect_ratio = ref_h / max(ref_w, 1)
+                target_height = max(int(round(target_width * aspect_ratio)), 1)
+
+            ref_pil = ref_pil.resize((target_width, target_height), Image.Resampling.LANCZOS)
+            arr = np.array(ref_pil).astype(np.float32) / 255.0
+            out.append(torch.from_numpy(arr))
+
+        return torch.stack(out, dim=0)
+
+    def _broadcast_image(self, img, batch_size):
+        b = img.shape[0]
+        if b == batch_size:
+            return img
+        if b == 1:
+            return img.repeat(batch_size, 1, 1, 1)
+        reps = int(math.ceil(batch_size / b))
+        tiled = img.repeat(reps, 1, 1, 1)[:batch_size]
+        return tiled
+
+    def _broadcast_mask(self, mask, batch_size):
+        b = mask.shape[0]
+        if b == batch_size:
+            return mask
+        if b == 1:
+            return mask.repeat(batch_size, 1, 1)
+        reps = int(math.ceil(batch_size / b))
+        tiled = mask.repeat(reps, 1, 1)[:batch_size]
+        return tiled
+
+    def _ensure_mask_3d(self, mask):
+        """确保遮罩为 (batch, height, width) 形状。
+        - (batch, 1, height, width) -> (batch, height, width)
+        - (height, width) -> (1, height, width)
+        其他情况原样返回。
+        """
+        if mask is None:
+            return None
+        if mask.dim() == 4:
+            if mask.shape[1] == 1:
+                return mask.squeeze(1)
+            # 取第一个通道作为遮罩
+            return mask[:, 0, :, :]
+        if mask.dim() == 2:
+            return mask.unsqueeze(0)
+        return mask
+
+    def _resize_mask_to_image(self, mask, image):
+        """将遮罩尺寸重采样到与图像一致 (H, W)。
+        使用最近邻以保持二值或离散值。
+        """
+        if mask is None or image is None:
+            return mask
+        target_h = int(image.shape[1])
+        target_w = int(image.shape[2])
+        if int(mask.shape[1]) == target_h and int(mask.shape[2]) == target_w:
+            return mask
+        mask4 = mask.unsqueeze(1)
+        resized4 = F.interpolate(
+            mask4, size=(target_h, target_w), mode="nearest"
+        )
+        return resized4.squeeze(1)
+
+
+class ImageThreeStitch:
+    """
+    ImageThreeStitch：三图拼接。先合并 image_2 与 image_3，再按 direction
+    将该组合贴到 image_1 的一侧。
+
+    - direction: top/bottom/left/right
+      - top/bottom: 2 与 3 先水平并排，再与 1 垂直拼接
+      - left/right: 2 与 3 先垂直堆叠，再与 1 水平拼接
+    - match_image_size: True 时沿目标轴等比缩放；False 时用 pad_color 居中填充
+    - spacing_width: 同一数值同时用于 2+3 的拼接与 (2,3) 与 1 的拼接
+    - spacing_color / pad_color: 字符串颜色，解析规则与 ImageSolid.parse_color 相同
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image_1": ("IMAGE", {"forceInput": True}),
+                "image_2": ("IMAGE", {"forceInput": True}),
+                "image_3": ("IMAGE", {"forceInput": True}),
+                "direction": (["top", "bottom", "left", "right"], {"default": "left"}),
+                "match_image_size": ("BOOLEAN", {"default": True}),
+                "spacing_width": ("INT", {"default": 10, "min": 0, "max": 1000, "step": 1}),
+                "spacing_color": ("STRING", {"default": "1.0"}),
+                "pad_color": ("STRING", {"default": "1.0"}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "stitch_attach"
+    CATEGORY = "1hewNodes/image"
+    DESCRIPTION = "合并 (2,3) 后按方向贴到 1 的一侧。"
+
+    def stitch_attach(
+        self,
+        image_1,
+        image_2,
+        image_3,
+        direction,
+        match_image_size,
+        spacing_width,
+        spacing_color,
+        pad_color,
+    ):
+        a = torch.clamp(image_1, min=0.0, max=1.0).to(torch.float32)
+        b = torch.clamp(image_2, min=0.0, max=1.0).to(torch.float32)
+        c = torch.clamp(image_3, min=0.0, max=1.0).to(torch.float32)
+
+        # 对齐批量维度
+        bs = max(a.shape[0], b.shape[0], c.shape[0])
+        a = self._broadcast_image(a, bs)
+        b = self._broadcast_image(b, bs)
+        c = self._broadcast_image(c, bs)
+
+        space_rgb = self._parse_color_string(spacing_color)
+        pad_rgb = self._parse_color_string(pad_color)
+
+        if direction in ("top", "bottom"):
+            pair = self._combine_horizontal(
+                b, c, match_image_size, spacing_width, space_rgb, pad_rgb, bs
+            )
+            out = self._stack_vertical(
+                a,
+                pair,
+                direction,
+                match_image_size,
+                spacing_width,
+                space_rgb,
+                pad_rgb,
+                bs,
+            )
+        else:
+            pair = self._combine_vertical(
+                b, c, match_image_size, spacing_width, space_rgb, pad_rgb, bs
+            )
+            out = self._stack_horizontal(
+                a,
+                pair,
+                direction,
+                match_image_size,
+                spacing_width,
+                space_rgb,
+                pad_rgb,
+                bs,
+            )
+
+        return (torch.clamp(out, min=0.0, max=1.0).to(torch.float32),)
+
+    # --- 合并 2 与 3 ---
+    def _combine_horizontal(
+        self, img2, img3, match, spacing_width, space_rgb, pad_rgb, batch_size
+    ):
+        _, h2, w2, _ = img2.shape
+        _, h3, w3, _ = img3.shape
+        # 合并阶段：
+        # - match=True 按较大高度等比缩放；
+        # - match=False 统一到较大高度，使用居中填充保持原图尺寸不变。
+        if match:
+            target_h = max(h2, h3)
+            img2 = self._resize_keep_ratio(img2, None, target_h)
+            img3 = self._resize_keep_ratio(img3, None, target_h)
+        else:
+            target_h = max(h2, h3)
+            img2 = self._pad_to_rgb(img2, target_h, w2, pad_rgb)
+            img3 = self._pad_to_rgb(img3, target_h, w3, pad_rgb)
+
+        _, hh2, ww2, _ = img2.shape
+        _, hh3, ww3, _ = img3.shape
+        strip = self._make_strip(
+            hh2, spacing_width, space_rgb, axis="v", dtype=img2.dtype,
+            device=img2.device, batch_size=batch_size,
+        )
+
+        return torch.cat([img2, strip, img3], dim=2)
+
+    def _combine_vertical(
+        self, img2, img3, match, spacing_width, space_rgb, pad_rgb, batch_size
+    ):
+        _, h2, w2, _ = img2.shape
+        _, h3, w3, _ = img3.shape
+        # 合并阶段：
+        # - match=True 按较大宽度等比缩放；
+        # - match=False 统一到较大宽度，使用居中填充保持原图尺寸不变。
+        if match:
+            target_w = max(w2, w3)
+            img2 = self._resize_keep_ratio(img2, target_w, None)
+            img3 = self._resize_keep_ratio(img3, target_w, None)
+        else:
+            target_w = max(w2, w3)
+            img2 = self._pad_to_rgb(img2, h2, target_w, pad_rgb)
+            img3 = self._pad_to_rgb(img3, h3, target_w, pad_rgb)
+
+        _, hh2, ww2, _ = img2.shape
+        _, hh3, ww3, _ = img3.shape
+        strip = self._make_strip(
+            spacing_width, ww2, space_rgb, axis="h", dtype=img2.dtype,
+            device=img2.device, batch_size=batch_size,
+        )
+
+        return torch.cat([img2, strip, img3], dim=1)
+
+    # --- 将 (2,3) 组合贴到 1 ---
+    def _stack_vertical(
+        self,
+        img1,
+        pair,
+        direction,
+        match,
+        spacing_width,
+        space_rgb,
+        pad_rgb,
+        batch_size,
+    ):
+        _, h1, w1, _ = img1.shape
+        _, hp, wp, _ = pair.shape
+        # 外部贴合：以 image_1 的宽度为基准
+        target_w = w1
+
+        if match:
+            img1 = self._resize_keep_ratio(img1, target_w, None)
+            pair = self._resize_keep_ratio(pair, target_w, None)
+        else:
+            # 不匹配尺寸：统一到较大的宽度，使用居中填充（不裁剪）
+            unified_w = max(w1, wp)
+            img1 = self._pad_to_rgb(img1, h1, unified_w, pad_rgb)
+            pair = self._pad_to_rgb(pair, hp, unified_w, pad_rgb)
+
+        _, h1, w1, _ = img1.shape
+        _, hp, wp, _ = pair.shape
+        # 间隔条宽度与最终统一宽度一致
+        strip = self._make_strip(spacing_width, w1 if match else unified_w, space_rgb, axis="h", dtype=img1.dtype, device=img1.device, batch_size=batch_size)
+
+        if direction == "bottom":
+            return torch.cat([img1, strip, pair], dim=1)
+        return torch.cat([pair, strip, img1], dim=1)
+
+    def _stack_horizontal(
+        self,
+        img1,
+        pair,
+        direction,
+        match,
+        spacing_width,
+        space_rgb,
+        pad_rgb,
+        batch_size,
+    ):
+        _, h1, w1, _ = img1.shape
+        _, hp, wp, _ = pair.shape
+        # 外部贴合：以 image_1 的高度为基准
+        target_h = h1
+
+        if match:
+            img1 = self._resize_keep_ratio(img1, None, target_h)
+            pair = self._resize_keep_ratio(pair, None, target_h)
+        else:
+            # 不匹配尺寸：统一到较大的高度，使用居中填充（不裁剪）
+            unified_h = max(h1, hp)
+            img1 = self._pad_to_rgb(img1, unified_h, w1, pad_rgb)
+            pair = self._pad_to_rgb(pair, unified_h, wp, pad_rgb)
+
+        _, h1, w1, _ = img1.shape
+        _, hp, wp, _ = pair.shape
+        # 间隔条高度与最终统一高度一致
+        strip = self._make_strip(h1 if match else unified_h, spacing_width, space_rgb, axis="v", dtype=img1.dtype, device=img1.device, batch_size=batch_size)
+
+        if direction == "right":
+            return torch.cat([img1, strip, pair], dim=2)
+        return torch.cat([pair, strip, img1], dim=2)
+
+    # --- 工具函数 ---
+    def _parse_color_string(self, color_str):
+        """解析任意颜色字符串为 0..1 RGB，复用 ImageSolid.parse_color。"""
+        try:
+            from .image import ImageSolid  # 延迟导入避免循环依赖
+            parser = ImageSolid()
+            rgb = parser.parse_color(color_str)
+            r = rgb[0] / 255.0
+            g = rgb[1] / 255.0
+            b = rgb[2] / 255.0
+            return (r, g, b)
+        except Exception:
+            return (1.0, 1.0, 1.0)
+
+    def _resize_keep_ratio(self, img, target_w, target_h):
+        """按目标宽或高等比缩放，另一维自适应；不拉伸。"""
+        _, h, w, _ = img.shape
+        if target_w is None:
+            scale = target_h / max(h, 1)
+            new_w = max(int(round(w * scale)), 1)
+            new_h = target_h
+        elif target_h is None:
+            scale = target_w / max(w, 1)
+            new_h = max(int(round(h * scale)), 1)
+            new_w = target_w
+        else:
+            new_w, new_h = target_w, target_h
+
+        nchw = img.permute(0, 3, 1, 2)
+        out = F.interpolate(
+            nchw, size=(new_h, new_w), mode="bicubic", align_corners=False
+        ).permute(0, 2, 3, 1)
+        return out
+
+    def _pad_to_rgb(self, img, target_h, target_w, fill_rgb):
+        """居中填充到指定尺寸，使用 RGB 填充颜色。"""
+        b, h, w, c = img.shape
+        out = torch.zeros(
+            (b, target_h, target_w, c), dtype=img.dtype, device=img.device
+        )
+        fill_t = torch.tensor(fill_rgb, dtype=img.dtype, device=img.device)
+        out[:] = fill_t
+        top = max((target_h - h) // 2, 0)
+        left = max((target_w - w) // 2, 0)
+        out[:, top : top + h, left : left + w, :] = img
+        return out
+
+    def _pad_or_crop_to_rgb(self, img, target_h, target_w, fill_rgb):
+        """居中对齐到指定尺寸：
+        - 若源尺寸小于目标尺寸，则填充居中；
+        - 若源尺寸大于目标尺寸，则居中裁剪到目标尺寸；
+        使用 RGB 填充颜色处理需要填充的区域。
+        """
+        b, h, w, c = img.shape
+        out = torch.zeros(
+            (b, target_h, target_w, c), dtype=img.dtype, device=img.device
+        )
+        fill_t = torch.tensor(fill_rgb, dtype=img.dtype, device=img.device)
+        out[:] = fill_t
+
+        # 计算源裁剪窗口（居中裁剪）
+        src_top = max((h - target_h) // 2, 0)
+        src_left = max((w - target_w) // 2, 0)
+        copy_h = min(h, target_h)
+        copy_w = min(w, target_w)
+
+        # 计算目标粘贴位置（居中填充）
+        dst_top = max((target_h - h) // 2, 0)
+        dst_left = max((target_w - w) // 2, 0)
+
+        out[:, dst_top : dst_top + copy_h, dst_left : dst_left + copy_w, :] = (
+            img[:, src_top : src_top + copy_h, src_left : src_left + copy_w, :]
+        )
+        return out
+
+    def _make_strip(self, h, w, fill_rgb, axis, dtype, device, batch_size=1):
+        """生成间隔条：axis='v' 垂直条，axis='h' 水平条。"""
+        if w <= 0:
+            return torch.zeros((batch_size, h, 0, 3), dtype=dtype, device=device)
+        if axis == "v":
+            out = torch.zeros((batch_size, h, w, 3), dtype=dtype, device=device)
+            out[:] = torch.tensor(fill_rgb, dtype=dtype, device=device)
+            return out
+        out = torch.zeros((batch_size, w, h, 3), dtype=dtype, device=device)
+        out[:] = torch.tensor(fill_rgb, dtype=dtype, device=device)
+        return out.permute(0, 2, 1, 3)
+
+    def _broadcast_image(self, img, batch_size):
+        b = img.shape[0]
+        if b == batch_size:
+            return img
+        if b == 1:
+            return img.repeat(batch_size, 1, 1, 1)
+        reps = int(math.ceil(batch_size / b))
+        tiled = img.repeat(reps, 1, 1, 1)[:batch_size]
+        return tiled
 
 
 class ImageAddLabel:
@@ -3247,6 +3752,7 @@ NODE_CLASS_MAPPINGS = {
     "1hew_ImageResizeUniversal": ImageResizeUniversal,
     "1hew_ImageRotateWithMask": ImageRotateWithMask,
     "1hew_ImageEditStitch": ImageEditStitch,
+    "1hew_ImageThreeStitch": ImageThreeStitch,
     "1hew_ImageAddLabel": ImageAddLabel,
     "1hew_ImagePlot": ImagePlot,
     "1hew_ImageStrokeByMask": ImageStrokeByMask,
@@ -3263,6 +3769,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "1hew_ImageResizeUniversal": "Image Resize Universal",
     "1hew_ImageRotateWithMask": "Image Rotate with Mask",
     "1hew_ImageEditStitch": "Image Edit Stitch",
+    "1hew_ImageThreeStitch": "Image Three Stitch",
     "1hew_ImageAddLabel": "Image Add Label",
     "1hew_ImagePlot": "Image Plot",
     "1hew_ImageStrokeByMask": "Image Stroke by Mask",

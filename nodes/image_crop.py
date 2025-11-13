@@ -694,9 +694,9 @@ class ImageCropWithBBoxMask:
                 "mask": ("MASK",),
                 "preset_ratio": (["mask", "image", "1:1", "3:2", "4:3", "16:9", "21:9", "2:3", "3:4", "9:16", "9:21"], {"default": "mask"}),
                 "scale_strength": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "divisible_by": ("INT", {"default": 8, "min": 1, "max": 1024, "step": 1}),
                 "crop_to_side": (["None", "longest", "shortest", "width", "height"], {"default": "None"}),
                 "crop_to_length": ("INT", {"default": 1024, "min": 8, "max": 8192, "step": 1}),
+                "divisible_by": ("INT", {"default": 8, "min": 1, "max": 1024, "step": 1}),
             }
         }
 

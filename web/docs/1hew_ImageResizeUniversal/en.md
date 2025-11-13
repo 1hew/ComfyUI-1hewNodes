@@ -13,9 +13,9 @@
 | `proportional_width` | - | INT | 1 | 1-1e8 | Custom ratio width value for custom mode |
 | `proportional_height` | - | INT | 1 | 1-1e8 | Custom ratio height value for custom mode |
 | `method` | - | COMBO[STRING] | lanczos | nearest, bilinear, lanczos, bicubic, hamming, box | Image scaling algorithm selection |
-| `scale_to_side` | - | COMBO[STRING] | None | None, longest, shortest, width, height, mega_pixels_k | Scale by side mode, determines how to calculate target dimensions |
+| `scale_to_side` | - | COMBO[STRING] | None | None, longest, shortest, width, height, length_to_sq_area | Scale by side mode, determines how to calculate target dimensions |
 | `scale_to_length` | - | INT | 1024 | 4-1e8 | Target length value, used with scale_to_side |
-| `fit` | - | COMBO[STRING] | crop | stretch, crop, pad | Fitting method: stretch, crop, pad |
+| `fit` | - | COMBO[STRING] | crop | crop, pad, stretch | Fitting method: crop, pad, stretch |
 | `pad_color` | - | STRING | 1.0 | Grayscale/HEX/RGB/edge | Padding color, supports multiple formats or "edge" for automatic edge color |
 | `divisible_by` | - | INT | 8 | 1-1024 | Divisibility number, ensures output dimensions are divisible by specified number |
 
@@ -39,7 +39,10 @@
 - **shortest**: Scales by shortest side to specified length
 - **width**: Scales by width to specified length
 - **height**: Scales by height to specified length
-- **mega_pixels_k**: Scales by total pixel count (in thousands of pixels)
+- **length_to_sq_area**: Scales by target area; the area equals
+  `scale_to_length²`. For example, `1024` yields an area of `1024×1024`,
+  and `2048` yields `2048×2048`. The aspect ratio determines width/height
+  distribution while the area remains `scale_to_length²`.
 
 ### Fitting Methods
 - **stretch**: Directly stretches to target dimensions, may change image ratio

@@ -91,10 +91,10 @@ class IntSplit:
             return (20, 10)
 
 
-class TextFilterComment:
+class TextFilter:
     """
-    文本注释过滤节点 - 过滤掉以 # 开头的注释行
-    支持单行注释和多行注释（三引号）的过滤
+    TextFilter 节点 - 过滤以 # 开头的注释行
+    支持单行注释与三引号多行注释过滤
     """
     
     def __init__(self):
@@ -105,6 +105,8 @@ class TextFilterComment:
         return {
             "required": {
                 "text": ("STRING", {"multiline": True, "default": "", "placeholder": "text"}),
+                "filter_empty_line": ("BOOLEAN", {"default": False}),
+                "filter_comment": ("BOOLEAN", {"default": False}),
             }
         }
 
@@ -114,7 +116,7 @@ class TextFilterComment:
     FUNCTION = "filter_comments"
     CATEGORY = "1hewNodes/text"
     
-    def parse_text_and_filter_comments(self, text):
+    def parse_text_and_filter_comments(self, text, filter_comment=False, filter_empty_line=False):
         """
         解析文本并过滤注释
         """
@@ -130,49 +132,70 @@ class TextFilterComment:
         for line in lines:
             original_line = line
             processed_line = ""
-            i = 0
-            
-            while i < len(line):
-                # 如果当前在多行注释中
-                if in_multiline_comment:
-                    # 查找多行注释的结束
-                    end_pos = line.find(multiline_quote_type, i)
-                    if end_pos != -1:
-                        # 找到结束标记，跳过它并继续处理剩余部分
-                        i = end_pos + len(multiline_quote_type)
-                        in_multiline_comment = False
-                        multiline_quote_type = None
-                    else:
-                        # 整行都在多行注释中，跳过整行
-                        break
-                else:
-                    # 检查是否遇到多行注释开始
-                    if i + 2 < len(line) and (line[i:i+3] == '"""' or line[i:i+3] == "'''"):
-                        multiline_quote_type = line[i:i+3]
-                        # 查找同行是否有结束标记
-                        end_pos = line.find(multiline_quote_type, i + 3)
+            if filter_comment:
+                i = 0
+                while i < len(line):
+                    # 如果当前在多行注释中
+                    if in_multiline_comment:
+                        # 查找多行注释的结束
+                        end_pos = line.find(multiline_quote_type, i)
                         if end_pos != -1:
-                            # 同行内的多行注释，跳过这部分
-                            i = end_pos + 3
+                            # 找到结束标记，跳过它并继续处理剩余部分
+                            i = end_pos + len(multiline_quote_type)
+                            in_multiline_comment = False
+                            multiline_quote_type = None
                         else:
-                            # 跨行多行注释开始
-                            in_multiline_comment = True
+                            # 整行都在多行注释中，跳过整行
                             break
-                    # 检查是否遇到单行注释
-                    elif line[i] == '#':
-                        # 遇到单行注释，忽略行的剩余部分
-                        break
                     else:
-                        # 普通字符，添加到处理后的行中
-                        processed_line += line[i]
-                        i += 1
-            
-            # 如果不在多行注释中，且处理后的行不是以#开头的注释行
+                        # 检查是否遇到多行注释开始
+                        if i + 2 < len(line) and (line[i:i+3] == '"""' or line[i:i+3] == "'''"):
+                            multiline_quote_type = line[i:i+3]
+                            # 查找同行是否有结束标记
+                            end_pos = line.find(multiline_quote_type, i + 3)
+                            if end_pos != -1:
+                                # 同行内的多行注释，跳过这部分
+                                i = end_pos + 3
+                            else:
+                                # 跨行多行注释开始
+                                in_multiline_comment = True
+                                break
+                        # 检查是否遇到单行注释
+                        elif line[i] == '#':
+                            # 遇到单行注释，忽略行的剩余部分
+                            break
+                        else:
+                            # 普通字符，添加到处理后的行中
+                            processed_line += line[i]
+                            i += 1
+            else:
+                processed_line = original_line
+
+            # 如果不在多行注释中，进行行内容的最终判断与追加
             if not in_multiline_comment:
                 # 移除行尾空白字符
                 processed_line = processed_line.rstrip()
-                # 只有当行有内容或者是原本就存在的空行时才添加
-                if processed_line or (not original_line.strip() and not original_line.lstrip().startswith('#')):
+
+                # 当开启过滤注释时：
+                # 1) 以注释开头的整行直接跳过；
+                # 2) 因过滤注释而变成空行的当前行也跳过（不受 filter_empty_line 影响）。
+                if filter_comment:
+                    starts_with_comment = original_line.lstrip().startswith('#')
+                    became_empty_by_filter = (
+                        processed_line.strip() == "" and original_line.strip() != "" and (
+                            '#' in original_line or
+                            original_line.strip().startswith('"""') or
+                            original_line.strip().startswith("'''")
+                        )
+                    )
+                    if starts_with_comment or became_empty_by_filter:
+                        continue
+
+                # 根据 filter_empty_line 决定是否保留空行（非注释导致的空行）
+                if filter_empty_line:
+                    if processed_line.strip():
+                        result.append(processed_line)
+                else:
                     result.append(processed_line)
         
         # 重新组合文本
@@ -184,19 +207,23 @@ class TextFilterComment:
             
         return parsed_text
 
-    def filter_comments(self, text):
+    def filter_comments(self, text, filter_comment=True, filter_empty_line=True):
         try:
             # 处理转义字符，支持 \n 换行
             text = text.replace('\\n', '\n')
             
             # 过滤注释
-            filtered_text = self.parse_text_and_filter_comments(text)
+            filtered_text = self.parse_text_and_filter_comments(
+                text,
+                filter_comment,
+                filter_empty_line,
+            )
             
             # 确保返回字符串类型
             return (str(filtered_text),)
             
         except Exception as e:
-            print(f"TextFilterComment error: {e}")
+            print(f"TextFilter error: {e}")
             return ("",)
 
 
@@ -217,6 +244,8 @@ class TextJoinMulti:
                 "text3": ("STRING", {"multiline": True, "default": "", "placeholder": "text_3"}),
                 "text4": ("STRING", {"multiline": True, "default": "", "placeholder": "text_4"}),
                 "text5": ("STRING", {"multiline": True, "default": "", "placeholder": "text_5"}),
+                "filter_empty_line": ("BOOLEAN", {"default": False}),
+                "filter_comment": ("BOOLEAN", {"default": False}),
                 "separator": ("STRING", {"default": "\\n"}),
             },
             "optional": {
@@ -229,13 +258,12 @@ class TextJoinMulti:
     FUNCTION = "text_join_multi"
     CATEGORY = "1hewNodes/text"
     
-    def parse_text_with_input(self, text, input):
+    def parse_text_with_input(self, text, input, filter_comment=False, filter_empty_line=False):
         parsed_text = text
         
         # 处理 {input} 引用
         input_value = "" if input is None or input == "" else str(input)
         parsed_text = parsed_text.replace("{input}", input_value)
-        
         
         # 先按行分割文本
         lines = parsed_text.split('\n')
@@ -246,61 +274,64 @@ class TextJoinMulti:
         for line in lines:
             original_line = line
             processed_line = ""
-            i = 0
-            
-            while i < len(line):
-                # 如果当前在多行注释中
-                if in_multiline_comment:
-                    # 查找多行注释的结束
-                    end_pos = line.find(multiline_quote_type, i)
-                    if end_pos != -1:
-                        # 找到结束标记，跳过它并继续处理剩余部分
-                        i = end_pos + len(multiline_quote_type)
-                        in_multiline_comment = False
-                        multiline_quote_type = None
-                    else:
-                        # 整行都在多行注释中，跳过整行
-                        break
-                else:
-                    # 检查是否遇到多行注释开始
-                    if line[i:i+3] == '"""' or line[i:i+3] == "'''":
-                        multiline_quote_type = line[i:i+3]
-                        # 查找同行是否有结束标记
-                        end_pos = line.find(multiline_quote_type, i + 3)
+            if filter_comment:
+                i = 0
+                while i < len(line):
+                    if in_multiline_comment:
+                        end_pos = line.find(multiline_quote_type, i)
                         if end_pos != -1:
-                            # 同行内的多行注释，跳过这部分
-                            i = end_pos + 3
+                            i = end_pos + len(multiline_quote_type)
+                            in_multiline_comment = False
+                            multiline_quote_type = None
                         else:
-                            # 跨行多行注释开始
-                            in_multiline_comment = True
                             break
-                    # 检查是否遇到单行注释
-                    elif line[i] == '#':
-                        # 遇到单行注释，忽略行的剩余部分
-                        break
                     else:
-                        # 普通字符，添加到处理后的行中
-                        processed_line += line[i]
-                        i += 1
+                        if i + 2 < len(line) and (line[i:i+3] == '"""' or line[i:i+3] == "'''"):
+                            multiline_quote_type = line[i:i+3]
+                            end_pos = line.find(multiline_quote_type, i + 3)
+                            if end_pos != -1:
+                                i = end_pos + 3
+                            else:
+                                in_multiline_comment = True
+                                break
+                        elif line[i] == '#':
+                            break
+                        else:
+                            processed_line += line[i]
+                            i += 1
+            else:
+                processed_line = original_line
             
-            # 如果不在多行注释中，且处理后的行不是以#开头的注释行
             if not in_multiline_comment:
-                # 移除行尾空白字符
                 processed_line = processed_line.rstrip()
-                # 只有当行有内容或者是原本就存在的空行时才添加
-                if processed_line or (not original_line.strip() and not original_line.startswith('#')):
+
+                # 当开启过滤注释时：
+                # 1) 以注释开头的整行直接跳过；
+                # 2) 因过滤注释而变成空行的当前行也跳过（不受 filter_empty_line 影响）。
+                if filter_comment:
+                    starts_with_comment = original_line.lstrip().startswith('#')
+                    became_empty_by_filter = (
+                        processed_line.strip() == "" and original_line.strip() != "" and (
+                            '#' in original_line or
+                            original_line.strip().startswith('"""') or
+                            original_line.strip().startswith("'''")
+                        )
+                    )
+                    if starts_with_comment or became_empty_by_filter:
+                        continue
+
+                if filter_empty_line:
+                    if processed_line.strip():
+                        result.append(processed_line)
+                else:
                     result.append(processed_line)
         
-        # 重新组合文本
         parsed_text = '\n'.join(result)
-        
-        # 如果最终结果只有空行或空内容，返回空字符串
         if not parsed_text.strip():
             return ""
-            
         return parsed_text
 
-    def text_join_multi(self, text1, text2, text3, text4, text5, separator="\n", input=None):
+    def text_join_multi(self, text1, text2, text3, text4, text5, separator="\n", filter_empty_line=False, filter_comment=False, input=None):
 
         try:
             # 处理转义字符 - 使用更通用的方法
@@ -315,7 +346,12 @@ class TextJoinMulti:
             for text in [text1, text2, text3, text4, text5]:
                 if text and text.strip():
                     # 处理文本中的 {input} 引用和注释过滤
-                    parsed_text = self.parse_text_with_input(text, input)
+                    parsed_text = self.parse_text_with_input(
+                        text,
+                        input,
+                        filter_comment,
+                        filter_empty_line,
+                    )
                     # 过滤后如果文本仍然有内容，则添加到列表
                     if parsed_text.strip():
                         text_list.append(parsed_text)
@@ -1218,7 +1254,7 @@ class ListCustomSeed:
 NODE_CLASS_MAPPINGS = {
     "1hew_IntWan": IntWan,
     "1hew_IntSplit": IntSplit,
-    "1hew_TextFilterComment": TextFilterComment,
+    "1hew_TextFilter": TextFilter,
     "1hew_TextJoinMulti": TextJoinMulti,
     "1hew_TextJoinByTextList": TextJoinByTextList,
     "1hew_TextPrefixSuffix": TextPrefixSuffix,
@@ -1232,7 +1268,7 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "1hew_IntWan": "Int Wan",
     "1hew_IntSplit": "Int Split",
-    "1hew_TextFilterComment": "Text Filter Comment",
+    "1hew_TextFilter": "Text Filter",
     "1hew_TextJoinMulti": "Text Join Multi",
     "1hew_TextJoinByTextList": "Text Join by Text List",
     "1hew_TextPrefixSuffix": "Text Prefix Suffix",

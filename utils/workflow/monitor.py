@@ -121,7 +121,7 @@ def find_workflow_directory():
     """自动查找工作流目录"""
     for workflow_dir in POSSIBLE_WORKFLOW_DIRS:
         if os.path.exists(workflow_dir) and os.path.isdir(workflow_dir):
-            logging.info(f"找到工作流目录：{workflow_dir}")
+            # logging.info(f"找到工作流目录：{workflow_dir}")
             return workflow_dir
     
     # 如果都不存在，创建默认目录

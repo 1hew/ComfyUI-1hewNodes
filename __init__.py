@@ -39,6 +39,17 @@ if os.path.exists(nodes_dir) and os.path.isdir(nodes_dir):
 # 添加这行来支持文档
 WEB_DIRECTORY = os.path.join(current_dir, "web")
 
+# 注册前端扩展目录（JS），用于动态输入端口等功能
+try:
+    import nodes
+    js_dir = os.path.join(current_dir, "js")
+    if os.path.isdir(js_dir):
+        # 通过 EXTENSION_WEB_DIRS 显式注册，确保浏览器侧加载到扩展脚本
+        nodes.EXTENSION_WEB_DIRS["ComfyUI-1hewNodes"] = js_dir
+except Exception:
+    # 在服务端启动早期阶段或旧版本 ComfyUI 上，nodes 可能尚未可用
+    pass
+
 # 全局变量保存监控模块引用
 _workflow_watcher = None
 _prev_sigint_handler = None

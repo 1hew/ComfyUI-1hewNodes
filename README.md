@@ -21,6 +21,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v2.0.5**
+- feat(multi): Added `Multi String Join`, `Multi Image Batch`, `Multi Mask Batch`, `Multi Image Stitch`
+- feat(image): Added `Image Three Stitch` node
+- feat(condition): Added `Text Encode QwenImageEdit Keep Size` node
+
 **v2.0.3**
 - feat(image_blend): Added `output_mask_invert` parameter to `Image Mask Blend` for output-only mask inversion
 
@@ -324,6 +329,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Resize Universal | Universal image resizing with multiple algorithms and constraints |
 | Image Rotate with Mask | Advanced image rotation with mask integration, multiple fill modes, and mask center rotation options |
 | Image Edit Stitch | Image stitching and merging with multiple stitching modes |
+| Image Three Stitch | Three-image stitcher with direction, size matching, spacing, and padding color control |
 | Image Add Label | Add text labels to images |
 | Image Plot | Image plotting and visualization tools |
 | Image Stroke by Mask | Apply stroke effects to mask regions with customizable width and color |
@@ -379,7 +385,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Workflow Name | Automatically retrieves current workflow filename with path control, custom prefixes/suffixes, and date formatting |
 | Range Mapping | Value range mapping tool supporting linear transformation and precision control for slider values |
-| Path Build | Path builder supporting preset paths and custom extensions |
 
 ### 🔄 Conversion Nodes
 | Node Name | Description |
@@ -416,7 +421,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Int Wan | Integer sequence generator for creating 4n+1 arithmetic progression sequences with configurable step control and range validation |
 | Int Split | Integer splitter node for dividing total values into two parts, supporting both percentage (0.0-1.0) and integer split point input methods |
-| Text Filter Comment | Text comment filter for filtering single-line comments (starting with #) and multi-line comments (wrapped in triple quotes), preserving non-comment blank lines |
+| Text Filter | Text Filter supporting filtering single line comments (starting with #), multi line comments (wrapped in three quotes), and empty line |
 | Text Join Multi | Multi-input text concatenator supporting multiple text inputs with dynamic variable referencing and custom separators |
 | Text Join by Text List | Text list joiner for merging any type of list into a string with support for prefix, suffix, and custom separators |
 | Text Prefix Suffix | Text prefix suffix formatter with wildcard input support for flexible data formatting with custom prefix, suffix, and separator |
@@ -425,6 +430,19 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | List Custom Float | Custom float list generator with dash separator and multiple delimiter support |
 | List Custom String | Custom string list generator with dash separator and multiple delimiter support |
 | List Custom Seed | Custom seed list generator for creating unique random seed lists with control after generate functionality |
+
+### 🔗 Multi Nodes
+| Node Name | Description |
+|-----------|-------------|
+| Multi String Join | Concatenate dynamic `string_X` inputs with `{input}` variable support and comment/triple-quote filtering; customizable separator |
+| Multi Image Batch | Build image batch from dynamic `image_X` with crop/pad/stretch size unification and edge/color padding |
+| Multi Mask Batch | Build mask batch from dynamic `mask_X` with crop/pad/stretch size unification and configurable gray padding |
+| Multi Image Stitch | Dynamic multi-image stitcher with direction, size matching, spacing, and padding color control |
+
+### 🎛️ Conditioning Nodes
+| Node Name | Description |
+|-----------|-------------|
+| Text Encode QwenImageEdit Keep Size | Qwen image-edit conditioning encoder combining vision inputs and text, supports size preservation modes and reference latents |
 
 
 

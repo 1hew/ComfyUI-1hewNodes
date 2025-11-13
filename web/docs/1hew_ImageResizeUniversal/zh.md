@@ -13,9 +13,9 @@
 | `proportional_width` | - | INT | 1 | 1-1e8 | 自定义比例宽度值，用于custom模式 |
 | `proportional_height` | - | INT | 1 | 1-1e8 | 自定义比例高度值，用于custom模式 |
 | `method` | - | COMBO[STRING] | lanczos | nearest, bilinear, lanczos, bicubic, hamming, box | 图像缩放算法选择 |
-| `scale_to_side` | - | COMBO[STRING] | None | None, longest, shortest, width, height, mega_pixels_k | 按边缩放模式，决定如何计算目标尺寸 |
+| `scale_to_side` | - | COMBO[STRING] | None | None, longest, shortest, width, height, length_to_sq_area | 按边缩放模式，决定如何计算目标尺寸 |
 | `scale_to_length` | - | INT | 1024 | 4-1e8 | 目标长度值，配合scale_to_side使用 |
-| `fit` | - | COMBO[STRING] | crop | stretch, crop, pad | 适应方式：stretch拉伸、crop裁剪、pad填充 |
+| `fit` | - | COMBO[STRING] | crop | crop, pad, stretch | 适应方式：crop裁剪、pad填充、stretch拉伸 |
 | `pad_color` | - | STRING | 1.0 | 灰度值/HEX/RGB/edge | 填充颜色，支持多种格式或使用"edge"自动获取边缘颜色 |
 | `divisible_by` | - | INT | 8 | 1-1024 | 尺寸整除数，确保输出尺寸能被指定数字整除 |
 
@@ -39,7 +39,9 @@
 - **shortest**：按最短边缩放到指定长度
 - **width**：按宽度缩放到指定长度
 - **height**：按高度缩放到指定长度
-- **mega_pixels_k**：按像素总数缩放（以千像素为单位）
+- **length_to_sq_area**：按面积缩放，目标面积为 `scale_to_length²`。例如，`1024`
+  表示 `1024×1024` 的面积，`2048` 表示 `2048×2048` 的面积。纵横比决定
+  宽高分配，面积保持为 `scale_to_length²`。
 
 ### 适应方式
 - **stretch**：直接拉伸到目标尺寸，可能改变图像比例
