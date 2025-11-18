@@ -1,18 +1,30 @@
-# URL to Video
+# URL to Video - Download video from URL
 
-**Node Function:** The `URL to Video` node converts video URLs to ComfyUI VIDEO objects, supporting both synchronous and asynchronous download methods with comprehensive error handling and timeout control.
+**Node Purpose:** `URL to Video` downloads a video from an HTTP(S) URL and outputs a video object for downstream processing.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-|--|--|--|--|--|--|
-| `video_url` | Required | STRING | "" | - | Video file URL address |
-| `timeout` | - | INT | 30 | 5-300 | Download timeout in seconds |
-| `use_async` | - | BOOLEAN | False | True/False | Whether to use asynchronous download (recommended for large files) |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `video_url` | - | STRING | - | http(s) | Direct URL to a video resource (must start with `http://` or `https://`). |
+| `timeout` | - | INT | 30 | 5-300 | Download timeout in seconds. |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `video` | VIDEO | ComfyUI VIDEO object (when VIDEO types available) |
-| `error_message` | STRING | Error message (when VIDEO types unavailable) |
+| Name | Type | Description |
+|------|------|-------------|
+| `video` | VIDEO | Video object constructed from downloaded bytes. |
+
+## Features
+
+- Streaming download: fetches content in chunks with a desktop browser user-agent.
+- Error handling: logs failures and raises exceptions for invalid URLs or download issues.
+- Compatibility: returns a `VideoFromFile` object suitable for downstream nodes.
+
+## Typical Usage
+
+- Provide a direct link to a video file hosted over HTTP(S).
+
+## Notes & Tips
+
+- Ensure the URL points to downloadable video content (not an HTML page or DRM stream).

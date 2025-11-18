@@ -1,40 +1,40 @@
-# Text Custom Extract
+# Text Custom Extract - Structured Text Extraction
 
-**Node Function:** The `Text Custom Extract` node extracts values of specified keys from JSON objects or arrays, supporting both precise matching and enhanced matching modes, with label filtering capabilities, ideal for data extraction and processing scenarios.
+**Node Purpose:** `Text Custom Extract` extracts values for a target `key` from JSON-like text. It supports robust input cleaning, multiple parse fallbacks, enhanced key synonyms, optional precision matching, and label-based filtering.
 
 ## Inputs
 
-| Parameter Name | Input Selection | Data Type | Default Value | Value Range | Description |
-| -------------- | --------------- | --------- | ------------- | ----------- | ----------- |
-| `json_data` | - | STRING | "" | Multiline text | JSON object or array data |
-| `key` | - | STRING | "zh" | Text | Key name to extract |
-| `precision_match` | - | COMBO[STRING] | disabled | disabled, enabled | Precision matching mode switch |
-| `label_filter` | Optional | STRING | "" | Text | Filter by label values (comma separated, supports partial match) |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `json_data` | - | STRING | `` | - | JSON or JSON-like text; code fences and leading/trailing non-JSON content are cleaned. |
+| `key` | - | STRING | `zh` | - | Target key to extract (supports synonyms). |
+| `precision_match` | - | COMBO | `disabled` | `disabled` / `enabled` | Exact-key matching when `enabled`; otherwise case-insensitive with synonyms. |
+| `label_filter` | - | STRING | `` | - | Optional comma-separated labels to filter items (supports Chinese/English). |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `string` | STRING | Extracted value string |
+| Name | Type | Description |
+|------|------|-------------|
+| `string` | STRING | Extracted value(s); lists of numbers are joined with commas; list items from arrays are joined by newlines. |
 
-## Function Description
+## Features
 
-### Label Filtering
-- **Filter support**: Filter objects by label values before extracting specified keys
-- **Multiple filters**: Support comma-separated multiple filter conditions
-- **Partial matching**: Support partial string matching for flexible filtering
-- **Chinese/English separators**: Support both Chinese (，) and English (,) comma separators
+- Input cleaning: removes code fences and trims to the first balanced JSON block.
+- Multi-strategy parsing: tries `json.loads`, falls back to `ast.literal_eval`, quote normalization, and regex key-value extraction.
+- Enhanced key synonyms: supports variations for `bbox`, `label`, `confidence`, `x`, `y`, `width`, `height`, `zh`, `en`.
+- Label filtering: optional filter on a `label` field for lists or objects.
+- Precision matching: exact-key when enabled; otherwise case-insensitive and synonym-aware.
+- Value formatting: numeric lists joined by commas; other lists stringified.
+- Core logic: cleaning; parsing; synonyms; lookup; format; filters; main execution.
 
-### Matching Modes
-- **Precise matching (enabled)**: Only matches exactly identical key names
-- **Enhanced matching (disabled)**: Supports multiple key name variants and language matching
+## Typical Usage
 
-### Enhanced Matching Features
-- **Case variants**: Automatically matches different case combinations
-- **Language mapping**: Intelligently recognizes Chinese-English key name correspondences
-  - English related: en, English, eng, 英文, 英语
-  - Chinese related: zh, Chinese, chn, 中文
-- **Common patterns**: Supports common key name variants for coordinates, dimensions, etc.
-  - Coordinates: x/X, y/Y, pos_x, position_x
-  - Dimensions: width/w, height/h
-  - Identifiers: id/ID, name/NAME
+- Simple extraction: set `key=zh` to extract Chinese text from objects or arrays.
+- Synonym use: set `key=bbox` to match `bbox`, `box`, `bounding_box`, etc.
+- Label filtering: set `label_filter=person,cat` to retain items whose labels contain `person` or `cat`.
+- Exact matching: set `precision_match=enabled` to require the exact provided key.
+
+## Notes & Tips
+
+- The node accepts JSON fenced by Markdown code blocks and trims extraneous text around JSON.
+- When input is an array of objects, matched values are joined with newlines in output.

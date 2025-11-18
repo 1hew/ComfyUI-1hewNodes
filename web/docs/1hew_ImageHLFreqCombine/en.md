@@ -1,47 +1,39 @@
-# Image HL Freq Combine
+﻿# Image HL Freq Combine - Recombine High/Low Frequency
 
-**Node Function:** The `Image HL Freq Combine` node is used to recombine high-frequency and low-frequency image layers, supporting multiple blending modes and intensity adjustments for precise control over high and low frequency component contributions.
+**Node Purpose:** `Image HL Freq Combine` recombines a high-frequency image with a low-frequency image using one of three methods: `rgb`, `hsv`, or `igbi`. It provides separate strength controls for the high and low layers and robust batch alignment.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-|--|--|--|--|--|--|
-| `high_freq` | Required | IMAGE | - | - | High-frequency detail layer image |
-| `low_freq` | Required | IMAGE | - | - | Low-frequency base layer image |
-| `method` | - | COMBO[STRING] | rgb | rgb, hsv, igbi | Recombination method, should match the method used for separation |
-| `high_strength` | - | FLOAT | 1.0 | 0.0-2.0 | High-frequency strength adjustment, controls detail layer contribution |
-| `low_strength` | - | FLOAT | 1.0 | 0.0-2.0 | Low-frequency strength adjustment, controls base layer contribution |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `high_freq` | - | IMAGE | - | - | High-frequency layer batch. |
+| `low_freq` | - | IMAGE | - | - | Low-frequency layer batch. |
+| `method` | - | COMBO | `rgb` | `rgb` / `hsv` / `igbi` | Recombination method. |
+| `high_strength` | - | FLOAT | 1.0 | 0.0–2.0 | Strength multiplier for the high layer; `rgb/hsv` are centered at 0.5. |
+| `low_strength` | - | FLOAT | 1.0 | 0.0–2.0 | Strength multiplier for the low layer. |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `image` | IMAGE | Recombined complete image |
+| Name | Type | Description |
+|------|------|-------------|
+| `image` | IMAGE | Recombined image batch.
 
 ## Features
 
-### Recombination Methods Details
+- Strength shaping: for `rgb/hsv`, the high layer is offset around mid-gray `(high-0.5)*high_strength+0.5`; `igbi` scales directly.
+- Methods:
+- `rgb`: linear light recombination `2*high + low - 1`.
+- `hsv`: linear light on V channel while preserving H/S from `low`.
+- `igbi`: weighted mix `0.65*high + 0.35*low` followed by levels adjustment.
+- Batch alignment: repeats smaller batches to match the larger one.
 
-#### RGB Mode
-- **Recombination algorithm**: Linear Light blending mode
-- **Formula**: `2 * high_freq + low_freq - 1`
-- **Strength adjustment**: High-frequency strength formula `(high_freq - 0.5) * strength + 0.5`
-- **Characteristics**: Suitable for general image recombination with natural results
+## Typical Usage
 
-#### HSV Mode
-- **Recombination algorithm**: Linear Light blending in HSV color space V channel
-- **Processing flow**:
-  1. Convert low-frequency image to HSV space
-  2. Extract H, S, V channels
-  3. Apply Linear Light blending on V channel
-  4. Recombine HSV and convert back to RGB
-- **Strength adjustment**: Same as RGB mode
-- **Characteristics**: Preserves hue and saturation, adjusts only luminance
+- Sharpening finish: separate high/low elsewhere, then recombine with `rgb` and adjust `high_strength`.
+- Tonal integration: use `hsv` to affect brightness only while preserving hue and saturation from the low layer.
+- Stylized blend: choose `igbi` for a more contrast-managed result via built-in levels.
 
-#### IGBI Mode
-- **Recombination algorithm**: Blending + levels adjustment
-- **Processing flow**:
-  1. 65% high-frequency + 35% low-frequency blending
-  2. Apply levels adjustment (black point 83, white point 172)
-- **Strength adjustment**: Direct multiplication adjustment for high-frequency `high_freq * strength`
-- **Characteristics**: Provides the most precise recombination effect
+## Notes & Tips
+
+- Input layers should be aligned in size and content; the node will handle batch count alignment but not spatial misalignment.
+- Values are clamped to `[0,1]` before recombination and output is clamped afterwards.

@@ -1,20 +1,39 @@
-# Image Batch Extract
+# Image Batch Extract - Select frames by index/step/uniform
 
-**Node Function:** The `Image Batch Extract` node is used to extract specific images from a batch of images, supporting multiple extraction modes: custom indices, step intervals, and automatic frame count calculation, commonly used for video frame extraction and image sequence processing.
+**Node Purpose:** `Image Batch Extract` selects specific frames from an input image batch using three modes: explicit index list, fixed step, or uniform sampling across the batch. Supports negative indices, large-batch chunked selection, and optional capping via `max_keep`.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-|--|--|--|--|--|--|
-| `image` | Required | IMAGE | - | - | Input batch of images |
-| `mode` | - | COMBO[STRING] | step | index, step, uniform | Extraction mode: index (custom indices), step (step interval), uniform (uniform distribution) |
-| `index` | - | STRING | "0" | Custom indices | Custom indices string, supports comma-separated index list like "0,2,5,10" |
-| `step` | - | INT | 4 | 1-8192 | Step interval, extract one image every N frames |
-| `uniform` | - | INT | 4 | 0-8192 | Uniform distribution count, extract specified number of images evenly from total frames |
-| `max_keep` | - | INT | 10 | 0-8192 | Maximum keep count, limits the final output image count |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `image` | optional | IMAGE | - | - | Input image batch. |
+| `mode` | - | COMBO | `step` | `index` / `step` / `uniform` | Selection mode. |
+| `index` | - | STRING | `0` | comma list | For `index` mode; comma-separated integers, supports negative indices (e.g., `-1`). |
+| `step` | - | INT | 4 | 1-8192 | For `step` mode; take every `step` frames. |
+| `uniform` | - | INT | 4 | 0-8192 | For `uniform` mode; select `uniform` frames evenly across the batch; `0` selects none. |
+| `max_keep` | - | INT | 10 | 0-8192 | Cap number of selected frames; `0` keeps all. |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `image` | IMAGE | Extracted image batch |
+| Name | Type | Description |
+|------|------|-------------|
+| `image` | IMAGE | Batch containing only the selected frames. |
+
+## Features
+
+- Index parsing: accepts English/Chinese commas; negative indices resolve relative to batch size.
+- Step selection: pick frames at fixed stride `step` starting from `0`.
+- Uniform sampling: evenly distribute `uniform` picks between `0` and `batch_size-1`.
+- Robust filtering: invalid indices are skipped; returns empty batch when no valid indices remain.
+- Chunked gather: selects in chunks (size `512`) to reduce memory spikes on large lists.
+
+## Typical Usage
+
+- Extract keyframes every N frames: set `mode=step`, `step=N`.
+- Uniform thumbnails: set `mode=uniform`, `uniform=K` to sample K frames across the batch.
+- Custom list: set `mode=index`, `index=0, 2, 10, -1` to include specific frames including the last.
+
+## Notes & Tips
+
+- `max_keep=0` keeps all selected frames; set `>0` to cap the output size.
+- If all indices are out of range, the output is an empty batch with matching dtype/device.

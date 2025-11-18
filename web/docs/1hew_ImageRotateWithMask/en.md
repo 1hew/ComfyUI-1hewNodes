@@ -1,23 +1,39 @@
-# Image Rotate with Mask
+# Image Rotate with Mask - Rotate with advanced padding
 
-## Description
-The `Image Rotate with Mask` node provides advanced image rotation capabilities with comprehensive mask support. It enables arbitrary angle rotation with multiple fill modes and offers the option to rotate around the mask's white region center, making it ideal for precise image transformations.
+**Node Purpose:** `Image Rotate with Mask` rotates images with optional mask alignment, advanced padding strategies, and center selection. Supports `expand` canvas, rotation around mask centroid, and consistent mask transformation.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-| --------- | -------- | --------- | ------- | ----- | ----------- |
-| `image` | Required | IMAGE | - | - | Input image to be rotated |
-| `angle` | Required | FLOAT | 0.0 | -3600.0 to 3600.0 | Rotation angle in degrees (negative for clockwise) |
-| `fill_mode` | Required | COMBO[STRING] | color | color, edge_extend, mirror | Fill mode for empty areas after rotation |
-| `fill_color` | Required | STRING | "0.0" | - | Fill color for empty areas (color mode only) |
-| `expand` | Required | BOOLEAN | True | - | Whether to expand canvas to contain the full rotated image |
-| `use_mask_center` | Required | BOOLEAN | False | - | Whether to rotate around the mask's white region center |
-| `mask` | Optional | MASK | - | - | Optional mask that undergoes the same transformation |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `image` | - | IMAGE | - | - | Input image batch. |
+| `mask` | optional | MASK | - | - | Optional mask batch aligned to `image`. |
+| `angle` | - | FLOAT | 0.0 | -3600.0–3600.0 | Rotation angle in degrees (clockwise positive). |
+| `pad_color` | - | STRING | `0.0` | Gray/HEX/RGB/`edge`/`average`/`extend`/`mirror` | Background strategy when expanding/cropping. |
+| `expand` | - | BOOLEAN | True | - | Whether to expand canvas to contain full rotated image. |
+| `mask_center` | - | BOOLEAN | False | - | Rotate around the centroid of the white mask area when provided. |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `image` | IMAGE | Rotated image with applied transformations |
-| `mask` | MASK | Rotated mask or rotation area mask |
+| Name | Type | Description |
+|------|------|-------------|
+| `image` | IMAGE | Rotated image batch. |
+| `mask` | MASK | Rotated mask; if absent, a mask of original image region is generated.
+
+## Features
+
+- Center control: when `mask_center=True`, computes weighted centroid of the white mask area and rotates around it.
+- Advanced padding: supports color fill, `edge` replicate, `mirror` reflect, and `extend` replicate borders using OpenCV when available; falls back to PIL otherwise.
+- Expand vs crop: `expand=True` enlarges canvas; `False` crops back to original size after rotation.
+- Robust mask handling: aligns mask to image size, rotates with nearest-neighbor, and generates a full-content mask when none is provided.
+
+## Typical Usage
+
+- Precise rotation: enable `mask_center` to rotate around a subject defined by mask.
+- Natural borders: use `pad_color=edge`/`mirror` to minimize artifacts when expanding.
+- Cropped output: set `expand=False` to keep original dimensions.
+
+## Notes & Tips
+
+- Angle sign is internally inverted to match PIL/OpenCV conventions; input `angle` rotates clockwise.
+- When OpenCV is unavailable, the node uses PIL equivalents with consistent behavior.

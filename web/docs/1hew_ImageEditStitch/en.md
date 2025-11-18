@@ -1,24 +1,43 @@
-# Image Edit Stitch
+# Image Edit Stitch - Stitch reference and edit images
 
-Stitches a reference image with an edit image (optionally with an edit mask),with configurable placement, spacing strip, and color parsing. Returns the composited image and two masks aligned to the output.
+**Node Purpose:** `Image Edit Stitch` stitches a reference image and an edit image along a chosen side with optional spacing. Preserves reference aspect ratio when `match_edit_size=False`, aligns edit mask to the edit image, and outputs both a combined mask and a split mask indicating edit vs reference regions.
 
 ## Inputs
 
-| Name | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- |
-| reference_image | IMAGE | Yes | - | The base image to stitch against. Supports batches. |
-| edit_image | IMAGE | Yes | - | The image to attach to the reference. Supports batches. |
-| edit_image_position | STRING (enum) | Yes | right | Where the edit image is attached: right, left, top, bottom. |
-| match_edit_size | BOOLEAN | Yes | false | If true, reference is resized with padding to exactly match edit image size before stitching. If false, reference is resized keeping aspect ratio only along the relevant axis. |
-| spacing | INT | Yes | 0 | Pixel width/height of the spacing strip inserted between images. 0 means no spacing strip. |
-| spacing_color | STRING | Yes | "1.0" | Color of spacing strip. Supports advanced color strings (see below). |
-| pad_color | STRING | Yes | "1.0" | Fill color used when resizing with padding (only applies when match_edit_size is true). Supports advanced color strings. |
-| edit_mask | MASK | No | - | Optional edit mask aligned to edit_image. If omitted, a full-ones mask is assumed for the edit side. |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `reference_image` | - | IMAGE | - | - | Reference image batch. |
+| `edit_image` | - | IMAGE | - | - | Edit image batch. |
+| `edit_mask` | optional | MASK | - | - | Mask aligned to edit image; auto-created as white if absent. |
+| `edit_image_position` | - | COMBO | `right` | `top`/`bottom`/`left`/`right` | Side on which the edit image is placed. |
+| `match_edit_size` | - | BOOLEAN | False | - | When True, resizes reference to match edit image size (with padding). When False, preserves reference aspect ratio. |
+| `spacing` | - | INT | 0 | 0–1000 | Spacing width/height between images. |
+| `spacing_color` | - | STRING | `1.0` | Gray/HEX/RGB | Spacing color (strict RGB 0..1). |
+| `pad_color` | - | STRING | `1.0` | Gray/HEX/RGB/`edge`/`average`/`extend`/`mirror` | Padding strategy for size reconciliation. |
 
 ## Outputs
 
 | Name | Type | Description |
-| --- | --- | --- |
-| image | IMAGE | The stitched image composed from reference and edit images, with optional spacing strip. Batch-safe. |
-| mask | MASK | A mask aligned to the output image highlighting the edit_image area (1 over the edit region, 0 elsewhere including spacing). Batch-safe. |
-| split_mask | MASK | A binary mask partitioning the output into reference (0) and edit (1) zones. Spacing strip area is 0. Batch-safe. |
+|------|------|-------------|
+| `image` | IMAGE | Stitched image batch. |
+| `mask` | MASK | Combined mask, edit region preserved, other regions set to 0. |
+| `split_mask` | MASK | Two-region mask: edit region `1`, reference region `0`. Includes spacing region as `0`.
+
+## Features
+
+- Aspect handling: preserves reference aspect ratio when not matching edit size; otherwise pads to match target side.
+- Mask alignment: resizes edit mask to edit image using nearest-neighbor to preserve binary nature.
+- Color parsing: supports `edge`, `average`, `extend`, `mirror` for padding; spacing color uses strict RGB.
+- Batch broadcasting: automatically repeats inputs to maximum batch size across `reference`, `edit`, and `mask`.
+- Position variants: `top`, `bottom`, `left`, `right` with consistent spacing behavior and mask composition.
+
+## Typical Usage
+
+- A/B view: place `edit_image` on `right` with `spacing>0` for visual comparison.
+- Vertical comparison: use `top/bottom` when stacking; spacing color provides a separator.
+- Preserve reference look: set `match_edit_size=False` to maintain reference proportions.
+
+## Notes & Tips
+
+- When only one image is provided, the node returns that image with a corresponding full white mask and a split mask indicating region semantics.
+- Spacing strips are constant color tensors expanded per batch for efficiency.

@@ -1,29 +1,33 @@
-# Mask Batch Math Ops
+# Mask Batch Math Ops - Reduce masks by OR/AND
 
-**Node Function:** The `Mask Batch Math Ops` node supports unified OR and AND operations on batch masks, merging multiple masks into a single mask.
+**Node Purpose:** `Mask Batch Math Ops` reduces a mask batch across the batch dimension using logical-maximum (`or`) or logical-minimum (`and`). Outputs a single aggregated mask as a one-frame batch.
 
 ## Inputs
 
-| Parameter Name | Input Selection | Data Type | Default Value | Value Range | Description |
-| -------------- | --------------- | --------- | ------------- | ----------- | ----------- |
-| `mask` | Required | MASK | - | - | Input mask batch |
-| `operation` | - | COMBO[STRING] | or | or, and | Batch operation type |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `mask` | - | MASK | - | - | Input mask batch; supports `B×H×W` or `B×H×W×1`. |
+| `operation` | - | COMBO | `or` | `or` / `and` | Reduction operator across batch. |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `mask` | MASK | Single mask after batch operation |
+| Name | Type | Description |
+|------|------|-------------|
+| `mask` | MASK | Single-frame aggregated mask (`B=1`), clamped to `[0,1]`. |
 
-## Function Description
+## Features
 
-### Batch Operation Types
-#### OR Operation
-- **Function**: Performs logical OR operation on all masks
-- **Effect**: Merges all mask regions, takes maximum value
-- **Usage**: Creates union mask containing all input regions
+- OR reduction: per-pixel maximum across frames.
+- AND reduction: per-pixel minimum across frames.
+- Channel handling: auto-squeezes masks with a trailing singleton channel and restores shape via `unsqueeze(0)`.
+- Chunked processing: reduces in chunks of `512` frames to limit memory usage.
+- Output normalization: converts to `float32`, clamps `[0,1]`, and preserves device.
 
-#### AND Operation
-- **Function**: Performs logical AND operation on all masks
-- **Effect**: Only preserves regions covered by all masks, takes minimum value
-- **Usage**: Creates intersection mask of all input regions
+## Typical Usage
+
+- Combine multiple segmentation results into a single consensus mask via `or`.
+- Enforce strict overlap regions using `and`.
+
+## Notes & Tips
+
+- For batches of size `≤1`, the input mask is returned unchanged.

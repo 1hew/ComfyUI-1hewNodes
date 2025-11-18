@@ -1,56 +1,41 @@
-// ComfyUI-1hewNodes: Dynamic input ports for AnySwitchInt
-// This extension enables real-time creation/removal of input_N ports
-// and keeps the 'select' widget in sync with available inputs.
-// Import ComfyUI app for extension registration
+// ComfyUI-1hewNodesV3: Dynamic input ports for multi nodes
+// Keep UI behavior consistent with V1: auto-append tail slot and normalize gaps
 import { app } from "../../../scripts/app.js";
 
 app.registerExtension({
-    name: "ComfyUI-1hewNodes.DynamicPorts",
+    name: "ComfyUI-1hewNodesV3.DynamicPorts",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         const configs = {
-            "1hew_AnySwitchInt": { base: "input_", addType: "*", select: "select", initial: 1 },
-            "1hew_TextEncodeQwenImageEditKeepSize": { base: "image_", addType: "IMAGE", select: null, initial: 1 },
             "1hew_MultiStringJoin": { base: "string_", addType: "STRING", select: null, initial: 1 },
             "1hew_MultiImageBatch": { base: "image_", addType: "IMAGE", select: null, initial: 1 },
             "1hew_MultiMaskBatch": { base: "mask_", addType: "MASK", select: null, initial: 1 },
             "1hew_MultiImageStitch": { base: "image_", addType: "IMAGE", select: null, initial: 2 },
+            "1hew_ImageMainStitch": { base: "image_", addType: "IMAGE", select: null, initial: 3 },
+            "1hew_AnySwitchInt": { base: "input_", addType: "*", select: "select", initial: 1 , max: 10},
+            "1hew_TextEncodeQwenImageEditKeepSize": { base: "image_", addType: "IMAGE", select: null, initial: 1, max: 10 },
+            "1hew_ImageListAppend": { base: "image_", addType: "IMAGE", select: null, initial: 2 },
+            "1hew_MultiMaskMathOps": { base: "mask_", addType: "MASK", select: null, initial: 2},
         };
-        const cfg = configs[nodeData?.name];
+        const typeName = nodeData?.name || nodeType?.type || nodeType?.title || nodeType?.name;
+        const cfg = configs[typeName];
         if (!cfg) return;
-        try {
-            console.log("[1hewNodes.DynamicPorts] attaching to:", nodeData?.name);
-        } catch (_) {}
 
-        const baseInput = cfg.base; // input prefix
-        const selectName = cfg.select; // widget name controlling selection (optional)
+        const baseInput = cfg.base;
+        const selectName = cfg.select;
+        const cap = typeof cfg.max === "number" && cfg.max > 0 ? cfg.max : Infinity;
 
         const originalOnConnectionsChange = nodeType.prototype.onConnectionsChange;
 
-        // Utility: get current dynamic inputs in order
         function listDynamicInputs(node) {
             return node.inputs?.filter(inp => inp?.name?.startsWith(baseInput)) || [];
         }
 
-        // Utility: next dynamic input name
         function nextInputName(node) {
             const inputs = listDynamicInputs(node);
-            const n = inputs.length; // existing count
+            const n = inputs.length;
             return baseInput + (n + 1);
         }
 
-        // Utility: count connected dynamic inputs
-        function countConnected(node) {
-            const inputs = listDynamicInputs(node);
-            let c = 0;
-            for (const inp of inputs) {
-                const idx = indexOfInput(node, inp.name);
-                const link = (node.inputs?.[idx] ?? {}).link;
-                if (link != null) c += 1;
-            }
-            return c;
-        }
-
-        // Utility: list indices of dynamic inputs
         function listDynamicInputIndices(node) {
             const idxs = [];
             for (let i = 0; i < (node.inputs?.length || 0); i++) {
@@ -59,55 +44,17 @@ app.registerExtension({
             return idxs;
         }
 
-        // Utility: check if given input index is connected
         function isConnectedIndex(node, idx) {
             return (node.inputs?.[idx] ?? {}).link != null;
         }
 
-        // Ensure only one empty dynamic input at tail; add one if all connected
-        function ensureSingleTrailingEmpty(node) {
-            const dynIdxs = listDynamicInputIndices(node);
-            const minInputs = Math.max(1, (cfg.initial ?? 1));
-
-            // 至少保证 minInputs 个动态输入存在
-            if (dynIdxs.length < minInputs) {
-                for (let i = dynIdxs.length; i < minInputs; i++) {
-                    addNextInput(node);
-                }
-            }
-
-            // 统计尾部空槽数量
-            let trailingEmpty = 0;
-            for (let i = dynIdxs.length - 1; i >= 0; i--) {
-                const idx = dynIdxs[i];
-                if (!isConnectedIndex(node, idx)) trailingEmpty += 1; else break;
-            }
-
-            // 移除多余的尾部空槽：保留至多一个，但不减少到少于 minInputs 个输入
-            while (trailingEmpty > 1) {
-                const dynIdxs2 = listDynamicInputIndices(node);
-                if (dynIdxs2.length <= minInputs) break; // 不少于最小输入数
-                const lastIdx = dynIdxs2[dynIdxs2.length - 1];
-                if (!isConnectedIndex(node, lastIdx)) {
-                    node.removeInput(lastIdx);
-                    trailingEmpty -= 1;
-                } else {
-                    break;
-                }
-            }
-
-            // 若最后一个槽已连接，则补充一个新的空槽
-            const dynIdxs3 = listDynamicInputIndices(node);
-            const lastIdx = dynIdxs3[dynIdxs3.length - 1];
-            if (isConnectedIndex(node, lastIdx)) {
-                addNextInput(node);
-            }
-
-            // 重排序号保持 image_1..image_N
-            renumberDynamicInputs(node);
+        function addNextInput(node) {
+            const count = listDynamicInputs(node).length;
+            if (count >= cap) return;
+            const name = nextInputName(node);
+            node.addInput(name, cfg.addType);
         }
 
-        // Renumber dynamic inputs to keep names sequential: input_1..input_N
         function renumberDynamicInputs(node) {
             const dynIdxs = listDynamicInputIndices(node);
             for (let i = 0; i < dynIdxs.length; i++) {
@@ -120,30 +67,67 @@ app.registerExtension({
             }
         }
 
-        // Normalize: move middle empty slots to tail and keep single empty at tail
-        function normalizeDynamicGaps(node) {
-            let changed = true;
-            while (changed) {
-                changed = false;
-                const dynIdxs = listDynamicInputIndices(node);
-                for (let k = 0; k < dynIdxs.length; k++) {
-                    const idx = dynIdxs[k];
-                    const isEmpty = !isConnectedIndex(node, idx);
-                    const hasLaterConnected = dynIdxs.slice(k + 1).some(j => isConnectedIndex(node, j));
-                    // If an empty exists before a later connected, move it to tail
-                    if (isEmpty && hasLaterConnected) {
-                        node.removeInput(idx);
-                        addNextInput(node);
-                        changed = true;
-                        break; // restart scanning since indices changed
-                    }
+        function normalizeDynamicTypes(node) {
+            const dynIdxs = listDynamicInputIndices(node);
+            for (let i = 0; i < dynIdxs.length; i++) {
+                const idx = dynIdxs[i];
+                const slot = node.inputs?.[idx];
+                if (slot && slot.type !== cfg.addType) {
+                    slot.type = cfg.addType;
                 }
             }
-            ensureSingleTrailingEmpty(node);
+        }
+
+        function ensureFirstInput(node) {
+            const inputs = listDynamicInputs(node);
+            const need = Math.max(1, (cfg.initial ?? 1));
+            if (inputs.length === 0) {
+                node.addInput(baseInput + "1", cfg.addType);
+            }
+            let current = listDynamicInputs(node).length;
+            const target = Math.min(need, cap);
+            while (current < target) {
+                addNextInput(node);
+                current += 1;
+            }
+            renumberDynamicInputs(node);
+            normalizeDynamicTypes(node);
+        }
+
+        function ensureSingleTrailingEmpty(node) {
+            const dynIdxs = listDynamicInputIndices(node);
+            const minInputs = Math.max(1, (cfg.initial ?? 1));
+            const targetMin = Math.min(minInputs, cap);
+            if (dynIdxs.length < targetMin) {
+                for (let i = dynIdxs.length; i < targetMin; i++) {
+                    addNextInput(node);
+                }
+            }
+            let trailingEmpty = 0;
+            for (let i = dynIdxs.length - 1; i >= 0; i--) {
+                const idx = dynIdxs[i];
+                if (!isConnectedIndex(node, idx)) trailingEmpty += 1; else break;
+            }
+            while (trailingEmpty > 1) {
+                const dynIdxs2 = listDynamicInputIndices(node);
+                if (dynIdxs2.length <= minInputs) break;
+                const lastIdx = dynIdxs2[dynIdxs2.length - 1];
+                if (!isConnectedIndex(node, lastIdx)) {
+                    node.removeInput(lastIdx);
+                    trailingEmpty -= 1;
+                } else {
+                    break;
+                }
+            }
+            const dynIdxs3 = listDynamicInputIndices(node);
+            const lastIdx = dynIdxs3[dynIdxs3.length - 1];
+            if (isConnectedIndex(node, lastIdx)) {
+                const count = listDynamicInputs(node).length;
+                if (count < cap) addNextInput(node);
+            }
             renumberDynamicInputs(node);
         }
 
-        // Update select widget max according to available inputs
         function syncSelectRange(node) {
             if (!selectName) return;
             const total = listDynamicInputs(node).length;
@@ -151,102 +135,71 @@ app.registerExtension({
             const w = node.widgets.find(w => w.name === selectName);
             if (!w) return;
             if (!w.options) w.options = {};
-            w.options.max = Math.max(1, total);
+            w.options.max = Math.max(1, Math.min(total, cap));
             if (typeof w.value === "number" && w.value > w.options.max) {
                 w.value = w.options.max;
             }
-        }
-
-        // Ensure at least one input_1 exists
-        function ensureFirstInput(node) {
-            const inputs = listDynamicInputs(node);
-            const need = Math.max(1, (cfg.initial ?? 1));
-            if (inputs.length === 0) {
-                node.addInput(baseInput + "1", cfg.addType);
-            }
-            // 若需要更多初始输入，依次补齐
-            let current = listDynamicInputs(node).length;
-            while (current < need) {
-                addNextInput(node);
-                current += 1;
-            }
-            renumberDynamicInputs(node);
-        }
-
-        // Add new input_N (lazy, wildcard)
-        function addNextInput(node) {
-            const name = nextInputName(node);
-            node.addInput(name, cfg.addType);
-        }
-
-        // Helper: find absolute input index by name
-        function indexOfInput(node, name) {
-            for (let i = 0; i < (node.inputs?.length || 0); i++) {
-                if (node.inputs[i]?.name === name) return i;
-            }
-            return -1;
-        }
-
-        // Trim trailing unconnected inputs, keep at least input_1
-        function trimTrailing(node) {
-            let inputs = listDynamicInputs(node);
-            for (let i = inputs.length - 1; i >= 1; i--) {
-                const name = inputs[i].name;
-                const idx = indexOfInput(node, name);
-                const link = (node.inputs?.[idx] ?? {}).link;
-                if (link == null) {
-                    if (idx >= 0) node.removeInput(idx);
-                } else {
-                    // stop at first connected from tail
-                    break;
-                }
-            }
+            node.setDirtyCanvas(true, true);
         }
 
         nodeType.prototype.onConnectionsChange = function(type, slot, connected, link_info, output) {
             const rv = originalOnConnectionsChange?.call(this, type, slot, connected, link_info, output);
             try {
-                // Only react to input changes
                 if (type !== LiteGraph.INPUT) {
                     syncSelectRange(this);
                     return rv;
                 }
-
                 ensureFirstInput(this);
-                const inputs = listDynamicInputs(this);
-                const slotName = this.inputs?.[slot]?.name;
-                const isDynamicSlot = typeof slotName === "string" && slotName.startsWith(baseInput);
                 const dynIdxs = listDynamicInputIndices(this);
                 const isLastDynamic = dynIdxs.length > 0 && dynIdxs[dynIdxs.length - 1] === slot;
-
-                // When connecting to the last dynamic input, always append a new one
-                // Align with Impact-Pack: keep one extra empty input at tail
+                const slotName = this.inputs?.[slot]?.name;
+                const isDynamicSlot = typeof slotName === "string" && slotName.startsWith(baseInput);
                 if (connected && isDynamicSlot && isLastDynamic) {
                     addNextInput(this);
                 }
-
-                // Normalize gaps for both connect/disconnect to keep empty only at tail
-                normalizeDynamicGaps(this);
-
-                // Sync select range with input count
+                // 归一化空槽到尾部并保持仅一个尾部空槽
+                let changed = true;
+                while (changed) {
+                    changed = false;
+                    const idxs = listDynamicInputIndices(this);
+                    for (let k = 0; k < idxs.length; k++) {
+                        const idx = idxs[k];
+                        const empty = !isConnectedIndex(this, idx);
+                        const laterHasConn = idxs.slice(k + 1).some(j => isConnectedIndex(this, j));
+                        if (empty && laterHasConn) {
+                            this.removeInput(idx);
+                            addNextInput(this);
+                            changed = true;
+                            break;
+                        }
+                    }
+                }
+                ensureSingleTrailingEmpty(this);
                 syncSelectRange(this);
+                normalizeDynamicTypes(this);
+                this.setDirtyCanvas(true, true);
             } catch (err) {
-                console.error("[1hewNodes.DynamicPorts] onConnectionsChange error", err);
+                console.error("[1hewNodesV3.DynamicPorts] onConnectionsChange error", err);
             }
             return rv;
         };
 
-        // Initialize when the node is created
         const originalCtor = nodeType.prototype.onAdded;
         nodeType.prototype.onAdded = function() {
             originalCtor?.call(this);
             try {
+                if (this.convertWidgetToInput && this.widgets) {
+                    const w = this.widgets.find(w => w.name === baseInput + "1");
+                    if (w) this.convertWidgetToInput(w);
+                }
                 ensureFirstInput(this);
-                normalizeDynamicGaps(this);
+                ensureSingleTrailingEmpty(this);
                 syncSelectRange(this);
-                console.log("[1hewNodes.DynamicPorts] node initialized");
+                normalizeDynamicTypes(this);
+                this.setDirtyCanvas(true, true);
+                console.log("[1hewNodesV3.DynamicPorts] node initialized");
             } catch (err) {
-                console.error("[1hewNodes.DynamicPorts] onAdded error", err);
+                console.error("[1hewNodesV3.DynamicPorts] onAdded error", err);
             }
         };
     }

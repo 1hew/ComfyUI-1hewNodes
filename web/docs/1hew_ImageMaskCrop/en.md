@@ -1,19 +1,38 @@
-# Image Mask Crop
+# Image Mask Crop - Mask-Boundary Cropping and Alpha Output
 
-**Node Function:** The `Image Mask Crop` node crops the image and mask using the mask's bounding box or keeps the original size, with optional RGBA output (mask as alpha). Supports batch cycling and size alignment when image/mask sizes differ.
+**Node Purpose:** `Image Mask Crop` crops by the mask’s bounding box or keeps original size, and optionally outputs alpha from the mask. Returns both the image and the processed mask, with robust batch size alignment.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-|--|--|--|--|--|--|
-| `image` | Required | IMAGE | - | - | Input image batch |
-| `mask` | Required | MASK | - | - | Input mask batch |
-| `output_crop` | Required | BOOLEAN | True | True/False | Crop to the mask bounding box when True; keep original size when False |
-| `output_alpha` | Required | BOOLEAN | False | True/False | Output RGBA when True (alpha = mask); otherwise RGB |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `image` | - | IMAGE | - | - | Input image batch. |
+| `mask` | - | MASK | - | - | Input mask batch. |
+| `output_crop` | - | BOOLEAN | true | - | Crop to the mask’s bbox; when false, keep original image size. |
+| `output_alpha` | - | BOOLEAN | false | - | Output RGBA with alpha from the mask when true; otherwise output RGB. |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `image` | IMAGE | Cropped or original-size image; RGBA when `output_alpha=True` |
-| `mask` | MASK | Cropped or aligned mask (0–1) |
+| Name | Type | Description |
+|------|------|-------------|
+| `image` | IMAGE | Cropped or original-size image; RGBA if `output_alpha` is true. |
+| `mask` | MASK | Cropped or padded mask aligned to the image output.
+
+## Features
+
+- BBox cropping: computes bbox from mask and crops image/mask accordingly.
+- Alpha channel: when `output_alpha` is true, the mask is written into the image alpha.
+- Size preservation: when `output_crop` is false, keeps original size and centers/pads the mask if needed.
+- Batch robustness: mismatched image/mask counts are cycled; outputs are padded to uniform sizes before stacking.
+
+## Typical Usage
+
+- Matte extraction: set `output_alpha=true` to produce RGBA cutouts; downstream compositing can use alpha directly.
+- Tight crops: set `output_crop=true` to focus on the mask region; `output_alpha=false` to keep RGB only.
+- Full-frame effects: set `output_crop=false` to maintain the original canvas while applying mask alpha.
+
+## Notes & Tips
+
+- If the mask has no non-zero pixels, the node falls back to original-size outputs and applies alpha (if enabled).
+- RGBA inputs are converted to RGB before cropping unless `output_alpha` is requested.
+- Outputs are device-safe and clamped to [0,1].

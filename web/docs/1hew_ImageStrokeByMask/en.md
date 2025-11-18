@@ -1,28 +1,36 @@
-# Image Stroke by Mask
+# Image Stroke by Mask - Outline mask regions
 
-## Description
-The `Image Stroke by Mask` node applies stroke effects to specified mask regions in input images. It creates outline borders around masked areas with customizable width and color, commonly used for highlighting objects or creating visual emphasis effects.
+**Node Purpose:** `Image Stroke by Mask` creates an outline (stroke) around the mask region on a black canvas in the stroke color, then pastes original image content inside the original mask. Outputs an updated mask which is the union of stroke and original mask.
 
 ## Inputs
 
-| Parameter Name | Input Selection | Data Type | Default Value | Value Range | Description |
-| -------------- | --------------- | --------- | ------------- | ----------- | ----------- |
-| `image` | Required | IMAGE | - | - | Input image for stroke processing |
-| `mask` | Required | MASK | - | - | Input mask defining stroke regions |
-| `stroke_width` | - | INT | 20 | 0-1000 | Stroke border width in pixels |
-| `stroke_color` | - | STRING | "1.0" | Multiple formats | Stroke color specification |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `image` | - | IMAGE | - | - | Input image batch. |
+| `mask` | - | MASK | - | - | Input mask batch. |
+| `stroke_width` | - | INT | 20 | 0–1000 | Stroke width in pixels. |
+| `stroke_color` | - | STRING | `1.0` | Gray/HEX/RGB/named | Stroke color; supports `average` (`a`) of image or `mask`-weighted (`mk`). |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `image` | IMAGE | Processed image with stroke effects applied |
-| `mask` | MASK | Combined mask including original mask and stroke regions |
+| Name | Type | Description |
+|------|------|-------------|
+| `image` | IMAGE | Image with stroke around mask and original content restored inside mask. |
+| `mask` | MASK | Stroke mask unioned with original mask.
 
 ## Features
 
-### Advanced Color Parsing
-- **Multiple color formats**: Supports grayscale values (0-1 and 0-255), RGB tuples, HEX codes, and color names
-- **Flexible input**: Accepts formats like "1.0", "255,128,64", "#FF8040", "red", etc.
-- **Bracket support**: Handles bracketed RGB values like "(127,126,69)"
-- **Fallback handling**: Returns white color for unrecognized inputs
+- Size alignment: resizes `mask` to image size (LANCZOS) to ensure consistent placement.
+- Color parsing: supports gray, HEX, `R,G,B`, named colors, `average` of image, and `mask`-weighted average color.
+- Stroke creation: uses morphological dilation (`cv2.MORPH_ELLIPSE`) and subtracts original mask to form the ring.
+- Batch support: processes batches by cycling indices when `image` and `mask` lengths differ.
+
+## Typical Usage
+
+- Highlight masked regions with a colored outline while keeping original content inside.
+- Compute stroke color from image average or mask-weighted average (`stroke_color=mk`).
+
+## Notes & Tips
+
+- Output image is black outside stroke and mask union; content within original mask is pasted from the input image.
+- Stroke kernel size is `(2×stroke_width+1)`, tuned for smooth elliptical dilation.

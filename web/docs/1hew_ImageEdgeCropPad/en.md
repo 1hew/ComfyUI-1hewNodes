@@ -1,44 +1,55 @@
-# Image Edge Crop Pad
+# Image Edge Crop/Pad - Per-edge crop and intelligent padding
 
-**Node Function:** The `Image Edge Crop Pad` node is used to perform edge cropping or padding operations on images, supporting negative values for inward cropping and positive values for outward padding, with multiple color formats and edge filling modes, commonly used for image size adjustment and edge processing.
+**Node Purpose:** `Image Edge Crop/Pad` performs inward cropping (negative values) and outward padding (positive values) per edge, with a uniform mode for symmetric edits. It supports multiple padding strategies (`extend`, `mirror`, `edge`, `average`) and rich color formats, and ensures amounts align to a chosen multiple via `divisible_by`.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-| --------- | -------- | --------- | ------- | ----- | ----------- |
-| `image` | Required | IMAGE | - | - | Input image to be processed |
-| `left_amount` | - | FLOAT | 0 | -8192~8192 | Left crop/pad amount, negative for crop, positive for pad |
-| `right_amount` | - | FLOAT | 0 | -8192~8192 | Right crop/pad amount, negative for crop, positive for pad |
-| `top_amount` | - | FLOAT | 0 | -8192~8192 | Top crop/pad amount, negative for crop, positive for pad |
-| `bottom_amount` | - | FLOAT | 0 | -8192~8192 | Bottom crop/pad amount, negative for crop, positive for pad |
-| `uniform_amount` | - | FLOAT | 0 | -8192~8192 | Uniform crop/pad amount, overrides other directional settings when non-zero |
-| `pad_color` | - | STRING | 0.0 | Multiple formats | Padding color, supports grayscale, HEX, RGB, color names and special values |
-| `divisible_by` | - | INT | 8 | 1-1024 | Ensure output dimensions are divisible by this value, commonly used for AI model size requirements |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `image` | - | IMAGE | - | - | Input image batch (`B×H×W×C`). |
+| `uniform_amount` | - | FLOAT | 0.0 | -8192–8192 | Symmetric crop/pad applied to all edges; `<1` treated as ratio of size; negative → crop; positive → pad. |
+| `top_amount` | - | FLOAT | 0.0 | -8192–8192 | Crop/pad amount for the top edge; `<1` treated as ratio of height. |
+| `bottom_amount` | - | FLOAT | 0.0 | -8192–8192 | Crop/pad amount for the bottom edge; `<1` treated as ratio of height. |
+| `left_amount` | - | FLOAT | 0.0 | -8192–8192 | Crop/pad amount for the left edge; `<1` treated as ratio of width. |
+| `right_amount` | - | FLOAT | 0.0 | -8192–8192 | Crop/pad amount for the right edge; `<1` treated as ratio of width. |
+| `pad_color` | - | STRING | `0.0` | formats | Padding color/strategy: grayscale/HEX/RGB/name or `extend`/`mirror`/`edge`/`average` (supports abbreviations). |
+| `divisible_by` | - | INT | 8 | 1–1024 | Round each edge amount to a multiple of this value to keep aligned sizes. |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `image` | IMAGE | Processed image |
-| `mask` | MASK | Operation area mask, cropped or padded areas are white, original image area is black |
+| Name | Type | Description |
+|------|------|-------------|
+| `image` | IMAGE | Cropped/padded image batch with per-edge operations applied. |
+| `mask` | MASK | Binary mask of edited areas; processed regions are white, original areas are black. |
 
 ## Features
 
-### Value Modes
-- **Percentage Mode**: When absolute value is less than 1 (e.g., 0.1, -0.2), calculated as percentage of image dimensions
-- **Pixel Mode**: When absolute value is greater than or equal to 1 (e.g., 50, -100), used directly as pixel values
-- **Negative Values**: Inward cropping, reducing image size
-- **Positive Values**: Outward padding, increasing image size
+- Per-edge control: combine `uniform_amount` with per-edge overrides for precise edits.
+- Ratio or pixels: amounts `<1` are treated as ratios; otherwise interpreted as pixel values.
+- Size alignment: quantizes each amount to `divisible_by` to maintain model-friendly dimensions.
+- Rich padding strategies:
+  - `extend`: replicate edge pixels (`replicate`).
+  - `mirror`: reflect edge pixels (`reflect` with segmented extension for large amounts).
+  - `edge`: fill with the average color of each edge (top/bottom/left/right).
+  - `average`: fill with the global average color.
+- Color formats: grayscale (`0.0`–`1.0`), HEX (`#RRGGBB` or `RGB`), RGB (`255,0,0` or `1.0,0.0,0.0`), and color names; single-letter aliases supported.
 
-### Uniform Mode
-- **uniform_amount Priority**: When uniform_amount is non-zero, it overrides other four directional settings
-- **Smart Distribution**: Negative values crop all edges inward, positive values pad all edges outward
-- **Percentage Handling**: Percentages in uniform mode are automatically distributed to each edge (divided by 2)
+## Mask Rules
 
-### Padding Color Support
-- **Grayscale Values**: e.g., "0.5" for 50% gray, "1.0" for white
-- **HEX Format**: e.g., "#FF0000" or "FF0000" for red
-- **RGB Format**: e.g., "255,0,0" or "1.0,0.0,0.0" for red
-- **Color Names**: e.g., "red", "blue", "white" and other standard color names
-- **Edge Color**: Use "edge", "e" or "ed" to automatically calculate average color of each edge for filling
-- **Average Color**: Use "average", "avg" or "a" to calculate average color of entire image
+- Crop-only: the mask marks cropped-away regions as white and original areas as black.
+- Pad-only: the mask matches output size; padded areas are white and original content areas are black.
+- Mixed edits: the mask expresses the union of edited regions (cropped + padded) as white.
+- All-zero amounts: returns the original image with an all-black mask.
+
+## Typical Usage
+
+- Uniform inward crop by 10%: set `uniform_amount=-0.1` and keep edge amounts at `0.0`.
+- Outward padding by 32 px with mirror content: set `uniform_amount=32`, `pad_color=mirror`, `divisible_by=8`.
+- Content-aware padding: set `pad_color=edge` or `average` to harmonize borders.
+- Mixed per-edge edits: combine `top_amount`, `bottom_amount`, `left_amount`, `right_amount` with `uniform_amount` for asymmetric operations.
+
+## Notes & Tips
+
+- Negative values crop inward; positive values pad outward. Ratios are relative to width/height per edge.
+- Use `divisible_by` to keep output dimensions aligned to model requirements (e.g., 8 or 16).
+- When using `mirror`, large paddings are applied iteratively to respect `reflect` constraints.

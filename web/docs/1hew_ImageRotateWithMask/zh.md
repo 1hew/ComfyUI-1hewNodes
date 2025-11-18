@@ -1,22 +1,39 @@
-# Image Rotate with Mask - 图像旋转与遮罩
+# Image Rotate with Mask - 带遮罩的高级旋转
 
-**节点功能：** `Image Rotate with Mask`节点提供高级图像旋转功能，具有全面的遮罩支持。支持任意角度旋转和多种填充模式，并提供围绕遮罩白色区域中心旋转的选项，非常适合精确的图像变换。
+**节点功能**：`Image Rotate with Mask` 对图像进行旋转，支持遮罩同步变换、高级填充策略以及基于遮罩的旋转中心。可选择扩展画布或裁剪回原尺寸。
 
-## 输入
+## Inputs | 输入
 
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
-| `image` | 必选 | IMAGE | - | - | 要旋转的输入图像 |
-| `angle` | 必选 | FLOAT | 0.0 | -3600.0到3600.0 | 旋转角度（度），负数为顺时针 |
-| `fill_mode` | 必选 | COMBO[STRING] | color | color, edge_extend, mirror | 旋转后空白区域的填充模式 |
-| `fill_color` | 必选 | STRING | "0.0" | - | 空白区域的填充颜色（仅color模式） |
-| `expand` | 必选 | BOOLEAN | True | - | 是否扩展画布以包含完整的旋转图像 |
-| `use_mask_center` | 必选 | BOOLEAN | False | - | 是否围绕遮罩白色区域中心旋转 |
-| `mask` | 可选 | MASK | - | - | 可选遮罩，与图像进行相同变换 |
+| `image` | - | IMAGE | - | - | 输入图像批次 |
+| `mask` | 可选 | MASK | - | - | 可选遮罩批次，与 `image` 对齐 |
+| `angle` | - | FLOAT | 0.0 | -3600.0–3600.0 | 旋转角度（度，顺时针为正） |
+| `pad_color` | - | STRING | `0.0` | 灰度/HEX/RGB/`edge`/`average`/`extend`/`mirror` | 画布扩展或裁剪时的背景策略 |
+| `expand` | - | BOOLEAN | True | - | 是否扩展画布以容纳完整旋转后的图像 |
+| `mask_center` | - | BOOLEAN | False | - | 当提供遮罩时，围绕遮罩白色区域的加权重心旋转 |
 
-## 输出
+## Outputs | 输出
 
 | 输出名称 | 数据类型 | 描述 |
 |---------|----------|------|
-| `image` | IMAGE | 应用变换后的旋转图像 |
-| `mask` | MASK | 旋转后的遮罩或旋转区域遮罩 |
+| `image` | IMAGE | 旋转后的图像批次 |
+| `mask` | MASK | 旋转后的遮罩；未提供遮罩时生成覆盖原始图像区域的遮罩 |
+
+## 功能说明
+
+- 中心控制：`mask_center=True` 时计算遮罩白色区域的加权重心，围绕其旋转。
+- 高级填充：支持颜色填充、`edge` 边缘平均、`mirror` 反射、`extend` 复制边界；优先使用 OpenCV，加速与一致性更好；无 OpenCV 时回退到 PIL。
+- 扩展/裁剪：`expand=True` 扩展画布；`False` 旋转后居中裁剪回原始尺寸。
+- 遮罩处理：遮罩与图像尺寸对齐、使用最近邻旋转，未提供遮罩时生成全内容遮罩。
+
+## 典型用法
+
+- 精准旋转：启用 `mask_center` 围绕主体区域进行旋转。
+- 自然边界：使用 `pad_color=edge`/`mirror`，降低扩展边缘的伪影。
+- 固定尺寸输出：设置 `expand=False` 保持原始分辨率。
+
+## 注意与建议
+
+- 内部会根据 PIL/OpenCV 约定修正角度方向；输入 `angle` 按顺时针作用。
+- 无 OpenCV 环境下使用 PIL 近似实现，行为保持一致。

@@ -1,45 +1,38 @@
-# Image HL Freq Separate
+﻿# Image HL Freq Separate - High/Low Frequency Separation
 
-**Node Function:** The `Image HL Freq Separate` node implements advanced frequency separation technology, supporting RGB, HSV, and IGBI separation methods. It can separate images into high-frequency detail layers and low-frequency base layers.
+**Node Purpose:** `Image HL Freq Separate` separates each image into high-frequency and low-frequency components using `rgb`, `hsv`, or `igbi` methods, and returns the separated layers along with a recombined preview.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-|--|--|--|--|--|--|
-| `image` | Required | IMAGE | - | - | Image to perform frequency separation on |
-| `method` | - | COMBO[STRING] | rgb | rgb, hsv, igbi | Separation method: rgb(RGB space), hsv(HSV space), igbi(Inverted Gaussian Blur Invert) |
-| `blur_radius` | - | FLOAT | 10.0 | 0.0-100.0 | Gaussian blur radius, controls the frequency range of separation |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `image` | - | IMAGE | - | - | Input image batch. |
+| `method` | - | COMBO | `rgb` | `rgb` / `hsv` / `igbi` | Separation method. |
+| `blur_radius` | - | FLOAT | 10.0 | 0.0–100.0 | Gaussian blur radius; internally ensured odd and ≥3.
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `high_freq` | IMAGE | High-frequency detail layer image |
-| `low_freq` | IMAGE | Low-frequency base layer image |
-| `combine` | IMAGE | Recombined complete image |
+| Name | Type | Description |
+|------|------|-------------|
+| `high_freq` | IMAGE | High-frequency layer batch. |
+| `low_freq` | IMAGE | Low-frequency layer batch. |
+| `combine` | IMAGE | Recombined result using the selected method.
 
 ## Features
 
-### Separation Methods Details
+- Odd radius: blur radius is rounded to an odd number ≥3.
+- Methods:
+- `rgb`: low = Gaussian blur; high = grayscale−blur + 0.5 (clamped), expanded to RGB. Recombine via linear light.
+- `hsv`: high from V−blur + 0.5; low from HSV with blurred V; recombine in HSV.
+- `igbi`: custom invert+blur mixing for high; low via Gaussian blur; recombine with levels.
+- Batch processing: processes each image independently and stacks results.
 
-#### RGB Mode
-- **Low-frequency layer**: Direct Gaussian blur on the original image
-- **High-frequency layer**: Calculated based on grayscale information using formula `(grayscale - blurred_grayscale) / 255 + 0.5`
-- **Recombination**: Uses Linear Light blending mode `2 * high_freq + low_freq - 1`
-- **Characteristics**: Suitable for general image processing with high computational efficiency
+## Typical Usage
 
-#### HSV Mode
-- **Low-frequency layer**: Gaussian blur on V channel while preserving H and S channels
-- **High-frequency layer**: V channel difference calculation using formula `(V_channel - blurred_V_channel) / 255 + 0.5`
-- **Recombination**: Linear Light blending in HSV space on V channel
-- **Characteristics**: Preserves hue and saturation, processes only luminance information
+- Detail retouch: extract high for texture work and low for tone work; use `combine` to preview.
+- Frequency-aware blending: feed `high_freq` and `low_freq` into `Image HL Freq Combine` for strength-controlled recomposition.
 
-#### IGBI Mode (Inverted Gaussian Blur Invert)
-- **Low-frequency layer**: Direct Gaussian blur on the original image
-- **High-frequency layer processing flow**:
-  1. Image inversion (255 - original)
-  2. Original image Gaussian blur
-  3. 50% blend of inverted image and blurred image
-  4. Invert again to get high-frequency layer
-- **Recombination**: 65% high-frequency + 35% low-frequency, then apply levels adjustment (black point 83, white point 172)
-- **Characteristics**: Provides the most precise detail separation effect
+## Notes & Tips
+
+- Inputs are converted to NumPy for OpenCV operations; outputs are float32 in `[0,1]`.
+- The `combine` output uses the same method as separation to illustrate intended recomposition.

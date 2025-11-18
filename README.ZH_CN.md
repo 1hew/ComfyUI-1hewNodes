@@ -21,6 +21,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.0.0**
+- build: 版本升级至 3.0.0
+
+<details>
+<summary><b>2.x 版本更新日志</b></summary>
+
 **v2.0.5**
 - feat(multi): 新增 `Multi String Join`、`Multi Image Batch`、`Multi Mask Batch`、`Multi Image Stitch`
 - feat(image): 新增 `Image Three Stitch` 节点
@@ -31,6 +37,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 **v2.0.0**
 - 重要变更：重大版本更新，升级到 2.0.0 后，已有 1.x 工作流需重新设置节点与参数方可正常运行，请谨慎更新。
+
+</details>
 
 <details>
 <summary><b>1.x 版本更新日志</b></summary>
@@ -320,16 +328,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🖼️ 图像处理节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Image Get Size | 图像尺寸获取器，从输入图像中提取宽度和高度信息，支持自动批处理 |
-| Image Solid FluxKontext | 基于 Flux Kontext 尺寸预设生成纯色图像，支持灵活的颜色输入格式 |
-| Image Solid QwenImage | 基于 QwenImage 尺寸预设生成纯色图像，支持灵活的颜色输入格式 |
 | Image Solid | 生成纯色图像，增强颜色参数支持多种输入格式和多种尺寸预设 |
 | Image Resize FluxKontext | 图像尺寸调整为FluxKontext尺寸，支持图像和遮罩的尺寸自动选择和手动选择 |
 | Image Resize Qwen Image | 专为 Qwen 视觉模型优化的图像尺寸调整，提供 7 种预设分辨率和自动宽高比选择 |
 | Image Resize Universal | 通用图像尺寸调整，支持多种算法和约束 |
 | Image Rotate with Mask | 高级图像旋转，支持遮罩集成、多种填充模式和遮罩中心旋转选项 |
 | Image Edit Stitch | 图像拼接与缝合，支持多种拼接模式 |
-| Image Three Stitch | 三图拼接，支持方向、尺寸匹配、间距与填充颜色 |
+| ImageMainStitch | 主画面拼接，支持动态 `image_2..image_N` 与方向/尺寸匹配/间距/填充 |
 | Image Add Label | 为图像添加文本标签 |
 | Image Plot | 图像绘制和可视化工具 |
 | Image Stroke by Mask | 对遮罩区域应用描边效果，支持自定义宽度和颜色 |
@@ -339,8 +344,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Image Mask Blend | 基于亮度的图像蒙版合成，支持羽化、透明度输出和多种颜色格式 |
-| Image Blend Modes by Alpha | 基于透明度的图像混合，支持多种Photoshop风格混合模式 |
-| Image Blend Modes by CSS | CSS标准混合模式，基于Pilgram库实现 |
+| Image Blend Mode by Alpha | 基于透明度的图像混合，支持多种Photoshop风格混合模式 |
+| Image Blend Mode by CSS | CSS标准混合模式，基于Pilgram库实现 |
 
 ### ✂️ 图像裁剪节点
 | 节点名称 | 功能描述 |
@@ -370,15 +375,14 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Mask Fill Hole | 填充遮罩中的封闭区域孔洞，支持批量处理 |
-| Mask Math Ops | 遮罩数学运算（交集、并集、差集、异或） |
 | Mask Crop by BBox Mask | 基于蒙版区域的遮罩边界框裁剪 |
 | Mask Paste by BBox Mask | 简化遮罩粘贴，支持自动基础遮罩创建和边界框检测 |
 
 ### 🔍 检测节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| DetectGuideLine | 引导线检测，融合 Canny、HoughLinesP 与 DBSCAN 消失点聚类 |
-| DetectYolo | YOLO模型目标检测，支持子文件夹模型、可自定义置信度阈值和可选标签显示控制 |
+| Detect Guide Line | 引导线检测，融合 Canny、HoughLinesP 与 DBSCAN 消失点聚类 |
+| Detect Yolo | YOLO模型目标检测，支持子文件夹模型、可自定义置信度阈值和可选标签显示控制 |
 
 ### 🔧 工具节点
 | 节点名称 | 功能描述 |
@@ -405,22 +409,31 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Any Switch Bool | 通用布尔切换节点，支持任意类型输入和惰性求值，根据布尔值条件选择输出 |
 | Any Switch Int | 多路整数切换节点，支持多个输入选项的切换，根据整数索引（1-5）选择对应的输入输出 |
 
+### 🔢 整数节点
+| 节点名称 | 功能描述 |
+|---------|----------|
+| Int Image Side Length | 基于图像尺寸输出选定边长（最长/最短/宽/高） |
+| Int Image Size | 输出图像宽度与高度两个整数 |
+| Int Mask Side Length | 基于遮罩尺寸输出选定边长（最长/最短/宽/高） |
+| Int Split | 将总数值分割为两部分，支持百分比与整数分割点 |
+| Int Wan | 生成 4n+1 等差数列，支持步长与范围校验 |
+
 ### 📦 批处理节点
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Image Batch Extract | 智能图像批次提取器，支持多种提取模式包括自定义索引、步长间隔和均匀分布 |
 | Image Batch Split | 智能图像批次拆分器，支持正向/反向拆分模式和增强的边界条件处理 |
 | Image Batch Group | 智能图像批次分组器，支持可配置的批次大小、重叠处理和灵活的填充策略 |
+| Image Batch Range | 从图像批次选择连续范围，支持起始索引与数量，越界安全 |
 | Image List Append | 图像列表追加器，智能合并图像到列表中 |
 | Mask Batch Math Ops | 批量遮罩数学运算 |
+| Mask Batch Range | 从遮罩批次选择连续范围，支持起始索引与数量，越界安全 |
 | Mask Batch Split | 智能遮罩批次拆分器，支持正向/反向拆分模式和增强的边界条件处理 |
 | Video Cut Group | 视频硬切检测器，通过分析相邻帧相似度识别场景切换点，支持快速和精确模式 |
 
 ### 📝 文本处理节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Int Wan | 整数序列生成器，支持生成4n+1等差数列序列，具有可配置步长控制和范围验证功能 |
-| Int Split | 整数分割节点，用于将总数值分割为两部分，支持百分比(0.0-1.0)和整数两种分割点输入方式 |
 | Text Filter | 文本过滤器，支持过滤单行注释（#开头）、多行注释（三引号包裹）和空行注释 |
 | Text Join Multi | 文本连接多输入器，支持多个文本输入的连接和动态变量引用，可自定义分隔符 |
 | Text Join by Text List | 文本列表连接器，支持将任意类型列表合并为字符串，支持前缀、后缀和自定义分隔符 |
@@ -436,13 +449,20 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Multi String Join | 动态多输入字符串连接，支持 `{input}` 变量与注释/三引号过滤，可自定义分隔符 |
 | Multi Image Batch | 从动态 `image_X` 构建批次，支持 crop/pad/stretch 尺寸统一与边缘/颜色填充 |
-| Multi Mask Batch | 从动态 `mask_X` 构建批次，支持 crop/pad/stretch 尺寸统一与灰度填充 |
 | Multi Image Stitch | 动态多图像拼接，支持方向、尺寸匹配、间距与填充颜色 |
+| Multi Mask Batch | 从动态 `mask_X` 构建批次，支持 crop/pad/stretch 尺寸统一与灰度填充 |
+| Multi Mask Math Ops | 动态多遮罩运算（交/并/差/异或），支持批次广播与统一尺寸 |
 
 ### 🎛️ 条件编码节点
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Text Encode QwenImageEdit Keep Size | Qwen 图文编辑条件编码，支持多图视觉编码、尺寸保持策略与参考潜空间 |
+
+### 💾 保存节点
+| 节点名称 | 功能描述 |
+|---------|----------|
+| Save Video | 保存视频到输出；支持空值输入，容器与编码器自动选择 |
+| Save Video RGBA | 将 images 保存为视频；支持 Alpha 预览与导出、可选音频、FPS 设置 |
 
 
 

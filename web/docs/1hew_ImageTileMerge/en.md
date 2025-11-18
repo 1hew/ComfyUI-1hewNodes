@@ -1,36 +1,34 @@
-# Image Tile Merge
+﻿# Image Tile Merge - Seam-Aware Tile Composition
 
-**Node Function:** The `Image Tile Merge` node intelligently merges multiple image tiles back into a complete image using an advanced weight mask system and cosine function gradient algorithm, ensuring perfect seamless stitching effects in merged images.
+**Node Purpose:** `Image Tile Merge` reconstructs the full image from tiles produced by tile-splitting nodes using the provided `tile_meta`. Applies seam-aware cosine weight masks over overlaps controlled by `blend_strength` for smooth merging.
 
 ## Inputs
 
-| Parameter Name | Input Selection | Data Type | Default Value | Value Range | Description |
-| -------------- | --------------- | --------- | ------------- | ----------- | ----------- |
-| `tiles` | Required | IMAGE | - | - | Image tile batch to be merged |
-| `tile_meta` | Required | DICT | - | - | Tile metadata from ImageTileSplit node |
-| `blend_strength` | - | FLOAT | 1.0 | 0.0-1.0 | Blend strength controlling overlap area blending degree using cosine function gradient algorithm |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `tile` | - | IMAGE | - | - | Tile batch or single tile; accepts `B×H×W×3` or `H×W×3`. |
+| `tile_meta` | - | DICT | - | - | Metadata dictionary from tile-split nodes. |
+| `blend_strength` | - | FLOAT | 1.0 | 0.0–1.0 | Controls overlap weighting; 0 disables blending.
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `merged_image` | IMAGE | Complete merged image |
+| Name | Type | Description |
+|------|------|-------------|
+| `image` | IMAGE | Merged full image.
 
-## Function Description
+## Features
 
-### Core Technical Features
-- **Weight Mask System**: Uses weight map accumulation for perfect blending in overlap areas
-- **Cosine Function Gradient**: Employs mathematically smoother cosine functions for natural transition effects
-- **High-Precision Calculation**: Uses 64-bit floating point for accumulation, avoiding precision loss and numerical errors
-- **Smart Boundary Handling**: Automatically handles edge tile special cases ensuring complete coverage
+- Tile count handling: trims or pads tiles to expected `rows*cols` using last tile or zeros to ensure completeness.
+- Cosine weight masks: generates smooth ramp weights along overlapped edges based on position and grid size.
+- Weighted composition: accumulates weighted tile contributions and normalizes by the total weight to avoid seams.
+- Overlap-aware: uses `overlap_width/height` from `tile_meta` to size blending ramps; scales by `blend_strength`.
 
-### Optimal Configuration Recommendations
-- **Recommended Settings**: `blend_strength = 1.0` (default value)
-- **Effect**: Achieves completely seamless image stitching suitable for all types of image processing tasks
+## Typical Usage
 
-### Application Scenarios
-- **AI processing result merging**: Merge AI-processed image tiles back into complete image
-- **Super-resolution reconstruction**: Merge super-resolution processed image tiles
-- **Large image processing**: Reconstruct large-sized images after tile processing
-- **Batch image stitching**: High-quality image stitching and panoramic composition
-- **Lossless image reconstruction**: Ensure processed images perfectly match original images
+- Merge after split: feed `tile` and `tile_meta` from `Image Tile Split` or `Image Tile Split Preset`, adjust `blend_strength` (e.g., 0.4–0.8) to minimize seams.
+- Robust to variations: if tiles exceed or are fewer than expected, automatic trim/pad maintains grid integrity.
+
+## Notes & Tips
+
+- `tile_meta['tile_metas'][i]` includes `crop_region`, `position (col,row)`, and `actual_crop_size`, which determine placement and crop trimming.
+- For large overlaps, reduce `blend_strength` when sharper boundaries are desired; increase for softer blending.

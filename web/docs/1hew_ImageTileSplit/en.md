@@ -1,29 +1,40 @@
-# Image Tile Split
+﻿# Image Tile Split - Grid Tiling with Overlap
 
-**Node Function:** The `Image Tile Split` node is used to intelligently split large images into multiple small tiles, supporting automatic grid division, custom split modes, and overlap area settings, commonly used for large image tile processing and AI inference optimization.
+**Node Purpose:** `Image Tile Split` splits a single image into a grid of tiles with optional overlap. Supports auto grid estimation, named presets like `2x3`, custom rows/cols, and tile sizes aligned to `divisible_by` multiples. Outputs a tile batch and a `tile_meta` dictionary for lossless merging.
 
 ## Inputs
 
-| Parameter Name | Input Selection | Data Type | Default Value | Value Range | Description |
-| -------------- | --------------- | --------- | ------------- | ----------- | ----------- |
-| `image` | Required | IMAGE | - | - | Input image to be split |
-| `split_mode` | - | COMBO[STRING] | auto | auto, custom, 2x2, 2x3, 2x4, 3x2, 3x3, 3x4, 4x2, 4x3, 4x4 | Split mode: auto, custom, or preset grids |
-| `overlap_amount` | - | FLOAT | 0.05 | 0.0-512.0 | Overlap amount, ≤1.0 for ratio mode, >1.0 for pixel mode |
-| `custom_rows` | Optional | INT | 2 | 1-10 | Number of rows in custom mode |
-| `custom_cols` | Optional | INT | 2 | 1-10 | Number of columns in custom mode |
-| `divisible_by` | Optional | INT | 8 | 1-64 | Divisibility number, ensures output dimensions are divisible by specified number |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `image` | - | IMAGE | - | - | Input image; only the first item of a batch is used. |
+| `split_mode` | - | COMBO | `auto` | `auto` / `custom` / `2x2` / `2x3` / `2x4` / `3x2` / `3x3` / `3x4` / `4x2` / `4x3` / `4x4` | Grid selection strategy. |
+| `overlap_amount` | - | FLOAT | 0.05 | 0.0–512.0 | Overlap as ratio (≤1.0) or pixels (>1.0). |
+| `custom_rows` | optional | INT | 2 | 1–10 | Rows when `split_mode=custom`. |
+| `custom_cols` | optional | INT | 2 | 1–10 | Cols when `split_mode=custom`. |
+| `divisible_by` | optional | INT | 8 | 1–64 | Tile sizes rounded up to multiples; affects final overlap.
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `tiles` | IMAGE | Split image tile batch |
-| `tiles_meta` | DICT | Tile metadata information including position, size, etc. |
+| Name | Type | Description |
+|------|------|-------------|
+| `tile` | IMAGE | Concatenated tile batch (`B = rows*cols`). |
+| `tile_meta` | DICT | Metadata for merge: `tile_metas` (per-tile), `original_size`, `grid_size`, `tile_width`, `tile_height`, `rows`, `cols`, `overlap_amount`, `overlap_mode`, `overlap_width`, `overlap_height`, `split_mode`, `divisible_by`.
 
-## Function Description
+## Features
 
-### Application Scenarios
-- **Large image AI processing**: Split large images into tiles for AI model inference
-- **Memory optimization**: Reduce memory usage when processing large images
-- **Parallel processing**: Support parallel processing of multiple tiles
-- **Super-resolution**: Work with AI super-resolution models to process ultra-large images
+- Auto grid: estimates rows/cols so each tile is near `1024×1024` and square-ish.
+- Overlap modes: ratio vs pixels, persisted as `overlap_mode` in metadata.
+- Size alignment: base tile size plus overlap, then rounded to `divisible_by`; recomputes final overlap after rounding.
+- Perfect coverage: computes precise tile positions so the last tile aligns with the image boundary.
+- Edge padding: edge tiles smaller than tile size are padded to full size to keep uniform outputs.
+
+## Typical Usage
+
+- Patch workflows: split large images for per-tile processing; overlap `0.05` to reduce seams.
+- Model constraints: set `divisible_by=8/16` to meet network stride restrictions.
+- Controlled layouts: choose `2x3` or `custom` rows/cols to match downstream tiling logic.
+
+## Notes & Tips
+
+- `tile_meta['tile_metas']` includes `crop_region`, `position (col,row)`, and `actual_crop_size`; pass this directly to `Image Tile Merge`.
+- If input is a batch, only the first image is used; feed single-image batches to avoid confusion.

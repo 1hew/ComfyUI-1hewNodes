@@ -1,52 +1,41 @@
-# Image HL Freq Transform
+﻿# Image HL Freq Transform - Masked Detail Transfer
 
-**Node Function:** The `Image HL Freq Transform` node implements advanced detail transfer technology, capable of transferring high-frequency information from detail images to generated images, with mask control and multiple frequency separation method support.
+**Node Purpose:** `Image HL Freq Transform` transfers detail from a `detail_image` onto a `generate_image` using `rgb`, `hsv`, or `igbi` separation methods, with optional `detail_mask` to control where the detail applies. Outputs the result and the intermediate high/low layers.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-|--|--|--|--|--|--|
-| `generate_image` | Required | IMAGE | - | - | Generated base image |
-| `detail_image` | Required | IMAGE | - | - | Detail reference image |
-| `method` | - | COMBO[STRING] | igbi | rgb, hsv, igbi | Frequency separation method |
-| `blur_radius` | - | FLOAT | 10.0 | 0.0-100.0 | Gaussian blur radius |
-| `detail_mask` | Optional | MASK | - | - | Detail area mask, controls transfer regions |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `generate_image` | - | IMAGE | - | - | Base image to receive detail. |
+| `detail_image` | - | IMAGE | - | - | Source image providing detail. |
+| `detail_mask` | optional | MASK | - | - | Mask controlling per-pixel detail transfer; full-white when absent. |
+| `method` | - | COMBO | `igbi` | `rgb` / `hsv` / `igbi` | Separation method for transfer. |
+| `blur_radius` | - | FLOAT | 10.0 | 0.0–100.0 | Gaussian blur radius; ensured odd and ≥3.
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `image` | IMAGE | Final image after detail transfer |
-| `high_freq` | IMAGE | Blended high-frequency layer |
-| `low_freq` | IMAGE | Low-frequency layer of generated image |
+| Name | Type | Description |
+|------|------|-------------|
+| `image` | IMAGE | Result image with transferred detail. |
+| `high_freq` | IMAGE | Intermediate high-frequency layer (after mixing). |
+| `low_freq` | IMAGE | Intermediate low-frequency layer.
 
 ## Features
 
-### Transfer Principles Details
+- Batch expansion: repeats smaller batches across `generate_image`, `detail_image`, and `detail_mask` to match the largest.
+- Mask semantics: when absent, a full-white 3-channel mask is used; otherwise it is broadcast to 3 channels.
+- Methods:
+- `igbi` transfer: builds high/low via invert+blur mixes from both images, blends highs by the mask, then mixes `0.65*high + 0.35*low` and applies levels.
+- `rgb/hsv` transfer: separates high/low from both images, blends highs by the mask, and recombines via linear light or HSV.
+- Odd radius: blur radius normalized to an odd integer.
 
-#### RGB/HSV Mode
-- **Processing flow**:
-  1. Perform frequency separation on detail image to get high-frequency layer
-  2. Perform frequency separation on generated image to get high and low frequency layers
-  3. Blend high-frequency layers through mask
-  4. Recombine final image
-- **Blur radius adjustment**: Generated image uses 1.5x blur radius for better results
-- **Characteristics**: Traditional method, suitable for general detail transfer needs
+## Typical Usage
 
-#### IGBI Mode (Recommended)
-- **Low-frequency layer**: Gaussian blur result of the generated image
-- **High-frequency layer calculation flow**:
-  1. **Generated image processing**: Invert → Gaussian blur → 50% blend with blurred image → Invert again
-  2. **Detail image processing**: Invert → Gaussian blur → 50% blend with blurred image → Invert again
-  3. **Mask blending**: Blend the two processed results through mask
-- **Final composition**: 65% high-frequency + 35% low-frequency, then apply levels adjustment (black point 83, white point 172)
-- **Characteristics**: Provides the most precise and natural detail transfer effect
+- Texture from reference: bring fine texture from a reference into a generated base while preserving base tone in low-frequency.
+- Masked retouch: apply detail only in selected regions with `detail_mask` (e.g., skin pores, fabric).
+- Method selection: choose `hsv` for brightness-only transfer, `rgb` for direct contrast transfer, `igbi` for level-managed stylization.
 
-### Mask Control Mechanism
-- **With Mask**:
-  - Detail transfer only in white areas of the mask
-  - Black areas preserve original details of generated image
-  - Supports grayscale masks for gradient transitions
-- **Without Mask**:
-  - Detail transfer across the entire image
-  - Automatically creates full white mask
+## Notes & Tips
+
+- Inputs are converted to NumPy for OpenCV operations; outputs are in `[0,1]` float32.
+- Large `blur_radius` widens the low-frequency envelope and softens high-frequency extraction.

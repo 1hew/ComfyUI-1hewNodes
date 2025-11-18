@@ -1,20 +1,39 @@
-# Image BBox Overlay by Mask
+# Image BBox Overlay by Mask - Draw bboxes from mask
 
-**Node Function:** The `Image BBox Overlay by Mask` node generates detection boxes based on masks and overlays them on images as outlines, supporting both independent and merge modes, capable of generating separate bounding boxes for each independent mask region or merging all masks into one bounding box.
+**Node Purpose:** `Image BBox Overlay by Mask` draws bounding boxes on images using connected components from the input mask or a single merged bbox. Supports color, stroke width, optional fill, and extra padding.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-| --------- | -------- | --------- | ------- | ----- | ----------- |
-| `image` | Required | IMAGE | - | - | Image to overlay bounding boxes on |
-| `mask` | Required | MASK | - | - | Mask used to generate bounding boxes |
-| `bbox_color` | - | COMBO[STRING] | green | red, green, blue, yellow, cyan, magenta, white, black | Bounding box color |
-| `line_width` | - | INT | 3 | 1-20 | Bounding box line width |
-| `padding` | - | INT | 0 | 0-50 | Bounding box padding pixels |
-| `output_mode` | - | COMBO[STRING] | separate | separate, merge | Output mode: separate (independent mode), merge (merge mode) |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `image` | - | IMAGE | - | - | Input image batch (`B×H×W×3`). |
+| `mask` | - | MASK | - | - | Mask batch (`B×H×W`). Automatically aligned and broadcast to image batch. |
+| `bbox_color` | - | COMBO | `green` | options | `red`/`green`/`blue`/`yellow`/`cyan`/`magenta`/`white`/`black`. |
+| `stroke_width` | - | INT | 4 | 1–100 | Line width for outline mode. |
+| `fill` | - | BOOLEAN | True | - | When True, fill bbox region; otherwise draw outline. |
+| `padding` | - | INT | 0 | 0–1000 | Expand bbox outward by this many pixels. |
+| `output_mode` | - | COMBO | `separate` | `separate`/`merge` | Multiple bboxes per component or a single merged bbox for the whole mask. |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `image` | IMAGE | Image with bounding boxes overlaid |
+| Name | Type | Description |
+|------|------|-------------|
+| `image` | IMAGE | Image batch with drawn bboxes. |
+
+## Features
+
+- Batch alignment: broadcasts `mask` to match image batch length and aligns size by LANCZOS.
+- Modes: `separate` finds connected components via `regionprops`; `merge` uses min/max over all positive mask pixels.
+- Padding: expands each bbox by `padding` in all directions, clamped to image bounds.
+- Async per-frame: processes each sample in worker threads for responsiveness.
+
+## Typical Usage
+
+- Visualize detection masks: set `output_mode=separate` to draw bboxes for each component.
+- Generate a single ROI: set `output_mode=merge` and tune `padding` to include context.
+- Choose display style: switch `fill` to fill the rectangle or use outline with `stroke_width`.
+
+## Notes & Tips
+
+- Mask thresholding uses `>128` on 8-bit representation when computing components and merged bbox.
+- Color options are mapped to fixed RGB values; defaults to `green` if not found.

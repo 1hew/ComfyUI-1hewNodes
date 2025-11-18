@@ -1,18 +1,33 @@
-# Mask Batch Split
+# Mask Batch Split - Split mask batch into two parts
 
-**Node Function:** The `Mask Batch Split` node intelligently splits mask batches into two separate groups based on configurable parameters, supporting both forward and backward splitting modes with enhanced boundary condition handling for mask processing workflows.
+**Node Purpose:** `Mask Batch Split` splits a mask batch into two parts by a count, optionally taking from the start or the end. Handles edge cases and performs non-blocking slicing.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-|--|--|--|--|--|--|
-| `mask` | Required | MASK | - | - | Input mask batch to be split |
-| `take_count` | Required | INT | 8 | 1-1024 | Number of masks to take for splitting |
-| `from_start` | Required | BOOLEAN | False | True/False | Split direction: True for taking from start, False for taking from end |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `mask` | - | MASK | - | - | Input mask batch. |
+| `take_count` | - | INT | 8 | 1-1024 | Number of frames in the taken part. |
+| `from_start` | - | BOOLEAN | `False` | - | If `True`, take from the start; otherwise take from the end. |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `mask_1` | MASK | First split result containing the specified portion of masks |
-| `mask_2` | MASK | Second split result containing the remaining masks |
+| Name | Type | Description |
+|------|------|-------------|
+| `mask_1` | MASK | First part of the split. |
+| `mask_2` | MASK | Second part of the split. |
+
+## Features
+
+- Directional split: `from_start=True` takes the first `take_count`; otherwise the last `take_count`.
+- Edge handling: when `take_count >= batch_size`, one output is full and the other is empty.
+- Async slicing: uses worker threads to avoid blocking.
+
+## Typical Usage
+
+- Separate mask prefixes from remaining segments.
+- Keep last N masks while retaining the rest.
+
+## Notes & Tips
+
+- Prints debug information on shapes and parameters, aiding graph debugging.

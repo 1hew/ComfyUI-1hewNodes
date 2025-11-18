@@ -1,38 +1,45 @@
-# Image Add Label
+# Image Add Label - Adaptive text labeling
 
-**Node Function:** The `Image Add Label` node is used to add text labels to images, supporting custom fonts, colors, positions and other attributes, with dynamic input value referencing, commonly used for image annotation and description.
+**Node Purpose:** `Image Add Label` adds text labels to images with auto-scaling based on image size and placement direction. Supports batch images and batch texts, dynamic variable substitution, dashed section separators, and multi-line wrapping that fits available space.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-|--|--|--|--|--|--|
-| `image` | Required | IMAGE | - | - | Image to add labels to |
-| `height_pad` | - | INT | 24 | 1-1024 | Total top and bottom padding for label area, final height auto-calculated based on actual text rendering height |
-| `font_size` | - | INT | 36 | 1-256 | Font size |
-| `invert_color` | - | BOOLEAN | True | True/False | Whether to invert colors, True for black text on white background, False for white text on black background |
-| `font` | - | COMBO[STRING] | Alibaba-PuHuiTi-Regular.otf | Font file list | Font selection, supports multiple font files |
-| `text` | - | STRING | "" | Multi-line text | Label text content, supports variable placeholders and mathematical operations, supports -- separator functionality |
-| `direction` | - | COMBO[STRING] | top | top, bottom, left, right | Label position: top, bottom, left, right |
-| `input1` | Optional | STRING | "" | - | Dynamic input value 1, can be referenced in text using {input1} |
-| `input2` | Optional | STRING | "" | - | Dynamic input value 2, can be referenced in text using {input2} |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `image` | - | IMAGE | - | - | Input image batch. |
+| `height_pad` | - | INT | 24 | 1–1024 | Minimum padding in pixels around text. Scales with image size. |
+| `font_size` | - | INT | 36 | 1–256 | Base font size at 1024 reference resolution. Scales automatically. |
+| `invert_color` | - | BOOLEAN | True | - | White label with black text when True; inverted when False. |
+| `font` | - | COMBO | auto | fonts dir | Font file from `fonts/` directory (e.g., `Alibaba-PuHuiTi-Regular.otf`). |
+| `text` | - | STRING(multiline) | "" | - | Label text. Supports `--` separator lines to split sections, otherwise uses newline. |
+| `direction` | - | COMBO | `top` | `top`/`bottom`/`left`/`right` | Placement side of the label. |
+| `input1` | - | STRING | "" | - | Optional variable available to template in `text`. |
+| `input2` | - | STRING | "" | - | Optional variable available to template in `text`. |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `image` | IMAGE | Image with labels added |
+| Name | Type | Description |
+|------|------|-------------|
+| `image` | IMAGE | Labeled image batch (`B×H×W×3`). |
 
 ## Features
 
-### Text Processing
-- **Multi-line Support**: Supports multi-line text, separated by line breaks
-- **Batch Processing**: Each line corresponds to one image when multi-line text
-- **Text Cycling**: Text cycles when there are more images than text lines
-- **Dash Separator**: When lines containing only dashes exist, content between -- becomes complete labels, other splitting methods are disabled
+- Auto scale: selects scale mode by content side and aspect, keeping perceived label proportion across sizes.
+- Smart wrap: width-constrained multi-line wrapping for both space-separated and CJK text; caches measurements for performance.
+- Fixed line height: consistent line spacing from font metrics, avoiding layout jitter across lines.
+- Variable templates: supports `{input1}`, `{input2}`, and per-frame expressions `{index}`, `{idx}`, `{range±K}`, with zero-padding for `{range}` depending on batch length.
+- Direction-aware layout: top/bottom create horizontal label bars; left/right rotate a temporary label and attach vertically.
+- Async rendering: per-frame rendering runs in worker threads to keep UI responsive.
 
-### Variable Support
-- **{index}**: Batch index, starting from 0 (0, 1, 2...)
-- **{idx}**: Batch index alias, starting from 0 (0, 1, 2...)
-- **{range}**: Batch index, starting from 0, with auto-padding format (00, 01, 02...)
-- **{input1}**: Custom input value 1
-- **{input2}**: Custom input value 2
+## Typical Usage
+
+- Add a top banner: set `direction=top`, write multi-line text, and tune `height_pad` for spacing.
+- Side annotation: set `direction=left/right` to attach a vertical label bar; content wraps by available height.
+- Batch templating: use `text` like `Frame {index+1}\nID {range}` to auto-number each frame.
+- Custom fonts: drop `.ttf/.otf` into `fonts/` and select via `font`.
+
+## Notes & Tips
+
+- Base sizing uses 1024 reference resolution; actual `font_size` and `height_pad` are scaled by image dimensions and placement side.
+- `--` separator lines split sections strictly; when present, only dashed blocks are considered, inner newlines are preserved.
+- Colors: `invert_color=True` creates white label with black text, `False` creates black label with white text.
