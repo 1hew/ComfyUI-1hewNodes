@@ -1,23 +1,31 @@
-# Image List Append
+# Image List Append - Concatenate image lists
 
-**Node Function:** The `Image List Append` node is used to append two image inputs into a list format, supporting intelligent merging of image batches, commonly used for image collection and batch processing workflows.
+**Node Purpose:** `Image List Append` merges multiple image inputs into a single list, preserving order by input suffix (`image_1`, `image_2`, ...). Accepts either single images or lists of images for each input.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-|--|--|--|--|--|--|
-| `image_1` | Required | IMAGE | - | - | First image input, can be a single image or image batch |
-| `image_2` | Required | IMAGE | - | - | Second image input, can be a single image or image batch |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `image_1` | optional | IMAGE/LIST | - | - | First image or image list. |
+| `image_2` | optional | IMAGE/LIST | - | - | Second image or image list. |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `image_list` | IMAGE | Merged image list |
+| Name | Type | Description |
+|------|------|-------------|
+| `image_list` | IMAGE_LIST | Combined list of images, ordered by input suffix. |
 
 ## Features
 
-### Use Cases
-- **Image Collection**: Merge images from multiple sources into one batch
-- **Batch Processing**: Prepare image lists for batch processing nodes
-- **Workflow Integration**: Connect different image processing branches
+- Flexible inputs: each input may be a single image or a list; `None` inputs are ignored.
+- Deterministic ordering: inputs are ordered by numeric suffix (`image_1`, `image_2`, ...).
+- Pass-through lists: lists are concatenated without copying frames.
+
+## Typical Usage
+
+- Merge outputs of different extractors into one list for downstream processing.
+- Build variable-length sequences by combining multiple branches.
+
+## Notes & Tips
+
+- Output is a Python-style list of images; connect to nodes that accept image lists.

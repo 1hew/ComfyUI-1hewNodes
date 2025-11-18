@@ -1,54 +1,89 @@
-import os
-import importlib
-import importlib.util
-import sys
-import logging
 import atexit
+import importlib
+import inspect
+import logging
+import os
+import pkgutil
 import signal
+import sys
 
-# 初始化映射字典
-NODE_CLASS_MAPPINGS = {}
-NODE_DISPLAY_NAME_MAPPINGS = {}
+from comfy_api.latest import ComfyExtension, io, ui
 
-# 获取当前目录
-current_dir = os.path.dirname(os.path.realpath(__file__))
 
-# 自动发现和导入 nodes 目录下的所有节点模块
-nodes_dir = os.path.join(current_dir, "nodes")
-if os.path.exists(nodes_dir) and os.path.isdir(nodes_dir):
-    # 将 nodes 目录添加到 Python 路径
-    if nodes_dir not in sys.path:
-        sys.path.append(nodes_dir)
-    
-    # 遍历 nodes 目录下的所有 Python 文件
-    for file in os.listdir(nodes_dir):
-        if file.endswith(".py") and file != "__init__.py":
-            module_name = file[:-3]  # 去掉 .py 后缀
+_CACHED_NODES = None
+
+
+def _discover_nodes() -> list[type[io.ComfyNode]]:
+    """
+    递归扫描并导入 `nodes` 子包下的所有节点类，统一注册。
+
+    - 仅在包级入口进行注册，节点文件不实现扩展入口。
+    - 严格返回继承自 `io.ComfyNode` 的类列表。
+    """
+    global _CACHED_NODES
+    if _CACHED_NODES is not None:
+        return _CACHED_NODES
+
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    nodes_dir = os.path.join(current_dir, "nodes")
+
+    discovered: list[type[io.ComfyNode]] = []
+
+    if not os.path.isdir(nodes_dir):
+        logging.info("[1hewNodesV3] 未检测到 nodes 目录，跳过扫描")
+        _CACHED_NODES = discovered
+        return discovered
+
+    package_name = __name__
+
+    # 导入顶层 nodes 包以获取遍历 __path__
+    try:
+        nodes_pkg = importlib.import_module(".nodes", package=package_name)
+    except Exception as exc:  # pragma: no cover
+        logging.error(f"[1hewNodesV3] 导入 nodes 包失败: {exc}")
+        _CACHED_NODES = discovered
+        return discovered
+
+    prefix = f"{package_name}.nodes."
+    for _, name, _ in pkgutil.walk_packages(nodes_pkg.__path__, prefix=prefix):
+        # 跳过包级 __init__，按模块导入
+        try:
+            module = importlib.import_module(name)
+        except Exception as exc:  # pragma: no cover
+            logging.error(f"[1hewNodesV3] 导入模块失败: {name}, 错误: {exc}")
+            continue
+
+        for _, obj in inspect.getmembers(module, inspect.isclass):
             try:
-                # 导入模块
-                module = importlib.import_module(f".{module_name}", package=f"{__name__}.nodes")
-                
-                # 如果模块有节点映射，则添加到全局映射中
-                if hasattr(module, "NODE_CLASS_MAPPINGS"):
-                    NODE_CLASS_MAPPINGS.update(module.NODE_CLASS_MAPPINGS)
-                if hasattr(module, "NODE_DISPLAY_NAME_MAPPINGS"):
-                    NODE_DISPLAY_NAME_MAPPINGS.update(module.NODE_DISPLAY_NAME_MAPPINGS)
-            except Exception as e:
-                print(f"导入节点模块 {module_name} 时出错: {e}")
+                if issubclass(obj, io.ComfyNode) and obj is not io.ComfyNode:
+                    discovered.append(obj)
+            except Exception:
+                continue
 
-# 添加这行来支持文档
-WEB_DIRECTORY = os.path.join(current_dir, "web")
+    _CACHED_NODES = discovered
+    return discovered
 
-# 注册前端扩展目录（JS），用于动态输入端口等功能
+
+class NodesV3Extension(ComfyExtension):
+    async def get_node_list(self) -> list[type[io.ComfyNode]]:
+        return _discover_nodes()
+
+
+async def comfy_entrypoint() -> ComfyExtension:
+    return NodesV3Extension()
+
+WEB_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)), "web")
+
+
+# 前端脚本注册，确保浏览器加载扩展 JS
 try:
     import nodes
-    js_dir = os.path.join(current_dir, "js")
+    js_dir = os.path.join(WEB_DIRECTORY, "js")
     if os.path.isdir(js_dir):
-        # 通过 EXTENSION_WEB_DIRS 显式注册，确保浏览器侧加载到扩展脚本
-        nodes.EXTENSION_WEB_DIRS["ComfyUI-1hewNodes"] = js_dir
+        nodes.EXTENSION_WEB_DIRS["ComfyUI-1hewNodesV3"] = js_dir
 except Exception:
-    # 在服务端启动早期阶段或旧版本 ComfyUI 上，nodes 可能尚未可用
     pass
+
 
 # 全局变量保存监控模块引用
 _workflow_watcher = None
@@ -123,6 +158,3 @@ def _signal_handler(signum, frame):
 
 # 自动启动工作流监控
 _start_workflow_monitor()
-
-# 导出映射
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

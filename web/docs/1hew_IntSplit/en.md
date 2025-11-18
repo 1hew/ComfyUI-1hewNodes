@@ -1,17 +1,36 @@
-# Int Split
+# Int Split - Integer Split
 
-**Node Function:** The `Int Split` node is designed to split a total value into two parts, supporting both percentage (0.0-1.0) and integer input modes for the split point. It's ideal for scenarios requiring proportional or fixed-value integer splitting, such as batch size allocation, dataset partitioning, and more.
+**Node Purpose:** `Int Split` divides a total integer into a split count determined by `split_point`. It supports ratio-based splitting when `split_point` is within `0.0–1.0`, and absolute-value splitting otherwise.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-|--|--|--|--|--|--|
-| `total` | Required | INT | 20 | 1-10000 | Total value to be split, step: 1 |
-| `split_point` | Required | FLOAT | 0.5 | 0.0-10000.0 | Split point, supports percentage (0.0-1.0) or integer values, step: 0.01 |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `total` | - | INT | `20` | `1–10000` | Total integer to be divided. |
+| `split_point` | - | FLOAT | `0.5` | `0.0–10000.0` | Ratio or absolute split value. `0.0–1.0` uses ratio mode; `1.0` yields `1`; values >1.0 use absolute mode and are clamped to `total`. |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `int_total` | INT | Original total value |
-| `int_split` | INT | Split value result |
+| Name | Type | Description |
+|------|------|-------------|
+| `int_total` | INT | Echo of the input `total`. |
+| `int_split` | INT | Computed split count from `split_point`. |
+
+## Features
+
+- Ratio mode: `0.0–1.0` multiplies `total` by `split_point`, then casts to `int`.
+- Special case: `split_point=1.0` produces `1` for single-block semantics.
+- Absolute mode: values >`1.0` are cast to `int` and clamped to `total`.
+- Non-negative guarantee: final value is clamped at minimum `0`.
+- Core logic: ratio vs absolute split computation and clamping.
+
+## Typical Usage
+
+- Balanced split: set `split_point=0.25` to obtain a quarter-sized split from `total`.
+- Fixed count: set `split_point=8` to request eight units (clamped to `total`).
+- Single unit: set `split_point=1.0` to produce `1` regardless of `total`.
+
+## Notes & Tips
+
+- Provide `total≥1` to keep the split meaningful.
+- Large absolute `split_point` values are safely clamped to `total`.

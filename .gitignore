@@ -8,3 +8,4 @@ __pycache__/
 current_workflow.tmp
 
 /cache/
+/tests/

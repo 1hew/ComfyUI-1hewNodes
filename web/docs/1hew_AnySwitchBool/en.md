@@ -1,23 +1,34 @@
-# Any Switch Bool
+# Any Switch Bool - Conditional Pass-Through
 
-**Node Function:** The `Any Switch Bool` node is a universal boolean conditional switcher that supports any type of input and lazy evaluation. It selects output between `on_true` or `on_false` values based on boolean conditions, computing only the required branch to improve execution efficiency. Ideal for conditional branch control and dynamic data routing.
+**Node Purpose:** `Any Switch Bool` selects between `on_true` and `on_false` inputs based on a boolean, emitting one value. Implements lazy evaluation so only the chosen branch is computed.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-|--|--|--|--|--|--|
-| `boolean` | Required | BOOLEAN | True | True/False | Boolean condition value controlling the switch |
-| `on_true` | Optional | * | - | - | Value to output when boolean is True (supports any type) |
-| `on_false` | Optional | * | - | - | Value to output when boolean is False (supports any type) |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `boolean` | - | BOOLEAN | True | - | Control flag. |
+| `on_true` | optional | ANY (`*`) | - | - | Value emitted when `boolean=True` (lazy). |
+| `on_false` | optional | ANY (`*`) | - | - | Value emitted when `boolean=False` (lazy).
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `output` | * | Selected output value based on boolean condition (type matches selected input) |
+| Name | Type | Description |
+|------|------|-------------|
+| `output` | ANY (`*`) | Selected input value.
 
-## Functionality
+## Features
 
-### Lazy Evaluation Mechanism
+- Lazy ports: only the active input port is evaluated.
+- Simple selection: returns `on_true` when `boolean=True`, otherwise `on_false`.
+- Robust fallback: on exceptions, returns `None`.
 
-- **Smart Computation**: Only computes the required branch, unselected branches are not executed
+## Typical Usage
+
+- Gate expensive operations: compute heavy branches only when enabled by a condition.
+- Default routing: pair with `Any Empty Bool` to route present vs empty inputs.
+- Mode toggles: quickly switch between two alternative processing paths.
+
+## Notes & Tips
+
+- Provide either or both branch inputs; the node emits whichever is active.
+- Combine with validation nodes to create safe, branch-controlled pipelines.

@@ -1,18 +1,33 @@
-# Image Batch Split - 图像批次拆分
+# Image Batch Split - 批次二段切分
 
-**节点功能：** `Image Batch Split`节点智能地将图像批次拆分为两个独立的组，基于可配置参数支持正向和反向拆分模式，具有增强的边界条件处理能力。
+**节点功能：** `Image Batch Split` 将图像批次按数量切分为两段，可选择从开头或结尾取。对 `take_count` ≥ 批次大小的情况做边界处理，并以非阻塞方式执行切片。
 
 ## 输入
 
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
-| `image` | 必选 | IMAGE | - | - | 要拆分的输入图像批次 |
-| `take_count` | 必选 | INT | 8 | 1-1024 | 拆分时要取的图像数量 |
-| `from_start` | 必选 | BOOLEAN | False | True/False | 拆分方向：True为从开头取，False为从结尾取 |
+| `image` | - | IMAGE | - | - | 输入图像批次 |
+| `take_count` | - | INT | 8 | 1-1024 | 取出的帧数量 |
+| `from_start` | - | BOOLEAN | `False` | - | 为 `True` 表示从开头取，否则从末尾取 |
 
 ## 输出
 
 | 输出名称 | 数据类型 | 描述 |
 |---------|----------|------|
-| `image_1` | IMAGE | 第一个拆分结果，包含指定部分的图像 |
-| `image_2` | IMAGE | 第二个拆分结果，包含剩余的图像 |
+| `image_1` | IMAGE | 切分后的第一段 |
+| `image_2` | IMAGE | 切分后的第二段 |
+
+## 功能说明
+
+- 方向控制：`from_start=True` 取前 `take_count` 帧；否则取后 `take_count` 帧。
+- 边界处理：当 `take_count >= batch_size` 时，一侧输出为全部，另一侧为空。
+- 异步切片：在工作线程执行切片，避免界面阻塞。
+
+## 典型用法
+
+- 将前缀片段与剩余片段分离：设置 `from_start=True`、`take_count=N`。
+- 保留最后 N 帧并保留其余：设置 `from_start=False`、`take_count=N`。
+
+## 注意与建议
+
+- 空输出保持与输入一致的类型/设备，便于后续节点处理。

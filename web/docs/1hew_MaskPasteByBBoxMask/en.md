@@ -1,17 +1,34 @@
-# Mask Paste by BBox Mask
+# Mask Paste by BBox Mask - Paste Mask into Bounding Box
 
-**Node Function:** The `Mask Paste by BBox Mask` node pastes a mask back to its original position in a base mask based on bounding box mask information. This node is designed for mask operations and provides a simplified interface for basic mask pasting without complex transformations.
+**Node Purpose:** `Mask Paste by BBox Mask` pastes a `paste_mask` into the bounding box region defined by `bbox_mask` on top of an optional `base_mask` (defaults to zeros). Handles batch cycling and resizes the paste to fit the bbox.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-| --------- | -------- | --------- | ------- | ----- | ----------- |
-| `paste_mask` | Required | MASK | - | - | Mask to be pasted |
-| `bbox_mask` | Required | MASK | - | - | Bounding box mask indicating paste position |
-| `base_mask` | Optional | MASK | - | - | Base mask to paste onto (defaults to black mask if not provided) |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `paste_mask` | - | MASK | - | - | Mask to paste into the bbox.
+| `bbox_mask` | - | MASK | - | - | Mask whose non-zero region defines the bbox.
+| `base_mask` | optional | MASK | - | - | Destination mask; defaults to zeros matching `bbox_mask` when absent.
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `mask` | MASK | Final mask with paste_mask pasted back to the bounding box area |
+| Name | Type | Description |
+|------|------|-------------|
+| `mask` | MASK | Mask after pasting into the bbox region.
+
+## Features
+
+- Batch cycling: aligns `base_mask`, `paste_mask`, and `bbox_mask` across differing batch sizes via modulo indexing.
+- BBox detection: threshold-based bbox from `bbox_mask` (`>10` on `[0..255]`).
+- Size fit: resizes `paste_mask` to bbox dimensions with Lanczos and pastes at bbox location.
+- Robust fallback: when bbox is absent, returns the `base_mask` item as-is.
+
+## Typical Usage
+
+- Region replacement: replace or insert a refined mask region within a detected bbox.
+- Crop-paste workflows: pair with mask cropping nodes to transform and relocate mask content.
+
+## Notes & Tips
+
+- Ensure `paste_mask` semantics match `base_mask` (white=selected) to avoid unintended inversions.
+- For precise alignment, `paste_mask` should be prepared to match bbox content (e.g., from a cropped mask).

@@ -21,6 +21,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.0.0**
+- build: bump version to 3.0.0
+
+<details>
+<summary><b> 2.x releases</b></summary>
+
 **v2.0.5**
 - feat(multi): Added `Multi String Join`, `Multi Image Batch`, `Multi Mask Batch`, `Multi Image Stitch`
 - feat(image): Added `Image Three Stitch` node
@@ -31,6 +37,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 **v2.0.0**
 - breaking: Major update. Existing workflows built with previous nodes require reconfiguration after upgrading to function correctly. Please review nodes and parameters carefully.
+
+</details>
 
 <details>
 <summary><b> 1.x releases</b></summary>
@@ -320,16 +328,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🖼️ Image Processing Nodes
 | Node Name | Description |
 |-----------|--------------|
-| Image Get Size | Image dimension extractor that extracts width and height information from input images with automatic batch processing support |
 | Image Solid FluxKontext | Generate solid color images based on Flux Kontext dimension presets with flexible color input format support |
-| Image Solid QwenImage | Generate solid color images based on QwenImage dimension presets with flexible color input format support |
-| Image Solid | Generate solid color images with enhanced color parameter supporting multiple input formats and multiple size presets |
 | Image Resize FluxKontext | Resize images to FluxKontext dimensions with support for automatic and manual size selection for images and masks |
 | Image Resize Qwen Image | Image resizing optimized for Qwen vision models, providing 7 preset resolutions and automatic aspect ratio selection |
 | Image Resize Universal | Universal image resizing with multiple algorithms and constraints |
 | Image Rotate with Mask | Advanced image rotation with mask integration, multiple fill modes, and mask center rotation options |
 | Image Edit Stitch | Image stitching and merging with multiple stitching modes |
-| Image Three Stitch | Three-image stitcher with direction, size matching, spacing, and padding color control |
+| ImageMainStitch | Main-image stitcher supporting dynamic `image_2..image_N`, direction, size matching, spacing, and padding |
 | Image Add Label | Add text labels to images |
 | Image Plot | Image plotting and visualization tools |
 | Image Stroke by Mask | Apply stroke effects to mask regions with customizable width and color |
@@ -339,8 +344,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|-------------|
 | Image Mask Blend | Luminance-based image mask compositing with feathering, alpha output, and multiple color format support |
-| Image Blend Modes by Alpha | Alpha-based image blending with multiple Photoshop-style blend modes |
-| Image Blend Modes by CSS | CSS standard blend modes based on Pilgram library |
+| Image Blend Mode by Alpha | Alpha-based image blending with multiple Photoshop-style blend modes |
+| Image Blend Mode by CSS | CSS standard blend modes based on Pilgram library |
 
 ### ✂️ Image Cropping Nodes
 | Node Name | Description |
@@ -370,15 +375,14 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|-------------|
 | Mask Fill Hole | Fill holes in enclosed areas of masks with batch processing support |
-| Mask Math Ops | Mask mathematical operations (intersection, union, difference, XOR) |
 | Mask Crop by BBox Mask | Mask bounding box cropping based on mask regions |
 | Mask Paste by BBox Mask | Simplified mask pasting with automatic base mask creation and bounding box detection |
 
 ### 🔍 Detection Nodes
 | Node Name | Description |
 |-----------|-------------|
-| DetectYolo | YOLO model object detection with subfolder model support, customizable confidence thresholds, and optional label display control |
-| DetectGuideLine | Guide line detection combining Canny, HoughLinesP, and DBSCAN vanishing-point clustering |
+| Detect Yolo | YOLO model object detection with subfolder model support, customizable confidence thresholds, and optional label display control |
+| Detect Guide Line | Guide line detection combining Canny, HoughLinesP, and DBSCAN vanishing-point clustering |
 
 ### 🔧 Utility Nodes
 | Node Name | Description |
@@ -405,22 +409,31 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Any Switch Bool | Universal boolean switch node supporting any type input with lazy evaluation, selecting output based on boolean condition |
 | Any Switch Int | Multi-way integer switch node supporting multiple input options, selecting corresponding input/output based on integer index (1-5) |
 
+### 🔢 Integer Nodes
+| Node Name | Description |
+|-----------|-------------|
+| Int Image Side Length | Output selected side length (longest/shortest/width/height) from image dimensions |
+| Int Image Size | Output width and height integers from image dimensions |
+| Int Mask Side Length | Output selected side length (longest/shortest/width/height) from mask dimensions |
+| Int Split | Split a total value into two parts, supporting percentage and integer split point |
+| Int Wan | Generate 4n+1 arithmetic sequences with step and range validation |
+
 ### 📦 Batch Processing Nodes
 | Node Name | Description |
 |-----------|-------------|
 | Image Batch Extract | Intelligent image batch extractor supporting multiple extraction modes including custom indices, step intervals, and uniform distribution |
 | Image Batch Split | Intelligent image batch splitter with forward/backward splitting modes and enhanced boundary condition handling |
 | Image Batch Group | Intelligent image batch grouper with configurable batch sizes, overlap handling, and flexible padding strategies |
+| Image Batch Range | Select a contiguous range from an image batch using start index and count; out-of-bounds safe |
 | Image List Append | Image list appender for intelligently merging images into lists |
 | Mask Batch Math Ops | Batch mask mathematical operations |
+| Mask Batch Range | Select a contiguous range from a mask batch using start index and count; out-of-bounds safe |
 | Mask Batch Split | Intelligent mask batch splitter with forward/backward splitting modes and enhanced boundary condition handling |
 | Video Cut Group | Video scene cut detector that identifies scene transitions by analyzing frame similarity, supporting both fast and precise modes |
 
 ### 📝 Text Processing Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Int Wan | Integer sequence generator for creating 4n+1 arithmetic progression sequences with configurable step control and range validation |
-| Int Split | Integer splitter node for dividing total values into two parts, supporting both percentage (0.0-1.0) and integer split point input methods |
 | Text Filter | Text Filter supporting filtering single line comments (starting with #), multi line comments (wrapped in three quotes), and empty line |
 | Text Join Multi | Multi-input text concatenator supporting multiple text inputs with dynamic variable referencing and custom separators |
 | Text Join by Text List | Text list joiner for merging any type of list into a string with support for prefix, suffix, and custom separators |
@@ -436,13 +449,20 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Multi String Join | Concatenate dynamic `string_X` inputs with `{input}` variable support and comment/triple-quote filtering; customizable separator |
 | Multi Image Batch | Build image batch from dynamic `image_X` with crop/pad/stretch size unification and edge/color padding |
-| Multi Mask Batch | Build mask batch from dynamic `mask_X` with crop/pad/stretch size unification and configurable gray padding |
 | Multi Image Stitch | Dynamic multi-image stitcher with direction, size matching, spacing, and padding color control |
+| Multi Mask Batch | Build mask batch from dynamic `mask_X` with crop/pad/stretch size unification and configurable gray padding |
+| Multi Mask Math Ops | Dynamic multi-mask operations (union/intersection/difference/XOR) with batch broadcasting and size alignment |
 
 ### 🎛️ Conditioning Nodes
 | Node Name | Description |
 |-----------|-------------|
 | Text Encode QwenImageEdit Keep Size | Qwen image-edit conditioning encoder combining vision inputs and text, supports size preservation modes and reference latents |
+
+### 💾 Save Nodes
+| Node Name | Description |
+|-----------|-------------|
+| Save Video | Save VIDEO to output; supports optional input, auto container/codec selection |
+| Save Video RGBA | Save images to video; supports alpha preview/output, optional audio, configurable FPS |
 
 
 

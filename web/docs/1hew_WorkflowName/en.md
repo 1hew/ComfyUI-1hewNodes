@@ -1,19 +1,39 @@
-# Workflow Name
+﻿# Workflow Name - Current Workflow Path/Name with Date
 
-**Node Function:** The `Workflow Name` node automatically retrieves the current workflow filename by monitoring temporary files. It supports path control, custom prefixes/suffixes, and date formatting, commonly used for dynamic workflow naming and file organization.
+**Node Purpose:** `Workflow Name` reads the current workflow path from a monitored temp file and formats the output with optional directory prefix for date, plus configurable `prefix`/`suffix` and extension handling.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-|--|--|--|--|--|--|
-| `prefix` | Optional | STRING | "" | - | Custom prefix to add before the workflow name |
-| `suffix` | Optional | STRING | "" | - | Custom suffix to add after the workflow name |
-| `date_format` | Optional | COMBO[STRING] | "yyyy-MM-dd" | Multiple formats | Date format for prefix: none, yyyy-MM-dd, yyyy/MM/dd, yyyyMMdd, yyyy-MM-dd HH:mm, yyyy/MM/dd HH:mm, yyyy-MM-dd HH:mm:ss, MM-dd, MM/dd, MMdd, dd, HH:mm, HH:mm:ss, yyyy年MM月dd日, MM月dd日, yyyyMMdd_HHmm, yyyyMMdd_HHmmss |
-| `full_path` | Optional | BOOLEAN | True | True/False | Whether to include the full path (relative to workflows directory) or just the filename |
-| `strip_extension` | Optional | BOOLEAN | True | True/False | Whether to remove the .json extension from the filename |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `prefix` | - | STRING | `` | - | Text prepended to the workflow name. |
+| `suffix` | - | STRING | `` | - | Text appended to the workflow name. |
+| `date_format` | - | COMBO | `yyyy-MM-dd` | many | Date folder prefix; set to `none` to disable. |
+| `full_path` | - | BOOLEAN | `False` | - | Output full path (dir + name) or only file name. |
+| `strip_extension` | - | BOOLEAN | `True` | - | Remove `.json` extension from the output name. |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `string` | STRING | Processed workflow name with applied formatting options |
+| Name | Type | Description |
+|------|------|-------------|
+| `string` | STRING | Formatted workflow path or name, optionally prefixed by date. |
+
+## Features
+
+- Monitored temp file: reads `current_workflow.tmp` from candidate locations under `custom_nodes`.
+- Retry-on-lock: retries on `PermissionError` with small delays.
+- Path processing: normalize slashes, choose full path or basename, handle `.json` extension.
+- Naming controls: apply `prefix`/`suffix`, optional extension stripping.
+- Date prefix: adds a date directory based on selected format.
+- Dynamic fingerprint: ensures fresh evaluation via a time-based fingerprint.
+
+## Typical Usage
+
+- Full path with date: keep `full_path=True`, `strip_extension=True`, and `date_format=yyyy-MM-dd` to organize saved results under dated folders.
+- Name only: set `full_path=False` to get just the file name with your `prefix`/`suffix`.
+- Preserve extension: set `strip_extension=False` when downstream consumers expect `.json`.
+
+## Notes & Tips
+
+- Ensure the monitoring script writes to `current_workflow.tmp` so the node can read the latest workflow path.
+- When `date_format=none`, the output omits the date folder while retaining other formatting choices.

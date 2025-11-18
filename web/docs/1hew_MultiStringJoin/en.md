@@ -1,19 +1,39 @@
-# Multi String Join
+# Multi String Join - Ordered Join with Filtering and Placeholder
 
-**Node Function:** The `Multi String Join` node concatenates dynamic `string_X` inputs into a single string, with per-input comment filtering, empty-line control, `{input}` placeholder substitution, and customizable separators.
+**Node Purpose:** `Multi String Join` joins multiple string inputs in numeric order using a configurable separator, with options to filter empty lines and comments, and to substitute `{input}` placeholders.
 
 ## Inputs
 
-| Parameter | Required | Data Type | Default | Range | Description |
-|--|--|--|--|--|--|
-| `string_1` | Optional | STRING | - | - | First dynamic text input; supports additional `string_2`, `string_3`, ... |
-| `filter_empty_line` | Required | BOOLEAN | False | True/False | Remove empty lines after processing each text |
-| `filter_comment` | Required | BOOLEAN | False | True/False | Filter line comments (`#`) and triple-quote blocks (`'''`/`"""`) |
-| `separator` | Required | STRING | "\\n" | - | Concatenation separator; supports \\n, \\t, \\r escapes |
-| `input` | Optional | STRING | "" | - | Dynamic input value referenced as `{input}` |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `filter_empty_line` | - | BOOLEAN | False | - | Remove empty lines after processing. |
+| `filter_comment` | - | BOOLEAN | False | - | Remove comments and triple-quoted blocks. |
+| `separator` | - | STRING | `\n` | - | Join separator; supports escapes `\n`, `\t`, `\r`. |
+| `input` | - | STRING | `` | - | Value to substitute into `{input}` placeholders. |
+| `string_1` | - | STRING | - | - | First string.
+| `string_2…string_N` | optional | STRING | - | - | Additional strings recognized by numeric suffix ordering.
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `string` | STRING | Joined result string |
+| Name | Type | Description |
+|------|------|-------------|
+| `string` | STRING | Joined and filtered result.
+
+## Features
+
+- Ordered collection: gathers `string_*` inputs by numeric suffix.
+- Placeholder substitution: replaces `{input}` inside each string and final result.
+- Comment filtering: removes `#` comments and respects `'''`/`"""` block quotes with stateful parsing.
+- Empty-line filtering: optional removal after trimming.
+- Separator decoding: interprets escape sequences for clean joins.
+
+## Typical Usage
+
+- Prompt assembly: combine prompt fragments with placeholders for dynamic content.
+- Config templating: join sections while stripping comments and blank lines.
+- Ordered merging: ensure `string_1..N` join in intended sequence.
+
+## Notes & Tips
+
+- Block-quote handling ensures multi-line quoted content is preserved when filtering comments.
+- Provide `separator="\n\n"` for paragraph breaks, or `", "` for comma-separated lists.

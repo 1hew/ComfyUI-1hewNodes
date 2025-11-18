@@ -1,46 +1,38 @@
-# Image Plot
+# Image Plot - Arrange images by layout
 
-**Node Function:** The `Image Plot` node is used to plot multiple images into one large image, supporting horizontal, vertical, and grid arrangements, commonly used for creating image collections or comparison displays. Supports both standard image batch processing and video collection time-series display.
+**Node Purpose:** `Image Plot` arranges images in a horizontal, vertical, or grid layout. Also supports a video-collection style input (list of batches) to produce frame-wise collages across multiple sequences.
 
 ## Inputs
 
-| Parameter Name | Input Selection | Data Type | Default Value | Value Range | Description |
-| -------------- | --------------- | --------- | ------------- | ----------- | ----------- |
-| `image` | Required | IMAGE | - | - | Image batch or video collection data to be combined |
-| `layout` | - | COMBO[STRING] | horizontal | horizontal, vertical, grid | Arrangement: horizontal, vertical, grid |
-| `spacing` | - | INT | 10 | 0-100 | Gap between images in pixels |
-| `grid_columns` | - | INT | 2 | 1-100 | Number of images per row in grid mode |
-| `background_color` | - | STRING | 1.0 | Grayscale/HEX/RGB | Background color, supports multiple formats |
+| Name | Port | Type | Default | Range | Description |
+| ---- | ---- | ---- | ------- | ----- | ----------- |
+| `image` | - | IMAGE or LIST | - | - | Input image batch or a list of batches for video-collection display. |
+| `layout` | - | COMBO | `horizontal` | `horizontal`/`vertical`/`grid` | Arrangement mode. |
+| `spacing` | - | INT | 10 | 0–1000 | Space between images. |
+| `grid_columns` | - | INT | 2 | 1–100 | Number of columns when using `grid`. |
+| `background_color` | - | STRING | `1.0` | Gray/HEX/RGB | Background color for the canvas. |
 
 ## Outputs
 
-| Output Name | Data Type | Description |
-|-------------|-----------|-------------|
-| `image` | IMAGE | Combined image |
+| Name | Type | Description |
+|------|------|-------------|
+| `image` | IMAGE | Combined image batch; for video-collection input, outputs a sequence batch (`T×H×W×3`). |
 
-## Function Description
+## Features
 
-### Input Type Support
-- **Standard Image Batch**: Processes single image batch for combined display
-- **Video Collection Data**: Supports multi-batch image time-series display with automatic list format detection
+- Standard plotting: converts batch frames to PIL, arranges per `layout`, and returns a single composed image.
+- Video collection: accepts a Python list of batches and builds per-frame collages across groups, preserving device and dtype.
+- Size normalization: bilinear resize to the minimal common size across images for clean alignment.
+- Color parsing: supports gray (`0.0–1.0`), HEX (`#RRGGBB`), and `R,G,B` integer tuples.
 
-### Arrangement Methods
-- **horizontal**: All images arranged horizontally in one row
-- **vertical**: All images arranged vertically in one column
-- **grid**: Arranged in grid pattern with specified number of columns
+## Typical Usage
 
-### Layout Control
-- **Gap control**: Can set spacing between images
-- **Background fill**: Empty areas filled with specified color
-- **Grid layout**: Can control number of images displayed per row
-- **Size normalization**: Automatically normalizes image sizes to minimum common dimensions
+- Create a side-by-side comparison: set `layout=horizontal` and adjust `spacing`.
+- Stack vertically: set `layout=vertical` to form a column.
+- Build grids: set `layout=grid` and tune `grid_columns` for tiled views.
+- Show multiple sequences: pass a list of batches to produce a frame-aligned collage across inputs.
 
-### Color Format Support
-- **Grayscale value**: 0.0-1.0 (e.g., "0.5" represents gray)
-- **Hexadecimal**: #RRGGBB (e.g., "#FF0000" represents red)
-- **RGB values**: R,G,B (e.g., "255,0,0" represents red)
+## Notes & Tips
 
-### Video Collection Processing
-- **Multi-batch support**: Can process multiple image batches for side-by-side display
-- **Frame count adaptation**: Automatically adapts to frame count differences between batches
-- **Cycling display**: Automatically cycles through frames when batch sizes differ
+- Video-collection detection is based on Python list input; tensor input is treated as a single batch.
+- Output tensor uses channels-last layout and clamps to `[0,1]`.
