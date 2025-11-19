@@ -1,12 +1,12 @@
 from comfy_api.latest import io
 
 
-class TextJoinMulti(io.ComfyNode):
+class StringJoinMulti(io.ComfyNode):
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
-            node_id="1hew_TextJoinMulti",
-            display_name="Text Join Multi",
+            node_id="1hew_StringJoinMulti",
+            display_name="String Join Multi",   
             category="1hewNodes/text",
             inputs=[
                 io.String.Input("text1", default="", multiline=True),

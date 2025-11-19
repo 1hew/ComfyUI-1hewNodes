@@ -21,6 +21,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.0.2**
+- feat(text): 添加 `String Filter` 节点
+- feat(text): 添加 `String Join Multi` 节点
+- feat(conversion): 添加 `Text List to String` 节点
+
 **v3.0.1**
 - feat(image): 添加 `Image PingPong` 节点，用于批量往返帧生成，支持预反转与拼接处去重、帧数截取
 - feat(audio): 添加 `Audio Duration` 节点，用于获取音频时长（秒）
@@ -404,6 +409,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Mask List to Batch | 将遮罩列表转换为批量遮罩，自动进行尺寸标准化 |
 | String Coordinate to BBoxes | 将字符串格式坐标转换为BBOXES格式，增强格式支持并改进SAM2兼容性 |
 | String Coordinate to BBox Mask | 将字符串格式坐标转换为BBoxMask格式，支持图像尺寸获取和灵活的输出模式 |
+| Text List to String | 文本列表合并，逐项应用前后缀并按分隔符拼接，支持转义与复合分隔符 |
 
 ### 🧠 逻辑节点
 | 节点名称 | 功能描述 |
@@ -439,11 +445,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📝 文本处理节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Text Filter | 文本过滤器，支持过滤单行注释（#开头）、多行注释（三引号包裹）和空行注释 |
-| Text Join Multi | 文本连接多输入器，支持多个文本输入的连接和动态变量引用，可自定义分隔符 |
-| Text Join by Text List | 文本列表连接器，支持将任意类型列表合并为字符串，支持前缀、后缀和自定义分隔符 |
-| Text Prefix Suffix | 文本前缀后缀器，支持通配符输入的灵活数据格式化，可自定义前缀、后缀和分隔符 |
+| Text Prefix Suffix | 文本前缀后缀器，支持通配符输入的灵活数据格式化，可自定义前缀和后缀 |
 | Text Custom Extract | 文本自定义提取器，从JSON中提取指定键值 |
+| String Filter | 文本过滤器，支持 `{input}` 替换、注释过滤（# 与三引号）、可选空行移除 |
+| String Join Multi | 多段文本拼接，支持 `{input}` 占位符、注释/空行过滤与复合分隔符 |
 | List Custom Int | 自定义整数列表生成器，支持连字符分割和多种分隔符 |
 | List Custom Float | 自定义浮点数列表生成器，支持连字符分割和多种分隔符 |
 | List Custom String | 自定义字符串列表生成器，支持连字符分割和多种分隔符 |
