@@ -9,30 +9,29 @@ class TextPrefixSuffix(io.ComfyNode):
             display_name="Text Prefix Suffix",
             category="1hewNodes/text",
             inputs=[
-                io.Custom("Any").Input("any_text"),
+                io.Custom("*").Input("text"),
                 io.String.Input("prefix", default=""),
                 io.String.Input("suffix", default=""),
-                io.String.Input("separator", default="\\n"),
             ],
             outputs=[io.String.Output(display_name="text")],
         )
 
     @classmethod
-    def validate_inputs(cls, any_text, prefix, suffix, separator):
+    def validate_inputs(cls, **kwargs):
         return True
 
     @classmethod
     async def execute(
-        cls, any_text, prefix: str, suffix: str, separator: str
+        cls, text, prefix: str, suffix: str
     ) -> io.NodeOutput:
-        sep = "\n" if separator == "\\n" else str(separator)
+        sep = "\n"
 
-        if not isinstance(any_text, (list, tuple)):
-            if hasattr(any_text, "__iter__") and not isinstance(any_text, str):
-                any_text = list(any_text)
+        if not isinstance(text, (list, tuple)):
+            if hasattr(text, "__iter__") and not isinstance(text, str):
+                text = list(text)
             else:
-                any_text = [any_text]
+                text = [text]
 
-        formatted = [f"{prefix}{str(item)}{suffix}" for item in any_text]
+        formatted = [f"{prefix}{str(item)}{suffix}" for item in text]
         result = sep.join(formatted)
         return io.NodeOutput(str(result))

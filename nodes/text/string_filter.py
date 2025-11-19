@@ -1,26 +1,33 @@
 from comfy_api.latest import io
 
 
-class TextFilter(io.ComfyNode):
+class StringFilter(io.ComfyNode):
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
-            node_id="1hew_TextFilter",
-            display_name="Text Filter",
+            node_id="1hew_StringFilter",
+            display_name="String Filter",
             category="1hewNodes/text",
             inputs=[
                 io.String.Input("text", default="", multiline=True),
                 io.Boolean.Input("filter_empty_line", default=False),
                 io.Boolean.Input("filter_comment", default=False),
+                io.String.Input("input", default=""),
             ],
             outputs=[io.String.Output(display_name="string")],
         )
 
     @classmethod
     async def execute(
-        cls, text: str, filter_empty_line: bool, filter_comment: bool
-    ) -> io.NodeOutput:
+        cls,
+        text: str,
+        filter_empty_line: bool,
+        filter_comment: bool,
+        input: str,
+        ) -> io.NodeOutput:
         text = (text or "").replace("\\n", "\n")
+        in_val = "" if input is None else str(input)
+        text = text.replace("{input}", in_val)
         filtered_text = cls._parse_text_and_filter_comments(
             text, filter_comment, filter_empty_line
         )

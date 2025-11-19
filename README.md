@@ -21,6 +21,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.0.2**
+- feat(text): Add `String Filter` node
+- feat(text): Add `String Join Multi` node
+- feat(conversion): Add `Text List to String` node
+
 **v3.0.1**
 - feat(image): Add `Image PingPong` node for bidirectional batch frame generation with pre-reverse, link-frame removal, and frame truncation
 - feat(audio): Add `Audio Duration` node to get audio length (seconds)
@@ -404,6 +409,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Mask List to Batch | Convert mask lists to batch masks with automatic size normalization |
 | String Coordinate to BBoxes | Convert string format coordinates to BBOXES format with enhanced format support and improved SAM2 compatibility |
 | String Coordinate to BBox Mask | Convert string format coordinates to BBoxMask format with image dimension support and flexible output modes |
+| Text List to String | Merge a text list by applying per-item prefix/suffix and joining with a separator; supports escape sequences and composite separators |
 
 ### 🧠 Logic Nodes
 | Node Name | Description |
@@ -439,11 +445,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📝 Text Processing Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Text Filter | Text Filter supporting filtering single line comments (starting with #), multi line comments (wrapped in three quotes), and empty line |
-| Text Join Multi | Multi-input text concatenator supporting multiple text inputs with dynamic variable referencing and custom separators |
-| Text Join by Text List | Text list joiner for merging any type of list into a string with support for prefix, suffix, and custom separators |
-| Text Prefix Suffix | Text prefix suffix formatter with wildcard input support for flexible data formatting with custom prefix, suffix, and separator |
+| Text Prefix Suffix | Text prefix suffix formatter with wildcard input support for flexible data formatting with custom prefix and suffix |
 | Text Custom Extract | Text custom extractor for extracting specified key values from JSON |
+| String Filter | Text cleaner supporting `{input}` substitution, comment filtering (# and triple quotes), and optional empty-line removal |
+| String Join Multi | Join up to 5 text blocks with `{input}` substitution, comment/empty-line filtering, and composite separators|
 | List Custom Int | Custom integer list generator with dash separator and multiple delimiter support |
 | List Custom Float | Custom float list generator with dash separator and multiple delimiter support |
 | List Custom String | Custom string list generator with dash separator and multiple delimiter support |
