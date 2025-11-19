@@ -44,12 +44,13 @@ class ImageMainStitch(io.ComfyNode):
         image_3: torch.Tensor | None = None,
         **kwargs,
     ) -> io.NodeOutput:
-        a = torch.clamp(image_1, min=0.0, max=1.0).to(torch.float32)
+        a = image_1.to(dtype=torch.float32).clamp(0.0, 1.0)
+        device = a.device
         others = []
         if image_2 is not None:
-            others.append(torch.clamp(image_2, min=0.0, max=1.0).to(torch.float32))
+            others.append(image_2.to(dtype=torch.float32, device=device).clamp(0.0, 1.0))
         if image_3 is not None:
-            others.append(torch.clamp(image_3, min=0.0, max=1.0).to(torch.float32))
+            others.append(image_3.to(dtype=torch.float32, device=device).clamp(0.0, 1.0))
         ordered = []
         for k in kwargs.keys():
             if k.startswith("image_"):
@@ -63,10 +64,13 @@ class ImageMainStitch(io.ComfyNode):
             val = kwargs.get(key)
             if val is None:
                 continue
-            others.append(torch.clamp(val, min=0.0, max=1.0).to(torch.float32))
+            if isinstance(val, torch.Tensor):
+                others.append(val.to(dtype=torch.float32, device=device).clamp(0.0, 1.0))
+            else:
+                others.append(torch.zeros_like(a))
 
         if len(others) == 0:
-            image = torch.clamp(a, min=0.0, max=1.0).to(torch.float32)
+            image = a.to(dtype=torch.float32).clamp(0.0, 1.0)
             return io.NodeOutput(image)
 
         bs = a.shape[0]
