@@ -12,7 +12,6 @@ class MultiStringJoin(io.ComfyNode):
                 io.Boolean.Input("filter_comment", default=False),
                 io.String.Input("separator", default="\\n"),
                 io.String.Input("input", default=""),
-                io.String.Input("string_1"),
             ],
             outputs=[io.String.Output(display_name="string")],
         )

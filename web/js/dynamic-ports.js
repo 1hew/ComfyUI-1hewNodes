@@ -32,8 +32,12 @@ app.registerExtension({
 
         function nextInputName(node) {
             const inputs = listDynamicInputs(node);
-            const n = inputs.length;
-            return baseInput + (n + 1);
+            let maxIndex = 0;
+            for (const inp of inputs) {
+                const suffix = parseInt(String(inp?.name).slice(baseInput.length), 10);
+                if (!isNaN(suffix)) maxIndex = Math.max(maxIndex, suffix);
+            }
+            return baseInput + (maxIndex + 1);
         }
 
         function listDynamicInputIndices(node) {
@@ -90,7 +94,6 @@ app.registerExtension({
                 addNextInput(node);
                 current += 1;
             }
-            renumberDynamicInputs(node);
             normalizeDynamicTypes(node);
         }
 
@@ -125,7 +128,41 @@ app.registerExtension({
                 const count = listDynamicInputs(node).length;
                 if (count < cap) addNextInput(node);
             }
-            renumberDynamicInputs(node);
+            
+        }
+
+        function renumberDynamicInputsCompact(node) {
+            const dynIdxs = listDynamicInputIndices(node);
+            for (let i = 0; i < dynIdxs.length; i++) {
+                const idx = dynIdxs[i];
+                const expected = baseInput + (i + 1);
+                const slot = node.inputs?.[idx];
+                if (slot && slot.name !== expected) slot.name = expected;
+            }
+        }
+
+        function scheduleCompactOnDisconnect(node, slot) {
+            if (!node._dpTimers) node._dpTimers = {};
+            const key = String(slot);
+            clearTimeout(node._dpTimers[key]);
+            node._dpTimers[key] = setTimeout(() => {
+                const name = node.inputs?.[slot]?.name;
+                if (!name || !String(name).startsWith(baseInput)) return;
+                const idxs = listDynamicInputIndices(node);
+                const pos = idxs.indexOf(slot);
+                if (pos < 0) return;
+                const empty = !isConnectedIndex(node, slot);
+                const laterHasConn = idxs.slice(pos + 1).some(j => isConnectedIndex(node, j));
+                if (empty && laterHasConn) {
+                    node.removeInput(slot);
+                    addNextInput(node);
+                    renumberDynamicInputsCompact(node);
+                    ensureSingleTrailingEmpty(node);
+                    syncSelectRange(node);
+                    normalizeDynamicTypes(node);
+                    node.setDirtyCanvas(true, true);
+                }
+            }, 20);
         }
 
         function syncSelectRange(node) {
@@ -157,22 +194,8 @@ app.registerExtension({
                 if (connected && isDynamicSlot && isLastDynamic) {
                     addNextInput(this);
                 }
-                // 归一化空槽到尾部并保持仅一个尾部空槽
-                let changed = true;
-                while (changed) {
-                    changed = false;
-                    const idxs = listDynamicInputIndices(this);
-                    for (let k = 0; k < idxs.length; k++) {
-                        const idx = idxs[k];
-                        const empty = !isConnectedIndex(this, idx);
-                        const laterHasConn = idxs.slice(k + 1).some(j => isConnectedIndex(this, j));
-                        if (empty && laterHasConn) {
-                            this.removeInput(idx);
-                            addNextInput(this);
-                            changed = true;
-                            break;
-                        }
-                    }
+                if (!connected && isDynamicSlot) {
+                    scheduleCompactOnDisconnect(this, slot);
                 }
                 ensureSingleTrailingEmpty(this);
                 syncSelectRange(this);
