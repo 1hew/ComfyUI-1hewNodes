@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.0.1**
+- feat(image): Add `Image PingPong` node for bidirectional batch frame generation with pre-reverse, link-frame removal, and frame truncation
+- feat(audio): Add `Audio Duration` node to get audio length (seconds)
+
 **v3.0.0**
 - build: bump version to 3.0.0
 
@@ -425,6 +429,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Batch Split | Intelligent image batch splitter with forward/backward splitting modes and enhanced boundary condition handling |
 | Image Batch Group | Intelligent image batch grouper with configurable batch sizes, overlap handling, and flexible padding strategies |
 | Image Batch Range | Select a contiguous range from an image batch using start index and count; out-of-bounds safe |
+| Image PingPong | Bidirectional frame repeat over batch, supports pre-reverse, link-frame removal, and frame truncation |
 | Image List Append | Image list appender for intelligently merging images into lists |
 | Mask Batch Math Ops | Batch mask mathematical operations |
 | Mask Batch Range | Select a contiguous range from a mask batch using start index and count; out-of-bounds safe |
@@ -463,6 +468,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Save Video | Save VIDEO to output; supports optional input, auto container/codec selection |
 | Save Video RGBA | Save images to video; supports alpha preview/output, optional audio, configurable FPS |
+
+### 🔊 Audio Nodes
+| Node Name | Description |
+|-----------|-------------|
+| Audio Duration | Get audio length (seconds) |
 
 
 

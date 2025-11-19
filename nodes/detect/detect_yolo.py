@@ -17,9 +17,7 @@ class DetectYolo(io.ComfyNode):
     def define_schema(cls) -> io.Schema:
         model_dir = cls.get_model_path()
         files = cls.get_files(model_dir, [".pt"])
-        options = list(files.keys()) or [
-            "No models found - Please add .pt files to models/yolo/",
-        ]
+        options = list(files.keys()) or ["No models found - Please add .pt files to models/yolo/"]
         return io.Schema(
             node_id="1hew_DetectYolo",
             display_name="Detect Yolo",
@@ -27,10 +25,10 @@ class DetectYolo(io.ComfyNode):
             inputs=[
                 io.Image.Input("image"),
                 io.Combo.Input("yolo_model", options=options, default=options[0]),
-                io.Float.Input("threshold", default=0.3, min=0.0, max=1.0),
+                io.Float.Input("threshold", default=0.3, min=0.0, max=1.0, step=0.01),
                 io.String.Input("mask_index", default="-1"),
                 io.Boolean.Input("label", default=True),
-                io.Float.Input("label_size", default=1.0, min=0.1, max=5.0),
+                io.Float.Input("label_size", default=1.0, min=0.1, max=5.0, step=0.01),
             ],
             outputs=[
                 io.Image.Output(display_name="plot_image"),
@@ -207,13 +205,15 @@ class DetectYolo(io.ComfyNode):
         results = yolo_model(_image, retina_masks=True, conf=threshold)
         plot_image = np.array(_image)
         image_masks = []
+        box_coords = []
         for result in results:
             if result.boxes is not None and len(result.boxes) > 0:
                 for index, box in enumerate(result.boxes):
-                    if not show_all and index not in selected_indices:
-                        continue
                     x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
                     x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                    box_coords.append((x1, y1, x2, y2))
+                    if not show_all and index not in selected_indices:
+                        continue
                     class_id = int(box.cls[0].cpu().numpy())
                     confidence = float(box.conf[0].cpu().numpy())
                     class_name = (
@@ -270,12 +270,12 @@ class DetectYolo(io.ComfyNode):
             if result.masks is not None and len(result.masks) > 0:
                 masks_data = result.masks.data
                 for index, mask in enumerate(masks_data):
-                    if not show_all and index not in selected_indices:
-                        continue
                     _mask = mask.cpu().numpy()
                     _mask = cls.np2pil((_mask * 255).astype(np.uint8)).convert("L")
+                    if _mask.size != _image.size:
+                        _mask = _mask.resize(_image.size, Image.NEAREST)
                     image_masks.append(cls.image2mask(_mask))
-            elif result.boxes is not None and len(result.boxes.xyxy) > 0:
+            if not image_masks and result.boxes is not None and len(result.boxes.xyxy) > 0:
                 white_image = Image.new("L", _image.size, "white")
                 for index, box in enumerate(result.boxes):
                     if not show_all and index not in selected_indices:
@@ -304,9 +304,24 @@ class DetectYolo(io.ComfyNode):
                         _mask = cls.add_mask(_mask, selected_masks[j])
                     ret_mask = _mask
                 else:
-                    ret_mask = torch.zeros(
-                        (1, _image.size[1], _image.size[0]), dtype=torch.float32
-                    )
+                    white_image = Image.new("L", _image.size, "white")
+                    fallback_masks = []
+                    for idx in selected_indices:
+                        if 0 <= idx < len(box_coords):
+                            x1, y1, x2, y2 = box_coords[idx]
+                            _m = Image.new("L", _image.size, "black")
+                            _m.paste(white_image.crop((x1, y1, x2, y2)), (x1, y1))
+                            fallback_masks.append(cls.image2mask(_m))
+                    if fallback_masks:
+                        _mask = fallback_masks[0]
+                        for j in range(1, len(fallback_masks)):
+                            _mask = cls.add_mask(_mask, fallback_masks[j])
+                        ret_mask = _mask
+                    else:
+                        ret_mask = torch.zeros(
+                            (1, _image.size[1], _image.size[0]),
+                            dtype=torch.float32,
+                        )
         else:
             ret_mask = torch.zeros(
                 (1, _image.size[1], _image.size[0]), dtype=torch.float32

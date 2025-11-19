@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.0.1**
+- feat(image): 添加 `Image PingPong` 节点，用于批量往返帧生成，支持预反转与拼接处去重、帧数截取
+- feat(audio): 添加 `Audio Duration` 节点，用于获取音频时长（秒）
+
 **v3.0.0**
 - build: 版本升级至 3.0.0
 
@@ -425,6 +429,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Batch Split | 智能图像批次拆分器，支持正向/反向拆分模式和增强的边界条件处理 |
 | Image Batch Group | 智能图像批次分组器，支持可配置的批次大小、重叠处理和灵活的填充策略 |
 | Image Batch Range | 从图像批次选择连续范围，支持起始索引与数量，越界安全 |
+| Image PingPong | 批量往返帧生成，支持预反转、拼接处去重与帧数截取 |
 | Image List Append | 图像列表追加器，智能合并图像到列表中 |
 | Mask Batch Math Ops | 批量遮罩数学运算 |
 | Mask Batch Range | 从遮罩批次选择连续范围，支持起始索引与数量，越界安全 |
@@ -463,6 +468,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Save Video | 保存视频到输出；支持空值输入，容器与编码器自动选择 |
 | Save Video RGBA | 将 images 保存为视频；支持 Alpha 预览与导出、可选音频、FPS 设置 |
+
+### 🔊 音频节点
+| 节点名称 | 功能描述 |
+|---------|----------|
+| Audio Duration | 获取音频时长（秒）|
 
 
 
