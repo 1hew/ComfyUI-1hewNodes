@@ -45,7 +45,12 @@ class ImageAddLabel(io.ComfyNode):
                 io.Int.Input("font_size", default=36, min=1, max=256, step=1),
                 io.Boolean.Input("invert_color", default=True),
                 io.Combo.Input("font", options=font_files, default=default_font),
-                io.String.Input("text", default="", multiline=True, placeholder="-- splits override separator\nelse use newline."),
+                io.String.Input(
+                    "text",
+                    default="",
+                    multiline=True,
+                    placeholder="hyphen-only line '-' or '---' splits\nelse newline > 。/. > ；/; > ，/,,",
+                ),
                 io.Combo.Input("direction", options=["top", "bottom", "left", "right"], default="top"),
                 io.String.Input("input1", default=""),
                 io.String.Input("input2", default=""),
@@ -355,43 +360,29 @@ class ImageAddLabel(io.ComfyNode):
 
     @classmethod
     def parse_text_list(cls, text):
-        """
-        解析文本列表，支持连字符分割和换行分割
-        当有只包含连字符的行时，只按 -- 进行分割，其他分割方式失效
-        否则按照换行符(\n) 分割
-        """
-        
-        if not text.strip():
+        if not text or not text.strip():
             return [""]
-        
-        # 检查是否有只包含连字符的行
-        lines = text.split('\n')
-        has_dash_separator = any(line.strip() and all(c == '-' for c in line.strip()) for line in lines)
-        
-        if has_dash_separator:
-            # 按连字符分割，其他分割方式失效（包括换行符）
-            sections = re.split(r'^\s*-+\s*$', text, flags=re.MULTILINE)
-            all_lists = []
-            
-            for section in sections:
-                section = section.strip()
-                if not section:
-                    continue
-                    
-                # 当有连字符分割时，每个段落作为一个完整项目，保留内部换行
-                # 移除引号
-                if (section.startswith('"') and section.endswith('"')) or (section.startswith("'") and section.endswith("'")):
-                    section = section[1:-1]
-                if section:
-                    all_lists.append(str(section))
-            
-            return all_lists if all_lists else [""]
+
+        dash_line_pattern = r'^\s*-+\s*$'
+        if re.search(dash_line_pattern, text, flags=re.MULTILINE):
+            parts = re.split(dash_line_pattern, text, flags=re.MULTILINE)
+        elif ("\n" in text) or ("\r" in text):
+            parts = re.split(r"\r?\n", text)
+        elif re.search(r"(。|(?<!\d)\.(?!\d))", text):
+            parts = re.split(r"(?:。|(?<!\d)\.(?!\d))+", text)
+        elif ("；" in text) or (";" in text):
+            parts = re.split(r"[；;]+", text)
         else:
-            # 按传统方式分割（换行符）
-            text_lines = text.strip().split('\n')
-            # 过滤空行
-            text_lines = [line.strip() for line in text_lines if line.strip()]
-            return text_lines if text_lines else [""]
+            parts = re.split(r"[，,]+", text)
+
+        out = []
+        for s in parts:
+            item = s.strip()
+            if len(item) >= 2 and ((item[0] == item[-1]) and item[0] in ('"', "'")):
+                item = item[1:-1].strip()
+            if item:
+                out.append(str(item))
+        return out if out else [""]
 
     @classmethod
     def _calculate_text_size(cls, text, font_obj):

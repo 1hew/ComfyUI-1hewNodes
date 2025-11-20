@@ -22,34 +22,10 @@ class ListCustomFloat(io.ComfyNode):
     @classmethod
     async def execute(cls, custom_text: str) -> io.NodeOutput:
         text = custom_text or ""
-        if not text.strip():
-            float_list = [0.0]
-        else:
-            lines = text.split("\n")
-            has_dash = any(
-                line.strip() and all(c == "-" for c in line.strip())
-                for line in lines
-            )
-            if has_dash:
-                sections = re.split(r"^\s*-+\s*$", text, flags=re.MULTILINE)
-                all_lists: list[float] = []
-                for section in sections:
-                    section = section.strip()
-                    if not section:
-                        continue
-                    if (
-                        (section.startswith('"') and section.endswith('"'))
-                        or (section.startswith("'") and section.endswith("'"))
-                    ):
-                        section = section[1:-1]
-                    try:
-                        all_lists.append(float(section))
-                    except (ValueError, TypeError):
-                        continue
-                float_list = all_lists if all_lists else [0.0]
-            else:
-                float_list = cls._parse_section(text)
-        return io.NodeOutput(float_list, len(float_list))
+        items = cls._split_text(text)
+        if not items:
+            items = [0.0]
+        return io.NodeOutput(items, len(items))
 
     @staticmethod
     def _parse_section(text: str) -> list[float]:
@@ -90,3 +66,38 @@ class ListCustomFloat(io.ComfyNode):
                     except (ValueError, TypeError):
                         continue
         return float_list if float_list else [0.0]
+
+    @staticmethod
+    def _strip_item(item: str) -> str:
+        s = item.strip()
+        if len(s) >= 2 and ((s[0] == s[-1]) and s[0] in ('"', "'")):
+            s = s[1:-1].strip()
+        return s
+
+    @classmethod
+    def _split_text(cls, text: str) -> list[float]:
+        t = text or ""
+        if not t.strip():
+            return []
+
+        dash_line_pattern = r"^\s*-+\s*$"
+        if re.search(dash_line_pattern, t, flags=re.MULTILINE):
+            parts = re.split(dash_line_pattern, t, flags=re.MULTILINE)
+        elif ("\n" in t) or ("\r" in t):
+            parts = re.split(r"\r?\n", t)
+        elif re.search(r"(。|(?<!\d)\.(?!\d))", t):
+            parts = re.split(r"(?:。|(?<!\d)\.(?!\d))+", t)
+        elif ("；" in t) or (";" in t):
+            parts = re.split(r"[；;]+", t)
+        else:
+            parts = re.split(r"[，,]+", t)
+
+        out: list[float] = []
+        for p in parts:
+            s = cls._strip_item(p)
+            if s:
+                try:
+                    out.append(float(s))
+                except (ValueError, TypeError):
+                    continue
+        return out

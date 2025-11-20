@@ -22,63 +22,39 @@ class ListCustomString(io.ComfyNode):
     @classmethod
     async def execute(cls, custom_text: str) -> io.NodeOutput:
         text = custom_text or ""
-        if not text.strip():
-            string_list = ["default"]
-        else:
-            lines = text.split("\n")
-            has_dash = any(
-                line.strip() and all(c == "-" for c in line.strip())
-                for line in lines
-            )
-            if has_dash:
-                sections = re.split(r"^\s*-+\s*$", text, flags=re.MULTILINE)
-                all_lists: list[str] = []
-                for section in sections:
-                    section = section.strip()
-                    if not section:
-                        continue
-                    if (
-                        (section.startswith('"') and section.endswith('"'))
-                        or (section.startswith("'") and section.endswith("'"))
-                    ):
-                        section = section[1:-1]
-                    if section:
-                        all_lists.append(str(section))
-                string_list = all_lists if all_lists else ["default"]
-            else:
-                string_list = cls._parse_section(text)
-        return io.NodeOutput(string_list, len(string_list))
+        items = cls._split_text(text)
+        if not items:
+            items = ["default"]
+        return io.NodeOutput(items, len(items))
 
     @staticmethod
-    def _parse_section(text: str) -> list[str]:
-        if not text.strip():
+    def _strip_item(item: str) -> str:
+        s = item.strip()
+        if len(s) >= 2 and ((s[0] == s[-1]) and s[0] in ('"', "'")):
+            s = s[1:-1].strip()
+        return s
+
+    @classmethod
+    def _split_text(cls, text: str) -> list[str]:
+        t = text or ""
+        if not t.strip():
             return []
-        lines = text.split("\n")
-        items_out: list[str] = []
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            if "," in line or ";" in line or "，" in line or "；" in line:
-                line = (
-                    line.replace(";", ",")
-                    .replace("，", ",")
-                    .replace("；", ",")
-                )
-                items = line.split(",")
-                for item in items:
-                    item = item.strip()
-                    if (item.startswith('"') and item.endswith('"')) or (
-                        item.startswith("'") and item.endswith("'")
-                    ):
-                        item = item[1:-1]
-                    if item:
-                        items_out.append(str(item))
-            else:
-                if (line.startswith('"') and line.endswith('"')) or (
-                    line.startswith("'") and line.endswith("'")
-                ):
-                    line = line[1:-1]
-                if line:
-                    items_out.append(str(line))
-        return items_out if items_out else ["default"]
+
+        dash_line_pattern = r"^\s*-+\s*$"
+        if re.search(dash_line_pattern, t, flags=re.MULTILINE):
+            parts = re.split(dash_line_pattern, t, flags=re.MULTILINE)
+        elif ("\n" in t) or ("\r" in t):
+            parts = re.split(r"\r?\n", t)
+        elif ("。" in t) or ("." in t):
+            parts = re.split(r"[。\.]+", t)
+        elif ("；" in t) or (";" in t):
+            parts = re.split(r"[；;]+", t)
+        else:
+            parts = re.split(r"[，,]+", t)
+
+        out: list[str] = []
+        for p in parts:
+            s = cls._strip_item(p)
+            if s:
+                out.append(str(s))
+        return out
