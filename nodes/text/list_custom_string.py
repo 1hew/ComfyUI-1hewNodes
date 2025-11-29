@@ -14,7 +14,7 @@ class ListCustomString(io.ComfyNode):
                 io.String.Input("custom_text", default="", multiline=True),
             ],
             outputs=[
-                io.MultiType.Output(display_name="string_list", is_output_list=True),
+                io.String.Output(display_name="string_list", is_output_list=True),
                 io.Int.Output(display_name="count"),
             ],
         )

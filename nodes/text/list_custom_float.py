@@ -14,7 +14,7 @@ class ListCustomFloat(io.ComfyNode):
                 io.String.Input("custom_text", default="", multiline=True),
             ],
             outputs=[
-                io.MultiType.Output(display_name="float_list", is_output_list=True),
+                io.Float.Output(display_name="float_list", is_output_list=True),
                 io.Int.Output(display_name="count"),
             ],
         )
