@@ -15,7 +15,7 @@ class ListCustomSeed(io.ComfyNode):
                 io.Int.Input("count", default=3, min=1, max=1000, step=1),
             ],
             outputs=[
-                io.MultiType.Output(display_name="seed_list", is_output_list=True),
+                io.Int.Output(display_name="seed_list", is_output_list=True),
                 io.Int.Output(display_name="count"),
             ],
         )
