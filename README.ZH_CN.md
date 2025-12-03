@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.0.5**
+- feat(image_tile): 合并 `Image Tile Split` 和 `Image Tile Split Preset` 节点为统一的 `Image Tile Split` 节点
+
 **v3.0.2**
 - feat(text): 添加 `String Filter` 节点
 - feat(text): 添加 `String Join Multi` 节点
@@ -369,8 +372,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🧩 图像分块节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Image Tile Split | 图像分块分割，支持重叠和自定义网格 |
-| Image Tile Split Preset | 图像分块分割，提供预定义分辨率预设和智能瓦片尺寸选择 |
+| Image Tile Split | 图像分块分割，支持自动/网格/预设模式、重叠处理及参考图尺寸分割 |
 | Image Tile Merge | 图像分块合并，智能拼接处理 |
 
 ### 🌊 高低频分离节点

@@ -1,40 +1,39 @@
-﻿# Image Tile Split - Grid Tiling with Overlap
+# Image Tile Split - Image Tile Splitter
 
-**Node Purpose:** `Image Tile Split` splits a single image into a grid of tiles with optional overlap. Supports auto grid estimation, named presets like `2x3`, custom rows/cols, and tile sizes aligned to `divisible_by` multiples. Outputs a tile batch and a `tile_meta` dictionary for lossless merging.
+**Node Purpose:** `Image Tile Split` splits a large image into smaller tiles based on various modes, supporting overlap, custom grids, and preset resolutions. It ensures seamless reconstruction by handling overlaps and precise positioning.
 
 ## Inputs
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `image` | - | IMAGE | - | - | Input image; only the first item of a batch is used. |
-| `split_mode` | - | COMBO | `auto` | `auto` / `custom` / `2x2` / `2x3` / `2x4` / `3x2` / `3x3` / `3x4` / `4x2` / `4x3` / `4x4` | Grid selection strategy. |
-| `overlap_amount` | - | FLOAT | 0.05 | 0.0–512.0 | Overlap as ratio (≤1.0) or pixels (>1.0). |
-| `custom_rows` | optional | INT | 2 | 1–10 | Rows when `split_mode=custom`. |
-| `custom_cols` | optional | INT | 2 | 1–10 | Cols when `split_mode=custom`. |
-| `divisible_by` | optional | INT | 8 | 1–64 | Tile sizes rounded up to multiples; affects final overlap.
+| `image` | required | IMAGE | - | - | Input image to be split. |
+| `get_tile_size` | optional | IMAGE | - | - | Reference image; if connected, its dimensions are used as the tile size (overrides `mode`). |
+| `mode` | - | COMBO | `auto` | `auto` / `grid` / Presets... | Split mode. `auto` calculates optimal grid; `grid` uses manual rows/cols; Presets use fixed resolutions. |
+| `overlap_amount` | - | FLOAT | 0.05 | 0.0-512.0 | Overlap between tiles. <=1.0 is ratio, >1.0 is pixels. |
+| `grid_row` | - | INT | 2 | 1-10 | Number of rows in `grid` mode. |
+| `grid_col` | - | INT | 2 | 1-10 | Number of columns in `grid` mode. |
+| `divisible_by` | - | INT | 8 | 1-1024 | Ensures tile dimensions are multiples of this value (ignored in Preset/Reference modes). |
 
 ## Outputs
 
 | Name | Type | Description |
 |------|------|-------------|
-| `tile` | IMAGE | Concatenated tile batch (`B = rows*cols`). |
-| `tile_meta` | DICT | Metadata for merge: `tile_metas` (per-tile), `original_size`, `grid_size`, `tile_width`, `tile_height`, `rows`, `cols`, `overlap_amount`, `overlap_mode`, `overlap_width`, `overlap_height`, `split_mode`, `divisible_by`.
+| `tile` | IMAGE | Batch of image tiles. |
+| `tile_meta` | DICT | Metadata containing tile positions, original size, overlap info, etc., for reconstruction. |
 
 ## Features
 
-- Auto grid: estimates rows/cols so each tile is near `1024×1024` and square-ish.
-- Overlap modes: ratio vs pixels, persisted as `overlap_mode` in metadata.
-- Size alignment: base tile size plus overlap, then rounded to `divisible_by`; recomputes final overlap after rounding.
-- Perfect coverage: computes precise tile positions so the last tile aligns with the image boundary.
-- Edge padding: edge tiles smaller than tile size are padded to full size to keep uniform outputs.
-
-## Typical Usage
-
-- Patch workflows: split large images for per-tile processing; overlap `0.05` to reduce seams.
-- Model constraints: set `divisible_by=8/16` to meet network stride restrictions.
-- Controlled layouts: choose `2x3` or `custom` rows/cols to match downstream tiling logic.
+- **Flexible Modes**:
+  - `auto`: Automatically calculates the best grid layout targeting ~1024px tiles.
+  - `grid`: Manually specify the number of rows and columns.
+  - **Presets**: Choose from a list of predefined resolutions (e.g., "1024x1024").
+  - **Reference Image**: Use the dimensions of another image (`get_tile_size`) as the tile size.
+- **Overlap Handling**: Supports both proportional (e.g., 0.05 for 5%) and absolute pixel overlap.
+- **Size Constraints**: `divisible_by` ensures tile sizes meet model requirements (e.g., multiples of 8 or 64) in auto/grid modes.
+- **Precise Positioning**: Calculates exact crop coordinates to ensure full coverage and seamless merging.
 
 ## Notes & Tips
 
-- `tile_meta['tile_metas']` includes `crop_region`, `position (col,row)`, and `actual_crop_size`; pass this directly to `Image Tile Merge`.
-- If input is a batch, only the first image is used; feed single-image batches to avoid confusion.
+- **Reference Image Priority**: If `get_tile_size` is connected, it takes precedence over the `mode` selection.
+- **Preset Behavior**: Preset resolutions and Reference Image sizes are strictly respected and are NOT adjusted by `divisible_by`.
+- **Reconstruction**: The `tile_meta` output is essential for the `Image Tile Merge` node to reconstruct the original image correctly.

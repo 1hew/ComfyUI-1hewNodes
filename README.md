@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.0.5**
+- feat(image_tile): Merged `Image Tile Split` and `Image Tile Split Preset` nodes into a unified `Image Tile Split` node
+
 **v3.0.2**
 - feat(text): Add `String Filter` node
 - feat(text): Add `String Join Multi` node
@@ -369,8 +372,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🧩 Image Tiling Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Image Tile Split | Image tile splitting with overlap and custom grid support |
-| Image Tile Split Preset | Image tile splitting with predefined resolution presets and intelligent tile size selection |
+| Image Tile Split | Image tile splitting with auto/grid/preset modes, overlap support, and reference image sizing |
 | Image Tile Merge | Image tile merging with intelligent stitching |
 
 ### 🌊 High-Low Frequency Separation Nodes

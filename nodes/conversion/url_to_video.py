@@ -17,7 +17,7 @@ class URLToVideo(io.ComfyNode):
             display_name="URL to Video",
             category="1hewNodes/conversion",
             inputs=[
-                io.String.Input("video_url"),
+                io.String.Input("video_url", default=""),
                 io.Int.Input("timeout", default=30, min=5, max=300, step=1),
             ],
             outputs=[
@@ -28,7 +28,7 @@ class URLToVideo(io.ComfyNode):
     @classmethod
     async def execute(cls, video_url: str, timeout: int) -> io.NodeOutput:
         if not video_url or not video_url.strip():
-            raise ValueError("视频URL不能为空")
+            return io.NodeOutput(None)
 
         if not video_url.startswith(("http://", "https://")):
             raise ValueError("无效的URL格式，必须以http://或https://开头")
