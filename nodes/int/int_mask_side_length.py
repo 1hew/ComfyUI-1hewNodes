@@ -11,7 +11,7 @@ class IntMaskSideLength(io.ComfyNode):
             category="1hewNodes/int",
             inputs=[
                 io.Mask.Input("mask"),
-                io.Combo.Input("mode", options=["longest", "shortest", "width", "height"], default="longest"),
+                io.Combo.Input("mode", options=["longest", "shortest", "width", "height"], default="shortest"),
             ],
             outputs=[io.Int.Output(display_name="int")],
         )

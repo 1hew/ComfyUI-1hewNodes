@@ -20,21 +20,22 @@ class StringCoordinateToBBoxes(io.ComfyNode):
     def execute(cls, coordinates_string: str) -> io.NodeOutput:
         if not coordinates_string.strip():
             return io.NodeOutput([[]])
-        lines = coordinates_string.strip().split("\n")
-        bboxes = []
-        for line in lines:
-            line = line.strip()
-            if not line:
+            
+        # New parsing logic to support JSON-like multi-line formats and flattened lists
+        cleaned_string = coordinates_string.replace("[", " ").replace("]", " ").replace("(", " ").replace(")", " ").replace(",", " ")
+        parts = cleaned_string.split()
+        all_coords = []
+        for part in parts:
+            try:
+                all_coords.append(int(float(part)))
+            except ValueError:
                 continue
-            line = line.replace("[", "").replace("]", "").replace("(", "").replace(")", "")
-            coords = []
-            for part in line.replace(",", " ").split():
-                try:
-                    coords.append(int(float(part)))
-                except ValueError:
-                    continue
-            if len(coords) >= 4:
-                bboxes.append(coords[:4])
+        
+        bboxes = []
+        for i in range(0, len(all_coords), 4):
+            if i + 4 <= len(all_coords):
+                bboxes.append(all_coords[i:i+4])
+                
         if not bboxes:
             return io.NodeOutput([[]])
         sam2_bboxes = [bboxes]

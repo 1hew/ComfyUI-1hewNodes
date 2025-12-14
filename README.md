@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.0.6**
+- feat(mask): Add `Mask Repeat` node, supporting batch mask repetition and inversion
+- feat(io): Add `Get File Count`, `Load Image From Folder`, and `Load Video From Folder` nodes to optimize file loading logic and stability
+
 **v3.0.5**
 - feat(image_tile): Merged `Image Tile Split` and `Image Tile Split Preset` nodes into a unified `Image Tile Split` node
 
@@ -388,6 +392,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Mask Fill Hole | Fill holes in enclosed areas of masks with batch processing support |
 | Mask Crop by BBox Mask | Mask bounding box cropping based on mask regions |
 | Mask Paste by BBox Mask | Simplified mask pasting with automatic base mask creation and bounding box detection |
+| Mask Repeat | Batch repeat masks with optional inversion support |
 
 ### 🔍 Detection Nodes
 | Node Name | Description |
@@ -470,9 +475,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Text Encode QwenImageEdit Keep Size | Qwen image-edit conditioning encoder combining vision inputs and text, supports size preservation modes and reference latents |
 
-### 💾 Save Nodes
+### 📁 IO Nodes
 | Node Name | Description |
 |-----------|-------------|
+| Get File Count | Get file count of specified type (image/video) in folder, supports recursive subfolder search |
+| Load Image From Folder | Load image at specified index from folder, supports batch processing and subfolders |
+| Load Video From Folder | Load video at specified index from folder, returns VIDEO object |
 | Save Video | Save VIDEO to output; supports optional input, auto container/codec selection |
 | Save Video RGBA | Save images to video; supports alpha preview/output, optional audio, configurable FPS |
 

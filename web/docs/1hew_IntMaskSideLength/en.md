@@ -7,7 +7,7 @@
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | `mask` | - | MASK | - | - | Input mask batch (`B×H×W`); only its spatial size is used. |
-| `mode` | - | COMBO | `longest` | `longest` / `shortest` / `width` / `height` | Select which side length to output. |
+| `mode` | - | COMBO | `shortest` | `longest` / `shortest` / `width` / `height` | Select which side length to output. |
 
 ## Outputs
 

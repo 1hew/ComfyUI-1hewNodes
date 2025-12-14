@@ -7,7 +7,7 @@
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | `image` | - | IMAGE | - | - | Input image batch (`B×H×W×C`); only spatial dimensions are used. |
-| `mode` | - | COMBO | `longest` | `longest` / `shortest` / `width` / `height` | Select which side length to output. |
+| `mode` | - | COMBO | `shortest` | `longest` / `shortest` / `width` / `height` | Select which side length to output. |
 
 ## Outputs
 

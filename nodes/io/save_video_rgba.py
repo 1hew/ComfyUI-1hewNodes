@@ -21,7 +21,7 @@ class SaveVideoRGBA(io.ComfyNode):
         return io.Schema(
             node_id="1hew_SaveVideoRGBA",
             display_name="Save Video RGBA",
-            category="1hewNodes/save",
+            category="1hewNodes/io",
             inputs=[
                 io.Image.Input("images"),
                 io.Float.Input(

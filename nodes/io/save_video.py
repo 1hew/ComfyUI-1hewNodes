@@ -17,7 +17,7 @@ class SaveVideo(io.ComfyNode):
         return io.Schema(
             node_id="1hew_SaveVideo",
             display_name="Save Video",
-            category="1hewNodes/save",
+            category="1hewNodes/io",
             description="保存视频到输出；支持空值输入。",
             inputs=[
                 io.Video.Input("video", optional=True, tooltip="要保存的视频；为空时节点直接通过。"),
