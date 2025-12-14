@@ -24,21 +24,20 @@ class StringCoordinateToBBoxMask(io.ComfyNode):
         batch_size, height, width, channels = image.shape
         if not coordinates_string.strip():
             return io.NodeOutput(torch.zeros((batch_size, height, width), dtype=torch.float32))
-        lines = coordinates_string.strip().split("\n")
-        bbox_lines = []
-        for line in lines:
-            line = line.strip()
-            if not line:
+        # New parsing logic to support JSON-like multi-line formats and flattened lists
+        cleaned_string = coordinates_string.replace("[", " ").replace("]", " ").replace("(", " ").replace(")", " ").replace(",", " ")
+        parts = cleaned_string.split()
+        all_coords = []
+        for part in parts:
+            try:
+                all_coords.append(int(float(part)))
+            except ValueError:
                 continue
-            line = line.replace("[", "").replace("]", "").replace("(", "").replace(")", "")
-            coords = []
-            for part in line.replace(",", " ").split():
-                try:
-                    coords.append(int(float(part)))
-                except ValueError:
-                    continue
-            if len(coords) >= 4:
-                bbox_lines.append(coords[:4])
+        
+        bbox_lines = []
+        for i in range(0, len(all_coords), 4):
+            if i + 4 <= len(all_coords):
+                bbox_lines.append(all_coords[i:i+4])
         if not bbox_lines:
             return io.NodeOutput(torch.zeros((batch_size, height, width), dtype=torch.float32))
         if output_mode == "separate":

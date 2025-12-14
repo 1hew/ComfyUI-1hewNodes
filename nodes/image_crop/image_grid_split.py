@@ -18,7 +18,8 @@ class ImageGridSplit(io.ComfyNode):
                 io.Image.Input("image"),
                 io.Int.Input("rows", default=2, min=1, max=10, step=1),
                 io.Int.Input("columns", default=2, min=1, max=10, step=1),
-                io.Int.Input("output_index", default=0, min=0, max=100, step=1),
+                io.Int.Input("index", default=0, min=-100, max=100, step=1),
+                io.Boolean.Input("all", default=False),
             ],
             outputs=[io.Image.Output(display_name="image")],
         )
@@ -29,7 +30,8 @@ class ImageGridSplit(io.ComfyNode):
         image: torch.Tensor,
         rows: int,
         columns: int,
-        output_index: int,
+        index: int,
+        all: bool,
     ) -> io.NodeOutput:
         """
         将图片按宫格分割
@@ -38,8 +40,8 @@ class ImageGridSplit(io.ComfyNode):
             image: 输入图片张量 (batch, height, width, channels)
             rows: 分割行数
             columns: 分割列数
-            output_index: 输出索引，0表示所有分割后的图片按批次输出，
-                         1表示第1张，2表示第2张，以此类推（横向优先）
+            index: 输出索引，支持 Python 风格索引（如 0 为第一个，-1 为最后一个）
+            all: 是否输出所有分割后的图片。若为 True，则 index 参数无效。
         
         Returns:
             分割后的图片张量
@@ -53,10 +55,6 @@ class ImageGridSplit(io.ComfyNode):
         
         # 总的网格数量
         total_grids = rows * columns
-        
-        # 验证输出索引
-        if output_index > total_grids:
-            raise ValueError(f"输出索引 {output_index} 超出范围，最大值为 {total_grids}")
         
         async def _split_one(batch_idx):
             def _do():
@@ -75,19 +73,28 @@ class ImageGridSplit(io.ComfyNode):
         parts = await asyncio.gather(*[_split_one(b) for b in range(batch_size)])
         all_split_images = [img for sub in parts for img in sub]
         
-        # 根据输出索引返回结果
-        if output_index == 0:
+        if all:
+            # 返回所有分割后的图片
             result = torch.stack(all_split_images, dim=0)
         else:
+            # 处理索引
+            if index < 0:
+                index += total_grids
+            
+            if index < 0 or index >= total_grids:
+                raise ValueError(f"索引 {index} 超出范围，有效范围为 0 到 {total_grids - 1} (或 -{total_grids} 到 -1)")
+
             selected_images = []
             for batch_idx in range(batch_size):
-                grid_idx = (output_index - 1) % total_grids
-                actual_idx = batch_idx * total_grids + grid_idx
+                # 计算当前批次中对应的网格索引
+                actual_idx = batch_idx * total_grids + index
                 if actual_idx < len(all_split_images):
                     selected_images.append(all_split_images[actual_idx])
                 else:
+                    # 理论上不应该走到这里，因为上面已经做了范围检查
                     selected_images.append(all_split_images[0])
             result = torch.stack(selected_images, dim=0)
+        
         return io.NodeOutput(result)
 
     @staticmethod

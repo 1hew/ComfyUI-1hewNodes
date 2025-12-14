@@ -7,7 +7,7 @@
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
 | `image` | - | IMAGE | - | - | 输入图像批次（`B×H×W×C`）；仅使用空间尺寸。 |
-| `mode` | - | COMBO | `longest` | `longest` / `shortest` / `width` / `height` | 选择输出的边长类型。 |
+| `mode` | - | COMBO | `shortest` | `longest` / `shortest` / `width` / `height` | 选择输出的边长类型。 |
 
 ## 输出
 

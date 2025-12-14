@@ -1,4 +1,4 @@
-from comfy_api.latest import io, ui
+from comfy_api.latest import io
 import asyncio
 import numpy as np
 import os
@@ -97,7 +97,7 @@ class ImageBBoxOverlayByMask(io.ComfyNode):
 
         out_t = torch.stack(out_imgs, dim=0).to(torch.float32).clamp(0.0, 1.0)
         out_t = out_t.to(image.device)
-        return io.NodeOutput(out_t, ui=ui.PreviewImage(out_t, cls=cls))
+        return io.NodeOutput(out_t)
     
     @staticmethod
     def draw_bbox(draw, x_min, y_min, x_max, y_max, color, stroke_width, fill):
