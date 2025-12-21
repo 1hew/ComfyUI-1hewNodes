@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.0.7**
+- feat(color): 添加 `Match Brightness Contrast` 节点
+
 **v3.0.6**
 - feat(mask): 添加 `Mask Repeat` 节点，支持遮罩批量重复与反转
 - feat(io): 添加 `Get File Count`、`Load Image From Folder`、`Load Video From Folder` 节点，优化文件加载逻辑与稳定性
@@ -355,6 +358,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Plot | 图像绘制和可视化工具 |
 | Image Stroke by Mask | 对遮罩区域应用描边效果，支持自定义宽度和颜色 |
 | Image BBox Overlay by Mask | 基于遮罩的图像边界框叠加，支持独立和合并模式 |
+
+### 🌈 颜色节点
+| 节点名称 | 功能描述 |
+|---------|----------|
+| Match Brightness Contrast | 调整源图像的亮度和对比度以匹配参考图像 |
 
 ### 🎨 图像混合节点
 | 节点名称 | 功能描述 |

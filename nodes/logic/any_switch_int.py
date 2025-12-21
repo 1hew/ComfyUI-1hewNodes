@@ -19,7 +19,10 @@ class AnySwitchInt(io.ComfyNode):
             display_name="Any Switch Int",
             category="1hewNodes/logic",
             inputs=dyn_inpts,
-            outputs=[io.Custom("*").Output(display_name="output")],
+            outputs=[
+                io.Custom("*").Output(display_name="output"),
+                io.Int.Output(display_name="select"),
+            ],
         )
 
     @classmethod
@@ -48,8 +51,8 @@ class AnySwitchInt(io.ComfyNode):
                 idx = cls.SELECT_MAX
             key = f"input_{idx}"
             if key in kwargs:
-                return io.NodeOutput(kwargs[key])
-            return io.NodeOutput(None)
+                return io.NodeOutput(kwargs[key], int(select))
+            return io.NodeOutput(None, int(select))
         except Exception as e:
             print(f"AnySwitchInt error: {e}")
-            return io.NodeOutput(None)
+            return io.NodeOutput(None, 0)
