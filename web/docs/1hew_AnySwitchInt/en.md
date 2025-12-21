@@ -14,6 +14,7 @@
 | Name | Type | Description |
 |------|------|-------------|
 | `output` | ANY (`*`) | Selected input value.
+| `select` | INT | The raw input select value.
 
 ## Features
 

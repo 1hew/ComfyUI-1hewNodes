@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.0.7**
+- feat(color): Add `Match Brightness Contrast` node
+
 **v3.0.6**
 - feat(mask): Add `Mask Repeat` node, supporting batch mask repetition and inversion
 - feat(io): Add `Get File Count`, `Load Image From Folder`, and `Load Video From Folder` nodes to optimize file loading logic and stability
@@ -355,6 +358,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Plot | Image plotting and visualization tools |
 | Image Stroke by Mask | Apply stroke effects to mask regions with customizable width and color |
 | Image BBox Overlay by Mask | Mask-based image bounding box overlay with independent and merge modes |
+
+### 🌈 Color Nodes
+| Node Name | Description |
+|-----------|-------------|
+| Match Brightness Contrast | Adjusts the brightness and contrast of the source image to match the reference image |
 
 ### 🎨 Image Blending Nodes
 | Node Name | Description |
