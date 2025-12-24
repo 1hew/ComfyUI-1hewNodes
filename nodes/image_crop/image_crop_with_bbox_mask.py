@@ -22,6 +22,7 @@ class ImageCropWithBBoxMask(io.ComfyNode):
                 io.Image.Input("image"),
                 io.Mask.Input("mask"),
                 io.Combo.Input("preset_ratio", options=["mask", "image", "auto", "9:16", "2:3", "3:4", "4:5", "1:1", "5:4", "4:3", "3:2", "16:9", "21:9"], default="mask"),
+                io.Image.Input("get_crop_ratio", optional=True),
                 io.Float.Input("scale_strength", default=0.0, min=0.0, max=1.0, step=0.01),
                 io.Combo.Input("crop_to_side", options=["None", "longest", "shortest", "width", "height"], default="None"),
                 io.Int.Input("crop_to_length", default=1024, min=8, max=8192, step=1),
@@ -44,7 +45,23 @@ class ImageCropWithBBoxMask(io.ComfyNode):
         crop_to_side: str,
         crop_to_length: int,
         divisible_by: int,
+        get_crop_ratio: torch.Tensor = None,
     ) -> io.NodeOutput:
+        if get_crop_ratio is not None:
+            _, h, w, _ = get_crop_ratio.shape
+            input_ratio = w / h
+            
+            # 预定义比例映射，避免重复解析字符串，提高效率
+            ratio_map = {
+                "9:16": 9/16, "2:3": 2/3, "3:4": 3/4, "4:5": 4/5, 
+                "1:1": 1.0, 
+                "5:4": 5/4, "4:3": 4/3, "3:2": 3/2, "16:9": 16/9, "21:9": 21/9
+            }
+            
+            # 使用 min 函数配合 key 参数，以 O(N) 复杂度找到最接近的比例
+            # 这种方式比手动循环更 Pythonic 且略快（减少了解析开销）
+            preset_ratio = min(ratio_map.keys(), key=lambda k: abs(input_ratio - ratio_map[k]))
+
         image = image.to(torch.float32).clamp(0.0, 1.0)
         mask = mask.to(torch.float32).clamp(0.0, 1.0)
 
