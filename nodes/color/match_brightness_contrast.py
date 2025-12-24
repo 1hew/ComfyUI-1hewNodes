@@ -34,8 +34,19 @@ class MatchBrightnessContrast(io.ComfyNode):
     async def execute(cls, source_image, reference_image, edge_amount, method="histogram", consistency="lock_first"):
         # source_image, reference_image: [B, H, W, C]
         
+        # 1. 全局设备对齐：确保参考图与源图在同一设备，避免循环内重复搬运
+        if reference_image.device != source_image.device:
+            reference_image = reference_image.to(source_image.device)
+            
         src_batch = source_image.shape[0]
         ref_batch = reference_image.shape[0]
+        
+        # 2. 全局参数计算：Batch 内图像尺寸一致，只需计算一次 Margin
+        h_src, w_src = source_image.shape[1:3]
+        margin_src = cls._calculate_margin(edge_amount, h_src, w_src)
+        
+        h_ref, w_ref = reference_image.shape[1:3]
+        margin_ref = cls._calculate_margin(edge_amount, h_ref, w_ref)
         
         # 预计算第一帧的统计信息或映射表 (如果开启了时序一致性)
         locked_params = None
@@ -44,11 +55,6 @@ class MatchBrightnessContrast(io.ComfyNode):
             ref_idx = 0
             ref_img = reference_image[ref_idx % ref_batch]
             src_img = source_image[0]
-            
-            h_src, w_src = src_img.shape[:2]
-            margin_src = cls._calculate_margin(edge_amount, h_src, w_src)
-            h_ref, w_ref = ref_img.shape[:2]
-            margin_ref = cls._calculate_margin(edge_amount, h_ref, w_ref)
             
             if method == "histogram":
                 locked_params = cls._calculate_histogram_luts(src_img, ref_img, margin_src, margin_ref)
@@ -66,19 +72,20 @@ class MatchBrightnessContrast(io.ComfyNode):
             ref_img = reference_image[ref_idx]
             src_img = source_image[i]
 
-            async def run_one(s_img, r_img, params=None):
+            async def run_one(s_img, r_img, m_src, m_ref, params=None):
                 async with sem:
                     # 将计算密集型任务放入线程池执行，避免阻塞事件循环
                     return await asyncio.to_thread(
                         cls._process_one_image,
                         s_img,
                         r_img,
-                        edge_amount,
+                        m_src,
+                        m_ref,
                         method,
                         params
                     )
             
-            tasks.append(run_one(src_img, ref_img, locked_params))
+            tasks.append(run_one(src_img, ref_img, margin_src, margin_ref, locked_params))
             
         # 并发执行所有任务
         results = await asyncio.gather(*tasks)
@@ -200,12 +207,13 @@ class MatchBrightnessContrast(io.ComfyNode):
     def _apply_standard_stats(cls, src_img, stats):
         """应用标准模式的统计信息"""
         mu_src, std_src, mu_ref, std_ref = stats
+        
         # 颜色迁移: (x - mu_src) * (std_ref / std_src) + mu_ref
         res = (src_img - mu_src) * (std_ref / std_src) + mu_ref
         return res
 
     @classmethod
-    def _process_one_image(cls, src_img, ref_img, edge_amount, method, params=None):
+    def _process_one_image(cls, src_img, ref_img, margin_src, margin_ref, method, params=None):
         """处理单张图像的辅助函数"""
         
         if params is not None:
@@ -216,12 +224,6 @@ class MatchBrightnessContrast(io.ComfyNode):
                 return cls._apply_standard_stats(src_img, params)
         
         # 实时计算模式
-        h_src, w_src = src_img.shape[:2]
-        margin_src = cls._calculate_margin(edge_amount, h_src, w_src)
-        
-        h_ref, w_ref = ref_img.shape[:2]
-        margin_ref = cls._calculate_margin(edge_amount, h_ref, w_ref)
-
         if method == "histogram":
             luts = cls._calculate_histogram_luts(src_img, ref_img, margin_src, margin_ref)
             return cls._apply_histogram_luts(src_img, luts)
