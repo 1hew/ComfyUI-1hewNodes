@@ -1,33 +1,41 @@
-# Match Brightness Contrast - Brightness and Contrast Matching
+# Match Brightness Contrast
 
-**Node Purpose:** `Match Brightness Contrast` adjusts the brightness and contrast of a source image to match a reference image. It provides options to calculate statistics based only on edge areas to ignore central content changes, making it suitable for seamless image blending or style transfer tasks.
+**Node Purpose:** Adjusts the brightness and contrast of the source image to match the reference image. Supports matching methods based on histogram or standard statistics, with control over the calculation area (full image or edges).
 
 ## Inputs
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `source_image` | required | IMAGE | - | - | The source image batch to be adjusted. |
-| `reference_image` | required | IMAGE | - | - | The reference image batch used as the target for brightness and contrast. |
-| `edge_amount` | - | FLOAT | 0.2 | 0.0 - 8192.0 | Controls the margin for statistics calculation. <= 0: Use full image; 0 < amount < 1.0: Percentage of short side; >= 1.0: Pixel count. |
+| `source_image` | Required | IMAGE | - | - | Source image batch to be adjusted |
+| `reference_image` | Required | IMAGE | - | - | Reference image batch providing brightness and contrast info |
+| `edge_amount` | - | FLOAT | 0.2 | 0.0-8192.0 | Calculation area control. <=0: Full image; <1.0: Edge percentage; >=1.0: Edge pixel width |
+| `consistency` | - | COMBO | `lock_first` | `lock_first` / `frame_match` | Temporal consistency. `lock_first`: Lock first frame params for sequence; `frame_match`: Match frame by frame |
+| `method` | - | COMBO | `histogram` | `standard` / `histogram` | Matching algorithm. `histogram`: Histogram matching (more precise); `standard`: Mean/Std matching (softer) |
 
 ## Outputs
 
 | Name | Type | Description |
 |------|------|-------------|
-| `image` | IMAGE | The adjusted image batch with brightness and contrast matched to the reference. |
+| `image` | IMAGE | Adjusted image batch |
 
 ## Features
 
-- **Brightness & Contrast Matching**: Automatically adjusts the source image's mean (brightness) and standard deviation (contrast) to align with the reference image.
-- **Edge-Based Statistics**: The `edge_amount` parameter allows users to specify whether to use the entire image or only the edge regions for calculating color statistics. This is particularly useful when the central content differs significantly but the background/lighting should match.
-- **Flexible Margin Control**: Supports both percentage-based (relative to the shortest side) and absolute pixel-based margin definitions.
-- **Batch Processing**: Supports batch processing for both source and reference images. If batch sizes differ, the reference images are cycled.
+- **Matching Algorithms**:
+  - `histogram`: Mapping based on Cumulative Distribution Function (CDF) of channel histograms, reproducing reference tone distribution more precisely.
+  - `standard`: Linear transformation based on mean and standard deviation, preserving more source texture features, yielding softer results.
+- **Area Control (`edge_amount`)**:
+  - 0: Statistics from the full image.
+  - >0: Statistics only from the peripheral edge areas, ignoring the center. Useful for matching ambient atmosphere while ignoring subject differences.
+- **Temporal Consistency (`consistency`)**:
+  - `lock_first`: Calculates matching parameters only from the first frame pair and applies them to all subsequent frames. Ideal for video processing to prevent flickering.
+  - `frame_match`: Calculates matching parameters for each frame individually. Suitable for unrelated image batches.
 
-## Usage Tips
+## Typical Usage
 
-- **Seamless Blending**: When compositing an object into a new background, use the background as the `reference_image` and the object as the `source_image`. Setting `edge_amount` to 0 (full image) or a small value can help align their lighting conditions.
-- **Style Transfer**: Use a reference image with a specific mood or lighting style to transfer its global brightness and contrast characteristics to the source image.
-- **Edge Amount**:
-    - Set to `0` or less to use the global statistics of the entire image.
-    - Set to a value between `0` and `1` (e.g., `0.2`) to use a percentage of the image's shortest side as the margin width.
-    - Set to a value `>= 1` to specify the exact margin width in pixels.
+- **Video Style Unification**: Connect video frames to `source_image` and a style reference to `reference_image`, set `consistency=lock_first` to unify video tone with the reference stably.
+- **Compositing Blending**: For image compositing, use foreground as `source_image` and background as `reference_image`, set appropriate `edge_amount` (e.g., 0.2) to blend foreground edges with the background tone.
+
+## Notes & Tips
+
+- Always use `lock_first` for video processing to ensure stability.
+- Proper use of `edge_amount` prevents subject colors (e.g., clothing) from interfering with the overall tone matching.

@@ -1,43 +1,46 @@
-# Image Crop With BBox Mask - Mask-Aware Crop with BBox Return
+# Image Crop With BBox Mask
 
-**Node Purpose:** `Image Crop With BBox Mask` crops the image around a mask’s bounding box using configurable aspect ratios and side-length targeting. It returns the cropped image, a `bbox_mask` marking the crop region on the original image, and the `cropped_mask` aligned to the crop.
+**Node Purpose:** Intelligently crops images based on the mask's bounding box. Supports various aspect ratio controls, size constraints, and batch processing. Outputs the cropped image, corresponding mask, and the bounding box mask of the original position for easy restoration.
 
 ## Inputs
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `image` | - | IMAGE | - | - | Input image batch. |
-| `mask` | - | MASK | - | - | Mask guiding crop center and bbox; required. |
-| `preset_ratio` | - | COMBO | `mask` | `mask` / `image` / `auto` / `1:1` / `3:2` / `4:3` / `16:9` / `21:9` / `2:3` / `3:4` / `9:16` / `9:21` | Aspect ratio source. |
-| `scale_strength` | - | FLOAT | 0.0 | 0.0–1.0 | Chooses a target size between the min/max valid sizes; higher values favor larger crops. |
-| `crop_to_side` | - | COMBO | `None` | `None` / `longest` / `shortest` / `width` / `height` | Side-length targeting mode. |
-| `crop_to_length` | - | INT | 1024 | 8–8192 | Target length when using `crop_to_side`. |
-| `divisible_by` | - | INT | 8 | 1–1024 | Target width/height must be multiples of this value. |
+| `image` | Required | IMAGE | - | - | Original image to be cropped |
+| `mask` | Required | MASK | - | - | Mask defining the subject to crop |
+| `preset_ratio` | - | COMBO | `mask` | `mask` / `image` / `auto` / `9:16` ... | Target aspect ratio preset. `mask` follows mask; `image` follows original; `auto` matches common ratios |
+| `get_crop_ratio` | Optional | IMAGE | - | - | Optional reference image. If connected, auto-matches its aspect ratio, overriding `preset_ratio` |
+| `scale_strength` | - | FLOAT | 0.0 | 0.0-1.0 | Scale strength. Extends the crop box outwards while maintaining aspect ratio |
+| `crop_to_side` | - | COMBO | `None` | `None` / `longest` / `shortest` / `width` / `height` | Target side control mode |
+| `crop_to_length` | - | INT | 1024 | 8-8192 | Target side length value |
+| `divisible_by` | - | INT | 8 | 1-1024 | Output size divisor constraint (often for model alignment) |
 
 ## Outputs
 
 | Name | Type | Description |
 |------|------|-------------|
-| `cropped_image` | IMAGE | Cropped image batch, padded to uniform size if needed. |
-| `bbox_mask` | MASK | Original-size mask; the crop rectangle area is white (1.0). |
-| `cropped_mask` | MASK | Mask cropped to the output image region.
+| `cropped_image` | IMAGE | Cropped and resized image |
+| `bbox_mask` | MASK | Mask in original image dimensions, white area indicating where the crop occurred |
+| `cropped_mask` | MASK | Mask corresponding to the cropped image |
 
 ## Features
 
-- Ratio orientation: determines landscape/portrait/square orientation from `preset_ratio`.
-- Flexible valid sizes: generates candidate sizes respecting aspect and `divisible_by`.
-- Side targeting: select by `width`/`height` or `longest`/`shortest`, then fit to `crop_to_length`.
-- BBox masking: emits `bbox_mask` with ones in the crop area and zeros elsewhere.
-- Batch robustness: expands smaller batches, then pads images/masks to common sizes for stacking.
+- **Smart Ratio Control**:
+  - `mask`: Fits the subject mask ratio as closely as possible.
+  - `auto`: Automatically calculates and matches the closest standard ratio (e.g., 4:3, 16:9).
+  - `get_crop_ratio`: Dynamically sets target ratio via input image.
+- **Size Constraints & Adjustment**:
+  - `scale_strength`: Allows the crop box to include more background context.
+  - `crop_to_side`/`crop_to_length`: Directly controls physical output resolution (e.g., fix long side to 1024).
+  - `divisible_by`: Ensures output dimensions are multiples of a specific value (e.g., 8 for SDXL).
+- **Batch Processing**: Supports batch inputs for Image and Mask, automatically broadcasting if batch sizes differ.
 
 ## Typical Usage
 
-- Consistent ratios: set `preset_ratio=4:3` and `divisible_by=8/16` to align model expectations.
-- Long-edge control: `crop_to_side=longest` with `crop_to_length` ensures uniform crop height/width across varied inputs.
-- Downstream paste: use `bbox_mask` with `Image Paste By BBox Mask` to restore processed crops to their original positions.
+- **Inpainting Preprocessing**: Crop subject using mask for local upscaling or repainting, then use `bbox_mask` to paste back.
+- **Dataset Preparation**: Batch crop subjects from large images and unify them to specific sizes (e.g., 512x512 or 1024x1024).
 
 ## Notes & Tips
 
-- If the mask is empty or invalid, the node returns the original image and a full-white `bbox_mask` as a fallback.
-- Cropped outputs are clamped to device-safe ranges and converted to RGB if needed.
-- Differences in output sizes across the batch are normalized by padding before stacking.
+- When `get_crop_ratio` is connected, `preset_ratio` setting is ignored.
+- If the mask is empty or invalid, the node returns default black/white images to prevent errors.

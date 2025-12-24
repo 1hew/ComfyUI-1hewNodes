@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.0.8**
+- refactor(image_crop): 优化 `Image Crop With BBox Mask` 节点
+- refactor(color): 优化 `Match Brightness Contrast` 节点
+
 **v3.0.7**
 - feat(color): 添加 `Match Brightness Contrast` 节点
 
