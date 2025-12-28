@@ -7,7 +7,7 @@
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | `image` | - | IMAGE | - | - | Input image batch. |
-| `mask` | - | MASK | - | - | Input mask batch; resized to match `image` size when needed. |
+| `mask` | optional | MASK | - | - | Input mask batch; resized to match `image` size when needed. |
 | `fill_hole` | - | BOOLEAN | true | - | Fill mask holes to ensure continuous shapes. |
 | `invert` | - | BOOLEAN | false | - | Invert the selection after morphology/feather steps. |
 | `feather` | - | INT | 0 | 0–50 | Gaussian blur radius applied to the mask. |

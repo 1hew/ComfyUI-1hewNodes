@@ -1,16 +1,16 @@
-# Match Brightness Contrast
+# Match Brightness Contrast - Match brightness and contrast
 
-**Node Purpose:** Adjusts the brightness and contrast of the source image to match the reference image. Supports matching methods based on histogram or standard statistics, with control over the calculation area (full image or edges).
+**Node Purpose:** `Match Brightness Contrast` adjusts the brightness and contrast of `source_image` to match `reference_image`. It supports histogram matching and standard mean/std matching, plus optional edge-only statistics and sequence consistency modes for batch workflows.
 
 ## Inputs
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `source_image` | Required | IMAGE | - | - | Source image batch to be adjusted |
-| `reference_image` | Required | IMAGE | - | - | Reference image batch providing brightness and contrast info |
-| `edge_amount` | - | FLOAT | 0.2 | 0.0-8192.0 | Calculation area control. <=0: Full image; <1.0: Edge percentage; >=1.0: Edge pixel width |
-| `consistency` | - | COMBO | `lock_first` | `lock_first` / `frame_match` | Temporal consistency. `lock_first`: Lock first frame params for sequence; `frame_match`: Match frame by frame |
-| `method` | - | COMBO | `histogram` | `standard` / `histogram` | Matching algorithm. `histogram`: Histogram matching (more precise); `standard`: Mean/Std matching (softer) |
+| `source_image` | - | IMAGE | - | - | Source image batch to be adjusted. |
+| `reference_image` | - | IMAGE | - | - | Reference image batch that provides target tone distribution. |
+| `edge_amount` | - | FLOAT | 0.2 | 0.0-8192.0 | Statistics area control. `<=0`: full image; `<1.0`: edge ratio based on the shorter side; `>=1.0`: edge width in pixels. |
+| `consistency` | - | COMBO | `lock_first` | `lock_first` / `lock_mid` / `lock_end` / `frame_match` | Sequence consistency. `lock_*` computes parameters once from a selected pair and applies to all source frames; `frame_match` computes per frame. |
+| `method` | - | COMBO | `histogram` | `standard` / `histogram` | Matching method. `histogram` uses per-channel CDF mapping; `standard` uses mean/std linear remap. |
 
 ## Outputs
 
@@ -26,16 +26,18 @@
 - **Area Control (`edge_amount`)**:
   - 0: Statistics from the full image.
   - >0: Statistics only from the peripheral edge areas, ignoring the center. Useful for matching ambient atmosphere while ignoring subject differences.
-- **Temporal Consistency (`consistency`)**:
-  - `lock_first`: Calculates matching parameters only from the first frame pair and applies them to all subsequent frames. Ideal for video processing to prevent flickering.
-  - `frame_match`: Calculates matching parameters for each frame individually. Suitable for unrelated image batches.
+- **Sequence Consistency (`consistency`)**:
+  - `lock_first`: Computes parameters from `source_image[0]` and `reference_image[0]`.
+  - `lock_mid`: Computes parameters from the middle frame of each input batch.
+  - `lock_end`: Computes parameters from the last frame of each input batch.
+  - `frame_match`: Computes parameters for each frame pair (`reference_image[i % ref_batch]`).
 
 ## Typical Usage
 
-- **Video Style Unification**: Connect video frames to `source_image` and a style reference to `reference_image`, set `consistency=lock_first` to unify video tone with the reference stably.
+- **Video Tone Unification**: Connect video frames to `source_image` and a tone reference sequence to `reference_image`, set `consistency=lock_mid` or `lock_end` to keep batch tone stable when the early reference frames vary.
 - **Compositing Blending**: For image compositing, use foreground as `source_image` and background as `reference_image`, set appropriate `edge_amount` (e.g., 0.2) to blend foreground edges with the background tone.
 
 ## Notes & Tips
 
-- Always use `lock_first` for video processing to ensure stability.
-- Proper use of `edge_amount` prevents subject colors (e.g., clothing) from interfering with the overall tone matching.
+- For sequence workflows, `lock_*` keeps a single mapping across frames, which helps keep tone consistent.
+- `edge_amount` focuses statistics on the border region and supports stable background tone matching.

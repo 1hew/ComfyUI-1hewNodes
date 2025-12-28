@@ -145,6 +145,11 @@ class WorkflowName(io.ComfyNode):
             else:
                 name_without_ext = file_name
                 extension = ""
+            
+            # 过滤非法文件名或特定系统文件名
+            if name_without_ext.lower() in [".index", "index", ""] or name_without_ext.startswith("."):
+                name_without_ext = "workflow"
+
             processed_name = name_without_ext
             if prefix:
                 processed_name = prefix + processed_name
@@ -194,7 +199,7 @@ class WorkflowName(io.ComfyNode):
                     date_str = now.strftime("%Y%m%d_%H%M%S")
                 else:
                     date_str = now.strftime("%Y-%m-%d")
-                result = f"{date_str}/{result}"
+                result = f"{date_str}/{name_without_ext}/{result}"
             return result
         except Exception as e:
             return f"路径处理错误：{str(e)}"

@@ -3,7 +3,7 @@ import { app } from "../../../scripts/app.js";
 app.registerExtension({
     name: "ComfyUI-1hewNodesV3.SaveVideoInfo",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
-        if (nodeData.name !== "1hew_SaveVideo") {
+        if (nodeData.name !== "1hew_SaveVideo" && nodeData.name !== "1hew_SaveVideoByImage") {
             return;
         }
 
@@ -18,14 +18,18 @@ app.registerExtension({
                 if (this.widgets) {
                     for (const w of this.widgets) {
                         if (w.element) {
-                            let videoEl = w.element;
-                            if (videoEl.tagName !== "VIDEO") {
-                                videoEl = w.element.querySelector("video");
+                            let videoEls = [];
+                            if (w.element.tagName === "VIDEO") {
+                                videoEls = [w.element];
+                            } else {
+                                videoEls = Array.from(
+                                    w.element.querySelectorAll("video")
+                                );
                             }
-                            
-                            if (videoEl) {
+
+                            for (const videoEl of videoEls) {
                                 attachDimensionDisplay(videoEl);
-                                return;
+                                applyLoopedHoverAudioPreview(videoEl);
                             }
                         }
                     }
@@ -39,6 +43,41 @@ app.registerExtension({
         };
     }
 });
+
+function applyLoopedHoverAudioPreview(videoEl) {
+    if (!videoEl || videoEl.dataset.comfy1hewPreviewApplied === "1") {
+        return;
+    }
+    videoEl.dataset.comfy1hewPreviewApplied = "1";
+
+    videoEl.autoplay = true;
+    videoEl.loop = true;
+    videoEl.muted = true;
+    videoEl.playsInline = true;
+    videoEl.controls = false;
+    videoEl.preload = "auto";
+
+    const safePlay = () => {
+        const p = videoEl.play();
+        if (p && typeof p.catch === "function") {
+            p.catch(() => {});
+        }
+    };
+
+    safePlay();
+    videoEl.addEventListener("loadeddata", safePlay);
+    videoEl.addEventListener("canplay", safePlay);
+
+    videoEl.addEventListener("pointerenter", () => {
+        videoEl.muted = false;
+        videoEl.volume = 1.0;
+        safePlay();
+    });
+
+    videoEl.addEventListener("pointerleave", () => {
+        videoEl.muted = true;
+    });
+}
 
 function attachDimensionDisplay(videoEl) {
     // 1. 获取或创建容器

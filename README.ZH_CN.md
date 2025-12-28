@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.1.0**
+- feat(io): 添加 `Save Video by Image` 节点，用于将图像序列编码保存为视频
+- refactor(color): 优化 `Match Brightness Contrast` 节点一致性选项
+
 **v3.0.8**
 - refactor(image_crop): 优化 `Image Crop With BBox Mask` 节点
 - refactor(color): 优化 `Match Brightness Contrast` 节点
@@ -493,8 +497,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Get File Count | 获取文件夹中指定类型（图像/视频）的文件数量，支持子文件夹递归 |
 | Load Image From Folder | 从文件夹加载指定索引的图像，支持批量处理和子文件夹 |
 | Load Video From Folder | 从文件夹加载指定索引的视频，返回 VIDEO 对象 |
+| Save Video by Image | 将图像序列合并并编码保存为视频，支持可选音频合成 |
 | Save Video | 保存视频到输出；支持空值输入，容器与编码器自动选择 |
-| Save Video RGBA | 将 images 保存为视频；支持 Alpha 预览与导出、可选音频、FPS 设置 |
 
 ### 🔊 音频节点
 | 节点名称 | 功能描述 |

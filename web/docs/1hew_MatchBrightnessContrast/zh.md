@@ -1,16 +1,16 @@
 # Match Brightness Contrast - 匹配亮度与对比度
 
-**节点功能：** 调整源图像的亮度和对比度以匹配参考图像。支持基于直方图或标准统计信息的匹配方法，并可控制计算区域（全图或边缘）。
+**节点功能：** `Match Brightness Contrast` 节点用于将 `source_image` 的亮度与对比度映射到 `reference_image` 的色调分布。支持直方图匹配与均值/标准差匹配，并提供边缘区域统计与序列一致性策略，适合批处理与视频帧序列。
 
 ## 输入
 
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
 | `source_image` | 必需 | IMAGE | - | - | 需要调整的源图像批次 |
-| `reference_image` | 必需 | IMAGE | - | - | 提供亮度与对比度参考的图像批次 |
-| `edge_amount` | - | FLOAT | 0.2 | 0.0-8192.0 | 计算区域控制。<=0: 全图; <1.0: 边缘百分比; >=1.0: 边缘像素宽度 |
-| `consistency` | - | COMBO | `lock_first` | `lock_first` / `frame_match` | 时序一致性控制。`lock_first`: 锁定首帧参数应用于全序列; `frame_match`: 逐帧匹配 |
-| `method` | - | COMBO | `histogram` | `standard` / `histogram` | 匹配算法。`histogram`: 直方图匹配 (更精确); `standard`: 均值/标准差匹配 (更柔和) |
+| `reference_image` | 必需 | IMAGE | - | - | 提供目标色调分布的参考图像批次 |
+| `edge_amount` | - | FLOAT | 0.2 | 0.0-8192.0 | 统计区域控制。`<=0`：全图；`<1.0`：按短边比例取边缘宽度；`>=1.0`：按像素取边缘宽度 |
+| `consistency` | - | COMBO | `lock_first` | `lock_first` / `lock_mid` / `lock_end` / `frame_match` | 序列一致性。`lock_*` 从选定帧对计算一次参数并应用到全部源帧；`frame_match` 逐帧计算 |
+| `method` | - | COMBO | `histogram` | `standard` / `histogram` | 匹配方法。`histogram` 通过通道 CDF 映射；`standard` 通过均值/标准差线性映射 |
 
 ## 输出
 
@@ -26,16 +26,18 @@
 - **区域控制 (`edge_amount`)**：
   - 当值为 0 时，统计全图信息。
   - 当值大于 0 时，仅统计图像四周边缘区域的信息，忽略中心内容。这对于忽略主体差异、仅匹配环境氛围非常有用。
-- **时序一致性 (`consistency`)**：
-  - `lock_first`：仅计算第一帧源图与参考图的匹配参数，并应用到后续所有帧。适合视频处理，避免因画面内容变化导致的闪烁。
-  - `frame_match`：每一帧都单独计算匹配参数。适合处理不相关的单图批次。
+- **序列一致性 (`consistency`)**：
+  - `lock_first`：使用 `source_image[0]` 与 `reference_image[0]` 计算参数。
+  - `lock_mid`：使用输入批次的中间帧计算参数。
+  - `lock_end`：使用输入批次的末帧计算参数。
+  - `frame_match`：逐帧计算参数（参考帧按 `reference_image[i % ref_batch]` 取值）。
 
 ## 典型用法
 
-- **视频风格统一**：连接视频帧到 `source_image`，风格参考图到 `reference_image`，设置 `consistency=lock_first`，使视频整体色调与参考图一致且保持稳定。
+- **视频色调统一**：连接视频帧到 `source_image`，参考序列到 `reference_image`，设置 `consistency=lock_mid` 或 `lock_end`，在参考序列前段存在偏移时保持映射稳定。
 - **图像合成融合**：在图像合成时，将前景图作为 `source_image`，背景图作为 `reference_image`，设置适当的 `edge_amount` (如 0.2)，使前景边缘的色调与背景融合。
 
 ## 注意与建议
 
-- 处理视频时务必使用 `lock_first` 以保证画面稳定性。
-- `edge_amount` 的合理使用可以避免主体颜色（如人物衣服）对整体色调匹配的干扰。
+- 序列流程使用 `lock_*` 可将单一映射应用到全部源帧，有助于保持色调一致。
+- `edge_amount` 将统计集中在边缘区域，可用于背景/环境氛围的稳定匹配。

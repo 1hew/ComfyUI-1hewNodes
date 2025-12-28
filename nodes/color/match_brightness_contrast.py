@@ -22,7 +22,16 @@ class MatchBrightnessContrast(io.ComfyNode):
                 io.Image.Input("source_image"),
                 io.Image.Input("reference_image"),
                 io.Float.Input("edge_amount", default=0.2, min=0.0, max=8192.0, step=0.01, display_mode=io.NumberDisplay.number),
-                io.Combo.Input("consistency", options=["lock_first", "frame_match"], default="lock_first"),
+                io.Combo.Input(
+                    "consistency",
+                    options=[
+                        "lock_first",
+                        "lock_mid",
+                        "lock_end",
+                        "frame_match",
+                    ],
+                    default="lock_first",
+                ),
                 io.Combo.Input("method", options=["standard", "histogram"], default="histogram"),
             ],
             outputs=[
@@ -50,11 +59,20 @@ class MatchBrightnessContrast(io.ComfyNode):
         
         # 预计算第一帧的统计信息或映射表 (如果开启了时序一致性)
         locked_params = None
-        if consistency == "lock_first" and src_batch > 0:
-            # 使用第一帧源图像和对应的参考图像计算参数
-            ref_idx = 0
+        if consistency in {"lock_first", "lock_mid", "lock_end"} and src_batch > 0:
+            # 使用选定帧的源图像和参考图像计算参数
+            if consistency == "lock_mid":
+                ref_idx = ref_batch // 2
+                src_idx = src_batch // 2
+            elif consistency == "lock_end":
+                ref_idx = ref_batch - 1
+                src_idx = src_batch - 1
+            else:
+                ref_idx = 0
+                src_idx = 0
+
             ref_img = reference_image[ref_idx % ref_batch]
-            src_img = source_image[0]
+            src_img = source_image[src_idx]
             
             if method == "histogram":
                 locked_params = cls._calculate_histogram_luts(src_img, ref_img, margin_src, margin_ref)
@@ -230,4 +248,3 @@ class MatchBrightnessContrast(io.ComfyNode):
         else:
             stats = cls._calculate_standard_stats(src_img, ref_img, margin_src, margin_ref)
             return cls._apply_standard_stats(src_img, stats)
-

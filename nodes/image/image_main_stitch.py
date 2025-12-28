@@ -28,7 +28,10 @@ class ImageMainStitch(io.ComfyNode):
                 io.String.Input("spacing_color", default="1.0"),
                 io.String.Input("pad_color", default="1.0"),
             ],
-            outputs=[io.Image.Output(display_name="image")],
+            outputs=[
+                io.Image.Output(display_name="image"),
+                io.Mask.Output(display_name="mask"),
+            ],
         )
 
     @classmethod
@@ -71,7 +74,12 @@ class ImageMainStitch(io.ComfyNode):
 
         if len(others) == 0:
             image = a.to(dtype=torch.float32).clamp(0.0, 1.0)
-            return io.NodeOutput(image)
+            mask = torch.ones(
+                (image.shape[0], image.shape[1], image.shape[2]),
+                dtype=torch.float32,
+                device=image.device,
+            )
+            return io.NodeOutput(image, mask)
 
         bs = a.shape[0]
         for t in others:
@@ -83,6 +91,7 @@ class ImageMainStitch(io.ComfyNode):
         pad_rgb = cls._parse_pad_color(pad_color)
 
         if direction in ("top", "bottom"):
+
             def build_pair_h():
                 cur = others[0]
                 for t in others[1:]:
@@ -96,8 +105,9 @@ class ImageMainStitch(io.ComfyNode):
                         bs,
                     )
                 return cur
+
             pair = await asyncio.to_thread(build_pair_h)
-            out = await asyncio.to_thread(
+            out, mask = await asyncio.to_thread(
                 cls._stack_vertical,
                 a,
                 pair,
@@ -109,6 +119,7 @@ class ImageMainStitch(io.ComfyNode):
                 bs,
             )
         else:
+
             def build_pair_v():
                 cur = others[0]
                 for t in others[1:]:
@@ -122,8 +133,9 @@ class ImageMainStitch(io.ComfyNode):
                         bs,
                     )
                 return cur
+
             pair = await asyncio.to_thread(build_pair_v)
-            out = await asyncio.to_thread(
+            out, mask = await asyncio.to_thread(
                 cls._stack_horizontal,
                 a,
                 pair,
@@ -136,7 +148,7 @@ class ImageMainStitch(io.ComfyNode):
             )
 
         image = torch.clamp(out, min=0.0, max=1.0).to(torch.float32)
-        return io.NodeOutput(image)
+        return io.NodeOutput(image, mask)
 
     # --- 合并 2 与 3 ---
     @classmethod
@@ -224,9 +236,21 @@ class ImageMainStitch(io.ComfyNode):
         # 间隔条宽度与最终统一宽度一致
         strip = cls._make_strip(spacing_width, w1 if match else unified_w, space_rgb, axis="h", dtype=img1.dtype, device=img1.device, batch_size=batch_size)
 
+        # mask
+        b = img1.shape[0]
+        mask_1 = torch.ones((b, h1, w1), dtype=torch.float32, device=img1.device)
+        mask_p = torch.zeros((b, hp, wp), dtype=torch.float32, device=img1.device)
+        mask_s = torch.zeros((b, strip.shape[1], strip.shape[2]), dtype=torch.float32, device=img1.device)
+
         if direction == "bottom":
-            return torch.cat([img1, strip, pair], dim=1)
-        return torch.cat([pair, strip, img1], dim=1)
+            return (
+                torch.cat([img1, strip, pair], dim=1),
+                torch.cat([mask_1, mask_s, mask_p], dim=1),
+            )
+        return (
+            torch.cat([pair, strip, img1], dim=1),
+            torch.cat([mask_p, mask_s, mask_1], dim=1),
+        )
 
     @classmethod
     def _stack_horizontal(
@@ -258,9 +282,21 @@ class ImageMainStitch(io.ComfyNode):
         # 间隔条高度与最终统一高度一致
         strip = cls._make_strip(h1 if match else unified_h, spacing_width, space_rgb, axis="v", dtype=img1.dtype, device=img1.device, batch_size=batch_size)
 
+        # mask
+        b = img1.shape[0]
+        mask_1 = torch.ones((b, h1, w1), dtype=torch.float32, device=img1.device)
+        mask_p = torch.zeros((b, hp, wp), dtype=torch.float32, device=img1.device)
+        mask_s = torch.zeros((b, strip.shape[1], strip.shape[2]), dtype=torch.float32, device=img1.device)
+
         if direction == "right":
-            return torch.cat([img1, strip, pair], dim=2)
-        return torch.cat([pair, strip, img1], dim=2)
+            return (
+                torch.cat([img1, strip, pair], dim=2),
+                torch.cat([mask_1, mask_s, mask_p], dim=2),
+            )
+        return (
+            torch.cat([pair, strip, img1], dim=2),
+            torch.cat([mask_p, mask_s, mask_1], dim=2),
+        )
 
     # --- 工具函数 ---
 
