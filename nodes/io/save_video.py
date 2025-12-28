@@ -8,7 +8,7 @@ import folder_paths
 from comfy.cli_args import args
 from comfy_api.input import VideoInput
 from comfy_api.latest import io, ui
-from comfy_api.util import VideoCodec, VideoContainer
+from comfy_api.util import VideoContainer
 
 
 class SaveVideo(io.ComfyNode):
@@ -18,12 +18,10 @@ class SaveVideo(io.ComfyNode):
             node_id="1hew_SaveVideo",
             display_name="Save Video",
             category="1hewNodes/io",
-            description="保存视频到输出；支持空值输入。",
             inputs=[
                 io.Video.Input("video", optional=True, tooltip="要保存的视频；为空时节点直接通过。"),
                 io.String.Input("filename_prefix", default="video/ComfyUI", tooltip="保存文件前缀；支持格式占位符（如 %date:yyyy-MM-dd%）。"),
-                io.Combo.Input("format", options=VideoContainer.as_input(), default="auto", tooltip="容器格式；auto 将自动选择合适格式。"),
-                io.Combo.Input("codec", options=VideoCodec.as_input(), default="auto", tooltip="编码器；auto 将根据容器与内容自动选择。"),
+                io.Boolean.Input("save_output", default=True, tooltip="是否保存到输出目录；若为 False 则保存到临时目录。"),
             ],
             outputs=[],
             hidden=[io.Hidden.prompt, io.Hidden.extra_pnginfo],
@@ -35,11 +33,16 @@ class SaveVideo(io.ComfyNode):
         cls,
         video: Optional[VideoInput],
         filename_prefix: str,
-        format: str,
-        codec: str,
+        save_output: bool,
     ) -> io.NodeOutput:
         if video is None:
             return io.NodeOutput()
+
+        output_dir = folder_paths.get_output_directory()
+        output_type = io.FolderType.output
+        if not save_output:
+            output_dir = folder_paths.get_temp_directory()
+            output_type = io.FolderType.temp
 
         width, height = video.get_dimensions()
         (
@@ -49,7 +52,7 @@ class SaveVideo(io.ComfyNode):
             subfolder,
             filename_prefix,
         ) = folder_paths.get_save_image_path(
-            filename_prefix, folder_paths.get_output_directory(), width, height
+            filename_prefix, output_dir, width, height
         )
 
         saved_metadata = None
@@ -62,11 +65,13 @@ class SaveVideo(io.ComfyNode):
             if len(metadata) > 0:
                 saved_metadata = metadata
 
+        format = "auto"
+        codec = "auto"
         extension = VideoContainer.get_extension(format)
         file = f"{filename}_{counter:05}_.{extension}"
 
         path = os.path.join(full_output_folder, file)
         await asyncio.to_thread(video.save_to, path, format=format, codec=codec, metadata=saved_metadata)
 
-        return io.NodeOutput(ui=ui.PreviewVideo([ui.SavedResult(file, subfolder, io.FolderType.output)])
+        return io.NodeOutput(ui=ui.PreviewVideo([ui.SavedResult(file, subfolder, output_type)])
         )

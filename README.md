@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.1.0**
+- feat(io): Add `Save Video by Image` node for encoding IMAGE batches into video
+- refactor(color): Enhance `Match Brightness Contrast` sequence consistency options
+
 **v3.0.8**
 - refactor(image_crop): Optimize `Image Crop With BBox Mask` node
 - refactor(color): Optimize `Match Brightness Contrast` node
@@ -493,8 +497,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Get File Count | Get file count of specified type (image/video) in folder, supports recursive subfolder search |
 | Load Image From Folder | Load image at specified index from folder, supports batch processing and subfolders |
 | Load Video From Folder | Load video at specified index from folder, returns VIDEO object |
+| Save Video by Image | Encode IMAGE batch into video with optional audio muxing |
 | Save Video | Save VIDEO to output; supports optional input, auto container/codec selection |
-| Save Video RGBA | Save images to video; supports alpha preview/output, optional audio, configurable FPS |
 
 ### 🔊 Audio Nodes
 | Node Name | Description |

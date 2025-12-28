@@ -27,7 +27,7 @@ class ImageMaskBlend(io.ComfyNode):
             category="1hewNodes/image/blend",
             inputs=[
                 io.Image.Input("image"),
-                io.Mask.Input("mask"),
+                io.Mask.Input("mask", optional=True),
                 io.Boolean.Input("fill_hole", default=True),
                 io.Boolean.Input("invert", default=False),
                 io.Int.Input("feather", default=0, min=0, max=50, step=1),
@@ -47,7 +47,6 @@ class ImageMaskBlend(io.ComfyNode):
     async def execute(
         cls,
         image: torch.Tensor,
-        mask: torch.Tensor,
         fill_hole: bool,
         invert: bool,
         feather: int,
@@ -56,6 +55,7 @@ class ImageMaskBlend(io.ComfyNode):
         background_color: str,
         background_opacity: float,
         output_mask_invert: bool,
+        mask: torch.Tensor | None = None,
     ) -> io.NodeOutput:
         """
         AE 对齐的遮罩融合（无 alpha 分支，输出 image 与 mask）：
@@ -76,6 +76,8 @@ class ImageMaskBlend(io.ComfyNode):
         """
         # 规范化输入数据
         image = torch.clamp(image, min=0.0, max=1.0).to(torch.float32)
+        if mask is None:
+            mask = torch.zeros(image.shape[:-1], dtype=torch.float32, device=image.device)
         mask = torch.clamp(mask, min=0.0, max=1.0).to(torch.float32)
         device = image.device
 
