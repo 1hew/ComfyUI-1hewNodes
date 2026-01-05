@@ -20,6 +20,7 @@
 |------|------|-------------|
 | `tile` | IMAGE | Batch of image tiles. |
 | `tile_meta` | DICT | Metadata containing tile positions, original size, overlap info, etc., for reconstruction. |
+| `bbox_mask` | MASK | Mask batch aligned with `tile`; each mask marks the tile crop region on the original image size (crop region = 1, elsewhere = 0). |
 
 ## Features
 
@@ -35,5 +36,5 @@
 ## Notes & Tips
 
 - **Reference Image Priority**: If `get_tile_size` is connected, it takes precedence over the `mode` selection.
-- **Preset Behavior**: Preset resolutions and Reference Image sizes are strictly respected and are NOT adjusted by `divisible_by`.
+- **Preset Behavior**: Preset resolutions and Reference Image sizes remain fixed; `divisible_by` is applied in `auto/grid` modes for size alignment.
 - **Reconstruction**: The `tile_meta` output is essential for the `Image Tile Merge` node to reconstruct the original image correctly.

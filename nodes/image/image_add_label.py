@@ -24,16 +24,19 @@ class ImageAddLabel(io.ComfyNode):
     """
     @classmethod
     def define_schema(cls) -> io.Schema:
-        package_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+        package_root = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+        )
         font_dir = os.path.join(package_root, "fonts")
         font_files = []
         if os.path.exists(font_dir):
             for file in os.listdir(font_dir):
                 if file.lower().endswith((".ttf", ".otf")):
                     font_files.append(file)
-        if not font_files:
-            font_files = ["FreeMono.ttf"]
+        font_files.sort()
         preferred = "Alibaba-PuHuiTi-Regular.otf"
+        if not font_files:
+            font_files = [preferred]
         default_font = preferred if preferred in font_files else font_files[0]
         return io.Schema(
             node_id="1hew_ImageAddLabel",
@@ -598,14 +601,17 @@ class ImageAddLabel(io.ComfyNode):
         """
         加载字体对象
         """
+        package_root = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+        )
+        font_path = os.path.join(package_root, "fonts", font)
+        if os.path.exists(font_path):
+            return ImageFont.truetype(font_path, font_size)
+
         try:
-            package_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-            font_path = os.path.join(package_root, "fonts", font)
-            font_obj = ImageFont.truetype(font_path, font_size)
-        except Exception as e:
-            print(f"无法加载字体 {font}: {e}，使用默认字体")
-            font_obj = ImageFont.load_default()
-        return font_obj
+            return ImageFont.truetype(font, font_size)
+        except Exception:
+            return ImageFont.load_default()
 
     @classmethod
     def validate_inputs(

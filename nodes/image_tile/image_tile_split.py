@@ -1,6 +1,6 @@
 import asyncio
 import math
-from typing import Any, Tuple, List, Dict
+from typing import Any
 
 import numpy as np
 from PIL import Image
@@ -55,6 +55,7 @@ class ImageTileSplit(io.ComfyNode):
             outputs=[
                 io.Image.Output(display_name="tile"),
                 io.Custom("DICT").Output(display_name="tile_meta"),
+                io.Mask.Output(display_name="bbox_mask"),
             ],
         )
 
@@ -169,6 +170,10 @@ class ImageTileSplit(io.ComfyNode):
         else:
             tiles_output = torch.empty(0, tile_height, tile_width, 3)
 
+        bbox_masks = cls.build_bbox_masks(tile_metas, original_size)
+        if bbox_masks.numel() > 0:
+            bbox_masks = bbox_masks.to(device=image.device, dtype=image.dtype)
+
         tile_meta = {
             "tile_metas": tile_metas,
             "original_size": original_size,
@@ -192,7 +197,28 @@ class ImageTileSplit(io.ComfyNode):
             tile_meta["tile_preset_size"] = preset_name
             tile_meta["predefined_size"] = f"{tile_width}x{tile_height}"
 
-        return io.NodeOutput(tiles_output, tile_meta)
+        return io.NodeOutput(tiles_output, tile_meta, bbox_masks)
+
+    @staticmethod
+    def build_bbox_masks(
+        tile_metas: list[dict[str, Any]],
+        original_size: tuple[int, int],
+    ) -> torch.Tensor:
+        img_width, img_height = original_size
+        if not tile_metas:
+            return torch.empty(0, img_height, img_width)
+
+        masks = np.zeros((len(tile_metas), img_height, img_width), dtype=np.float32)
+        for i, meta_item in enumerate(tile_metas):
+            left, top, right, bottom = meta_item["crop_region"]
+            left = max(0, int(left))
+            top = max(0, int(top))
+            right = min(img_width, int(right))
+            bottom = min(img_height, int(bottom))
+            if right > left and bottom > top:
+                masks[i, top:bottom, left:right] = 1.0
+
+        return torch.from_numpy(masks)
 
     @staticmethod
     def calculate_auto_grid(width, height, target_size=1024):

@@ -1,6 +1,8 @@
 from comfy_api.latest import io
 import torch
 
+from ...utils import first_torch_tensor, make_ui_text
+
 
 class IntImageSize(io.ComfyNode):
     @classmethod
@@ -20,8 +22,18 @@ class IntImageSize(io.ComfyNode):
 
     @classmethod
     async def execute(cls, image: torch.Tensor) -> io.NodeOutput:
-        if image.dim() == 3:
-            image = image.unsqueeze(0)
-        height = int(image.shape[1])
-        width = int(image.shape[2])
-        return io.NodeOutput(width, height)
+        tensor = first_torch_tensor(image)
+        if tensor is None or getattr(tensor, "ndim", 0) < 3:
+            return io.NodeOutput(
+                0,
+                0,
+                ui=make_ui_text("0x0"),
+            )
+
+        height = int(tensor.shape[-3])
+        width = int(tensor.shape[-2])
+        return io.NodeOutput(
+            width,
+            height,
+            ui=make_ui_text(f"{width}x{height}"),
+        )

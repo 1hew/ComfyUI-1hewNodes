@@ -1,6 +1,8 @@
 from comfy_api.latest import io
 import torch
 
+from ...utils import first_torch_tensor, make_ui_text
+
 
 class IntMaskSideLength(io.ComfyNode):
     @classmethod
@@ -18,8 +20,15 @@ class IntMaskSideLength(io.ComfyNode):
 
     @classmethod
     async def execute(cls, mask: torch.Tensor, mode: str) -> io.NodeOutput:
-        h = int(mask.shape[-2])
-        w = int(mask.shape[-1])
+        tensor = first_torch_tensor(mask)
+        if tensor is None or getattr(tensor, "ndim", 0) < 2:
+            return io.NodeOutput(
+                0,
+                ui=make_ui_text("0"),
+            )
+
+        h = int(tensor.shape[-2])
+        w = int(tensor.shape[-1])
         if mode == "shortest":
             value = min(w, h)
         elif mode == "width":
@@ -28,4 +37,8 @@ class IntMaskSideLength(io.ComfyNode):
             value = h
         else:
             value = max(w, h)
-        return io.NodeOutput(int(value))
+        value = int(value)
+        return io.NodeOutput(
+            value,
+            ui=make_ui_text(str(value)),
+        )

@@ -1,7 +1,7 @@
 from comfy_api.latest import io
 import numpy as np
+from PIL import Image
 import torch
-from PIL import Image, ImageOps
 
 
 class ImageBlendModeByAlpha(io.ComfyNode):
@@ -51,6 +51,9 @@ class ImageBlendModeByAlpha(io.ComfyNode):
         # 检查并转换 RGBA 图像为 RGB
         base_image = cls._convert_rgba_to_rgb(base_image)
         overlay_image = cls._convert_rgba_to_rgb(overlay_image)
+        batch_size = max(base_image.shape[0], overlay_image.shape[0])
+        base_image = cls._repeat_to_batch_size(base_image, batch_size)
+        overlay_image = cls._repeat_to_batch_size(overlay_image, batch_size)
         
         # 处理叠加图层
         blended = cls._apply_blend(base_image, overlay_image, blend_mode, opacity)
@@ -58,7 +61,7 @@ class ImageBlendModeByAlpha(io.ComfyNode):
         # 如果提供了遮罩，则应用遮罩
         if overlay_mask is not None:
             # 获取批次大小
-            base_batch_size = base_image.shape[0]
+            base_batch_size = blended.shape[0]
             mask_batch_size = overlay_mask.shape[0]
             
             # 创建输出图像列表
@@ -106,7 +109,22 @@ class ImageBlendModeByAlpha(io.ComfyNode):
             result = blended
         
         return io.NodeOutput(result)
-    
+
+    @staticmethod
+    def _repeat_to_batch_size(images: torch.Tensor, batch_size: int) -> torch.Tensor:
+        current_batch_size = images.shape[0]
+        if current_batch_size == batch_size:
+            return images
+
+        repeat_factor = batch_size // current_batch_size
+        remainder = batch_size % current_batch_size
+
+        repeated = images.repeat(repeat_factor, 1, 1, 1)
+        if remainder > 0:
+            repeated = torch.cat([repeated, images[:remainder]], dim=0)
+
+        return repeated
+
     @staticmethod
     def _convert_rgba_to_rgb(image):
         """将RGBA图像转换为RGB图像"""
@@ -129,36 +147,6 @@ class ImageBlendModeByAlpha(io.ComfyNode):
     
     @classmethod
     def _apply_blend(cls, base, overlay, blend_mode, opacity):
-        # 确保两个图像具有相同的批次大小
-        base_batch_size = base.shape[0]
-        overlay_batch_size = overlay.shape[0]
-        
-        # 处理批量不匹配：使用最大批次数量并复制较少批次的数据
-        if base_batch_size != overlay_batch_size:
-            max_batch_size = max(base_batch_size, overlay_batch_size)
-            
-            # 复制基础图像以匹配最大批次数量
-            if base_batch_size < max_batch_size:
-                repeat_factor = max_batch_size // base_batch_size
-                remainder = max_batch_size % base_batch_size
-                base_repeated = base.repeat(repeat_factor, 1, 1, 1)
-                if remainder > 0:
-                    base_remainder = base[:remainder]
-                    base = torch.cat([base_repeated, base_remainder], dim=0)
-                else:
-                    base = base_repeated
-            
-            # 复制叠加图像以匹配最大批次数量
-            if overlay_batch_size < max_batch_size:
-                repeat_factor = max_batch_size // overlay_batch_size
-                remainder = max_batch_size % overlay_batch_size
-                overlay_repeated = overlay.repeat(repeat_factor, 1, 1, 1)
-                if remainder > 0:
-                    overlay_remainder = overlay[:remainder]
-                    overlay = torch.cat([overlay_repeated, overlay_remainder], dim=0)
-                else:
-                    overlay = overlay_repeated
-        
         # 确保两个图像具有相同的尺寸
         base_height, base_width = base.shape[1:3]
         overlay_height, overlay_width = overlay.shape[1:3]

@@ -2,6 +2,8 @@ import random
 
 from comfy_api.latest import io
 
+from ...utils import make_ui_text
+
 
 class ListCustomSeed(io.ComfyNode):
     @classmethod
@@ -40,7 +42,8 @@ class ListCustomSeed(io.ComfyNode):
                 if s not in used:
                     used.add(s)
                     seeds.append(cls._clamp_seed(s))
-        return io.NodeOutput(seeds, len(seeds))
+        count_val = len(seeds)
+        return io.NodeOutput(seeds, count_val, ui=make_ui_text(str(count_val)))
 
     @staticmethod
     def _clamp_seed(seed: int) -> int:
