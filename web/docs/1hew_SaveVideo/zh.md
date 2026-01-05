@@ -1,32 +1,33 @@
-# Save Video - 保存视频
+# Save Video - 保存视频对象
 
-**节点功能：** `Save Video` 节点将 `VideoInput` 保存到输出目录或临时目录，并在界面中返回预览结果。节点支持可选输入，适合条件分支流程。
+**节点功能：** `Save Video` 用于将 VIDEO 对象保存到磁盘并返回保存路径。优先沿用源视频容器扩展名，并在存在 Alpha 时生成便于 UI 播放的预览视频。
 
 ## 输入
 
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
-| `video` | 可选 | VIDEO | - | - | 要保存的视频；输入为空时节点直接完成流程。 |
-| `filename_prefix` | - | STRING | `video/ComfyUI` | - | 保存文件前缀；支持格式占位符（如 `%date:yyyy-MM-dd%`）。 |
-| `save_output` | - | BOOLEAN | True | - | 为 True 时保存到输出目录；为 False 时保存到临时目录。 |
+| `video` | 可选 | VIDEO | - | - | 需要保存的视频对象；输入为空时节点直接通过。 |
+| `filename_prefix` | - | STRING | `video/ComfyUI` | - | 文件名前缀；支持占位符（如 `%date:yyyy-MM-dd%`）。 |
+| `save_output` | - | BOOLEAN | `true` | - | 保存到输出目录（true）或临时目录（false）。 |
 
 ## 输出
 
 | 输出名称 | 数据类型 | 描述 |
 |---------|----------|------|
-| - | - | 输出节点；在界面中返回保存结果的视频预览。 |
+| `file_path` | STRING | 保存后视频文件的绝对路径。 |
 
 ## 功能说明
 
-- 可选输入：`video` 支持按需连接，便于条件分支与可选保存。
-- 自动格式选择：使用 `format=auto` 与 `codec=auto` 选择适合的输出格式。
-- 元数据写入：在 ComfyUI 允许写入元数据时，保存 prompt 与 extra 信息到视频元数据。
+- 扩展名沿用：当 VIDEO 输入包含源路径时，优先使用源文件扩展名生成输出文件。
+- 元数据写入：在启用元数据时写入 prompt 与额外信息。
+- Alpha 预览：使用 ffprobe 检测 Alpha，并生成 VP9 WebM 预览用于界面播放。
+- 安全命名：基于 ComfyUI 的保存路径分配与计数器避免重名冲突。
 
 ## 典型用法
 
-- 保存上游视频：连接 VIDEO 输出到 `video`，设置 `filename_prefix` 进行归档。
-- 条件保存：在分支逻辑中按需提供 `video`，实现仅在满足条件时保存。
+- 保存下游生成或选择的 VIDEO 对象，并将输出路径交给外部工具使用。
 
 ## 注意与建议
 
-- `save_output=False` 适合以预览为主的流程，将文件保存在临时目录中。
+- Alpha 检测与预览生成依赖 `ffprobe` 与 `ffmpeg` 可执行文件。
+

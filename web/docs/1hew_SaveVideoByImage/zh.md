@@ -1,39 +1,38 @@
-# Save Video by Image - 图像序列保存为视频
+# Save Video by Image - 序列帧编码为视频
 
-**节点功能：** `Save Video by Image` 节点将 IMAGE 批次编码为视频文件，并支持可选的 AUDIO 合成。节点具备 Alpha 感知的编码与容器选择策略，并在界面中返回视频预览结果。
+**节点功能：** `Save Video by Image` 用于将 IMAGE 批次按指定 FPS 编码保存为视频文件。支持可选音频混流，并对包含 Alpha 的图像提供兼容的输出策略。
 
 ## 输入
 
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
-| `image` | 必需 | IMAGE | - | - | 输入图像批次 `[B,H,W,C]`，像素范围为 0–1。 |
-| `audio` | 可选 | AUDIO | - | - | 可选音频输入，包含 `waveform` 与 `sample_rate`。 |
-| `fps` | - | FLOAT | 8.0 | 0.01–120.0 | 输出视频帧率。 |
-| `filename_prefix` | - | STRING | `video/ComfyUI` | - | 保存路径前缀，位于输出目录或临时目录下。 |
-| `save_output` | - | BOOLEAN | True | - | 为 True 时保存到输出目录；为 False 时保存到临时目录。 |
+| `image` | - | IMAGE | - | - | 作为视频帧的图像批次。 |
+| `audio` | 可选 | AUDIO | - | - | 可选音频，用于混流到输出视频。 |
+| `fps` | - | FLOAT | `8.0` | 0.01-120 | 编码帧率（每秒帧数）。 |
+| `filename_prefix` | - | STRING | `video/ComfyUI` | - | 文件名前缀；遵循 ComfyUI 的保存路径规则。 |
+| `save_output` | - | BOOLEAN | `true` | - | 保存到输出目录（true）或临时目录（false）。 |
 
 ## 输出
 
 | 输出名称 | 数据类型 | 描述 |
 |---------|----------|------|
-| - | - | 输出节点；在界面中返回保存结果的视频预览。 |
+| `file_path` | STRING | 保存后视频文件的绝对路径。 |
 
 ## 功能说明
 
-- 尺寸对齐：自动调整为偶数宽高，以适配常见视频编码约束。
-- Alpha 支持：
-  - RGBA 输入（`C=4`）使用支持透明通道的编码方式。
-  - `save_output=True` 且为 RGBA 时，输出目录保存 `.mov`，同时生成 `.webm` 作为界面预览。
-- 音频合成：提供 `audio` 时，节点生成临时 WAV 并合成到目标视频容器。
-- FFmpeg 管线：通过 stdin 方式向 FFmpeg 传输原始帧数据进行编码。
+- FFmpeg 编码：以 rawvideo 方式向 ffmpeg 流式写入帧并完成编码。
+- 音频混流：将输入音频保存为临时 WAV，并在编码时进行混流。
+- Alpha 输出策略：
+  - RGBA 且 `save_output=true`：输出 `.mov`（ProRes，保留 Alpha），并在临时目录生成 `.webm` 预览。
+  - RGBA 且 `save_output=false`：输出带 Alpha 的 `.webm` 到临时目录。
+  - RGB：输出 `.mp4`（H.264）到目标目录。
+- 尺寸对齐：对常见编码器要求的偶数宽高进行自动调整。
 
 ## 典型用法
 
-- 将帧序列导出为 MP4：连接 IMAGE 批次，设置 `fps`，保持 `save_output=True`。
-- 导出带透明通道序列：输入 RGBA 图像，设置 `save_output=True` 生成 `.mov` 并提供 `.webm` 预览。
-- 合成音频：连接上游 AUDIO，节点将音频合成到输出视频中。
+- 将处理后的帧批次快速编码为可预览视频，并将输出路径交给后续节点使用。
 
 ## 注意与建议
 
-- 系统环境中准备可用的 `ffmpeg` 命令。
-- 批次数量与分辨率影响编码耗时，可按工作流需求选择合适的帧率与帧数。
+- 编码依赖 `ffmpeg` 可执行文件处于可访问环境中。
+

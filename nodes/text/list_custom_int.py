@@ -2,6 +2,8 @@ import re
 
 from comfy_api.latest import io
 
+from ...utils import make_ui_text
+
 
 class ListCustomInt(io.ComfyNode):
     @classmethod
@@ -25,7 +27,8 @@ class ListCustomInt(io.ComfyNode):
         items = cls._split_text(text)
         if not items:
             items = [0]
-        return io.NodeOutput(items, len(items))
+        count = len(items)
+        return io.NodeOutput(items, count, ui=make_ui_text(str(count)))
 
     @staticmethod
     def _parse_section(text: str) -> list[int]:

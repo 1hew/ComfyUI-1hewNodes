@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.2.0**
+- refactor(io): Refactor IO group
+
 **v3.1.0**
 - feat(io): Add `Save Video by Image` node for encoding IMAGE batches into video
 - refactor(color): Enhance `Match Brightness Contrast` sequence consistency options
@@ -494,11 +497,14 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📁 IO Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Get File Count | Get file count of specified type (image/video) in folder, supports recursive subfolder search |
-| Load Image From Folder | Load image at specified index from folder, supports batch processing and subfolders |
-| Load Video From Folder | Load video at specified index from folder, returns VIDEO object |
-| Save Video by Image | Encode IMAGE batch into video with optional audio muxing |
-| Save Video | Save VIDEO to output; supports optional input, auto container/codec selection |
+| Get File Count | Count image/video files in a folder with optional recursive scanning |
+| Load Image | Load images from a file or folder with batch mode, size unification, and derived masks |
+| Load Video | Select a video from a file or folder and apply trimming/FPS settings during decoding |
+| Load Video to Image | Decode a video into an image batch, audio, fps, and frame count |
+| Save Image | Save image batches to output/temp and return absolute saved file paths |
+| Save Video by Image | Encode an image batch into a video with optional audio muxing and alpha support |
+| Save Video | Save a VIDEO object to disk with container extension preservation and alpha preview |
+
 
 ### 🔊 Audio Nodes
 | Node Name | Description |
@@ -522,6 +528,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 [comfyUI_FrequencySeparation_RGB-HSV](https://github.com/risunobushi/comfyUI_FrequencySeparation_RGB-HSV)
 
 [comfyui_extractstoryboards](https://github.com/gitadmini/comfyui_extractstoryboards)
+
+[ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
+
 
 
 ## 🌟 Star

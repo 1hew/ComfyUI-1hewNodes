@@ -1,24 +1,34 @@
-# Get File Count
+# Get File Count - Count files in a folder
 
-**Node Purpose:** Counts the number of files of a specific type (Image or Video) in a folder.
+**Node Purpose:** `Get File Count` scans a folder and returns the number of image or video files found. It supports recursive scanning, stable sorting, and a change hash suitable for caching.
 
 ## Inputs
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `folder` | - | STRING | "" | - | The absolute path to the folder to check. |
-| `type` | - | COMBO | "image" | "image" / "video" | The type of files to count. |
-| `include_subfolder` | - | BOOLEAN | True | - | Whether to search in subfolders. |
+| `folder` | - | STRING | `""` | - | Target folder path. |
+| `type` | - | COMBO | `image` | `image` / `video` | File type group to count. |
+| `include_subdir` | - | BOOLEAN | `true` | - | Include subfolders in the scan. |
 
 ## Outputs
 
 | Name | Type | Description |
 |------|------|-------------|
-| `count` | INT | The total count of matching files found. |
+| `count` | INT | Number of matched files. |
+| `folder` | STRING | Echo of the input folder. |
+| `include_subdir` | BOOLEAN | Echo of the input option. |
 
 ## Features
 
-- **Format Filtering**: Counts files based on selected type:
-  - **Image**: `.png`, `.jpg`, `.jpeg`, `.bmp`, `.tiff`, `.webp`
-  - **Video**: `.webm`, `.mp4`, `.mkv`, `.gif`, `.mov`, `.avi`
-- **Utility**: Useful for iterating through datasets or validating folder contents before processing.
+- Extension filtering: counts common image or video extensions.
+- Deterministic order: paths are sorted case-insensitively for consistent results.
+- Change tracking: a path-list hash is used to support efficient downstream caching.
+
+## Typical Usage
+
+- Count frames as files before batch loading images or videos from a directory.
+
+## Notes & Tips
+
+- When `folder` points to an empty or unmatched directory, `count` becomes `0`.
+

@@ -24,7 +24,9 @@ class SaveVideoByImage(io.ComfyNode):
                 io.String.Input("filename_prefix", default="video/ComfyUI"),
                 io.Boolean.Input("save_output", default=True),
             ],
-            outputs=[],
+            outputs=[
+                io.String.Output(display_name="file_path"),
+            ],
             hidden=[io.Hidden.prompt, io.Hidden.extra_pnginfo],
             is_output_node=True,
         )
@@ -181,7 +183,11 @@ class SaveVideoByImage(io.ComfyNode):
             if audio_path and os.path.exists(audio_path):
                 os.remove(audio_path)
 
+        folder_path = os.path.abspath(os.path.dirname(path))
+        file_path = os.path.abspath(path)
+
         return io.NodeOutput(
+            file_path,
             ui=ui.PreviewVideo(
                 [
                     ui.SavedResult(

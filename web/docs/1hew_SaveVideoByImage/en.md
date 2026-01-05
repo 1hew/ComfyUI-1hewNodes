@@ -1,39 +1,38 @@
-# Save Video by Image - Encode image batches into video
+# Save Video by Image - Encode an image batch into a video
 
-**Node Purpose:** `Save Video by Image` encodes an IMAGE batch into a video file at the given FPS. It supports optional AUDIO muxing, alpha-aware codec/container selection, and returns a preview in the UI.
+**Node Purpose:** `Save Video by Image` encodes an IMAGE batch into a video file with a specified FPS. It supports optional audio muxing and alpha-aware output strategies.
 
 ## Inputs
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `image` | - | IMAGE | - | - | Input image batch `[B,H,W,C]` in 0–1 range. |
-| `audio` | optional | AUDIO | - | - | Optional audio dict containing `waveform` and `sample_rate`. |
-| `fps` | - | FLOAT | 8.0 | 0.01–120.0 | Frames per second for the output video. |
-| `filename_prefix` | - | STRING | `video/ComfyUI` | - | Save path prefix under output or temp directory. |
-| `save_output` | - | BOOLEAN | True | - | When True, saves into the output directory; when False, saves into the temp directory. |
+| `image` | - | IMAGE | - | - | Image batch used as frames. |
+| `audio` | optional | AUDIO | - | - | Optional audio to mux into the output. |
+| `fps` | - | FLOAT | `8.0` | 0.01-120 | Frames per second for encoding. |
+| `filename_prefix` | - | STRING | `video/ComfyUI` | - | Output filename prefix; follows ComfyUI save path rules. |
+| `save_output` | - | BOOLEAN | `true` | - | Save into output directory (true) or temp directory (false). |
 
 ## Outputs
 
 | Name | Type | Description |
 |------|------|-------------|
-| - | - | Output node; returns a UI preview of the saved video. |
+| `file_path` | STRING | Absolute path of the saved video file. |
 
 ## Features
 
-- Dimension alignment: auto-resizes to even width/height for video encoding compatibility.
-- Alpha handling:
-  - RGBA inputs (`C=4`) use alpha-capable encoding.
-  - When `save_output=True` with RGBA, the node saves a `.mov` for final output and a `.webm` for UI preview.
-- Audio muxing: when `audio` is provided, the node writes a temporary WAV and muxes it into the final container.
-- FFmpeg piping: streams raw frames to FFmpeg via stdin for efficient encoding.
+- FFmpeg raw-video encoding: streams frames to ffmpeg for encoding.
+- Audio support: saves provided audio to a temp WAV and muxes it during encoding.
+- Alpha-aware behavior:
+  - RGBA + `save_output=true`: saves a `.mov` (ProRes) to output and emits a `.webm` preview in temp.
+  - RGBA + `save_output=false`: saves `.webm` with alpha to temp.
+  - RGB: saves `.mp4` (H.264) to output or temp.
+- Even-dimension handling: automatically resizes to even width/height for common codecs.
 
 ## Typical Usage
 
-- Export a frame sequence as MP4: connect an IMAGE batch, set `fps`, keep `save_output=True`.
-- Export an RGBA sequence: use RGBA images, set `save_output=True` to generate a `.mov` plus a `.webm` preview.
-- Add audio: connect an AUDIO input from upstream nodes, and the node muxes audio into the result.
+- Convert a processed frame batch into a previewable video and keep the output path for later steps.
 
 ## Notes & Tips
 
-- Ensure `ffmpeg` is available on the system PATH.
-- Large batches increase encoding time; use a suitable FPS and batch length for workflow needs.
+- Ensure `ffmpeg` is available in your environment for encoding.
+

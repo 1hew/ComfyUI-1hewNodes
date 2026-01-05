@@ -1,32 +1,33 @@
-# Save Video - Save VideoInput to disk
+# Save Video - Save a VIDEO object to disk
 
-**Node Purpose:** `Save Video` saves a `VideoInput` into the output or temp directory and returns a UI preview. It supports optional input and can pass through when the input is empty.
+**Node Purpose:** `Save Video` writes a VIDEO object to disk and returns the saved path. It preserves the source container extension when available and provides an alpha-friendly preview for UI display.
 
 ## Inputs
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `video` | optional | VIDEO | - | - | Video to save; when absent, the node completes with no output. |
-| `filename_prefix` | - | STRING | `video/ComfyUI` | - | Save prefix; supports format placeholders (e.g., `%date:yyyy-MM-dd%`). |
-| `save_output` | - | BOOLEAN | True | - | When True, saves into the output directory; when False, saves into the temp directory. |
+| `video` | optional | VIDEO | - | - | Video to save; omitted input yields a passthrough behavior. |
+| `filename_prefix` | - | STRING | `video/ComfyUI` | - | Output filename prefix; supports formatting placeholders (e.g. `%date:yyyy-MM-dd%`). |
+| `save_output` | - | BOOLEAN | `true` | - | Save into output directory (true) or temp directory (false). |
 
 ## Outputs
 
 | Name | Type | Description |
 |------|------|-------------|
-| - | - | Output node; returns a UI preview of the saved video. |
+| `file_path` | STRING | Absolute path of the saved video file. |
 
 ## Features
 
-- Optional input handling: `video` can be omitted for conditional workflows.
-- Auto container selection: uses `format=auto` and `codec=auto` to pick a suitable output format.
-- Metadata embedding: when enabled in ComfyUI, writes prompt and extra PNG info as metadata.
+- Container-aware saving: uses the source file extension when the VIDEO input exposes a path.
+- Metadata embedding: attaches prompt/extra metadata when ComfyUI metadata is enabled.
+- Alpha preview workflow: detects alpha via ffprobe and generates a VP9 WebM preview for UI playback.
+- Safe naming: uses ComfyUI save path allocation with counters to avoid collisions.
 
 ## Typical Usage
 
-- Save an upstream decoded video: connect a VIDEO output into `video` and set `filename_prefix`.
-- Conditional save: drive `video` with an optional branch so the node saves only when a valid video is provided.
+- Save a selected or processed VIDEO object and use the returned path for external tools.
 
 ## Notes & Tips
 
-- `save_output=False` is useful for preview-oriented workflows that keep artifacts in the temp directory.
+- Ensure `ffprobe` and `ffmpeg` are available for alpha detection and preview generation.
+

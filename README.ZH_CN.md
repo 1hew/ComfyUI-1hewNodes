@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.2.0**
+- refactor(io): 重构 IO 组
+
 **v3.1.0**
 - feat(io): 添加 `Save Video by Image` 节点，用于将图像序列编码保存为视频
 - refactor(color): 优化 `Match Brightness Contrast` 节点一致性选项
@@ -494,11 +497,14 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📁 IO 节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Get File Count | 获取文件夹中指定类型（图像/视频）的文件数量，支持子文件夹递归 |
-| Load Image From Folder | 从文件夹加载指定索引的图像，支持批量处理和子文件夹 |
-| Load Video From Folder | 从文件夹加载指定索引的视频，返回 VIDEO 对象 |
-| Save Video by Image | 将图像序列合并并编码保存为视频，支持可选音频合成 |
-| Save Video | 保存视频到输出；支持空值输入，容器与编码器自动选择 |
+| Get File Count | 统计目录中图片或视频文件数量，支持递归扫描 |
+| Load Image | 从文件/目录加载图片，支持批量加载、尺寸统一与遮罩输出 |
+| Load Video | 从文件/目录选择视频并输出 VIDEO 对象，解码阶段应用裁切与 FPS 设置 |
+| Load Video to Image | 将视频解码为图像帧批次、音频、fps 与帧数信息 |
+| Save Image | 保存图像批次到输出/临时目录，并输出保存后的绝对路径 |
+| Save Video by Image | 将图像批次编码为视频，支持可选音频混流与 Alpha 输出策略 |
+| Save Video | 保存 VIDEO 对象并返回路径，沿用容器扩展名并生成 Alpha 预览 |
+
 
 ### 🔊 音频节点
 | 节点名称 | 功能描述 |
@@ -522,6 +528,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 [comfyUI_FrequencySeparation_RGB-HSV](https://github.com/risunobushi/comfyUI_FrequencySeparation_RGB-HSV)
 
 [comfyui_extractstoryboards](https://github.com/gitadmini/comfyui_extractstoryboards)
+
+[ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
+
 
 
 ## 🌟 星星
