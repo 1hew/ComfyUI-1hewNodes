@@ -1,8 +1,10 @@
 import asyncio
+import json
 import os
 from typing import Optional
 
 import folder_paths
+from comfy.cli_args import args
 import torch
 import torch.nn.functional as functional
 import torchaudio
@@ -40,6 +42,7 @@ class SaveVideoByImage(io.ComfyNode):
                 io.Float.Input("fps", default=8.0, min=0.01, max=120.0, step=0.01),
                 io.String.Input("filename_prefix", default="video/ComfyUI"),
                 io.Boolean.Input("save_output", default=True),
+                io.Boolean.Input("save_metadata", default=False),
             ],
             outputs=[
                 io.String.Output(display_name="file_path"),
@@ -55,6 +58,7 @@ class SaveVideoByImage(io.ComfyNode):
         fps: float,
         filename_prefix: str,
         save_output: bool,
+        save_metadata: bool,
         audio: Optional[dict] = None,
     ) -> io.NodeOutput:
         images = image
@@ -147,6 +151,19 @@ class SaveVideoByImage(io.ComfyNode):
             frame_count = int(images.shape[0])
             encode_passes = 2 if (has_alpha and save_output) else 1
             progress_bar = _new_progress_bar(frame_count * encode_passes)
+            metadata_comment = None
+            if save_metadata and not args.disable_metadata:
+                metadata: dict[str, object] = {}
+                if cls.hidden.extra_pnginfo is not None:
+                    metadata.update(cls.hidden.extra_pnginfo)
+                if cls.hidden.prompt is not None:
+                    metadata["prompt"] = cls.hidden.prompt
+                if metadata:
+                    metadata_comment = json.dumps(
+                        metadata,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
             if has_alpha and save_output:
                 await cls.ffmpeg_encode(
                     images=images,
@@ -161,6 +178,7 @@ class SaveVideoByImage(io.ComfyNode):
                     video_args=["-auto-alt-ref", "0", "-b:v", "0", "-crf", "30"],
                     audio_codec="libopus",
                     progress_bar=progress_bar,
+                    metadata_comment=metadata_comment,
                 )
                 await cls.ffmpeg_encode(
                     images=images,
@@ -175,6 +193,7 @@ class SaveVideoByImage(io.ComfyNode):
                     video_args=["-profile:v", "4"],
                     audio_codec="aac",
                     progress_bar=progress_bar,
+                    metadata_comment=metadata_comment,
                 )
             else:
                 await cls.ffmpeg_encode(
@@ -201,6 +220,7 @@ class SaveVideoByImage(io.ComfyNode):
                     ),
                     audio_codec="libopus" if has_alpha else "aac",
                     progress_bar=progress_bar,
+                    metadata_comment=metadata_comment,
                 )
         finally:
             if audio_path and os.path.exists(audio_path):
@@ -240,6 +260,7 @@ class SaveVideoByImage(io.ComfyNode):
         video_args: list[str],
         audio_codec: str,
         progress_bar: Optional[object] = None,
+        metadata_comment: Optional[str] = None,
     ):
         ffmpeg_path = "ffmpeg"
 
@@ -268,6 +289,10 @@ class SaveVideoByImage(io.ComfyNode):
 
         if audio_path:
             command.extend(["-c:a", audio_codec, "-shortest"])
+
+        command.extend(["-map_metadata", "-1"])
+        if metadata_comment:
+            command.extend(["-metadata", f"comment={metadata_comment}"])
 
         command.append(path)
 

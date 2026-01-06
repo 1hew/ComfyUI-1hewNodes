@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from typing import Optional
 
@@ -41,6 +42,7 @@ class SaveVideo(io.ComfyNode):
                 io.Video.Input("video", optional=True, tooltip="要保存的视频；为空时节点直接通过。"),
                 io.String.Input("filename_prefix", default="video/ComfyUI", tooltip="保存文件前缀；支持格式占位符（如 %date:yyyy-MM-dd%）。"),
                 io.Boolean.Input("save_output", default=True, tooltip="是否保存到输出目录；若为 False 则保存到临时目录。"),
+                io.Boolean.Input("save_metadata", default=False, tooltip="是否写入 prompt/workflow 元数据。"),
             ],
             outputs=[
                 io.String.Output(display_name="file_path"),
@@ -55,6 +57,7 @@ class SaveVideo(io.ComfyNode):
         video: Optional[VideoInput],
         filename_prefix: str,
         save_output: bool,
+        save_metadata: bool,
     ) -> io.NodeOutput:
         if video is None:
             return io.NodeOutput()
@@ -127,15 +130,19 @@ class SaveVideo(io.ComfyNode):
                     with open(preview_path, "wb"):
                         pass
 
-        saved_metadata = None
-        if not args.disable_metadata:
+        metadata_comment = None
+        if save_metadata and not args.disable_metadata:
             metadata: dict[str, object] = {}
             if cls.hidden.extra_pnginfo is not None:
                 metadata.update(cls.hidden.extra_pnginfo)
             if cls.hidden.prompt is not None:
                 metadata["prompt"] = cls.hidden.prompt
-            if len(metadata) > 0:
-                saved_metadata = metadata
+            if metadata:
+                metadata_comment = json.dumps(
+                    metadata,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
 
         progress_steps = 1
         if has_alpha and preview_path != path:
@@ -147,7 +154,7 @@ class SaveVideo(io.ComfyNode):
             path,
             format=format,
             codec=codec,
-            metadata=saved_metadata,
+            metadata=None,
         )
         if progress_bar is not None:
             try:
@@ -155,8 +162,17 @@ class SaveVideo(io.ComfyNode):
             except Exception:
                 pass
 
+        await cls._remux_metadata(
+            input_path=path,
+            metadata_comment=metadata_comment,
+        )
+
         if has_alpha and preview_path != path:
-            await cls.generate_preview(video.path, preview_path)
+            await cls.generate_preview(
+                path,
+                preview_path,
+                strip_metadata=not save_metadata,
+            )
             if progress_bar is not None:
                 try:
                     progress_bar.update(1)
@@ -177,6 +193,49 @@ class SaveVideo(io.ComfyNode):
                 ]
             )
         )
+
+    @staticmethod
+    async def _remux_metadata(
+        input_path: str,
+        metadata_comment: Optional[str],
+    ):
+        if not os.path.isfile(input_path):
+            return
+
+        base, ext = os.path.splitext(input_path)
+        tmp_path = f"{base}.tmp{ext}"
+
+        command = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            input_path,
+            "-map",
+            "0",
+            "-c",
+            "copy",
+            "-map_metadata",
+            "-1",
+        ]
+
+        if metadata_comment:
+            command.extend(["-metadata", f"comment={metadata_comment}"])
+
+        command.append(tmp_path)
+
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await process.communicate()
+
+        if process.returncode != 0:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            raise Exception(f"FFmpeg remux failed: {stderr.decode()}")
+
+        os.replace(tmp_path, input_path)
 
     @staticmethod
     async def check_has_alpha(path: str) -> bool:
@@ -217,34 +276,12 @@ class SaveVideo(io.ComfyNode):
             return False
 
     @staticmethod
-    async def generate_preview(input_path: str, output_path: str):
+    async def generate_preview(
+        input_path: str,
+        output_path: str,
+        strip_metadata: bool = False,
+    ):
         try:
-            command = [
-                "ffmpeg",
-                "-y",
-                "-i",
-                input_path,
-                "-c:v",
-                "libvpx-vp9",
-                "-pix_fmt",
-                "yuva420p",
-                "-auto-alt-ref",
-                "0",
-                "-b:v",
-                "0",
-                "-crf",
-                "30",
-                "-an",  # No audio for preview usually, or keep it? save_video_by_image keeps it if present.
-                # Let's keep audio if possible, but save_video_by_image adds it separately.
-                # Here we just convert the file.
-                output_path,
-            ]
-            
-            # If input has audio, we should probably keep it or transcode it.
-            # Using -an for safety unless we want to deal with audio codecs.
-            # save_video_by_image uses "libopus" for alpha preview.
-            # Let's try to include audio with libopus.
-            
             command = [
                 "ffmpeg",
                 "-y",
@@ -262,8 +299,12 @@ class SaveVideo(io.ComfyNode):
                 "30",
                 "-c:a",
                 "libopus",
-                output_path,
             ]
+
+            if strip_metadata:
+                command.extend(["-map_metadata", "-1"])
+
+            command.append(output_path)
 
             process = await asyncio.create_subprocess_exec(
                 *command,

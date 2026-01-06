@@ -492,10 +492,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Multi Mask Batch | Build mask batch from dynamic `mask_X` with crop/pad/stretch size unification and configurable gray padding |
 | Multi Mask Math Ops | Dynamic multi-mask operations (union/intersection/difference/XOR) with batch broadcasting and size alignment |
 
-### 🎛️ Conditioning Nodes
-| Node Name | Description |
-|-----------|-------------|
-| Text Encode QwenImageEdit Keep Size | Qwen image-edit conditioning encoder combining vision inputs and text, supports size preservation modes and reference latents |
 
 ### 📁 IO Nodes
 | Node Name | Description |
