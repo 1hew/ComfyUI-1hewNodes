@@ -1,6 +1,6 @@
 import asyncio
-from comfy_api.latest import io
 import numpy as np
+from comfy_api.latest import io
 from PIL import Image
 import torch
 import torch.nn.functional as F
@@ -11,14 +11,14 @@ class ImageMaskCrop(io.ComfyNode):
 
     参数语义：
     - output_alpha：是否输出带 alpha 通道的图像（由 mask 提供），
-      True 输出 RGBA，False 输出 RGB。
+      True 输出 RGBA，False 时输入为 RGBA 则保持 RGBA。
     - output_crop：是否根据 mask 的边界框进行裁剪，
       True 裁剪到 bbox，False 保持原输入尺寸。
 
     批处理规则：图像与遮罩数量不一致时按最大批次循环使用。
     输出与公式：
     - 当 output_alpha=True：alpha = mask（0–255），图像输出为 RGBA；
-      当 output_alpha=False：输出为 RGB（若输入有 alpha 则丢弃）。
+      当 output_alpha=False：输入为 RGBA 则保持 RGBA，输入为 RGB 则输出 RGB。
     - 当 output_crop=True：对图像与遮罩进行 bbox 裁剪后输出；
       当 output_crop=False：保持原尺寸，整幅图应用 alpha 或保持 RGB。
     """
@@ -91,8 +91,6 @@ class ImageMaskCrop(io.ComfyNode):
                         rgb_np = np.array(img_pil)
                         if rgb_np.ndim == 2:
                             rgb_np = np.stack([rgb_np] * 3, axis=-1)
-                        elif rgb_np.shape[2] == 4:
-                            rgb_np = rgb_np[:, :, :3]
                         img_t = torch.from_numpy(
                             rgb_np.astype(np.float32) / 255.0
                         )
@@ -121,8 +119,6 @@ class ImageMaskCrop(io.ComfyNode):
                         cropped_np = np.array(cropped_img)
                         if cropped_np.ndim == 2:
                             cropped_np = np.stack([cropped_np] * 3, axis=-1)
-                        elif cropped_np.shape[2] == 4:
-                            cropped_np = cropped_np[:, :, :3]
                         img_t = torch.from_numpy(
                             cropped_np.astype(np.float32) / 255.0
                         )
@@ -149,8 +145,6 @@ class ImageMaskCrop(io.ComfyNode):
                         rgb_np = np.array(img_pil)
                         if rgb_np.ndim == 2:
                             rgb_np = np.stack([rgb_np] * 3, axis=-1)
-                        elif rgb_np.shape[2] == 4:
-                            rgb_np = rgb_np[:, :, :3]
                         img_t = torch.from_numpy(
                             rgb_np.astype(np.float32) / 255.0
                         )
@@ -208,8 +202,25 @@ class ImageMaskCrop(io.ComfyNode):
             pad_h = max_height - h
             pad_w = max_width - w
             pad_c = max_channels - c
-            padded_img = F.pad(img, (0, pad_c, 0, pad_w, 0, pad_h), value=0)
-            padded_images.append(padded_img)
+            padded_spatial = F.pad(img, (0, 0, 0, pad_w, 0, pad_h), value=0)
+            if pad_c <= 0:
+                padded_images.append(padded_spatial)
+                continue
+
+            if max_channels == 4 and c == 3 and pad_c == 1:
+                extra = torch.ones(
+                    (max_height, max_width, 1),
+                    dtype=padded_spatial.dtype,
+                    device=padded_spatial.device,
+                )
+            else:
+                extra = torch.zeros(
+                    (max_height, max_width, pad_c),
+                    dtype=padded_spatial.dtype,
+                    device=padded_spatial.device,
+                )
+
+            padded_images.append(torch.cat([padded_spatial, extra], dim=2))
         return padded_images
     
     @staticmethod

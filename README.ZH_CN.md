@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.2.1**
+- feat(io): 添加视频加载条
+
 **v3.2.0**
 - refactor(io): 重构 IO 组
 

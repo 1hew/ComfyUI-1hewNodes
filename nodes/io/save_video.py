@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import shutil
 from typing import Optional
 
 import folder_paths
@@ -11,8 +10,24 @@ from comfy_api.input import VideoInput
 from comfy_api.latest import io, ui
 from comfy_api.util import VideoContainer
 
+try:
+    from comfy.utils import ProgressBar
+except Exception:
+    ProgressBar = None
+
 
 _PATH_LOCK: Optional[asyncio.Lock] = None
+
+
+def _new_progress_bar(total: int):
+    if ProgressBar is None:
+        return None
+    if int(total or 0) <= 0:
+        return None
+    try:
+        return ProgressBar(int(total))
+    except Exception:
+        return None
 
 
 class SaveVideo(io.ComfyNode):
@@ -122,12 +137,32 @@ class SaveVideo(io.ComfyNode):
             if len(metadata) > 0:
                 saved_metadata = metadata
 
-        await asyncio.to_thread(video.save_to, path, format=format, codec=codec, metadata=saved_metadata)
+        progress_steps = 1
+        if has_alpha and preview_path != path:
+            progress_steps += 1
+        progress_bar = _new_progress_bar(progress_steps)
+
+        await asyncio.to_thread(
+            video.save_to,
+            path,
+            format=format,
+            codec=codec,
+            metadata=saved_metadata,
+        )
+        if progress_bar is not None:
+            try:
+                progress_bar.update(1)
+            except Exception:
+                pass
 
         if has_alpha and preview_path != path:
             await cls.generate_preview(video.path, preview_path)
+            if progress_bar is not None:
+                try:
+                    progress_bar.update(1)
+                except Exception:
+                    pass
 
-        folder_path = os.path.abspath(os.path.dirname(path))
         file_path = os.path.abspath(path)
 
         return io.NodeOutput(
@@ -238,7 +273,7 @@ class SaveVideo(io.ComfyNode):
             _, stderr = await process.communicate()
             
             if process.returncode != 0:
-                print(f"Warning: Preview generation failed: {stderr.decode()}")
+                print(f"Info: Preview generation skipped: {stderr.decode()}")
                 
         except Exception as e:
-            print(f"Warning: Preview generation error: {e}")
+            print(f"Info: Preview generation skipped: {e}")

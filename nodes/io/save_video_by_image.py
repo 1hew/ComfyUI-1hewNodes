@@ -8,7 +8,24 @@ import torch.nn.functional as functional
 import torchaudio
 from comfy_api.latest import io, ui
 
+try:
+    from comfy.utils import ProgressBar
+except Exception:
+    ProgressBar = None
+
 _PATH_LOCK: Optional[asyncio.Lock] = None
+
+
+def _new_progress_bar(total: int):
+    if ProgressBar is None:
+        return None
+    if int(total or 0) <= 0:
+        return None
+    try:
+        return ProgressBar(int(total))
+    except Exception:
+        return None
+
 
 class SaveVideoByImage(io.ComfyNode):
     @classmethod
@@ -127,6 +144,9 @@ class SaveVideoByImage(io.ComfyNode):
                 audio_path = None
 
         try:
+            frame_count = int(images.shape[0])
+            encode_passes = 2 if (has_alpha and save_output) else 1
+            progress_bar = _new_progress_bar(frame_count * encode_passes)
             if has_alpha and save_output:
                 await cls.ffmpeg_encode(
                     images=images,
@@ -140,6 +160,7 @@ class SaveVideoByImage(io.ComfyNode):
                     output_pix_fmt="yuva420p",
                     video_args=["-auto-alt-ref", "0", "-b:v", "0", "-crf", "30"],
                     audio_codec="libopus",
+                    progress_bar=progress_bar,
                 )
                 await cls.ffmpeg_encode(
                     images=images,
@@ -153,6 +174,7 @@ class SaveVideoByImage(io.ComfyNode):
                     output_pix_fmt="yuva444p10le",
                     video_args=["-profile:v", "4"],
                     audio_codec="aac",
+                    progress_bar=progress_bar,
                 )
             else:
                 await cls.ffmpeg_encode(
@@ -178,12 +200,12 @@ class SaveVideoByImage(io.ComfyNode):
                         ]
                     ),
                     audio_codec="libopus" if has_alpha else "aac",
+                    progress_bar=progress_bar,
                 )
         finally:
             if audio_path and os.path.exists(audio_path):
                 os.remove(audio_path)
 
-        folder_path = os.path.abspath(os.path.dirname(path))
         file_path = os.path.abspath(path)
 
         return io.NodeOutput(
@@ -217,6 +239,7 @@ class SaveVideoByImage(io.ComfyNode):
         output_pix_fmt: str,
         video_args: list[str],
         audio_codec: str,
+        progress_bar: Optional[object] = None,
     ):
         ffmpeg_path = "ffmpeg"
 
@@ -257,14 +280,35 @@ class SaveVideoByImage(io.ComfyNode):
             )
 
             async def feed_stdin():
-                for i in range(images.shape[0]):
+                total_frames = int(images.shape[0])
+                update_every = max(1, int(total_frames // 200) or 1)
+                last_reported = 0
+                frames_written = 0
+                for i in range(total_frames):
                     frame = images[i]
                     frame = (frame * 255).byte().cpu().numpy()
                     try:
                         process.stdin.write(frame.tobytes())
                         await process.stdin.drain()
+                        frames_written += 1
+                        if (
+                            progress_bar is not None
+                            and frames_written - last_reported >= update_every
+                        ):
+                            delta = frames_written - last_reported
+                            try:
+                                progress_bar.update(int(delta))
+                            except Exception:
+                                pass
+                            last_reported = frames_written
                     except (BrokenPipeError, OSError):
                         break
+                if progress_bar is not None and frames_written > last_reported:
+                    delta = frames_written - last_reported
+                    try:
+                        progress_bar.update(int(delta))
+                    except Exception:
+                        pass
                 process.stdin.close()
 
             async def log_stderr():
