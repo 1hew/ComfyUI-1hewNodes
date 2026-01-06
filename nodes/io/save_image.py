@@ -22,6 +22,7 @@ class SaveImage(io.ComfyNode):
                 io.Image.Input("image", optional=True),
                 io.String.Input("filename_prefix", default="image/ComfyUI"),
                 io.Boolean.Input("save_output", default=True),
+                io.Boolean.Input("save_metadata", default=False),
             ],
             outputs=[
                 io.String.Output(display_name="file_path"),
@@ -36,6 +37,7 @@ class SaveImage(io.ComfyNode):
         image: Optional[torch.Tensor],
         filename_prefix: str,
         save_output: bool,
+        save_metadata: bool,
     ) -> io.NodeOutput:
         if image is None:
             return io.NodeOutput()
@@ -46,12 +48,21 @@ class SaveImage(io.ComfyNode):
         if _PATH_LOCK is None:
             _PATH_LOCK = asyncio.Lock()
 
+        class _Hidden:
+            prompt = None
+            extra_pnginfo = None
+
+        class _NoMetadataNode:
+            hidden = _Hidden()
+
+        effective_cls = cls if save_metadata else _NoMetadataNode
+
         async with _PATH_LOCK:
             results = ui.ImageSaveHelper.save_images(
                 image,
                 filename_prefix=filename_prefix,
                 folder_type=folder_type,
-                cls=cls,
+                cls=effective_cls,
                 compress_level=4,
             )
 

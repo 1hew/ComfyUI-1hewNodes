@@ -492,10 +492,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Multi Mask Batch | 从动态 `mask_X` 构建批次，支持 crop/pad/stretch 尺寸统一与灰度填充 |
 | Multi Mask Math Ops | 动态多遮罩运算（交/并/差/异或），支持批次广播与统一尺寸 |
 
-### 🎛️ 条件编码节点
-| 节点名称 | 功能描述 |
-|---------|----------|
-| Text Encode QwenImageEdit Keep Size | Qwen 图文编辑条件编码，支持多图视觉编码、尺寸保持策略与参考潜空间 |
 
 ### 📁 IO 节点
 | 节点名称 | 功能描述 |
