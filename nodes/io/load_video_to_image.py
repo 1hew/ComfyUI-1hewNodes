@@ -14,6 +14,11 @@ import numpy as np
 import torch
 from comfy_api.latest import io
 
+try:
+    from comfy.utils import ProgressBar
+except Exception:
+    ProgressBar = None
+
 
 VALID_VIDEO_EXTENSIONS = {
     ".avi",
@@ -27,6 +32,17 @@ VALID_VIDEO_EXTENSIONS = {
     ".m4v",
     ".qt",
 }
+
+
+def _new_progress_bar(total: int):
+    if ProgressBar is None:
+        return None
+    if int(total or 0) <= 0:
+        return None
+    try:
+        return ProgressBar(int(total))
+    except Exception:
+        return None
 
 
 class VideoComponents:
@@ -120,7 +136,7 @@ class VideoFromFile:
             "-select_streams",
             "v:0",
             "-show_entries",
-            "stream=width,height,avg_frame_rate,pix_fmt",
+            "stream=width,height,avg_frame_rate,pix_fmt,nb_frames,duration",
             "-of",
             "json",
             path,
@@ -152,7 +168,22 @@ class VideoFromFile:
         height = int(stream.get("height") or 0)
         fps = cls._parse_rate(stream.get("avg_frame_rate") or "")
         pix_fmt = (stream.get("pix_fmt") or "").lower()
-        return {"width": width, "height": height, "fps": fps, "pix_fmt": pix_fmt}
+        try:
+            nb_frames = int(stream.get("nb_frames") or 0)
+        except Exception:
+            nb_frames = 0
+        try:
+            duration = float(stream.get("duration") or 0.0)
+        except Exception:
+            duration = 0.0
+        return {
+            "width": width,
+            "height": height,
+            "fps": fps,
+            "pix_fmt": pix_fmt,
+            "nb_frames": nb_frames,
+            "duration": duration,
+        }
 
     @staticmethod
     def _prefer_alpha_for_stream(stream) -> bool:
@@ -175,6 +206,8 @@ class VideoFromFile:
         width: int,
         height: int,
         pix_fmt: str,
+        expected_frames: int = 0,
+        progress_bar: Optional[object] = None,
     ) -> list[np.ndarray]:
         if int(width) <= 0 or int(height) <= 0:
             info = VideoFromFile._probe_video_info_with_ffprobe(path)
@@ -213,7 +246,14 @@ class VideoFromFile:
                 f"Resolved ffmpeg path: {ffmpeg_exe}"
             ) from exc
 
+        if progress_bar is None and int(expected_frames or 0) > 0:
+            progress_bar = _new_progress_bar(int(expected_frames))
         frames: list[np.ndarray] = []
+        update_every = 0
+        last_reported = 0
+        frames_decoded = 0
+        if progress_bar is not None and int(expected_frames or 0) > 0:
+            update_every = max(1, int(int(expected_frames) // 200) or 1)
         try:
             stdout = process.stdout
             if stdout is None:
@@ -227,9 +267,28 @@ class VideoFromFile:
                     height, width, channels
                 )
                 frames.append(frame.copy())
+                if progress_bar is not None and update_every:
+                    frames_decoded += 1
+                    if frames_decoded - last_reported >= update_every:
+                        delta = frames_decoded - last_reported
+                        try:
+                            progress_bar.update(int(delta))
+                        except Exception:
+                            pass
+                        last_reported = frames_decoded
 
             return frames
         finally:
+            if (
+                progress_bar is not None
+                and update_every
+                and frames_decoded > last_reported
+            ):
+                delta = frames_decoded - last_reported
+                try:
+                    progress_bar.update(int(delta))
+                except Exception:
+                    pass
             stderr_text = ""
             try:
                 process.wait(timeout=30)
@@ -278,6 +337,11 @@ class VideoFromFile:
             width = int(info.get("width") or 0)
             height = int(info.get("height") or 0)
             fps = float(info.get("fps") or 0.0)
+            expected_frames = int(info.get("nb_frames") or 0)
+            if expected_frames <= 0:
+                duration = float(info.get("duration") or 0.0)
+                if duration > 0.0 and fps > 0.0:
+                    expected_frames = int(round(duration * fps))
 
             frames = []
             for pix_fmt in ("rgba", "rgb24"):
@@ -287,6 +351,7 @@ class VideoFromFile:
                         width=width,
                         height=height,
                         pix_fmt=pix_fmt,
+                        expected_frames=expected_frames,
                     )
                 except Exception:
                     frames = []
@@ -301,6 +366,8 @@ class VideoFromFile:
 
         frames: list[np.ndarray] = []
         video_info: dict = {}
+        expected_video_frames = 0
+        progress_bar = None
 
         if len(container.streams.video) > 0:
             stream = container.streams.video[0]
@@ -329,6 +396,20 @@ class VideoFromFile:
                 "width": stream.width,
                 "height": stream.height,
             }
+            expected_video_frames = int(video_info.get("source_frame_count") or 0)
+            if expected_video_frames <= 0:
+                try:
+                    duration = float(stream.duration * stream.time_base)
+                except Exception:
+                    duration = 0.0
+                if duration > 0.0 and float(video_info.get("fps") or 0.0) > 0.0:
+                    expected_video_frames = int(
+                        round(duration * float(video_info["fps"]))
+                    )
+            progress_bar = _new_progress_bar(expected_video_frames)
+            update_every = max(1, int(expected_video_frames // 200) or 1)
+            last_reported = 0
+            frames_decoded = 0
             if (
                 float(video_info.get("fps") or 0.0) <= 0.0
                 or int(video_info.get("width") or 0) <= 0
@@ -399,8 +480,23 @@ class VideoFromFile:
                         img_np = np.concatenate([rgb, alpha], axis=-1)
 
                     frames.append(img_np)
+                    if progress_bar is not None:
+                        frames_decoded += 1
+                        if frames_decoded - last_reported >= update_every:
+                            delta = frames_decoded - last_reported
+                            try:
+                                progress_bar.update(int(delta))
+                            except Exception:
+                                pass
+                            last_reported = frames_decoded
             except Exception as exc:
                 pass
+            if progress_bar is not None and frames_decoded > last_reported:
+                delta = frames_decoded - last_reported
+                try:
+                    progress_bar.update(int(delta))
+                except Exception:
+                    pass
 
             if prefer_alpha and frames and frames[0].shape[-1] != 4:
                 ff_frames = self._decode_frames_with_ffmpeg(
@@ -408,6 +504,7 @@ class VideoFromFile:
                     width=int(stream.width or 0),
                     height=int(stream.height or 0),
                     pix_fmt="rgba",
+                    expected_frames=expected_video_frames,
                 )
                 if ff_frames:
                     frames = ff_frames
@@ -420,6 +517,7 @@ class VideoFromFile:
                         width=int(stream.width or 0),
                         height=int(stream.height or 0),
                         pix_fmt=ff_pix_fmt,
+                        expected_frames=expected_video_frames,
                     )
                 except Exception:
                     frames = []
@@ -428,6 +526,12 @@ class VideoFromFile:
             info = self._probe_video_info_with_ffprobe(path)
             width = int(info.get("width") or 0)
             height = int(info.get("height") or 0)
+            fps = float(info.get("fps") or 0.0)
+            expected_frames = int(info.get("nb_frames") or 0)
+            if expected_frames <= 0:
+                duration = float(info.get("duration") or 0.0)
+                if duration > 0.0 and fps > 0.0:
+                    expected_frames = int(round(duration * fps))
             for pix_fmt in ("rgba", "rgb24"):
                 try:
                     frames = self._decode_frames_with_ffmpeg(
@@ -435,6 +539,7 @@ class VideoFromFile:
                         width=width,
                         height=height,
                         pix_fmt=pix_fmt,
+                        expected_frames=expected_frames,
                     )
                 except Exception:
                     frames = []
