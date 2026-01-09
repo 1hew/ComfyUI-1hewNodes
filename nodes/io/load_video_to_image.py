@@ -596,7 +596,7 @@ class LoadVideoToImage(io.ComfyNode):
             display_name="Load Video to Image",
             category="1hewNodes/io",
             inputs=[
-                io.String.Input("path", default=""),
+                io.String.Input("file", default=""),
                 io.Int.Input("frame_limit", default=0, min=0, max=100000, step=1),
                 io.Float.Input("fps", default=0.0, min=0.0, max=120.0, step=1.0),
                 io.Int.Input("start_skip", default=0, min=0, max=100000, step=1),
@@ -616,7 +616,7 @@ class LoadVideoToImage(io.ComfyNode):
     @classmethod
     async def execute(
         cls,
-        path: str,
+        file: str,
         fps: float,
         frame_limit: int,
         start_skip: int,
@@ -625,8 +625,8 @@ class LoadVideoToImage(io.ComfyNode):
         video_index: int,
         include_subdir: bool,
     ) -> io.NodeOutput:
-        path = (path or "").strip().strip('"').strip("'")
-        video_paths = cls.get_video_paths(path, include_subdir)
+        file = (file or "").strip().strip('"').strip("'")
+        video_paths = cls.get_video_paths(file, include_subdir)
         count = len(video_paths)
 
         if count == 0:
@@ -892,19 +892,19 @@ class LoadVideoToImage(io.ComfyNode):
         return video_paths
 
     @classmethod
-    def IS_CHANGED(cls, path, include_subdir, **kwargs):
-        path = (path or "").strip().strip('"').strip("'")
-        if os.path.isfile(path):
+    def IS_CHANGED(cls, file, include_subdir, **kwargs):
+        file = (file or "").strip().strip('"').strip("'")
+        if os.path.isfile(file):
             try:
-                mtime = os.path.getmtime(path)
-                return hashlib.sha256(f"{path}:{mtime}".encode()).hexdigest()
+                mtime = os.path.getmtime(file)
+                return hashlib.sha256(f"{file}:{mtime}".encode()).hexdigest()
             except OSError:
                 return float("nan")
 
-        if not os.path.isdir(path):
+        if not os.path.isdir(file):
             return float("nan")
 
-        video_paths = cls.get_video_paths(path, include_subdir)
+        video_paths = cls.get_video_paths(file, include_subdir)
         m = hashlib.sha256()
         for video_path in video_paths:
             try:

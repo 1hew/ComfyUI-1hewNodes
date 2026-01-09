@@ -508,6 +508,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Save Video | 保存 VIDEO 对象并返回路径，沿用容器扩展名并生成 Alpha 预览 |
 
 
+### 🎛️ 条件编码节点
+| 节点名称 | 功能描述 |
+|---------|----------|
+| Text Encode QwenImageEdit Keep Size | Qwen 图文编辑条件编码，支持多图视觉编码、尺寸保持策略与参考潜空间 |
+
+
 ### 🔊 音频节点
 | 节点名称 | 功能描述 |
 |---------|----------|

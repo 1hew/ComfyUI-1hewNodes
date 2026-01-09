@@ -28,8 +28,8 @@ app.registerExtension({
                 ? onConfigure.apply(this, arguments)
                 : undefined;
             if (this.widgets) {
-                const pathWidget = this.widgets.find((w) => w.name === "path");
-                if (pathWidget && pathWidget.value) {
+                const fileWidget = this.widgets.find((w) => w.name === "file");
+                if (fileWidget && fileWidget.value) {
                     setTimeout(() => {
                         const update = this.updatePreview;
                         if (update) update();
@@ -52,7 +52,7 @@ app.registerExtension({
                 ? onNodeCreated.apply(this, arguments)
                 : undefined;
 
-            const pathWidget = this.widgets.find((w) => w.name === "path");
+            const fileWidget = this.widgets.find((w) => w.name === "file");
             const indexWidget = this.widgets.find((w) => w.name === "video_index");
             const includeSubdirWidget = this.widgets.find(
                 (w) => w.name === "include_subdir"
@@ -479,7 +479,7 @@ app.registerExtension({
             container.appendChild(fileInputEl);
 
             // Add upload button widget
-            const uploadWidget = this.addWidget("button", "choose video to upload", "image", () => {
+            const uploadWidget = this.addWidget("button", "choose file to upload", "image", () => {
                 app.canvas.node_widget = null; // Clear active widget
                 fileInputEl.click();
             });
@@ -508,10 +508,10 @@ app.registerExtension({
                     return;
                 }
 
-                if (pathWidget) {
-                    pathWidget.value = newPath;
-                    if (typeof pathWidget.callback === "function") {
-                        pathWidget.callback();
+                if (fileWidget) {
+                    fileWidget.value = newPath;
+                    if (typeof fileWidget.callback === "function") {
+                        fileWidget.callback();
                     }
                 }
                 if (this.updatePreview) {
@@ -549,10 +549,10 @@ app.registerExtension({
                     return;
                 }
 
-                if (pathWidget) {
-                    pathWidget.value = folder;
-                    if (typeof pathWidget.callback === "function") {
-                        pathWidget.callback();
+                if (fileWidget) {
+                    fileWidget.value = folder;
+                    if (typeof fileWidget.callback === "function") {
+                        fileWidget.callback();
                     }
                 }
 
@@ -690,11 +690,11 @@ app.registerExtension({
             setTimeout(ensurePreviewLayout, 800);
 
             this.updatePreview = async () => {
-                const path = pathWidget.value;
+                const file = fileWidget.value;
                 const index = indexWidget.value;
                 const includeSubdir = includeSubdirWidget.value;
 
-                if (!path) {
+                if (!file) {
                     this._comfy1hewVideoInfo = null;
                     this.videoWidget.aspectRatio = undefined;
                     infoEl.innerText = "";
@@ -706,7 +706,7 @@ app.registerExtension({
                 }
 
                 const params = new URLSearchParams({
-                    path: path,
+                    file: file,
                     index: index,
                     include_subdir: includeSubdir,
                     t: Date.now(),
@@ -725,7 +725,7 @@ app.registerExtension({
 
                 try {
                     const infoParams = new URLSearchParams({
-                        path: path,
+                        file: file,
                         index: index,
                         include_subdir: includeSubdir,
                     });
@@ -774,11 +774,11 @@ app.registerExtension({
                 return r2;
             };
 
-            if (pathWidget) pathWidget.callback = this.updatePreview;
+            if (fileWidget) fileWidget.callback = this.updatePreview;
             if (indexWidget) indexWidget.callback = this.updatePreview;
             if (includeSubdirWidget) includeSubdirWidget.callback = this.updatePreview;
 
-            if (pathWidget && pathWidget.value) {
+            if (fileWidget && fileWidget.value) {
                 this.updatePreview();
             }
 
