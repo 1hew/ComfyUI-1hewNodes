@@ -1,84 +1,13 @@
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
 import { addPreviewMenuOptions, applyPreviewHiddenState } from "./core/preview_menu.js";
-
-async function srcToDataUrl(src) {
-    const res = await fetch(src);
-    const blob = await res.blob();
-    return await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ""));
-        reader.readAsDataURL(blob);
-    });
-}
-
-async function saveMaskFromClipspaceToSidecar(node) {
-    const clipspace = window?.ComfyApp?.clipspace;
-    const imgs = clipspace?.imgs;
-    if (!Array.isArray(imgs) || imgs.length === 0) {
-        return;
-    }
-
-    const combinedIndex =
-        typeof clipspace?.combinedIndex === "number" ? clipspace.combinedIndex : 0;
-    const combinedImg = imgs[combinedIndex] || imgs[0];
-    const combinedSrc = combinedImg?.src;
-    if (!combinedSrc) {
-        return;
-    }
-
-    const getWidgetValue = (name, fallback) => {
-        const w = node?.widgets?.find((x) => x?.name === name);
-        return w ? w.value : fallback;
-    };
-
-    const path = getWidgetValue("path", "");
-    const index = getWidgetValue("index", 0);
-    const includeSubdir = getWidgetValue("include_subdir", true);
-    const all = Boolean(getWidgetValue("all", false));
-
-    const resolveParams = new URLSearchParams({
-        path: path,
-        index: index,
-        include_subdir: includeSubdir,
-        all: all ? "true" : "false",
-    });
-    const resolved = await api.fetchApi(
-        `/1hew/resolve_image_from_folder?${resolveParams.toString()}`
-    );
-    if (resolved.status !== 200) {
-        return;
-    }
-    const resolvedJson = await resolved.json();
-    const imagePath = resolvedJson?.path;
-    if (!imagePath) {
-        return;
-    }
-
-    const maskDataUrl = await srcToDataUrl(combinedSrc);
-    if (!maskDataUrl) {
-        return;
-    }
-
-    await api.fetchApi("/1hew/save_sidecar_mask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            image_path: imagePath,
-            mask_data_url: maskDataUrl,
-        }),
-    });
-
-    try {
-        if (node?.updatePreview) {
-            await node.updatePreview();
-        }
-    } catch {}
-
-    try {
-        app.graph.setDirtyCanvas(true, true);
-    } catch {}
-}
+import {
+    addCopyMediaFrameMenuOption,
+    addSaveMediaMenuOption,
+    collectDropPayload,
+    installImagePreviewLayout,
+} from "./core/media_utils.js";
+import { saveMaskFromClipspaceToSidecar } from "./core/image_mask_sidecar.js";
 
 app.registerExtension({
     name: "ComfyUI-1hewNodes.load_image",
@@ -89,6 +18,54 @@ app.registerExtension({
 
         const applyPreviewStyle = (node) => {
             applyPreviewHiddenState(node);
+        };
+
+        const getExtraMenuOptions = nodeType.prototype.getExtraMenuOptions;
+        nodeType.prototype.getExtraMenuOptions = function (_, options) {
+            const r = getExtraMenuOptions ? getExtraMenuOptions.apply(this, arguments) : undefined;
+
+            // Remove "Save Mask" option if present (robust check)
+            if (Array.isArray(options)) {
+                for (let i = options.length - 1; i >= 0; i--) {
+                    const opt = options[i];
+                    if (opt && typeof opt.content === "string" && opt.content.trim() === "Save Mask") {
+                        options.splice(i, 1);
+                    }
+                }
+            }
+
+            // Add standard preview options (Hide/Show, etc.)
+            addPreviewMenuOptions(options, { app, currentNode: this });
+
+            let imgEl = null;
+            if (this.imageWidget && this.imageWidget.element) {
+                imgEl = this.imageWidget.element.querySelector("img");
+            }
+
+            const getImgElFromNode = (node) =>
+                node?.imageWidget?.element?.querySelector("img");
+
+            addSaveMediaMenuOption(options, {
+                app,
+                currentNode: this,
+                content: "Save Image",
+                getMediaElFromNode: getImgElFromNode,
+                filenamePrefix: "image",
+                filenameExt: "png",
+            });
+
+            if (imgEl && imgEl.src) {
+                addCopyMediaFrameMenuOption(options, {
+                    content: "Copy Image",
+                    getWidth: () => imgEl.naturalWidth,
+                    getHeight: () => imgEl.naturalHeight,
+                    drawToCanvas: (ctx) => ctx.drawImage(imgEl, 0, 0),
+                    copyErrorMessage: "Failed to copy image to clipboard:",
+                    prepareErrorMessage: "Error preparing image copy:",
+                });
+            }
+
+            return r;
         };
 
         const onConfigure = nodeType.prototype.onConfigure;
@@ -145,8 +122,8 @@ app.registerExtension({
                     Array.isArray(desiredSize) && typeof desiredSize[1] === "number"
                         ? desiredSize[1]
                         : 0;
-            this._comfy1hewLoadImageBaseSize = [baseW, baseH];
-        } catch {}
+                this._comfy1hewLoadImageBaseSize = [baseW, baseH];
+            } catch {}
             this._comfy1hewLoadImageWasEmptyPath = true;
             this._comfy1hewLoadImageRedrawQueued = false;
             this._comfy1hewLoadImageHadPreview = false;
@@ -185,10 +162,21 @@ app.registerExtension({
 
                 const data = await res.json();
                 const uploadedFolder = data?.folder;
-                if (!uploadedFolder) return;
+                const uploadedFiles = data?.files;
+
+                if (!uploadedFolder && (!uploadedFiles || uploadedFiles.length === 0)) return;
+
+                let finalPath = uploadedFolder;
+                // If backend returns specific file paths and we uploaded files, try to use the direct file path
+                if (Array.isArray(uploadedFiles) && uploadedFiles.length > 0) {
+                    // If we only have one file, use its full path
+                    if (uploadedFiles.length === 1) {
+                        finalPath = uploadedFiles[0];
+                    }
+                }
 
                 if (pathWidget) {
-                    pathWidget.value = uploadedFolder;
+                    pathWidget.value = finalPath;
                     if (typeof pathWidget.callback === "function") {
                         pathWidget.callback();
                     }
@@ -213,58 +201,6 @@ app.registerExtension({
                 }
 
                 app.graph.setDirtyCanvas(true, true);
-            };
-
-            const readAllEntries = async (dirEntry) => {
-                const reader = dirEntry.createReader();
-                const entries = [];
-                while (true) {
-                    const batch = await new Promise((resolve) => reader.readEntries(resolve));
-                    if (!batch || batch.length === 0) break;
-                    entries.push(...batch);
-                }
-                return entries;
-            };
-
-            const walkEntry = async (entry) => {
-                if (!entry) return [];
-                if (entry.isFile) {
-                    const file = await new Promise((resolve) => entry.file(resolve));
-                    const relativePath = (entry.fullPath || file.name).replace(/^\/+/, "").trim();
-                    return [{ file, relativePath }];
-                }
-                if (entry.isDirectory) {
-                    const entries = await readAllEntries(entry);
-                    const out = [];
-                    for (const e of entries) {
-                        const sub = await walkEntry(e);
-                        out.push(...sub);
-                    }
-                    return out;
-                }
-                return [];
-            };
-
-            const collectDropPayload = async (e) => {
-                const items = e?.dataTransfer?.items;
-                if (items && items.length > 0) {
-                    const out = [];
-                    let hasDirectory = false;
-                    for (const item of items) {
-                        const entry = item?.webkitGetAsEntry?.();
-                        if (!entry) continue;
-                        if (entry.isDirectory) hasDirectory = true;
-                        const sub = await walkEntry(entry);
-                        out.push(...sub);
-                    }
-                    return { pairs: out, hasDirectory };
-                }
-
-                const files = Array.from(e?.dataTransfer?.files || []);
-                return {
-                    pairs: files.map((f) => ({ file: f, relativePath: f.name })),
-                    hasDirectory: false,
-                };
             };
 
             const imageEl = document.createElement("img");
@@ -312,6 +248,14 @@ app.registerExtension({
             container.appendChild(imageEl);
             container.appendChild(infoEl);
 
+            imageEl.addEventListener("contextmenu", (e) => {
+                e.preventDefault();
+                const node = this;
+                if (app.canvas) {
+                    app.canvas.processContextMenu(node, e);
+                }
+            });
+
             this.imageWidget = this.addDOMWidget(
                 "image_preview",
                 "div",
@@ -330,116 +274,14 @@ app.registerExtension({
             };
 
             this._comfy1hewImageAutoSizeKey = "";
-
-            const autoSizeToContent = () => {
-                if (!this.imageWidget.aspectRatio) {
-                    return;
-                }
-
-                const maxAspectRatio =
-                    typeof this.imageWidget._comfy1hew_maxAspectRatio === "number"
-                        ? this.imageWidget._comfy1hew_maxAspectRatio
-                        : null;
-                const aspectRatio =
-                    maxAspectRatio && isFinite(maxAspectRatio)
-                        ? Math.min(this.imageWidget.aspectRatio, maxAspectRatio)
-                        : this.imageWidget.aspectRatio;
-
-                const width = this.size[0];
-                const desiredWidgetHeight = width * aspectRatio + 20;
-
-                let desiredHeight;
-                if (Number.isFinite(this.imageWidget.last_y)) {
-                    desiredHeight = this.imageWidget.last_y + desiredWidgetHeight;
-                } else {
-                    try {
-                        const computed = this.computeSize?.([
-                            this.size[0],
-                            this.size[1],
-                        ]);
-                        if (
-                            Array.isArray(computed) &&
-                            computed.length >= 2 &&
-                            Number.isFinite(computed[1])
-                        ) {
-                            desiredHeight = computed[1];
-                        }
-                    } catch {}
-                    if (!Number.isFinite(desiredHeight)) {
-                        const estimatedTop = 130;
-                        desiredHeight = estimatedTop + desiredWidgetHeight;
-                    }
-                }
-
-                if (allWidget && allWidget.value) {
-                    desiredHeight = Math.min(desiredHeight, 420);
-                }
-
-                if (this.size[1] + 1 < desiredHeight) {
-                    this.setSize([this.size[0], desiredHeight]);
-                }
-            };
-
-            const requestAutoSize = () => {
-                if (!imageEl.naturalWidth || !imageEl.naturalHeight) {
-                    return;
-                }
-                const key = `${imageEl.naturalWidth}x${imageEl.naturalHeight}`;
-                if (this._comfy1hewImageAutoSizeKey === key) {
-                    return;
-                }
-                this._comfy1hewImageAutoSizeKey = key;
-                setTimeout(autoSizeToContent, 0);
-            };
-
-            const updateLayout = () => {
-                if (container.dataset.comfy1hewForceHidden === "1") {
-                    container.style.height = "0px";
-                    container.style.display = "none";
-                    app.graph.setDirtyCanvas(true, true);
-                    return;
-                }
-                if (!this.imageWidget?.aspectRatio) {
-                    container.style.height = "0px";
-                    container.style.display = "none";
-                    app.graph.setDirtyCanvas(true, true);
-                    return;
-                }
-                container.style.display = "flex";
-
-                let availableHeight;
-                if (Number.isFinite(this.imageWidget?.last_y)) {
-                    availableHeight = this.size[1] - this.imageWidget.last_y - 15;
-                } else {
-                    const maxAspectRatio =
-                        typeof this.imageWidget._comfy1hew_maxAspectRatio ===
-                        "number"
-                            ? this.imageWidget._comfy1hew_maxAspectRatio
-                            : null;
-                    const aspectRatio =
-                        maxAspectRatio && isFinite(maxAspectRatio)
-                            ? Math.min(this.imageWidget.aspectRatio, maxAspectRatio)
-                            : this.imageWidget.aspectRatio;
-                    const width = this.size[0];
-                    availableHeight = width * aspectRatio + 20;
-                }
-
-                if (availableHeight < 0) availableHeight = 0;
-                container.style.height = `${availableHeight}px`;
-
-                app.graph.setDirtyCanvas(true, true);
-            };
-
-            const originalOnResize = this.onResize;
-            this.onResize = function (size) {
-                const r2 = originalOnResize
-                    ? originalOnResize.apply(this, arguments)
-                    : undefined;
-                try {
-                    updateLayout();
-                } catch {}
-                return r2;
-            };
+            const { requestAutoSize, updateLayout } = installImagePreviewLayout({
+                app,
+                node: this,
+                imageWidget: this.imageWidget,
+                container,
+                imageEl,
+                allWidget,
+            });
 
             this.updatePreview = async () => {
                 this._comfy1hewLoadImageReqId = (this._comfy1hewLoadImageReqId || 0) + 1;
@@ -663,8 +505,42 @@ app.registerExtension({
                 }, 200);
             }
 
+            const onPaste = (e) => {
+                if (!e.clipboardData) return;
+                
+                // Check if this node is selected
+                if (!app.canvas.selected_nodes || !app.canvas.selected_nodes[this.id]) {
+                    return;
+                }
+
+                const items = e.clipboardData.items;
+                if (!items) return;
+
+                const files = [];
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
+                        const file = items[i].getAsFile();
+                        if (file) {
+                            const name = file.name || "pasted_image.png";
+                            files.push({ file: file, relativePath: name });
+                        }
+                    }
+                }
+                
+                if (files.length > 0) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    uploadFilesAsFolder(files, false);
+                }
+            };
+            document.addEventListener("paste", onPaste, { capture: true });
+
             const originalOnRemoved = this.onRemoved;
             this.onRemoved = function () {
+                try {
+                    document.removeEventListener("paste", onPaste, { capture: true });
+                } catch {}
                 try {
                     if (this._comfy1hewLoadImagePoller) {
                         clearInterval(this._comfy1hewLoadImagePoller);
@@ -706,34 +582,7 @@ app.registerExtension({
             return r;
         };
 
-        const getExtraMenuOptions = nodeType.prototype.getExtraMenuOptions;
-        nodeType.prototype.getExtraMenuOptions = function (_, options) {
-            if (getExtraMenuOptions) {
-                getExtraMenuOptions.apply(this, arguments);
-            }
 
-            addPreviewMenuOptions(options, { app, currentNode: this });
-
-            const canvas = app.canvas;
-            const selectedNodes = canvas.selected_nodes || {};
-            let targetNodes = Object.values(selectedNodes);
-            if (targetNodes.length === 0) {
-                targetNodes = [this];
-            }
-
-            if (!options) {
-                return;
-            }
-
-            options.push({
-                content: "Save Mask",
-                callback: async () => {
-                    for (const node of targetNodes) {
-                        await saveMaskFromClipspaceToSidecar(node);
-                    }
-                },
-            });
-        };
 
         if (!window.__comfy1hewLoadImageClipspacePatched) {
             window.__comfy1hewLoadImageClipspacePatched = true;
@@ -757,7 +606,7 @@ app.registerExtension({
                         if (node?.type !== "load_image") {
                             return;
                         }
-                        saveMaskFromClipspaceToSidecar(node);
+                        saveMaskFromClipspaceToSidecar({ node, api, app });
                     }, 0);
                     return r2;
                 };

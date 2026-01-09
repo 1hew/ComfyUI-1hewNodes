@@ -30,7 +30,7 @@ def _discover_nodes() -> list[type[io.ComfyNode]]:
     discovered: list[type[io.ComfyNode]] = []
 
     if not os.path.isdir(nodes_dir):
-        logging.info("[1hewNodesV3] 未检测到 nodes 目录，跳过扫描")
+        logging.info("[ComfyUI-1hewNodes] 未检测到 nodes 目录，跳过扫描")
         _CACHED_NODES = discovered
         return discovered
 
@@ -40,7 +40,7 @@ def _discover_nodes() -> list[type[io.ComfyNode]]:
     try:
         nodes_pkg = importlib.import_module(".nodes", package=package_name)
     except Exception as exc:  # pragma: no cover
-        logging.error(f"[1hewNodesV3] 导入 nodes 包失败: {exc}")
+        logging.error(f"[ComfyUI-1hewNodes] 导入 nodes 包失败: {exc}")
         _CACHED_NODES = discovered
         return discovered
 
@@ -50,7 +50,7 @@ def _discover_nodes() -> list[type[io.ComfyNode]]:
         try:
             module = importlib.import_module(name)
         except Exception as exc:  # pragma: no cover
-            logging.error(f"[1hewNodesV3] 导入模块失败: {name}, 错误: {exc}")
+            logging.error(f"[ComfyUI-1hewNodes] 导入模块失败: {name}, 错误: {exc}")
             continue
 
         for _, obj in inspect.getmembers(module, inspect.isclass):
@@ -72,17 +72,18 @@ class NodesV3Extension(ComfyExtension):
 async def comfy_entrypoint() -> ComfyExtension:
     return NodesV3Extension()
 
-WEB_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)), "web")
+WEB_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)), "web", "js")
 
 
 # 前端脚本注册，确保浏览器加载扩展 JS
 try:
     import nodes
-    js_dir = os.path.join(WEB_DIRECTORY, "js")
-    if os.path.isdir(js_dir):
-        nodes.EXTENSION_WEB_DIRS["ComfyUI-1hewNodesV3"] = js_dir
-except Exception:
-    pass
+
+    extension_dir_name = os.path.basename(os.path.dirname(os.path.realpath(__file__)))
+    if os.path.isdir(WEB_DIRECTORY):
+        nodes.EXTENSION_WEB_DIRS[extension_dir_name] = WEB_DIRECTORY
+except Exception as exc:
+    logging.warning(f"[ComfyUI-1hewNodes] 前端静态目录注册跳过: {exc}")
 
 
 # 全局变量保存监控模块引用
