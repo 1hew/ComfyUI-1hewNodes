@@ -72,8 +72,8 @@ app.registerExtension({
         nodeType.prototype.onConfigure = function () {
             const r = onConfigure ? onConfigure.apply(this, arguments) : undefined;
             if (this.widgets) {
-                const pathWidget = this.widgets.find((w) => w.name === "path");
-                if (pathWidget && pathWidget.value) {
+                const fileWidget = this.widgets.find((w) => w.name === "file");
+                if (fileWidget && fileWidget.value) {
                     this._comfy1hewLoadImagePendingPreview = true;
                     setTimeout(() => {
                         const update = this.updatePreview;
@@ -103,7 +103,7 @@ app.registerExtension({
         nodeType.prototype.onNodeCreated = function () {
             const r = onNodeCreated ? onNodeCreated.apply(this, arguments) : undefined;
 
-            const pathWidget = this.widgets.find((w) => w.name === "path");
+            const fileWidget = this.widgets.find((w) => w.name === "file");
             const indexWidget = this.widgets.find((w) => w.name === "index");
             const includeSubdirWidget = this.widgets.find(
                 (w) => w.name === "include_subdir"
@@ -175,10 +175,10 @@ app.registerExtension({
                     }
                 }
 
-                if (pathWidget) {
-                    pathWidget.value = finalPath;
-                    if (typeof pathWidget.callback === "function") {
-                        pathWidget.callback();
+                if (fileWidget) {
+                    fileWidget.value = finalPath;
+                    if (typeof fileWidget.callback === "function") {
+                        fileWidget.callback();
                     }
                 }
 
@@ -248,6 +248,37 @@ app.registerExtension({
             container.appendChild(imageEl);
             container.appendChild(infoEl);
 
+            const fileInputEl = document.createElement("input");
+            fileInputEl.type = "file";
+            fileInputEl.accept = "image/*";
+            fileInputEl.style.display = "none";
+            container.appendChild(fileInputEl);
+
+            const uploadWidget = this.addWidget(
+                "button",
+                "choose file to upload",
+                "image",
+                () => {
+                    app.canvas.node_widget = null;
+                    try {
+                        fileInputEl.value = "";
+                    } catch {}
+                    fileInputEl.click();
+                }
+            );
+            uploadWidget.serialize = false;
+
+            fileInputEl.addEventListener("change", async () => {
+                const file = fileInputEl.files && fileInputEl.files[0];
+                if (!file) return;
+                try {
+                    await uploadFilesAsFolder(
+                        [{ file: file, relativePath: file?.name }],
+                        false
+                    );
+                } catch {}
+            });
+
             imageEl.addEventListener("contextmenu", (e) => {
                 e.preventDefault();
                 const node = this;
@@ -287,7 +318,7 @@ app.registerExtension({
                 this._comfy1hewLoadImageReqId = (this._comfy1hewLoadImageReqId || 0) + 1;
                 const reqId = this._comfy1hewLoadImageReqId;
 
-                const path = pathWidget.value;
+                const file = fileWidget.value;
                 const index = indexWidget.value;
                 const includeSubdir = includeSubdirWidget
                     ? includeSubdirWidget.value
@@ -296,8 +327,8 @@ app.registerExtension({
                 if (this.imageWidget) {
                     this.imageWidget._comfy1hew_maxAspectRatio = all ? 1.25 : null;
                 }
-                const trimmedPath = String(path || "").trim();
-                if (trimmedPath === "") {
+                const trimmedFile = String(file || "").trim();
+                if (trimmedFile === "") {
                     this._comfy1hewLoadImageWasEmptyPath = true;
                     const lastImgSrc = this._comfy1hewLoadImageLastImgSrc;
 
@@ -377,7 +408,7 @@ app.registerExtension({
                 this._comfy1hewLoadImageWasEmptyPath = false;
 
                 const params = new URLSearchParams({
-                    path: path,
+                    file: file,
                     include_subdir: includeSubdir,
                     t: Date.now(),
                 });
@@ -476,13 +507,13 @@ app.registerExtension({
             };
 
             // 监听 widget 变化
-            if (pathWidget) pathWidget.callback = this.updatePreview;
+            if (fileWidget) fileWidget.callback = this.updatePreview;
             if (indexWidget) indexWidget.callback = this.updatePreview;
             if (includeSubdirWidget) includeSubdirWidget.callback = this.updatePreview;
             if (allWidget) allWidget.callback = this.updatePreview;
 
             const computeStateKey = () => {
-                const p = String(pathWidget ? pathWidget.value : "");
+                const p = String(fileWidget ? fileWidget.value : "");
                 const i = String(indexWidget ? indexWidget.value : 0);
                 const s = String(includeSubdirWidget ? includeSubdirWidget.value : true);
                 const a = String(allWidget ? allWidget.value : false);
@@ -564,7 +595,7 @@ app.registerExtension({
             setTimeout(ensurePreviewLayout, 500);
 
             // 初始加载
-            if (pathWidget && pathWidget.value) {
+            if (fileWidget && fileWidget.value) {
                 this.updatePreview();
             }
             if (this._comfy1hewLoadImagePendingPreview) {

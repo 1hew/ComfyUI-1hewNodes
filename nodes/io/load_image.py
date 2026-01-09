@@ -37,7 +37,7 @@ class LoadImage(io.ComfyNode):
             category="1hewNodes/io",
             inputs=[
                 io.Image.Input("get_image_size", optional=True),
-                io.String.Input("path", default=""),
+                io.String.Input("file", default=""),
                 io.Int.Input("index", default=0, min=-8192, max=8192, step=1),
                 io.Boolean.Input("include_subdir", default=True),
                 io.Boolean.Input("all", default=False),
@@ -227,11 +227,11 @@ class LoadImage(io.ComfyNode):
         return image_paths
 
     @classmethod
-    def IS_CHANGED(cls, path, include_subdir, **kwargs):
-        if not path:
+    def IS_CHANGED(cls, file, include_subdir, **kwargs):
+        if not file:
             return float("nan")
 
-        image_paths = cls.get_image_paths(path, include_subdir)
+        image_paths = cls.get_image_paths(file, include_subdir)
         if not image_paths:
             return float("nan")
         m = hashlib.sha256()
@@ -281,13 +281,13 @@ class LoadImage(io.ComfyNode):
     @classmethod
     async def execute(
         cls,
-        path: str,
+        file: str,
         index: int,
         all: bool,
         include_subdir: bool,
         get_image_size: torch.Tensor | None = None,
     ) -> io.NodeOutput:
-        image_paths = cls.get_image_paths(path, include_subdir)
+        image_paths = cls.get_image_paths(file, include_subdir)
         count = len(image_paths)
 
         if count == 0:
@@ -345,9 +345,9 @@ class LoadImage(io.ComfyNode):
 
         else:
             idx = index % count
-            path = image_paths[idx]
+            selected_path = image_paths[idx]
             try:
-                img, mask = cls.load_image(path)
+                img, mask = cls.load_image(selected_path)
                 tensor = cls.pil2tensor(img)
                 mask_tensor = mask.unsqueeze(0).unsqueeze(-1)
 
@@ -359,7 +359,7 @@ class LoadImage(io.ComfyNode):
                 output_image = tensor
                 output_mask = mask_tensor.squeeze(-1)
             except Exception as e:
-                print(f"Error loading image {path}: {e}")
+                print(f"Error loading image {selected_path}: {e}")
                 return io.NodeOutput(None, None)
 
         return io.NodeOutput(
@@ -479,7 +479,11 @@ async def upload_images(request):
 
 @PromptServer.instance.routes.get("/1hew/view_image_from_folder")
 async def view_image_from_folder(request):
-    folder = request.query.get("path") or request.query.get("folder")
+    folder = (
+        request.query.get("file")
+        or request.query.get("path")
+        or request.query.get("folder")
+    )
     index_str = request.query.get("index", "0")
     include_subdir = (
         (request.query.get("include_subdir") or "true").lower()
@@ -603,7 +607,11 @@ async def view_image_from_folder(request):
 
 @PromptServer.instance.routes.get("/1hew/resolve_image_from_folder")
 async def resolve_image_from_folder(request):
-    folder = request.query.get("path") or request.query.get("folder")
+    folder = (
+        request.query.get("file")
+        or request.query.get("path")
+        or request.query.get("folder")
+    )
     index_str = request.query.get("index", "0")
     include_subdir = (
         (request.query.get("include_subdir") or "true").lower()

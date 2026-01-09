@@ -931,7 +931,7 @@ class LoadVideo(io.ComfyNode):
             display_name="Load Video",
             category="1hewNodes/io",
             inputs=[
-                io.String.Input("path", default=""),
+                io.String.Input("file", default=""),
                 io.Int.Input("frame_limit", default=0, min=0, max=100000, step=1),
                 io.Float.Input("fps", default=0.0, min=0.0, max=120.0, step=1.0),
                 io.Int.Input("start_skip", default=0, min=0, max=100000, step=1),
@@ -946,7 +946,7 @@ class LoadVideo(io.ComfyNode):
     @classmethod
     async def execute(
         cls,
-        path: str,
+        file: str,
         start_skip: int,
         end_skip: int,
         fps: float,
@@ -955,8 +955,8 @@ class LoadVideo(io.ComfyNode):
         video_index: int,
         include_subdir: bool,
     ) -> io.NodeOutput:
-        path = (path or "").strip().strip('"').strip("'")
-        video_paths = cls.get_video_paths(path, include_subdir)
+        file = (file or "").strip().strip('"').strip("'")
+        video_paths = cls.get_video_paths(file, include_subdir)
         count = len(video_paths)
 
         if count == 0:
@@ -1230,8 +1230,8 @@ class LoadVideo(io.ComfyNode):
         return video_paths
 
     @classmethod
-    def IS_CHANGED(cls, path, include_subdir, **kwargs):
-        path = (path or "").strip().strip('"').strip("'")
+    def IS_CHANGED(cls, file, include_subdir, **kwargs):
+        file = (file or "").strip().strip('"').strip("'")
         start_skip = int(kwargs.get("start_skip") or 0)
         end_skip = int(kwargs.get("end_skip") or 0)
         fps = float(kwargs.get("fps") or 0.0)
@@ -1242,19 +1242,19 @@ class LoadVideo(io.ComfyNode):
             f"video_index:{video_index}|start_skip:{start_skip}|end_skip:{end_skip}"
             f"|fps:{fps}|frame_limit:{frame_limit}|format:{format}"
         )
-        if os.path.isfile(path):
+        if os.path.isfile(file):
             try:
-                mtime = os.path.getmtime(path)
+                mtime = os.path.getmtime(file)
                 return hashlib.sha256(
-                    f"{path}:{mtime}:{settings_key}".encode()
+                    f"{file}:{mtime}:{settings_key}".encode()
                 ).hexdigest()
             except OSError:
                 return float("nan")
 
-        if not os.path.isdir(path):
+        if not os.path.isdir(file):
             return float("nan")
 
-        video_paths = cls.get_video_paths(path, include_subdir)
+        video_paths = cls.get_video_paths(file, include_subdir)
         m = hashlib.sha256()
         m.update(f"{settings_key}|include_subdir:{include_subdir}".encode())
         for video_path in video_paths:
@@ -1469,7 +1469,9 @@ async def upload_videos(request):
 
 @PromptServer.instance.routes.get("/1hew/video_info_from_folder")
 async def video_info_from_folder(request):
-    path = request.query.get("path") or request.query.get("folder")
+    path = request.query.get("file") or request.query.get("path") or request.query.get(
+        "folder"
+    )
     index_str = (
         request.query.get("index") or request.query.get("video_index") or "0"
     )
@@ -1552,7 +1554,9 @@ async def video_info_from_folder(request):
 
 @PromptServer.instance.routes.get("/1hew/view_video_from_folder")
 async def view_video_from_folder(request):
-    path = request.query.get("path") or request.query.get("folder")
+    path = request.query.get("file") or request.query.get("path") or request.query.get(
+        "folder"
+    )
     index_str = (
         request.query.get("index") or request.query.get("video_index") or "0"
     )

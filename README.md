@@ -508,6 +508,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Save Video | Save a VIDEO object to disk with container extension preservation and alpha preview |
 
 
+### 🎛️ Conditioning Nodes
+| Node Name | Description |
+|-----------|-------------|
+| Text Encode QwenImageEdit Keep Size | Qwen image-edit conditioning encoder combining vision inputs and text, supports size preservation modes and reference latents |
+
+
 ### 🔊 Audio Nodes
 | Node Name | Description |
 |-----------|-------------|
