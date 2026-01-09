@@ -95,6 +95,82 @@ app.registerExtension({
                 getExtraMenuOptions.apply(this, arguments);
             }
             addPreviewMenuOptions(options, { app, currentNode: this });
+
+            // Helper to find videos
+            const getVideoEls = (node) => {
+                let videoEls = [];
+                if (node.widgets) {
+                    for (const w of node.widgets) {
+                        if (w.element) {
+                            if (w.element.tagName === "VIDEO") {
+                                videoEls.push(w.element);
+                            } else {
+                                videoEls.push(...Array.from(w.element.querySelectorAll("video")));
+                            }
+                        }
+                    }
+                }
+                return videoEls;
+            };
+
+            const videoEls = getVideoEls(this);
+
+            // Add "Save Video" option
+            if (videoEls.length > 0 && videoEls.some(v => v.src)) {
+                options.push({
+                    content: "Save Video",
+                    callback: () => {
+                        const canvas = app.canvas;
+                        const selected = canvas.selected_nodes || {};
+                        const selection = Object.values(selected);
+                        const targets = selection.length > 0 && selection.includes(this) ? selection : [this];
+
+                        for (const node of targets) {
+                             const nodeVideos = getVideoEls(node);
+                             for (const v of nodeVideos) {
+                                 if (v && v.src) {
+                                     const a = document.createElement("a");
+                                     a.href = v.src;
+                                     a.download = `video_${node.id}_${Date.now()}.mp4`;
+                                     document.body.appendChild(a);
+                                     a.click();
+                                     document.body.removeChild(a);
+                                 }
+                             }
+                        }
+                    }
+                });
+            }
+
+            // Add "Copy Frame" option
+            const firstVideo = videoEls.find(v => v.videoWidth && v.videoHeight);
+            if (firstVideo) {
+                options.push({
+                    content: "Copy Frame",
+                    callback: () => {
+                        try {
+                            const canvas = document.createElement("canvas");
+                            canvas.width = firstVideo.videoWidth;
+                            canvas.height = firstVideo.videoHeight;
+                            const ctx = canvas.getContext("2d");
+                            ctx.drawImage(firstVideo, 0, 0);
+                            
+                            canvas.toBlob((blob) => {
+                                if (blob) {
+                                    try {
+                                        const item = new ClipboardItem({ "image/png": blob });
+                                        navigator.clipboard.write([item]);
+                                    } catch (err) {
+                                        console.error("Failed to copy frame to clipboard:", err);
+                                    }
+                                }
+                            }, "image/png");
+                        } catch (err) {
+                            console.error("Error preparing frame copy:", err);
+                        }
+                    }
+                });
+            }
         };
     }
 });

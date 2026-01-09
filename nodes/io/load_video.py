@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import math
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 from typing import Optional
 
@@ -16,6 +18,11 @@ import numpy as np
 import torch
 from comfy_api.latest import io
 from server import PromptServer
+
+try:
+    from comfy_api.input_impl.video_types import VideoFromFile as ComfyVideoFromFile
+except Exception:
+    ComfyVideoFromFile = None
 
 try:
     from comfy.utils import ProgressBar
@@ -612,9 +619,121 @@ class VideoFromFileWithSettings:
         return self._video.get_dimensions()
 
     def save_to(self, path, format="auto", codec="auto", metadata=None):
-        return self._video.save_to(
-            path, format=format, codec=codec, metadata=metadata
-        )
+        info = VideoFromFile._probe_video_info_with_ffprobe(self.path)
+        source_fps = float(info.get("fps") or 0.0)
+        
+        # Optimization: If no settings change the video, just copy
+        is_default_format = (not self._format) or (self._format.lower() in ("n", "", "default"))
+        if (
+            self._start_skip == 0
+            and self._end_skip == 0
+            and self._frame_limit == 0
+            and (self._fps <= 0 or (source_fps > 0 and abs(self._fps - source_fps) < 0.01))
+            and is_default_format
+        ):
+            return self._video.save_to(path, format, codec, metadata)
+
+        components = self.get_components()
+        if components is None or components.images is None or components.images.shape[0] == 0:
+            return path
+
+        images = components.images
+        audio = components.audio
+        fps = components.frame_rate
+        
+        if images.device.type != "cpu":
+            images = images.cpu()
+            
+        images_np = (images * 255.0).clamp(0, 255).byte().numpy()
+        
+        T, H, W, C = images_np.shape
+        pix_fmt = "rgba" if C == 4 else "rgb24"
+        
+        ffmpeg_exe = VideoFromFile._resolve_ffmpeg_exe()
+        
+        audio_tmp = None
+        audio_data = None
+        sample_rate = 44100
+        
+        if audio is not None and audio.get("waveform") is not None:
+             waveform = audio["waveform"]
+             sample_rate = audio.get("sample_rate", 44100)
+             if waveform.dim() == 2:
+                 waveform = waveform.unsqueeze(0)
+             
+             if waveform.device.type != "cpu":
+                 waveform = waveform.cpu()
+             waveform_np = waveform.numpy()
+             
+             if waveform_np.shape[0] > 0:
+                 audio_data = waveform_np[0]
+                 
+                 fd, audio_tmp = tempfile.mkstemp(suffix=".f32le")
+                 os.close(fd)
+                 
+                 with open(audio_tmp, "wb") as f:
+                     audio_data.T.tofile(f)
+        
+        cmd = [ffmpeg_exe, "-y"]
+        
+        cmd.extend([
+            "-f", "rawvideo",
+            "-vcodec", "rawvideo",
+            "-s", f"{W}x{H}",
+            "-pix_fmt", pix_fmt,
+            "-r", f"{fps}",
+            "-i", "-"
+        ])
+        
+        if audio_tmp:
+            channels = audio_data.shape[0]
+            cmd.extend([
+                "-f", "f32le",
+                "-ar", str(sample_rate),
+                "-ac", str(channels),
+                "-i", audio_tmp
+            ])
+            
+        if codec == "auto" or codec is None:
+            cmd.extend(["-c:v", "libx264", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p"])
+            cmd.extend(["-c:a", "aac", "-b:a", "128k"])
+        else:
+            cmd.extend(["-c:v", codec])
+            cmd.extend(["-c:a", "aac"])
+
+        cmd.extend(["-map", "0:v:0"])
+        if audio_tmp:
+            cmd.extend(["-map", "1:a:0"])
+            
+        cmd.append(path)
+        
+        try:
+            process = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            try:
+                process.stdin.write(images_np.tobytes())
+                process.stdin.close()
+            except Exception as e:
+                print(f"Error writing to ffmpeg stdin: {e}")
+            
+            stdout, stderr = process.communicate()
+            
+            if process.returncode != 0:
+                print(f"FFmpeg encoding failed: {stderr.decode('utf-8', 'replace')}")
+                
+        finally:
+            if audio_tmp and os.path.exists(audio_tmp):
+                try:
+                    os.remove(audio_tmp)
+                except:
+                    pass
+                    
+        return path
 
     def get_components(self) -> Optional[VideoComponents]:
         components = self._video.get_components()
@@ -622,10 +741,12 @@ class VideoFromFileWithSettings:
             return None
 
         images = components.images
+        audio = components.audio
         source_fps = float(components.frame_rate or 0.0)
         if images is not None:
-            images, fps = LoadVideo.apply_video_settings(
+            images, audio, fps = LoadVideo.apply_video_settings(
                 images=images,
+                audio=audio,
                 fps=self._fps,
                 source_fps=source_fps,
                 frame_limit=self._frame_limit,
@@ -640,7 +761,165 @@ class VideoFromFileWithSettings:
         if frame_count == 0:
             return VideoComponents(images=None, audio=None, frame_rate=0.0)
 
-        return VideoComponents(images=images, audio=components.audio, frame_rate=fps)
+        return VideoComponents(images=images, audio=audio, frame_rate=fps)
+
+
+def _processed_video_cache_dir() -> str:
+    return os.path.join(folder_paths.get_temp_directory(), "1hew_processed_videos")
+
+
+def _encode_components_to_video_path(components: VideoComponents, out_path: str) -> str:
+    if components is None or components.images is None:
+        return out_path
+
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+
+    base, ext = os.path.splitext(out_path)
+    tmp_path = f"{base}.{time.time_ns()}.tmp{ext}"
+
+    images = components.images
+    audio = components.audio
+    fps = float(components.frame_rate or 0.0)
+    if fps <= 0.0:
+        fps = 1.0
+
+    if images.device.type != "cpu":
+        images = images.cpu()
+
+    images_np = (images * 255.0).clamp(0, 255).byte().numpy()
+
+    _, height, width, channels = images_np.shape
+    has_alpha = int(channels) == 4
+    input_pix_fmt = "rgba" if has_alpha else "rgb24"
+
+    ffmpeg_exe = VideoFromFile._resolve_ffmpeg_exe()
+
+    audio_tmp = None
+    audio_data = None
+    sample_rate = 44100
+
+    if audio is not None and audio.get("waveform") is not None:
+        waveform = audio["waveform"]
+        sample_rate = audio.get("sample_rate", 44100)
+        if waveform.dim() == 2:
+            waveform = waveform.unsqueeze(0)
+
+        if waveform.device.type != "cpu":
+            waveform = waveform.cpu()
+        waveform_np = waveform.numpy()
+
+        if waveform_np.shape[0] > 0:
+            audio_data = waveform_np[0]
+
+            fd, audio_tmp = tempfile.mkstemp(suffix=".f32le")
+            os.close(fd)
+
+            with open(audio_tmp, "wb") as f:
+                audio_data.T.tofile(f)
+
+    cmd = [ffmpeg_exe, "-y"]
+    cmd.extend(
+        [
+            "-f",
+            "rawvideo",
+            "-vcodec",
+            "rawvideo",
+            "-s",
+            f"{width}x{height}",
+            "-pix_fmt",
+            input_pix_fmt,
+            "-r",
+            f"{fps}",
+            "-i",
+            "-",
+        ]
+    )
+
+    if audio_tmp:
+        channels = audio_data.shape[0]
+        cmd.extend(
+            [
+                "-f",
+                "f32le",
+                "-ar",
+                str(sample_rate),
+                "-ac",
+                str(channels),
+                "-i",
+                audio_tmp,
+            ]
+        )
+
+    out_ext = ext.lower()
+    if has_alpha or out_ext == ".webm":
+        cmd.extend(
+            [
+                "-c:v",
+                "libvpx-vp9",
+                "-pix_fmt",
+                "yuva420p",
+                "-auto-alt-ref",
+                "0",
+                "-b:v",
+                "0",
+                "-crf",
+                "33",
+                "-deadline",
+                "realtime",
+                "-cpu-used",
+                "5",
+            ]
+        )
+        if audio_tmp:
+            cmd.extend(["-c:a", "libopus"])
+    else:
+        cmd.extend(
+            [
+                "-c:v",
+                "libx264",
+                "-preset",
+                "fast",
+                "-crf",
+                "23",
+                "-pix_fmt",
+                "yuv420p",
+            ]
+        )
+        if audio_tmp:
+            cmd.extend(["-c:a", "aac", "-b:a", "128k"])
+
+    cmd.extend(["-map", "0:v:0"])
+    if audio_tmp:
+        cmd.extend(["-map", "1:a:0"])
+
+    cmd.append(tmp_path)
+
+    try:
+        process = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        try:
+            process.stdin.write(images_np.tobytes())
+            process.stdin.close()
+        except Exception:
+            pass
+        process.communicate()
+    finally:
+        if audio_tmp and os.path.exists(audio_tmp):
+            try:
+                os.remove(audio_tmp)
+            except OSError:
+                pass
+
+    try:
+        os.replace(tmp_path, out_path)
+    except OSError:
+        return out_path
+
+    return out_path
 
 
 class LoadVideo(io.ComfyNode):
@@ -686,33 +965,106 @@ class LoadVideo(io.ComfyNode):
         idx = video_index % count
         selected = video_paths[idx]
 
-        return io.NodeOutput(
-            VideoFromFileWithSettings(
-                path=selected,
-                start_skip=start_skip,
-                end_skip=end_skip,
-                fps=fps,
-                frame_limit=frame_limit,
-                format=format,
-            )
+        start_skip = int(start_skip or 0)
+        end_skip = int(end_skip or 0)
+        frame_limit = int(frame_limit or 0)
+        fps = float(fps or 0.0)
+        format = (format or "4n+1").strip()
+
+        is_default_format = (not format) or (
+            format.strip().lower() in {"n", "", "default"}
         )
+        needs_fps_change = fps > 0.0
+        if needs_fps_change:
+            info = VideoFromFile._probe_video_info_with_ffprobe(selected)
+            source_fps = float(info.get("fps") or 0.0)
+            if source_fps <= 0.0 or abs(fps - source_fps) >= 0.01:
+                needs_fps_change = True
+            else:
+                needs_fps_change = False
+
+        if (
+            start_skip == 0
+            and end_skip == 0
+            and frame_limit == 0
+            and not needs_fps_change
+            and is_default_format
+        ):
+            if ComfyVideoFromFile is not None:
+                return io.NodeOutput(ComfyVideoFromFile(selected))
+            return io.NodeOutput(VideoFromFile(selected))
+
+        video = VideoFromFileWithSettings(
+            path=selected,
+            start_skip=start_skip,
+            end_skip=end_skip,
+            fps=fps,
+            frame_limit=frame_limit,
+            format=format,
+        )
+
+        components = video.get_components()
+        if components is None or components.images is None:
+            return io.NodeOutput(None)
+
+        settings_key = (
+            f"video_index:{int(video_index)}|start_skip:{int(start_skip)}"
+            f"|end_skip:{int(end_skip)}|fps:{float(fps)}"
+            f"|frame_limit:{int(frame_limit)}|format:{(format or '4n+1').strip()}"
+        )
+        try:
+            mtime = os.path.getmtime(selected)
+        except OSError:
+            mtime = 0.0
+
+        key = hashlib.sha256(
+            f"{os.path.abspath(selected)}:{mtime}:{settings_key}".encode()
+        ).hexdigest()
+        cache_dir = _processed_video_cache_dir()
+        os.makedirs(cache_dir, exist_ok=True)
+
+        out_ext = ".webm" if int(components.images.shape[-1]) == 4 else ".mp4"
+        out_path = os.path.join(cache_dir, f"{key}{out_ext}")
+
+        if not os.path.isfile(out_path):
+            await asyncio.to_thread(_encode_components_to_video_path, components, out_path)
+
+        if ComfyVideoFromFile is not None:
+            return io.NodeOutput(ComfyVideoFromFile(out_path))
+        return io.NodeOutput(VideoFromFile(out_path))
 
     @staticmethod
     def apply_video_settings(
         images: torch.Tensor,
+        audio: Optional[dict],
         source_fps: float,
         fps: float,
         frame_limit: int,
         start_skip: int,
         end_skip: int,
         format: str,
-    ) -> tuple[torch.Tensor, float]:
+    ) -> tuple[torch.Tensor, Optional[dict], float]:
         images = LoadVideo._apply_frame_subset(
             images=images,
             start_skip=int(start_skip or 0),
             end_skip=int(end_skip or 0),
             frame_limit=0,
         )
+
+        # Handle Audio Start Skip
+        if audio is not None and start_skip > 0 and source_fps > 0:
+            try:
+                sample_rate = audio.get("sample_rate", 44100)
+                waveform = audio.get("waveform")
+                if waveform is not None:
+                    start_sec = float(start_skip) / float(source_fps)
+                    start_sample = int(start_sec * sample_rate)
+                    if start_sample < waveform.shape[-1]:
+                        audio["waveform"] = waveform[..., start_sample:]
+                    else:
+                        audio["waveform"] = waveform[..., :0]
+            except Exception:
+                pass
 
         images = LoadVideo._force_frame_rate(
             images=images,
@@ -734,7 +1086,23 @@ class LoadVideo(io.ComfyNode):
             fps=float(fps or 0.0),
             format=format or "Default",
         )
-        return images, fps
+
+        # Handle Audio End Trimming (Match final video duration)
+        if audio is not None and images is not None and fps > 0:
+            try:
+                frame_count = images.shape[0]
+                duration_sec = float(frame_count) / float(fps)
+                sample_rate = audio.get("sample_rate", 44100)
+                waveform = audio.get("waveform")
+                
+                if waveform is not None:
+                    target_samples = int(duration_sec * sample_rate)
+                    if waveform.shape[-1] > target_samples:
+                         audio["waveform"] = waveform[..., :target_samples]
+            except Exception:
+                pass
+
+        return images, audio, fps
 
     @staticmethod
     def _force_frame_rate(

@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.2.3**
+- refactor(io): Optimize IO group
+
 **v3.2.1**
 - feat(io): Add video loading progress bar
 

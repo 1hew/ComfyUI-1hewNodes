@@ -1,4 +1,6 @@
 import asyncio
+import re
+
 from comfy_api.latest import io, ui
 import torch
 
@@ -81,7 +83,14 @@ class ImageBatchExtract(io.ComfyNode):
             return io.NodeOutput(empty)
 
     @classmethod
-    def _get_extract_indices(cls, batch_size: int, mode: str, index: str, step: int, uniform: int):
+    def _get_extract_indices(
+        cls,
+        batch_size: int,
+        mode: str,
+        index: str,
+        step: int,
+        uniform: int,
+    ):
         try:
             if mode == "index":
                 if not index.strip():
@@ -108,21 +117,40 @@ class ImageBatchExtract(io.ComfyNode):
 
     @staticmethod
     def _parse_custom_indices(indices_str: str, batch_size: int | None = None):
-        indices = []
+        indices: list[int] = []
         try:
-            normalized = indices_str.replace("，", ",")
-            parts = normalized.split(",")
+            normalized = (
+                indices_str.replace("，", ",")
+                .replace("；", ",")
+                .replace(";", ",")
+            )
+            parts = [p.strip() for p in normalized.split(",") if p.strip()]
             for part in parts:
-                p = part.strip()
-                if not p:
+                match_range = re.match(
+                    r"^\s*(-?\d+)\s*-\s*(-?\d+)\s*$",
+                    part,
+                )
+                if match_range:
+                    start = int(match_range.group(1))
+                    end = int(match_range.group(2))
+                    if batch_size is not None:
+                        if start < 0:
+                            start = batch_size + start
+                        if end < 0:
+                            end = batch_size + end
+                    step = 1 if start <= end else -1
+                    indices.extend(list(range(start, end + step, step)))
                     continue
-                try:
-                    idx = int(p)
+
+                match_int = re.match(r"^\s*(-?\d+)\s*$", part)
+                if match_int:
+                    idx = int(match_int.group(1))
                     if batch_size is not None and idx < 0:
                         idx = batch_size + idx
                     indices.append(idx)
-                except ValueError:
-                    print(f"[ImageBatchExtract] 跳过无效索引: '{p}'")
+                    continue
+
+                print(f"[ImageBatchExtract] 跳过无效索引: '{part}'")
             print(f"[ImageBatchExtract] 解析索引 -> {indices}")
         except Exception as e:
             print(f"[ImageBatchExtract] 解析错误: {str(e)}")

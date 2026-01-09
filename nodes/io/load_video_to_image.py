@@ -639,12 +639,14 @@ class LoadVideoToImage(io.ComfyNode):
         components = video_helper.get_components()
 
         images = components.images
+        audio = components.audio
         source_fps = float(components.frame_rate or 0.0)
         if images is not None:
-            images, fps = cls.apply_video_settings(
+            images, audio, fps = cls.apply_video_settings(
                 images=images,
-                fps=fps,
+                audio=audio,
                 source_fps=source_fps,
+                fps=fps,
                 frame_limit=frame_limit,
                 start_skip=start_skip,
                 end_skip=end_skip,
@@ -660,7 +662,7 @@ class LoadVideoToImage(io.ComfyNode):
 
         return io.NodeOutput(
             images,
-            components.audio,
+            audio,
             fps,
             frame_count,
         )
@@ -668,13 +670,14 @@ class LoadVideoToImage(io.ComfyNode):
     @staticmethod
     def apply_video_settings(
         images: torch.Tensor,
+        audio: Optional[dict],
         source_fps: float,
         fps: float,
         frame_limit: int,
         start_skip: int,
         end_skip: int,
         format: str,
-    ) -> tuple[torch.Tensor, float]:
+    ) -> tuple[torch.Tensor, Optional[dict], float]:
         # 1. Apply Skip (Subset of original frames)
         # Note: We do NOT apply frame_limit here, as it should apply to the final output
         images = LoadVideoToImage._apply_frame_subset(
@@ -683,6 +686,21 @@ class LoadVideoToImage(io.ComfyNode):
             end_skip=int(end_skip or 0),
             frame_limit=0, # Limit applied last
         )
+
+        # Handle Audio Start Skip
+        if audio is not None and start_skip > 0 and source_fps > 0:
+            try:
+                sample_rate = audio.get("sample_rate", 44100)
+                waveform = audio.get("waveform")
+                if waveform is not None:
+                    start_sec = float(start_skip) / float(source_fps)
+                    start_sample = int(start_sec * sample_rate)
+                    if start_sample < waveform.shape[-1]:
+                        audio["waveform"] = waveform[..., start_sample:]
+                    else:
+                        audio["waveform"] = waveform[..., :0]
+            except Exception:
+                pass
 
         # 2. Force Frame Rate (Resampling)
         # We want to maintain the duration of this subset while resampling to target fps.
@@ -708,7 +726,23 @@ class LoadVideoToImage(io.ComfyNode):
             fps=float(fps or 0.0),
             format=format or "Default",
         )
-        return images, fps
+
+        # Handle Audio End Trimming (Match final video duration)
+        if audio is not None and images is not None and fps > 0:
+            try:
+                frame_count = images.shape[0]
+                duration_sec = float(frame_count) / float(fps)
+                sample_rate = audio.get("sample_rate", 44100)
+                waveform = audio.get("waveform")
+                
+                if waveform is not None:
+                    target_samples = int(duration_sec * sample_rate)
+                    if waveform.shape[-1] > target_samples:
+                         audio["waveform"] = waveform[..., :target_samples]
+            except Exception:
+                pass
+
+        return images, audio, fps
 
     @staticmethod
     def _force_frame_rate(

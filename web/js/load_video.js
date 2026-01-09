@@ -3,124 +3,14 @@ import { api } from "../../../scripts/api.js";
 import {VIDEO_FORMATS, resolveComboValue, resolveFormatConfig} from "./core/format_step.js";
 import {installWidgetSourceOverlay, roundToPrecision} from "./core/annotated_widget.js";
 import { addPreviewMenuOptions, applyPreviewHiddenState } from "./core/preview_menu.js";
-
-const managedVideos = new Set();
-let resumeHooksInstalled = false;
-
-function installResumeHooks() {
-    if (resumeHooksInstalled) {
-        return;
-    }
-    resumeHooksInstalled = true;
-
-    const resumeAll = () => {
-        for (const videoEl of managedVideos) {
-            if (!videoEl) {
-                continue;
-            }
-            if (videoEl.dataset.comfy1hewUserPaused === "1") {
-                continue;
-            }
-            const p = videoEl.play();
-            if (p && typeof p.catch === "function") {
-                p.catch(() => {});
-            }
-        }
-    };
-
-    document.addEventListener("visibilitychange", () => {
-        if (document.hidden) {
-            return;
-        }
-        resumeAll();
-    });
-    window.addEventListener("focus", resumeAll);
-    window.addEventListener("pageshow", resumeAll);
-}
-
-function applyLoopedHoverAudioPreview(videoEl) {
-    if (!videoEl || videoEl.dataset.comfy1hewPreviewApplied === "1") {
-        return;
-    }
-    videoEl.dataset.comfy1hewPreviewApplied = "1";
-
-    installResumeHooks();
-    managedVideos.add(videoEl);
-
-    videoEl.autoplay = true;
-    videoEl.loop = true;
-    videoEl.muted = true;
-    videoEl.playsInline = true;
-    videoEl.controls = false;
-    videoEl.preload = "auto";
-
-    const safePlay = () => {
-        if (videoEl.dataset.comfy1hewUserPaused === "1") {
-            return;
-        }
-        if (videoEl.dataset.comfy1hewFrameAccurate === "1") {
-            return;
-        }
-        const p = videoEl.play();
-        if (p && typeof p.catch === "function") {
-            p.catch(() => {});
-        }
-    };
-
-    safePlay();
-    videoEl.addEventListener("loadeddata", safePlay);
-    videoEl.addEventListener("canplay", safePlay);
-    videoEl.addEventListener("playing", () => managedVideos.add(videoEl));
-
-    videoEl.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (videoEl.dataset.comfy1hewFrameAccurate === "1") {
-            if (videoEl.dataset.comfy1hewUserPaused === "1") {
-                videoEl.dataset.comfy1hewUserPaused = "0";
-                if (videoEl.dataset.comfy1hewForceMute !== "1") {
-                    videoEl.muted = false;
-                    videoEl.volume = 1.0;
-                }
-            } else {
-                videoEl.dataset.comfy1hewUserPaused = "1";
-                videoEl.muted = true;
-            }
-            return;
-        }
-        if (videoEl.paused) {
-            videoEl.dataset.comfy1hewUserPaused = "0";
-            if (videoEl.dataset.comfy1hewForceMute !== "1") {
-                videoEl.muted = false;
-                videoEl.volume = 1.0;
-            }
-            safePlay();
-        } else {
-            videoEl.dataset.comfy1hewUserPaused = "1";
-            videoEl.pause();
-        }
-    });
-
-    videoEl.addEventListener("pointerenter", () => {
-        if (videoEl.dataset.comfy1hewUserPaused === "1") {
-            return;
-        }
-        if (videoEl.dataset.comfy1hewForceMute === "1") {
-            videoEl.muted = true;
-        } else {
-            videoEl.muted = false;
-            videoEl.volume = 1.0;
-        }
-        if (videoEl.dataset.comfy1hewFrameAccurate === "1") {
-            return;
-        }
-        safePlay();
-    });
-
-    videoEl.addEventListener("pointerleave", () => {
-        videoEl.muted = true;
-    });
-}
+import {
+    addCopyMediaFrameMenuOption,
+    addSaveMediaMenuOption,
+    applyLoopedHoverAudioPreview,
+    collectDropPayload,
+    installVideoPreviewLayout,
+} from "./core/media_utils.js";
+import { installVideoPlaybackState } from "./core/video_playback_state.js";
 
 app.registerExtension({
     name: "ComfyUI-1hewNodes.LoadVideo",
@@ -680,66 +570,6 @@ app.registerExtension({
                 app.graph.setDirtyCanvas(true, true);
             };
 
-            const readAllEntries = async (dirEntry) => {
-                const reader = dirEntry.createReader();
-                const entries = [];
-                while (true) {
-                    const batch = await new Promise((resolve) =>
-                        reader.readEntries(resolve)
-                    );
-                    if (!batch || batch.length === 0) break;
-                    entries.push(...batch);
-                }
-                return entries;
-            };
-
-            const walkEntry = async (entry) => {
-                if (!entry) return [];
-                if (entry.isFile) {
-                    const file = await new Promise((resolve) =>
-                        entry.file(resolve)
-                    );
-                    const relativePath = (entry.fullPath || file.name)
-                        .replace(/^\/+/, "")
-                        .trim();
-                    return [{ file, relativePath }];
-                }
-                if (entry.isDirectory) {
-                    const entries = await readAllEntries(entry);
-                    const out = [];
-                    for (const e of entries) {
-                        const sub = await walkEntry(e);
-                        out.push(...sub);
-                    }
-                    return out;
-                }
-                return [];
-            };
-
-            const collectDropPayload = async (e) => {
-                const items = e?.dataTransfer?.items;
-                if (items && items.length > 0) {
-                    const out = [];
-                    let hasDirectory = false;
-                    for (const item of items) {
-                        const entry = item?.webkitGetAsEntry?.();
-                        if (!entry) continue;
-                        if (entry.isDirectory) {
-                            hasDirectory = true;
-                        }
-                        const sub = await walkEntry(entry);
-                        out.push(...sub);
-                    }
-                    return { pairs: out, hasDirectory };
-                }
-
-                const files = Array.from(e?.dataTransfer?.files || []);
-                return {
-                    pairs: files.map((f) => ({ file: f, relativePath: f.name })),
-                    hasDirectory: false,
-                };
-            };
-
             this.onDropFile = function (file) {
                 try {
                     uploadSingleFile(file);
@@ -830,124 +660,17 @@ app.registerExtension({
             };
 
             this._comfy1hewVideoAutoSizeKey = "";
-
-            const autoSizeToContent = () => {
-                if (!this.videoWidget.aspectRatio) {
-                    return;
-                }
-                
-                const width = this.size[0];
-                // 重新计算理想高度：宽度 * 比例 + 底部文字高度(20)
-                const desiredWidgetHeight = width * this.videoWidget.aspectRatio + 20;
-                
-                // 获取 widget 的位置，计算总高度
-                let desiredHeight;
-                if (Number.isFinite(this.videoWidget.last_y)) {
-                    desiredHeight = this.videoWidget.last_y + desiredWidgetHeight;
-                } else {
-                    try {
-                        const computed = this.computeSize?.([
-                            this.size[0],
-                            this.size[1],
-                        ]);
-                        if (
-                            Array.isArray(computed) &&
-                            computed.length >= 2 &&
-                            Number.isFinite(computed[1])
-                        ) {
-                            desiredHeight = computed[1];
-                        }
-                    } catch {}
-                    if (!Number.isFinite(desiredHeight)) {
-                        let estimatedTop = 130;
-                        if (this.widgets && this.widgets.length > 0) {
-                            const widgetCount = this.widgets.filter(
-                                (w) => w !== this.videoWidget && w.type !== "hidden"
-                            ).length;
-                            // 估算: 标题栏(30) + (Widget高度(20)+间距(6)) * 数量 + 底部留白
-                            estimatedTop = 30 + widgetCount * 26 + 30;
-                        }
-                        if (estimatedTop < 130) estimatedTop = 130;
-                        desiredHeight = estimatedTop + desiredWidgetHeight;
-                    }
-                }
-
-                // 如果当前高度小于理想高度，自动撑开
-                if (this.size[1] + 1 < desiredHeight) {
-                    this.setSize([this.size[0], desiredHeight]);
-                }
-            };
-
-            const requestAutoSize = () => {
-                if (!videoEl.videoWidth || !videoEl.videoHeight) {
-                    return;
-                }
-                const key = `${videoEl.videoWidth}x${videoEl.videoHeight}`;
-                if (this._comfy1hewVideoAutoSizeKey === key) {
-                    return;
-                }
-                this._comfy1hewVideoAutoSizeKey = key;
-                setTimeout(autoSizeToContent, 0);
-            };
-
-            const updateLayout = () => {
-                if (container.dataset.comfy1hewForceHidden === "1") {
-                    container.style.height = "0px";
-                    container.style.display = "none";
-                    return;
-                }
-                if (!this.videoWidget.aspectRatio) {
-                    container.style.height = "0px";
-                    container.style.display = "none";
-                    return;
-                }
-                container.style.display = "flex";
-
-                // 1. 尝试使用 last_y 准确计算起始位置
-                // last_y 是 LiteGraph 计算出的当前 widget 的 y 坐标
-                let availableHeight;
-                if (Number.isFinite(this.videoWidget?.last_y)) {
-                    // 节点高度 - widget起始位置 - 底部留白 (15px)
-                    availableHeight = this.size[1] - this.videoWidget.last_y - 15;
-                } else {
-                    const width = this.size[0];
-                    availableHeight = width * this.videoWidget.aspectRatio + 20;
-                }
-
-                // 3. 确保高度有效
-                if (availableHeight < 0) availableHeight = 0;
-
-                // 4. 设置容器高度
-                container.style.height = `${availableHeight}px`;
-                
-                // 5. 强制重绘，确保 LiteGraph 更新布局
-                app.graph.setDirtyCanvas(true, true);
-            };
-
-            const ensurePreviewLayout = () => {
-                if (container.dataset.comfy1hewForceHidden === "1") {
-                    updateLayout();
-                    return;
-                }
-
-                if (videoEl.videoWidth && videoEl.videoHeight) {
-                    this.videoWidget.aspectRatio =
-                        videoEl.videoHeight / videoEl.videoWidth;
-                }
-
-                requestAutoSize();
-                updateLayout();
-                autoSizeToContent();
-            };
+            const { updateLayout, ensurePreviewLayout } = installVideoPreviewLayout({
+                app,
+                node: this,
+                videoWidget: this.videoWidget,
+                container,
+                videoEl,
+            });
 
             videoEl.addEventListener("loadedmetadata", () => {
                 infoEl.innerText = `${videoEl.videoWidth} x ${videoEl.videoHeight}`;
-                if (videoEl.videoWidth && videoEl.videoHeight) {
-                    this.videoWidget.aspectRatio =
-                        videoEl.videoHeight / videoEl.videoWidth;
-                    requestAutoSize();
-                    updateLayout();
-                }
+                ensurePreviewLayout();
             });
 
             videoEl.addEventListener("error", () => {
@@ -961,8 +684,6 @@ app.registerExtension({
             videoEl.addEventListener("play", updateLayout);
             videoEl.addEventListener("pause", updateLayout);
 
-            this.updateVideoLayout = updateLayout;
-            this._comfy1hewEnsurePreviewLayout = ensurePreviewLayout;
             applyPreviewHiddenState(this, { respectFrameAccurateOnShow: true });
             setTimeout(ensurePreviewLayout, 0);
             setTimeout(ensurePreviewLayout, 200);
@@ -1028,389 +749,19 @@ app.registerExtension({
                 app.graph.setDirtyCanvas(true, true);
             };
 
-            // --- Helper: Update Video Playback State ---
-            const parseFormatSpec = (raw) => {
-                const f = String(raw ?? "").trim().toLowerCase();
-                if (!f || f === "n" || f === "default") {
-                    return { step: 1, mod: 0 };
-                }
-                if (!f.includes("n")) {
-                    return { step: 1, mod: 0 };
-                }
-                const parts = f.split("n");
-                let step = 1;
-                let mod = 0;
-                try {
-                    if (parts[0]) {
-                        step = Number.parseInt(parts[0], 10);
-                    }
-                    if (parts.length > 1 && parts[1]) {
-                        mod = Number.parseInt(parts[1], 10);
-                    }
-                } catch {
-                    return { step: 1, mod: 0 };
-                }
-                if (!Number.isFinite(step) || step <= 0) {
-                    step = 1;
-                }
-                if (!Number.isFinite(mod)) {
-                    mod = 0;
-                }
-                return { step, mod };
-            };
-
-            const stopFrameAccuratePreview = () => {
-                const runner = videoEl?._comfy1hewFrameAccurateRunner;
-                if (runner && typeof runner.stop === "function") {
-                    runner.stop();
-                }
-                if (videoEl) {
-                    videoEl._comfy1hewFrameAccurateRunner = null;
-                    videoEl.dataset.comfy1hewFrameAccurate = "0";
-                }
-            };
-
-            const startFrameAccuratePreview = () => {
-                if (!videoEl) {
-                    return;
-                }
-
-                const cfg = videoEl._comfy1hew_previewConfig;
-                if (!cfg || !cfg.enabled) {
-                    stopFrameAccuratePreview();
-                    return;
-                }
-
-                if (videoEl._comfy1hewFrameAccurateRunner) {
-                    videoEl._comfy1hewFrameAccurateRunner.stop();
-                    videoEl._comfy1hewFrameAccurateRunner = null;
-                }
-
-                videoEl.dataset.comfy1hewFrameAccurate = "1";
-                const token = { stopped: false };
-
-                const waitMs = (ms) =>
-                    new Promise((resolve) => setTimeout(resolve, ms));
-
-                const seekTo = (t) =>
-                    new Promise((resolve) => {
-                        let timeoutId = null;
-                        const onSeeked = () => {
-                            if (timeoutId) {
-                                clearTimeout(timeoutId);
-                            }
-                            resolve();
-                        };
-                        timeoutId = setTimeout(() => {
-                            try {
-                                videoEl.removeEventListener("seeked", onSeeked);
-                            } catch {}
-                            resolve();
-                        }, 250);
-                        try {
-                            videoEl.addEventListener("seeked", onSeeked, {
-                                once: true,
-                            });
-                            videoEl.currentTime = t;
-                        } catch {
-                            clearTimeout(timeoutId);
-                            resolve();
-                        }
-                    });
-
-                const clampTime = (t) => {
-                    const d = Number(videoEl.duration);
-                    if (Number.isFinite(d) && d > 0) {
-                        if (t < 0) return 0;
-                        if (t > d) return d;
-                        return t;
-                    }
-                    return t;
-                };
-
-                const computeSourceFrameIndex = (outputIndex, config) => {
-                    const count = Number(config.subsetCount) || 0;
-                    if (count <= 0) {
-                        return Number(config.startSkip) || 0;
-                    }
-
-                    let subsetIndex = outputIndex;
-                    const srcFps = Number(config.sourceFps) || 0;
-                    const tgtFps = Number(config.targetFps) || 0;
-                    if (srcFps > 0 && tgtFps > 0) {
-                        subsetIndex = Math.round(
-                            outputIndex * srcFps / tgtFps
-                        );
-                    }
-                    subsetIndex = Math.max(0, Math.min(subsetIndex, count - 1));
-                    return (Number(config.startSkip) || 0) + subsetIndex;
-                };
-
-                const runner = {
-                    stop: () => {
-                        token.stopped = true;
-                    },
-                };
-                videoEl._comfy1hewFrameAccurateRunner = runner;
-
-                const run = async () => {
-                    let outputIndex = 0;
-                    while (!token.stopped) {
-                        const config = videoEl._comfy1hew_previewConfig;
-                        if (!config || !config.enabled) {
-                            break;
-                        }
-
-                        if (videoEl.dataset.comfy1hewUserPaused === "1") {
-                            await waitMs(100);
-                            continue;
-                        }
-
-                        const frameCount = Number(config.finalFrameCount) || 0;
-                        if (frameCount <= 0) {
-                            const startT = clampTime(Number(config.startTime) || 0);
-                            await seekTo(startT);
-                            await waitMs(150);
-                            continue;
-                        }
-
-                        if (outputIndex >= frameCount) {
-                            outputIndex = 0;
-                        }
-
-                        const srcIdx = computeSourceFrameIndex(outputIndex, config);
-                        const fps = Number(config.sourceFps) || 0;
-                        const t = fps > 0 ? (srcIdx + 0.5) / fps : 0;
-                        await seekTo(clampTime(t));
-
-                        outputIndex += 1;
-
-                        const playbackFps = Number(config.playbackFps) || 0;
-                        const tickFps =
-                            playbackFps > 0 ? Math.min(playbackFps, 60) : 30;
-                        await waitMs(1000 / tickFps);
-                    }
-                };
-
-                try {
-                    videoEl.pause();
-                } catch {}
-                run().catch(() => {});
-            };
-
-            const updateVideoPlaybackState = () => {
-                if (!this._comfy1hewVideoInfo || !videoEl) return;
-
-                const info = this._comfy1hewVideoInfo;
-                const sourceFps = Number(info.fps) || 0;
-                const duration = Number(info.duration) || 0;
-                let sourceFrameCount = Number(info.frame_count) || 0;
-
-                const hasControls =
-                    !!startSkipWidget
-                    || !!endSkipWidget
-                    || !!fpsWidget
-                    || !!frameLimitWidget
-                    || !!formatWidget;
-
-                if (!hasControls) {
-                    stopFrameAccuratePreview();
-                    return;
-                }
-
-                if (sourceFps <= 0) {
-                    stopFrameAccuratePreview();
-                    return;
-                }
-
-                if (sourceFrameCount === 0 && duration > 0) {
-                    sourceFrameCount = Math.round(duration * sourceFps);
-                }
-
-                const startSkip = Number(startSkipWidget?.value) || 0;
-                const endSkip = Number(endSkipWidget?.value) || 0;
-                const frameLimit = Number(frameLimitWidget?.value) || 0;
-                const targetFps = Number(fpsWidget?.value) || 0;
-
-                const subsetCount = Math.max(
-                    0,
-                    sourceFrameCount - startSkip - endSkip
-                );
-
-                let resampledCount = subsetCount;
-                if (subsetCount <= 0) {
-                    resampledCount = 0;
-                } else if (targetFps > 0) {
-                    const subsetDuration = (subsetCount - 1) / sourceFps;
-                    resampledCount =
-                        Math.floor(subsetDuration * targetFps + 1e-9) + 1;
-                    resampledCount = Math.max(resampledCount, 1);
-                }
-
-                let formatText = formatWidget ? formatWidget.value : "4n+1";
-                if (formatWidget) {
-                    formatText = resolveComboValue(formatWidget, formatText);
-                }
-                const fmt = parseFormatSpec(formatText);
-
-                let formatCount = resampledCount;
-                if (
-                    String(formatText ?? "")
-                        .trim()
-                        .toLowerCase() !== "n"
-                ) {
-                    if (formatCount < fmt.mod) {
-                        formatCount = 0;
-                    } else {
-                        const k = Math.floor(
-                            (formatCount - fmt.mod) / fmt.step
-                        );
-                        formatCount = fmt.step * k + fmt.mod;
-                        formatCount = Math.max(0, formatCount);
-                    }
-                }
-
-                let finalFrameCount = formatCount;
-                if (frameLimit > 0) {
-                    finalFrameCount = Math.min(finalFrameCount, frameLimit);
-                }
-                finalFrameCount = Math.max(0, finalFrameCount);
-
-                let lastSubsetIndex = 0;
-                if (finalFrameCount > 0) {
-                    const lastOut = finalFrameCount - 1;
-                    if (targetFps > 0 && subsetCount > 0) {
-                        lastSubsetIndex = Math.round(
-                            lastOut * sourceFps / targetFps
-                        );
-                    } else {
-                        lastSubsetIndex = lastOut;
-                    }
-                    if (subsetCount > 0) {
-                        lastSubsetIndex = Math.max(
-                            0,
-                            Math.min(lastSubsetIndex, subsetCount - 1)
-                        );
-                    } else {
-                        lastSubsetIndex = 0;
-                    }
-                }
-
-                const startSourceIndex = Math.max(0, startSkip);
-                const lastSourceIndex = Math.max(
-                    startSourceIndex,
-                    startSkip + lastSubsetIndex
-                );
-
-                const startTime = startSourceIndex / sourceFps;
-                let endTime =
-                    finalFrameCount > 0
-                        ? (lastSourceIndex + 1) / sourceFps
-                        : startTime;
-
-                if (Number.isFinite(duration) && duration > 0) {
-                    endTime = Math.min(endTime, duration);
-                } else if (
-                    Number.isFinite(videoEl.duration)
-                    && videoEl.duration > 0
-                ) {
-                    endTime = Math.min(endTime, videoEl.duration);
-                }
-                if (endTime < startTime) {
-                    endTime = startTime;
-                }
-
-                const playbackFps = targetFps > 0 ? targetFps : sourceFps;
-
-                videoEl._comfy1hew_startTime = startTime;
-                videoEl._comfy1hew_endTime = endTime;
-                videoEl.playbackRate = 1.0;
-                videoEl._comfy1hew_previewConfig = {
-                    enabled: true,
-                    sourceFps,
-                    targetFps,
-                    playbackFps,
-                    sourceFrameCount,
-                    subsetCount,
-                    startSkip,
-                    endSkip,
-                    finalFrameCount,
-                    startTime,
-                    endTime,
-                };
-
-                if (
-                    Number.isFinite(videoEl.currentTime)
-                    && (videoEl.currentTime < startTime
-                        || videoEl.currentTime > endTime)
-                ) {
-                    try {
-                        videoEl.currentTime = (startSourceIndex + 0.5) / sourceFps;
-                    } catch {}
-                }
-
-                stopFrameAccuratePreview();
-            };
-
-            // Use requestVideoFrameCallback for frame-accurate looping if available
-            // Fallback to timeupdate if not supported
-            const onVideoFrame = (now, metadata) => {
-                if (!videoEl || !videoEl._comfy1hew_previewConfig) {
-                     if (videoEl && typeof videoEl.requestVideoFrameCallback === 'function') {
-                         videoEl.requestVideoFrameCallback(onVideoFrame);
-                     }
-                     return;
-                }
-
-                const start = videoEl._comfy1hew_startTime ?? 0;
-                const end = videoEl._comfy1hew_endTime ?? videoEl.duration;
-                
-                // metadata.mediaTime provides the presentation timestamp in seconds
-                // Use a slightly tighter tolerance than timeupdate
-                // Use 1.0 frame tolerance to aggressively avoid rendering the next frame
-                const sourceFps = (videoEl._comfy1hew_previewConfig && videoEl._comfy1hew_previewConfig.sourceFps) || 30;
-                const tolerance = 1.0 / sourceFps;
-                
-                if (end > start && metadata.mediaTime >= (end - tolerance)) {
-                    const startSourceIndex = (videoEl._comfy1hew_previewConfig && videoEl._comfy1hew_previewConfig.startSkip) || 0;
-                    
-                    // Jump back
-                    videoEl.currentTime = (startSourceIndex + 0.5) / sourceFps;
-                    
-                    // Ensure it keeps playing if not paused by user
-                    if (!videoEl.paused) {
-                        const p = videoEl.play();
-                        if (p && typeof p.catch === "function") p.catch(() => {});
-                    }
-                }
-
-                // Schedule next frame check
-                if (typeof videoEl.requestVideoFrameCallback === 'function') {
-                    videoEl.requestVideoFrameCallback(onVideoFrame);
-                }
-            };
-
-            if (typeof videoEl.requestVideoFrameCallback === 'function') {
-                videoEl.requestVideoFrameCallback(onVideoFrame);
-            } else {
-                // Fallback for browsers without rVFC support
-                videoEl.addEventListener("timeupdate", () => {
-                    const start = videoEl._comfy1hew_startTime ?? 0;
-                    const end = videoEl._comfy1hew_endTime ?? videoEl.duration;
-                    
-                    if (end > start && videoEl.currentTime >= end) {
-                        const startSourceIndex = (videoEl._comfy1hew_previewConfig && videoEl._comfy1hew_previewConfig.startSkip) || 0;
-                        const sourceFps = (videoEl._comfy1hew_previewConfig && videoEl._comfy1hew_previewConfig.sourceFps) || 30;
-                        videoEl.currentTime = (startSourceIndex + 0.5) / sourceFps;
-                        if (!videoEl.paused) {
-                            const p = videoEl.play();
-                            if (p && typeof p.catch === "function") p.catch(() => {});
-                        }
-                    }
-                });
-            }
-
-            this.updateVideoPlaybackState = updateVideoPlaybackState;
+            const playback = installVideoPlaybackState({
+                node: this,
+                videoEl,
+                widgets: {
+                    startSkipWidget,
+                    endSkipWidget,
+                    fpsWidget,
+                    frameLimitWidget,
+                    formatWidget,
+                },
+                resolveComboValue,
+            });
+            this.updateVideoPlaybackState = playback.updateVideoPlaybackState;
 
             const originalOnResize = this.onResize;
             this.onResize = function (size) {
@@ -1446,6 +797,42 @@ app.registerExtension({
                 currentNode: this,
                 respectFrameAccurateOnShow: true,
             });
+
+            let videoEl = null;
+            if (this.videoWidget && this.videoWidget.element) {
+                 videoEl = this.videoWidget.element.querySelector("video");
+                 if (!videoEl && this.videoWidget.element.tagName === "VIDEO") {
+                     videoEl = this.videoWidget.element;
+                 }
+            }
+
+            const getVideoElFromNode = (node) => {
+                if (!node?.videoWidget?.element) {
+                    return null;
+                }
+                const el = node.videoWidget.element;
+                return el.tagName === "VIDEO" ? el : el.querySelector("video");
+            };
+
+            addSaveMediaMenuOption(options, {
+                app,
+                currentNode: this,
+                content: "Save Video",
+                getMediaElFromNode: getVideoElFromNode,
+                filenamePrefix: "video",
+                filenameExt: "mp4",
+            });
+
+            if (videoEl) {
+                addCopyMediaFrameMenuOption(options, {
+                    content: "Copy Frame",
+                    getWidth: () => videoEl.videoWidth,
+                    getHeight: () => videoEl.videoHeight,
+                    drawToCanvas: (ctx) => ctx.drawImage(videoEl, 0, 0),
+                    copyErrorMessage: "Failed to copy frame to clipboard:",
+                    prepareErrorMessage: "Error preparing frame copy:",
+                });
+            }
         };
     },
 });

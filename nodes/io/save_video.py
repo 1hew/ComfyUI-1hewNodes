@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import shutil
 from typing import Optional
 
 import folder_paths
@@ -70,10 +71,14 @@ class SaveVideo(io.ComfyNode):
 
         width, height = video.get_dimensions()
 
-        # Check for alpha channel
+        path_attr = cls._coerce_path(getattr(video, "path", None))
+        source_path = path_attr
+        if not isinstance(source_path, str):
+            source_path = cls._coerce_path(getattr(video, "source_path", None))
+
         has_alpha = False
-        if hasattr(video, "path") and os.path.exists(video.path):
-            has_alpha = await cls.check_has_alpha(video.path)
+        if isinstance(source_path, str) and os.path.exists(source_path):
+            has_alpha = await cls.check_has_alpha(source_path)
 
         global _PATH_LOCK
         if _PATH_LOCK is None:
@@ -99,8 +104,8 @@ class SaveVideo(io.ComfyNode):
             extension = VideoContainer.get_extension(format)
 
             # Try to use source extension if available
-            if hasattr(video, "path"):
-                _, source_ext = os.path.splitext(video.path)
+            if isinstance(source_path, str):
+                _, source_ext = os.path.splitext(source_path)
                 if source_ext:
                     extension = source_ext.lstrip(".")
 
@@ -149,13 +154,33 @@ class SaveVideo(io.ComfyNode):
             progress_steps += 1
         progress_bar = _new_progress_bar(progress_steps)
 
-        await asyncio.to_thread(
-            video.save_to,
-            path,
-            format=format,
-            codec=codec,
-            metadata=None,
-        )
+        if isinstance(path_attr, str) and os.path.isfile(path_attr):
+            has_audio = await cls._has_audio_stream(source_path)
+            if has_audio:
+                await asyncio.to_thread(shutil.copy2, path_attr, path)
+            else:
+                await cls._write_silent_audio_video(
+                    input_path=path_attr,
+                    output_path=path,
+                )
+        else:
+            try:
+                await asyncio.to_thread(
+                    video.save_to,
+                    path,
+                    format=format,
+                    codec=codec,
+                    metadata=None,
+                )
+            except Exception:
+                cls._strip_video_audio(video)
+                await asyncio.to_thread(
+                    video.save_to,
+                    path,
+                    format=format,
+                    codec=codec,
+                    metadata=None,
+                )
         if progress_bar is not None:
             try:
                 progress_bar.update(1)
@@ -274,6 +299,109 @@ class SaveVideo(io.ComfyNode):
             return any(fmt in pix_fmt for fmt in alpha_formats)
         except Exception:
             return False
+
+    @staticmethod
+    def _coerce_path(value) -> Optional[str]:
+        if value is None:
+            return None
+        try:
+            return os.fspath(value)
+        except TypeError:
+            return None
+
+    @staticmethod
+    def _strip_video_audio(video: object) -> None:
+        attr_names = [
+            "_VideoInput__components",
+            "_ComfyVideo__components",
+        ]
+        for attr in attr_names:
+            try:
+                components = getattr(video, attr)
+                if hasattr(components, "audio"):
+                    setattr(components, "audio", None)
+            except Exception:
+                pass
+
+        for attr in dir(video):
+            if "__components" not in attr and "components" not in attr.lower():
+                continue
+            try:
+                components = getattr(video, attr)
+                if hasattr(components, "audio"):
+                    setattr(components, "audio", None)
+            except Exception:
+                pass
+
+    @staticmethod
+    async def _has_audio_stream(path: str) -> bool:
+        try:
+            command = [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "a:0",
+                "-show_entries",
+                "stream=index",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                path,
+            ]
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await process.communicate()
+            return bool(stdout.strip())
+        except Exception:
+            return False
+
+    @staticmethod
+    async def _write_silent_audio_video(
+        input_path: str,
+        output_path: str,
+    ) -> None:
+        _, ext = os.path.splitext(output_path)
+        ext = ext.lower()
+        audio_codec = "aac"
+        if ext in {".webm", ".mkv"}:
+            audio_codec = "libopus"
+
+        command = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            input_path,
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=channel_layout=stereo:sample_rate=44100",
+            "-shortest",
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c:v",
+            "copy",
+            "-c:a",
+            audio_codec,
+        ]
+
+        if audio_codec == "aac":
+            command.extend(["-b:a", "128k", "-movflags", "+faststart"])
+
+        command.append(output_path)
+
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await process.communicate()
+        if process.returncode != 0:
+            raise Exception(f"FFmpeg silent-audio mux failed: {stderr.decode()}")
 
     @staticmethod
     async def generate_preview(

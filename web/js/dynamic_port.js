@@ -1,5 +1,3 @@
-// ComfyUI-1hewNodesV3: Dynamic input ports for multi nodes
-// Keep UI behavior consistent with V1: auto-append tail slot and normalize gaps
 import { app } from "../../../scripts/app.js";
 
 app.registerExtension({
@@ -11,12 +9,14 @@ app.registerExtension({
             "1hew_MultiMaskBatch": { base: "mask_", addType: "MASK", select: null, initial: 1 },
             "1hew_MultiImageStitch": { base: "image_", addType: "IMAGE", select: null, initial: 2 },
             "1hew_ImageMainStitch": { base: "image_", addType: "IMAGE", select: null, initial: 3 },
-            "1hew_AnySwitchInt": { base: "input_", addType: "*", select: "select", initial: 1 , max: 10},
-            "1hew_TextEncodeQwenImageEditKeepSize": { base: "image_", addType: "IMAGE", select: null, initial: 1, max: 10 },
+            "1hew_AnySwitchInt": { base: "input_", addType: "*", select: "select", initial: 1, max: 10 },
             "1hew_ImageListAppend": { base: "image_", addType: "IMAGE", select: null, initial: 2 },
-            "1hew_MultiMaskMathOps": { base: "mask_", addType: "MASK", select: null, initial: 2},
+            "1hew_MultiMaskMathOps": { base: "mask_", addType: "MASK", select: null, initial: 2 },
         };
-        const typeName = nodeData?.name || nodeType?.type || nodeType?.title || nodeType?.name;
+        const typeName = nodeData?.name
+            || nodeType?.type
+            || nodeType?.title
+            || nodeType?.name;
         const cfg = configs[typeName];
         if (!cfg) return;
 
@@ -25,6 +25,46 @@ app.registerExtension({
         const cap = typeof cfg.max === "number" && cfg.max > 0 ? cfg.max : Infinity;
 
         const originalOnConnectionsChange = nodeType.prototype.onConnectionsChange;
+
+        const enableAutoCompact = typeName === "1hew_AnySwitchInt";
+
+        function compactNodeHeight(node) {
+            if (!enableAutoCompact) {
+                return;
+            }
+            if (!node || node.flags?.collapsed) {
+                return;
+            }
+
+            let desiredHeight = null;
+            try {
+                const computed = node.computeSize?.([node.size?.[0], node.size?.[1]]);
+                if (
+                    Array.isArray(computed)
+                    && computed.length >= 2
+                    && Number.isFinite(computed[1])
+                ) {
+                    desiredHeight = computed[1];
+                }
+            } catch (_) {}
+
+            if (
+                Number.isFinite(desiredHeight)
+                && node.size?.[1] > desiredHeight + 2
+            ) {
+                node.setSize([node.size[0], desiredHeight]);
+                node.setDirtyCanvas(true, true);
+            }
+        }
+
+        function scheduleCompact(node) {
+            if (!enableAutoCompact) {
+                return;
+            }
+            setTimeout(() => compactNodeHeight(node), 0);
+            setTimeout(() => compactNodeHeight(node), 120);
+            setTimeout(() => compactNodeHeight(node), 600);
+        }
 
         function listDynamicInputs(node) {
             return node.inputs?.filter(inp => inp?.name?.startsWith(baseInput)) || [];
@@ -128,7 +168,6 @@ app.registerExtension({
                 const count = listDynamicInputs(node).length;
                 if (count < cap) addNextInput(node);
             }
-            
         }
 
         function renumberDynamicInputsCompact(node) {
@@ -184,6 +223,7 @@ app.registerExtension({
             try {
                 if (type !== LiteGraph.INPUT) {
                     syncSelectRange(this);
+                    scheduleCompact(this);
                     return rv;
                 }
                 ensureFirstInput(this);
@@ -201,6 +241,7 @@ app.registerExtension({
                 syncSelectRange(this);
                 normalizeDynamicTypes(this);
                 this.setDirtyCanvas(true, true);
+                scheduleCompact(this);
             } catch (err) {
                 console.error("[1hewNodesV3.DynamicPorts] onConnectionsChange error", err);
             }
@@ -215,15 +256,40 @@ app.registerExtension({
                     const w = this.widgets.find(w => w.name === baseInput + "1");
                     if (w) this.convertWidgetToInput(w);
                 }
+                if (selectName && this.widgets && enableAutoCompact) {
+                    const w = this.widgets.find(w => w.name === selectName);
+                    if (w) {
+                        const nodeInstance = this;
+                        const prev = w.callback;
+                        w.callback = function() {
+                            const r = prev?.apply(this, arguments);
+                            try {
+                                scheduleCompact(nodeInstance);
+                            } catch (_) {}
+                            return r;
+                        };
+                    }
+                }
                 ensureFirstInput(this);
                 ensureSingleTrailingEmpty(this);
                 syncSelectRange(this);
                 normalizeDynamicTypes(this);
                 this.setDirtyCanvas(true, true);
-                console.log("[1hewNodesV3.DynamicPorts] node initialized");
             } catch (err) {
                 console.error("[1hewNodesV3.DynamicPorts] onAdded error", err);
             }
+            try {
+                scheduleCompact(this);
+            } catch (_) {}
+        };
+
+        const originalOnConfigure = nodeType.prototype.onConfigure;
+        nodeType.prototype.onConfigure = function () {
+            const r = originalOnConfigure?.apply(this, arguments);
+            try {
+                scheduleCompact(this);
+            } catch (_) {}
+            return r;
         };
     }
 });

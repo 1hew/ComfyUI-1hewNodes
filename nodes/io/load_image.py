@@ -474,7 +474,7 @@ async def upload_images(request):
     if not saved:
         return web.json_response({"error": "no valid files"}, status=400)
 
-    return web.json_response({"folder": target_dir, "count": len(saved)})
+    return web.json_response({"folder": target_dir, "count": len(saved), "files": saved})
 
 
 @PromptServer.instance.routes.get("/1hew/view_image_from_folder")
