@@ -10,7 +10,7 @@ app.registerExtension({
             "1hew_MultiImageStitch": { base: "image_", addType: "IMAGE", select: null, initial: 2 },
             "1hew_ImageMainStitch": { base: "image_", addType: "IMAGE", select: null, initial: 3 },
             "1hew_AnySwitchInt": { base: "input_", addType: "*", select: "select", initial: 1, max: 10 },
-            "1hew_TextEncodeQwenImageEditKeepSize": { base: "image_", addType: "IMAGE", select: null, initial: 1, max: 10 },
+            "1hew_TextEncodeQwenImageEdit": { base: "image_", addType: "IMAGE", select: null, initial: 1, max: 10 },
             "1hew_ImageListAppend": { base: "image_", addType: "IMAGE", select: null, initial: 2 },
             "1hew_MultiMaskMathOps": { base: "mask_", addType: "MASK", select: null, initial: 2 },
         };

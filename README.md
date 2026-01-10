@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.2.6**
+- refactor(condition): Optimize `Text Encode QwenImageEdit` node
+
 **v3.2.3**
 - refactor(io): Optimize IO group
 
@@ -511,7 +514,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎛️ Conditioning Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Text Encode QwenImageEdit Keep Size | Qwen image-edit conditioning encoder combining vision inputs and text, supports size preservation modes and reference latents |
+| Text Encode QwenImageEdit | Qwen image-edit conditioning encoder combining vision inputs and text, supports size preservation modes and reference latents |
 
 
 ### 🔊 Audio Nodes
