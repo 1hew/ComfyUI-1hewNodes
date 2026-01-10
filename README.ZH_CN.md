@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.2.6**
+- refactor(condition): 优化 `Text Encode QwenImageEdit` 节点
+
 **v3.2.3**
 - refactor(io): 优化 IO 组
 
@@ -511,7 +514,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎛️ 条件编码节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Text Encode QwenImageEdit Keep Size | Qwen 图文编辑条件编码，支持多图视觉编码、尺寸保持策略与参考潜空间 |
+| Text Encode QwenImageEdit | Qwen 图文编辑条件编码，支持多图视觉编码、尺寸保持策略与参考潜空间 |
 
 
 ### 🔊 音频节点
