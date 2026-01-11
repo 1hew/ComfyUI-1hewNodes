@@ -43,7 +43,7 @@ class SaveVideo(io.ComfyNode):
                 io.Video.Input("video", optional=True, tooltip="要保存的视频；为空时节点直接通过。"),
                 io.String.Input("filename_prefix", default="video/ComfyUI", tooltip="保存文件前缀；支持格式占位符（如 %date:yyyy-MM-dd%）。"),
                 io.Boolean.Input("save_output", default=True, tooltip="是否保存到输出目录；若为 False 则保存到临时目录。"),
-                io.Boolean.Input("save_metadata", default=False, tooltip="是否写入 prompt/workflow 元数据。"),
+                io.Boolean.Input("save_metadata", default=True, tooltip="是否写入 prompt/workflow 元数据。"),
             ],
             outputs=[
                 io.String.Output(display_name="file_path"),

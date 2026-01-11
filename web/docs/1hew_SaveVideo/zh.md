@@ -1,14 +1,15 @@
-# Save Video - 保存视频对象
+# Save Video - 保存视频到磁盘并写入元数据
 
-**节点功能：** `Save Video` 用于将 VIDEO 对象保存到磁盘并返回保存路径。优先沿用源视频容器扩展名，并在存在 Alpha 时生成便于 UI 播放的预览视频。
+**节点功能：** `Save Video` 将 VIDEO 输入保存到 ComfyUI 输出目录或临时目录，并返回保存后的绝对文件路径。支持将 prompt/workflow 元数据写入容器的 `comment` 字段；当源视频包含透明通道时，可在临时目录生成 WEBM 预览用于 UI 播放。
 
 ## 输入
 
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
-| `video` | 可选 | VIDEO | - | - | 需要保存的视频对象；输入为空时节点直接通过。 |
-| `filename_prefix` | - | STRING | `video/ComfyUI` | - | 文件名前缀；支持占位符（如 `%date:yyyy-MM-dd%`）。 |
-| `save_output` | - | BOOLEAN | `true` | - | 保存到输出目录（true）或临时目录（false）。 |
+| `video` | 可选 | VIDEO | - | - | 要保存的视频；输入为空时节点输出空结果。 |
+| `filename_prefix` | - | STRING | `video/ComfyUI` | - | 保存文件前缀，交由 ComfyUI 路径生成处理；通常支持日期占位符（如 `%date:yyyy-MM-dd%`）。 |
+| `save_output` | - | BOOLEAN | `true` | - | 开启时保存到输出目录；未开启时保存到临时目录。 |
+| `save_metadata` | - | BOOLEAN | `true` | - | 开启时将 prompt/workflow 元数据写入容器 `comment` 字段。 |
 
 ## 输出
 
@@ -18,16 +19,21 @@
 
 ## 功能说明
 
-- 扩展名沿用：当 VIDEO 输入包含源路径时，优先使用源文件扩展名生成输出文件。
-- 元数据写入：在启用元数据时写入 prompt 与额外信息。
-- Alpha 预览：使用 ffprobe 检测 Alpha，并生成 VP9 WebM 预览用于界面播放。
-- 安全命名：基于 ComfyUI 的保存路径分配与计数器避免重名冲突。
+- 输出位置控制：通过 `save_output` 选择输出目录或临时目录。
+- 扩展名推导：在可获取源文件扩展名时，保存文件采用源扩展名。
+- 元数据封装：通过 `ffmpeg` 对媒体进行 remux，将元数据写入 `comment`
+  字段并保持流拷贝。
+- 透明预览：通过 `ffprobe` 检测透明通道，生成 WEBM 预览到临时目录便于
+  UI 播放查看。
+- 界面预览：在 UI 面板展示 Preview Video 入口。
 
 ## 典型用法
 
-- 保存下游生成或选择的 VIDEO 对象，并将输出路径交给外部工具使用。
+- 保存上游处理后的成品视频到输出目录便于归档。
+- 开启元数据写入，将生成参数随结果一并保存。
+- 透明视频流程中使用预览文件快速检查透明效果。
 
 ## 注意与建议
 
-- Alpha 检测与预览生成依赖 `ffprobe` 与 `ffmpeg` 可执行文件。
-
+- 节点调用 `ffprobe` 进行透明/音频探测，调用 `ffmpeg` 完成 remux 与预览生成。
+- 节点对路径分配过程做串行化处理，计数器更稳定。
