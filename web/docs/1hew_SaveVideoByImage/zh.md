@@ -1,16 +1,17 @@
-# Save Video by Image - 序列帧编码为视频
+# Save Video by Image - 由图像批次编码视频
 
-**节点功能：** `Save Video by Image` 用于将 IMAGE 批次按指定 FPS 编码保存为视频文件。支持可选音频混流，并对包含 Alpha 的图像提供兼容的输出策略。
+**节点功能：** `Save Video by Image` 将 IMAGE 图像批次按帧序编码为视频，并支持将 AUDIO 输入混流进输出文件。节点返回保存后的绝对文件路径，并提供 UI 预览入口。对包含透明通道的序列，节点以 WEBM（VP9）作为预览输出；在保存到输出目录时可同时导出高质量 MOV（ProRes）成品。
 
 ## 输入
 
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
-| `image` | - | IMAGE | - | - | 作为视频帧的图像批次。 |
-| `audio` | 可选 | AUDIO | - | - | 可选音频，用于混流到输出视频。 |
-| `fps` | - | FLOAT | `8.0` | 0.01-120 | 编码帧率（每秒帧数）。 |
-| `filename_prefix` | - | STRING | `video/ComfyUI` | - | 文件名前缀；遵循 ComfyUI 的保存路径规则。 |
-| `save_output` | - | BOOLEAN | `true` | - | 保存到输出目录（true）或临时目录（false）。 |
+| `image` | - | IMAGE | - | - | 图像批次按时间顺序作为视频帧进行编码。 |
+| `audio` | 可选 | AUDIO | - | - | 音频输入；提供时混流进输出视频。 |
+| `fps` | - | FLOAT | `8.0` | 0.01-120.0 | 编码帧率。 |
+| `filename_prefix` | - | STRING | `video/ComfyUI` | - | 保存文件前缀，交由 ComfyUI 路径生成处理；通常支持日期占位符（如 `%date:yyyy-MM-dd%`）。 |
+| `save_output` | - | BOOLEAN | `true` | - | 开启时保存到输出目录；未开启时保存到临时目录。 |
+| `save_metadata` | - | BOOLEAN | `true` | - | 开启时将 prompt/workflow 元数据写入容器 `comment` 字段。 |
 
 ## 输出
 
@@ -20,19 +21,23 @@
 
 ## 功能说明
 
-- FFmpeg 编码：以 rawvideo 方式向 ffmpeg 流式写入帧并完成编码。
-- 音频混流：将输入音频保存为临时 WAV，并在编码时进行混流。
-- Alpha 输出策略：
-  - RGBA 且 `save_output=true`：输出 `.mov`（ProRes，保留 Alpha），并在临时目录生成 `.webm` 预览。
-  - RGBA 且 `save_output=false`：输出带 Alpha 的 `.webm` 到临时目录。
-  - RGB：输出 `.mp4`（H.264）到目标目录。
-- 尺寸对齐：对常见编码器要求的偶数宽高进行自动调整。
+- 帧序编码：通过 stdin 向 `ffmpeg` 流式写入 rawvideo 帧进行编码。
+- 音频混流：将 AUDIO 转为临时 WAV 文件并混流进输出。
+- 偶数尺寸对齐：对宽高做偶数对齐，编码过程更稳定。
+- 透明通道输出策略：
+  - 帧包含透明通道时，默认导出 WEBM（VP9 + yuva420p）。
+  - 帧包含透明通道且 `save_output=true` 时，在临时目录生成预览 WEBM，
+    同时在输出目录导出 MOV（ProRes 4444）成品。
+- 元数据写入：将 prompt/workflow JSON 写入 `comment` 字段。
+- 界面预览：在 UI 面板展示 Preview Video 入口；存在预览文件时优先用于播放。
 
 ## 典型用法
 
-- 将处理后的帧批次快速编码为可预览视频，并将输出路径交给后续节点使用。
+- 将生成的帧批次编码为 MP4 便于分享。
+- 编码 RGBA 透明序列：用 WEBM 预览播放，用 MOV（ProRes）导出高质量成品。
+- 为成品视频附加音频轨道并输出到最终交付路径。
 
 ## 注意与建议
 
-- 编码依赖 `ffmpeg` 可执行文件处于可访问环境中。
-
+- 节点调用 `ffmpeg` 完成编码与混流。
+- 提供 `audio` 时会在临时目录生成中间 WAV，并在编码结束后清理。

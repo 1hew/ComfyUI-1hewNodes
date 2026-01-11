@@ -22,7 +22,7 @@ class SaveImage(io.ComfyNode):
                 io.Image.Input("image", optional=True),
                 io.String.Input("filename_prefix", default="image/ComfyUI"),
                 io.Boolean.Input("save_output", default=True),
-                io.Boolean.Input("save_metadata", default=False),
+                io.Boolean.Input("save_metadata", default=True),
             ],
             outputs=[
                 io.String.Output(display_name="file_path"),

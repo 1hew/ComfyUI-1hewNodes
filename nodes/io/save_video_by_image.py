@@ -42,7 +42,7 @@ class SaveVideoByImage(io.ComfyNode):
                 io.Float.Input("fps", default=8.0, min=0.01, max=120.0, step=0.01),
                 io.String.Input("filename_prefix", default="video/ComfyUI"),
                 io.Boolean.Input("save_output", default=True),
-                io.Boolean.Input("save_metadata", default=False),
+                io.Boolean.Input("save_metadata", default=True),
             ],
             outputs=[
                 io.String.Output(display_name="file_path"),
