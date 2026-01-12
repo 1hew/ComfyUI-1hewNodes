@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import shutil
+import tempfile
 from typing import Optional
 
 import folder_paths
@@ -235,25 +236,46 @@ class SaveVideo(io.ComfyNode):
             "-y",
             "-i",
             input_path,
-            "-map",
-            "0",
-            "-c",
-            "copy",
-            "-map_metadata",
-            "-1",
         ]
 
+        ffmetadata_path = None
         if metadata_comment:
-            command.extend(["-metadata", f"comment={metadata_comment}"])
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                delete=False,
+                suffix=".ffmeta",
+            ) as meta_file:
+                ffmetadata_path = meta_file.name
+                escaped = metadata_comment.replace("\\", "\\\\")
+                for char in ("=", ";", "#", "\n", "\r"):
+                    escaped = escaped.replace(char, f"\\{char}")
+                meta_file.write(";FFMETADATA1\n")
+                meta_file.write(f"comment={escaped}\n")
+            command.extend(["-f", "ffmetadata", "-i", ffmetadata_path])
+
+        command.extend(["-map", "0", "-c", "copy"])
+
+        if metadata_comment:
+            command.extend(["-map_metadata", "1"])
+        else:
+            command.extend(["-map_metadata", "-1"])
 
         command.append(tmp_path)
 
-        process = await asyncio.create_subprocess_exec(
-            *command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        _, stderr = await process.communicate()
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await process.communicate()
+        finally:
+            if ffmetadata_path and os.path.exists(ffmetadata_path):
+                try:
+                    os.remove(ffmetadata_path)
+                except Exception:
+                    pass
 
         if process.returncode != 0:
             if os.path.exists(tmp_path):

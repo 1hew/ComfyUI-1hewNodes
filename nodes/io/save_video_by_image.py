@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import tempfile
 from typing import Optional
 
 import folder_paths
@@ -27,6 +28,13 @@ def _new_progress_bar(total: int):
         return ProgressBar(int(total))
     except Exception:
         return None
+
+
+def _escape_ffmetadata_value(value: str) -> str:
+    escaped = value.replace("\\", "\\\\")
+    for char in ("=", ";", "#", "\n", "\r"):
+        escaped = escaped.replace(char, f"\\{char}")
+    return escaped
 
 
 class SaveVideoByImage(io.ComfyNode):
@@ -263,6 +271,7 @@ class SaveVideoByImage(io.ComfyNode):
         metadata_comment: Optional[str] = None,
     ):
         ffmpeg_path = "ffmpeg"
+        ffmetadata_path = None
 
         command = [
             ffmpeg_path,
@@ -284,15 +293,31 @@ class SaveVideoByImage(io.ComfyNode):
         if audio_path:
             command.extend(["-i", audio_path])
 
+        if metadata_comment:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                delete=False,
+                suffix=".ffmeta",
+            ) as meta_file:
+                ffmetadata_path = meta_file.name
+                meta_file.write(";FFMETADATA1\n")
+                meta_file.write(
+                    f"comment={_escape_ffmetadata_value(metadata_comment)}\n"
+                )
+            command.extend(["-f", "ffmetadata", "-i", ffmetadata_path])
+
         command.extend(["-c:v", video_codec, "-pix_fmt", output_pix_fmt])
         command.extend(video_args)
 
         if audio_path:
             command.extend(["-c:a", audio_codec, "-shortest"])
 
-        command.extend(["-map_metadata", "-1"])
         if metadata_comment:
-            command.extend(["-metadata", f"comment={metadata_comment}"])
+            metadata_input_index = 1 if not audio_path else 2
+            command.extend(["-map_metadata", str(metadata_input_index)])
+        else:
+            command.extend(["-map_metadata", "-1"])
 
         command.append(path)
 
@@ -356,6 +381,12 @@ class SaveVideoByImage(io.ComfyNode):
             if os.path.exists(path):
                 os.remove(path)
             raise e
+        finally:
+            if ffmetadata_path and os.path.exists(ffmetadata_path):
+                try:
+                    os.remove(ffmetadata_path)
+                except Exception:
+                    pass
 
     @staticmethod
     def _resize_images(images: torch.Tensor, height: int, width: int) -> torch.Tensor:
