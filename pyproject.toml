@@ -1,7 +1,7 @@
 [project]
 name = "ComfyUI-1hewNodes"
 description = "This is a custom node collection for ComfyUI that provides some utility nodes."
-version = "3.2.7"
+version = "3.2.8"
 license = {file = "LICENSE"}
 
 [project.urls]
