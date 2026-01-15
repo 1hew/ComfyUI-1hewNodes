@@ -1654,6 +1654,11 @@ async def view_video_from_folder(request):
         return web.Response(status=404)
 
     path = path.strip().strip('"').strip("'")
+    want_raw = (request.query.get("raw") or "").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
     want_preview = (request.query.get("preview") or "").lower() in {
         "1",
         "true",
@@ -1661,6 +1666,8 @@ async def view_video_from_folder(request):
     }
 
     if os.path.isfile(path):
+        if want_raw:
+            return web.FileResponse(path)
         if want_preview:
             proxy_path, content_type = _ensure_preview_proxy(path)
             if proxy_path and content_type:
@@ -1690,6 +1697,8 @@ async def view_video_from_folder(request):
     idx = index % len(video_paths)
     selected = video_paths[idx]
 
+    if want_raw:
+        return web.FileResponse(selected)
     if want_preview:
         proxy_path, content_type = _ensure_preview_proxy(selected)
         if proxy_path and content_type:
@@ -1701,3 +1710,127 @@ async def view_video_from_folder(request):
             return web.FileResponse(preview, headers={"Content-Type": "video/webm"})
         return web.FileResponse(selected, headers={"Content-Type": "video/mp4"})
     return web.FileResponse(selected)
+
+
+def _get_video_path_from_request(request) -> str:
+    path = request.query.get("file") or request.query.get("path") or request.query.get(
+        "folder"
+    )
+    index_str = (
+        request.query.get("index") or request.query.get("video_index") or "0"
+    )
+    include_subdir = (
+        (request.query.get("include_subdir") or "true").lower()
+        == "true"
+    )
+
+    if not path:
+        return ""
+
+    path = path.strip().strip('"').strip("'")
+    if os.path.isfile(path):
+        return path
+
+    if not os.path.isdir(path):
+        return ""
+
+    try:
+        index = int(index_str)
+    except ValueError:
+        index = 0
+
+    video_paths = LoadVideo.get_video_paths(path, include_subdir)
+    if not video_paths:
+        return ""
+
+    idx = index % len(video_paths)
+    return video_paths[idx]
+
+
+def _is_supported_video_path(path: str) -> bool:
+    if not isinstance(path, str) or not path:
+        return False
+    if not os.path.isfile(path):
+        return False
+    ext = os.path.splitext(path)[1].lower()
+    return ext in VALID_VIDEO_EXTENSIONS
+
+
+async def _extract_video_frame_png(
+    path: str,
+    timestamp_s: float,
+) -> bytes:
+    ffmpeg_exe = VideoFromFile._resolve_ffmpeg_exe()
+    ts = max(0.0, float(timestamp_s or 0.0))
+    command = [
+        ffmpeg_exe,
+        "-v",
+        "error",
+        "-ss",
+        f"{ts:.6f}",
+        "-i",
+        path,
+        "-frames:v",
+        "1",
+        "-f",
+        "image2pipe",
+        "-vcodec",
+        "png",
+        "-",
+    ]
+    process = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, _ = await process.communicate()
+    if process.returncode != 0:
+        return b""
+    return stdout or b""
+
+
+@PromptServer.instance.routes.get("/1hew/video_frame_from_folder")
+async def video_frame_from_folder(request):
+    selected = _get_video_path_from_request(request)
+    if not _is_supported_video_path(selected):
+        return web.Response(status=404)
+
+    try:
+        timestamp_s = float(request.query.get("t") or 0.0)
+    except ValueError:
+        timestamp_s = 0.0
+
+    png = await _extract_video_frame_png(selected, timestamp_s)
+    if not png:
+        return web.Response(status=404)
+    return web.Response(body=png, headers={"Content-Type": "image/png"})
+
+
+@PromptServer.instance.routes.get("/1hew/download_video_by_path")
+async def download_video_by_path(request):
+    path = (request.query.get("path") or "").strip().strip('"').strip("'")
+    if not _is_supported_video_path(path):
+        return web.Response(status=404)
+
+    name = _safe_filename(path)
+    headers = {
+        "Content-Disposition": f'attachment; filename="{name}"',
+    }
+    return web.FileResponse(path, headers=headers)
+
+
+@PromptServer.instance.routes.get("/1hew/video_frame_by_path")
+async def video_frame_by_path(request):
+    path = (request.query.get("path") or "").strip().strip('"').strip("'")
+    if not _is_supported_video_path(path):
+        return web.Response(status=404)
+
+    try:
+        timestamp_s = float(request.query.get("t") or 0.0)
+    except ValueError:
+        timestamp_s = 0.0
+
+    png = await _extract_video_frame_png(path, timestamp_s)
+    if not png:
+        return web.Response(status=404)
+    return web.Response(body=png, headers={"Content-Type": "image/png"})
