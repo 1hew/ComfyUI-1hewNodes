@@ -1,4 +1,5 @@
 import { app } from "../../../scripts/app.js";
+import { api } from "../../../scripts/api.js";
 import { addPreviewMenuOptions, applyPreviewHiddenState } from "./core/preview_menu.js";
 
 const managedVideos = new Set();
@@ -10,6 +11,50 @@ app.registerExtension({
         if (nodeData.name !== "1hew_SaveVideo" && nodeData.name !== "1hew_SaveVideoByImage") {
             return;
         }
+
+        const basename = (p) => {
+            if (!p) return "";
+            const normalized = String(p).replace(/\\/g, "/");
+            const parts = normalized.split("/");
+            return parts.length ? parts[parts.length - 1] : normalized;
+        };
+
+        const extractOriginalPath = (message) => {
+            const visit = (v, depth) => {
+                if (depth <= 0) return null;
+                if (typeof v === "string") {
+                    const s = v.trim();
+                    if (!s) return null;
+                    if (
+                        /^[a-zA-Z]:\\/.test(s)
+                        || s.startsWith("\\\\")
+                        || s.startsWith("/")
+                    ) {
+                        return s;
+                    }
+                    return null;
+                }
+                if (!v || typeof v !== "object") {
+                    return null;
+                }
+                if (typeof v.file_path === "string" && v.file_path.trim()) {
+                    return v.file_path.trim();
+                }
+                if (Array.isArray(v)) {
+                    for (const item of v) {
+                        const r = visit(item, depth - 1);
+                        if (r) return r;
+                    }
+                    return null;
+                }
+                for (const key of Object.keys(v)) {
+                    const r = visit(v[key], depth - 1);
+                    if (r) return r;
+                }
+                return null;
+            };
+            return visit(message, 6);
+        };
 
         const applyVideoStyle = (node) => {
             if (node.widgets) {
@@ -25,6 +70,12 @@ app.registerExtension({
                         }
 
                         for (const videoEl of videoEls) {
+                            if (node?._comfy1hewOriginalVideoPath) {
+                                videoEl.dataset.comfy1hewOriginalVideoPath =
+                                    node._comfy1hewOriginalVideoPath;
+                            } else {
+                                delete videoEl.dataset.comfy1hewOriginalVideoPath;
+                            }
                             attachDimensionDisplay(videoEl);
                             applyLoopedHoverAudioPreview(videoEl);
                         }
@@ -41,6 +92,11 @@ app.registerExtension({
         nodeType.prototype.onExecuted = function(message) {
             if (onExecuted) {
                 onExecuted.apply(this, arguments);
+            }
+
+            const originalPath = extractOriginalPath(message);
+            if (originalPath) {
+                this._comfy1hewOriginalVideoPath = originalPath;
             }
 
             // 尝试寻找视频元素并添加尺寸显示
@@ -126,17 +182,21 @@ app.registerExtension({
                         const targets = selection.length > 0 && selection.includes(this) ? selection : [this];
 
                         for (const node of targets) {
-                             const nodeVideos = getVideoEls(node);
-                             for (const v of nodeVideos) {
-                                 if (v && v.src) {
-                                     const a = document.createElement("a");
-                                     a.href = v.src;
-                                     a.download = `video_${node.id}_${Date.now()}.mp4`;
-                                     document.body.appendChild(a);
-                                     a.click();
-                                     document.body.removeChild(a);
-                                 }
-                             }
+                            const originalPath = node?._comfy1hewOriginalVideoPath;
+                            const url = originalPath
+                                ? `/1hew/download_video_by_path?path=${encodeURIComponent(originalPath)}&t=${Date.now()}`
+                                : null;
+                            const suggested = originalPath
+                                ? basename(originalPath)
+                                : `video_${node.id}_${Date.now()}.mp4`;
+                            const nodeVideos = getVideoEls(node);
+                            const fallbackSrc = nodeVideos.find((v) => v && v.src)?.src;
+                            const a = document.createElement("a");
+                            a.href = url || fallbackSrc || "";
+                            a.download = suggested;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
                         }
                     }
                 });
@@ -147,22 +207,49 @@ app.registerExtension({
             if (firstVideo) {
                 options.push({
                     content: "Copy Frame",
-                    callback: () => {
+                    callback: async () => {
                         try {
+                            const originalPath = this?._comfy1hewOriginalVideoPath;
+                            if (originalPath) {
+                                const urlParams = new URLSearchParams({
+                                    path: originalPath,
+                                    t: String(firstVideo.currentTime || 0),
+                                    r: String(Date.now()),
+                                });
+                                const res = await api.fetchApi(
+                                    `/1hew/video_frame_by_path?${urlParams.toString()}`,
+                                    { cache: "no-store" },
+                                );
+                                if (res && res.status === 200) {
+                                    const blob = await res.blob();
+                                    const item = new ClipboardItem({
+                                        "image/png": blob,
+                                    });
+                                    await navigator.clipboard.write([item]);
+                                    return;
+                                }
+                            }
+
                             const canvas = document.createElement("canvas");
                             canvas.width = firstVideo.videoWidth;
                             canvas.height = firstVideo.videoHeight;
                             const ctx = canvas.getContext("2d");
                             ctx.drawImage(firstVideo, 0, 0);
-                            
-                            canvas.toBlob((blob) => {
-                                if (blob) {
-                                    try {
-                                        const item = new ClipboardItem({ "image/png": blob });
-                                        navigator.clipboard.write([item]);
-                                    } catch (err) {
-                                        console.error("Failed to copy frame to clipboard:", err);
-                                    }
+
+                            canvas.toBlob(async (blob) => {
+                                if (!blob) {
+                                    return;
+                                }
+                                try {
+                                    const item = new ClipboardItem({
+                                        "image/png": blob,
+                                    });
+                                    await navigator.clipboard.write([item]);
+                                } catch (err) {
+                                    console.error(
+                                        "Failed to copy frame to clipboard:",
+                                        err,
+                                    );
                                 }
                             }, "image/png");
                         } catch (err) {

@@ -4,8 +4,6 @@ import {VIDEO_FORMATS, resolveComboValue, resolveFormatConfig} from "./core/form
 import {installWidgetSourceOverlay, roundToPrecision} from "./core/annotated_widget.js";
 import { addPreviewMenuOptions, applyPreviewHiddenState } from "./core/preview_menu.js";
 import {
-    addCopyMediaFrameMenuOption,
-    addSaveMediaMenuOption,
     applyLoopedHoverAudioPreview,
     collectDropPayload,
     installVideoPreviewLayout,
@@ -840,23 +838,105 @@ app.registerExtension({
                 return el.tagName === "VIDEO" ? el : el.querySelector("video");
             };
 
-            addSaveMediaMenuOption(options, {
-                app,
-                currentNode: this,
+            const getTargets = () => {
+                const canvas = app.canvas;
+                const selected = canvas.selected_nodes || {};
+                const selection = Object.values(selected);
+                if (selection.length > 0 && selection.includes(this)) {
+                    return selection;
+                }
+                return [this];
+            };
+
+            const basename = (p) => {
+                if (!p) return "";
+                const normalized = String(p).replace(/\\/g, "/");
+                const parts = normalized.split("/");
+                return parts.length ? parts[parts.length - 1] : normalized;
+            };
+
+            const getNodeParams = (node) => {
+                const fileWidget = node?.widgets?.find((w) => w.name === "file");
+                const indexWidget = node?.widgets?.find(
+                    (w) => w.name === "video_index",
+                );
+                const includeSubdirWidget = node?.widgets?.find(
+                    (w) => w.name === "include_subdir",
+                );
+                const file = String(fileWidget?.value || "").trim();
+                if (!file) {
+                    return null;
+                }
+                return {
+                    file,
+                    index: String(indexWidget?.value ?? "0"),
+                    includeSubdir: String(includeSubdirWidget?.value ?? true),
+                };
+            };
+
+            options.push({
                 content: "Save Video",
-                getMediaElFromNode: getVideoElFromNode,
-                filenamePrefix: "video",
-                filenameExt: "mp4",
+                callback: () => {
+                    const targets = getTargets();
+                    for (const node of targets) {
+                        const params = getNodeParams(node);
+                        if (!params) {
+                            continue;
+                        }
+                        const urlParams = new URLSearchParams({
+                            file: params.file,
+                            index: params.index,
+                            include_subdir: params.includeSubdir,
+                            raw: "1",
+                            t: Date.now(),
+                        });
+                        const url = `/1hew/view_video_from_folder?${urlParams.toString()}`;
+                        const suggested =
+                            basename(node?._comfy1hewVideoInfo?.path)
+                            || `video_${node.id}_${Date.now()}.mp4`;
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = suggested;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                    }
+                },
             });
 
             if (videoEl) {
-                addCopyMediaFrameMenuOption(options, {
+                options.push({
                     content: "Copy Frame",
-                    getWidth: () => videoEl.videoWidth,
-                    getHeight: () => videoEl.videoHeight,
-                    drawToCanvas: (ctx) => ctx.drawImage(videoEl, 0, 0),
-                    copyErrorMessage: "Failed to copy frame to clipboard:",
-                    prepareErrorMessage: "Error preparing frame copy:",
+                    callback: async () => {
+                        const params = getNodeParams(this);
+                        if (!params) {
+                            return;
+                        }
+                        const urlParams = new URLSearchParams({
+                            file: params.file,
+                            index: params.index,
+                            include_subdir: params.includeSubdir,
+                            t: String(videoEl.currentTime || 0),
+                            r: String(Date.now()),
+                        });
+                        try {
+                            const res = await api.fetchApi(
+                                `/1hew/video_frame_from_folder?${urlParams.toString()}`,
+                                { cache: "no-store" },
+                            );
+                            if (!res || res.status !== 200) {
+                                return;
+                            }
+                            const blob = await res.blob();
+                            const item = new ClipboardItem({ "image/png": blob });
+                            await navigator.clipboard.write([item]);
+                        } catch (err) {
+                            console.error(
+                                "Failed to copy frame to clipboard:",
+                                err,
+                            );
+                        }
+                    },
                 });
             }
         };
