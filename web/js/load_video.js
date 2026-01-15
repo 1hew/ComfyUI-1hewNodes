@@ -455,7 +455,7 @@ app.registerExtension({
 
             const container = document.createElement("div");
             Object.assign(container.style, {
-                display: "flex",
+                display: "none",
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
@@ -669,7 +669,14 @@ app.registerExtension({
             });
 
             videoEl.addEventListener("loadedmetadata", () => {
-                infoEl.innerText = `${videoEl.videoWidth} x ${videoEl.videoHeight}`;
+                const info = this?._comfy1hewVideoInfo;
+                const w = Number(info?.width) || 0;
+                const h = Number(info?.height) || 0;
+                if (w > 0 && h > 0) {
+                    infoEl.innerText = `${w} x ${h}`;
+                } else {
+                    infoEl.innerText = `${videoEl.videoWidth} x ${videoEl.videoHeight}`;
+                }
                 ensurePreviewLayout();
             });
 
@@ -694,21 +701,31 @@ app.registerExtension({
                 const index = indexWidget.value;
                 const includeSubdir = includeSubdirWidget.value;
 
-                if (!file) {
+                const trimmedFile = String(file || "").trim();
+                if (trimmedFile === "") {
                     this._comfy1hewVideoInfo = null;
                     this.videoWidget.aspectRatio = undefined;
                     infoEl.innerText = "";
+                    container.style.display = "none";
+                    try {
+                        videoEl.pause();
+                    } catch {}
                     videoEl.removeAttribute("src");
+                    try {
+                        videoEl.load();
+                    } catch {}
                     updateLayout();
                     this.setSize([this.size[0], 0]);
                     setTimeout(ensurePreviewLayout, 0);
                     return;
                 }
 
+                container.style.display = "flex";
                 const params = new URLSearchParams({
-                    file: file,
+                    file: trimmedFile,
                     index: index,
                     include_subdir: includeSubdir,
+                    preview: "true",
                     t: Date.now(),
                 });
 
@@ -725,7 +742,7 @@ app.registerExtension({
 
                 try {
                     const infoParams = new URLSearchParams({
-                        file: file,
+                        file: trimmedFile,
                         index: index,
                         include_subdir: includeSubdir,
                     });
@@ -740,6 +757,15 @@ app.registerExtension({
                     }
                 } catch {
                     this._comfy1hewVideoInfo = null;
+                }
+
+                const info = this._comfy1hewVideoInfo;
+                const w = Number(info?.width) || 0;
+                const h = Number(info?.height) || 0;
+                if (w > 0 && h > 0) {
+                    infoEl.innerText = `${w} x ${h}`;
+                    this.videoWidget.aspectRatio = h / w;
+                    ensurePreviewLayout();
                 }
                 
                 if (this.updateVideoPlaybackState) {

@@ -1390,6 +1390,91 @@ def _ensure_preview_proxy_webm(source_path: str) -> str:
     return out_path
 
 
+def _ensure_preview_proxy(source_path: str) -> tuple[str, str]:
+    source_path = os.path.abspath(source_path)
+    try:
+        mtime = os.path.getmtime(source_path)
+    except OSError:
+        return "", ""
+
+    info = VideoFromFile._probe_video_info_with_ffprobe(source_path)
+    pix_fmt = info.get("pix_fmt") or ""
+    has_alpha = _has_alpha_pix_fmt(pix_fmt)
+
+    if has_alpha:
+        out_path = _ensure_preview_proxy_webm(source_path)
+        if not out_path:
+            return "", ""
+        return out_path, "video/webm"
+
+    key = hashlib.sha256(f"{source_path}:{mtime}:mp4".encode()).hexdigest()
+    cache_dir = _preview_cache_dir()
+    os.makedirs(cache_dir, exist_ok=True)
+    out_path = os.path.join(cache_dir, f"{key}.mp4")
+
+    if os.path.isfile(out_path):
+        try:
+            if os.path.getmtime(out_path) >= mtime:
+                return out_path, "video/mp4"
+        except OSError:
+            pass
+
+    ffmpeg_exe = VideoFromFile._resolve_ffmpeg_exe()
+    tmp_path = os.path.join(cache_dir, f"{key}.{time.time_ns()}.tmp.mp4")
+
+    vf = (
+        "scale='min(1280,iw)':-2,"
+        "scale=trunc(iw/2)*2:trunc(ih/2)*2"
+    )
+    command = [
+        ffmpeg_exe,
+        "-y",
+        "-v",
+        "error",
+        "-i",
+        source_path,
+        "-an",
+        "-vf",
+        vf,
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "28",
+        "-movflags",
+        "+faststart",
+        tmp_path,
+    ]
+
+    try:
+        res = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except Exception:
+        return "", ""
+
+    if res.returncode != 0:
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except OSError:
+            pass
+        return "", ""
+
+    try:
+        os.replace(tmp_path, out_path)
+    except OSError:
+        return "", ""
+
+    return out_path, "video/mp4"
+
+
 @PromptServer.instance.routes.post("/1hew/upload_video")
 async def upload_video(request):
     reader = await request.multipart()
@@ -1569,14 +1654,24 @@ async def view_video_from_folder(request):
         return web.Response(status=404)
 
     path = path.strip().strip('"').strip("'")
+    want_preview = (request.query.get("preview") or "").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
 
     if os.path.isfile(path):
+        if want_preview:
+            proxy_path, content_type = _ensure_preview_proxy(path)
+            if proxy_path and content_type:
+                return web.FileResponse(
+                    proxy_path,
+                    headers={"Content-Type": content_type},
+                )
         if path.lower().endswith(".mov"):
             preview = _ensure_preview_proxy_webm(path)
             if preview:
-                return web.FileResponse(
-                    preview, headers={"Content-Type": "video/webm"}
-                )
+                return web.FileResponse(preview, headers={"Content-Type": "video/webm"})
             return web.FileResponse(path, headers={"Content-Type": "video/mp4"})
         return web.FileResponse(path)
 
@@ -1594,6 +1689,11 @@ async def view_video_from_folder(request):
 
     idx = index % len(video_paths)
     selected = video_paths[idx]
+
+    if want_preview:
+        proxy_path, content_type = _ensure_preview_proxy(selected)
+        if proxy_path and content_type:
+            return web.FileResponse(proxy_path, headers={"Content-Type": content_type})
 
     if selected.lower().endswith(".mov"):
         preview = _ensure_preview_proxy_webm(selected)

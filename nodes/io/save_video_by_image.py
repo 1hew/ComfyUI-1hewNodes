@@ -37,6 +37,24 @@ def _escape_ffmetadata_value(value: str) -> str:
     return escaped
 
 
+async def _remove_file_with_retries(
+    path: str,
+    *,
+    attempts: int = 20,
+    base_delay_s: float = 0.05,
+) -> None:
+    for attempt in range(attempts):
+        try:
+            os.remove(path)
+            return
+        except FileNotFoundError:
+            return
+        except PermissionError:
+            if attempt >= attempts - 1:
+                return
+            await asyncio.sleep(base_delay_s * (attempt + 1))
+
+
 class SaveVideoByImage(io.ComfyNode):
     @classmethod
     def define_schema(cls):
@@ -142,11 +160,13 @@ class SaveVideoByImage(io.ComfyNode):
                     if waveform.dim() == 3:
                         waveform = waveform.squeeze(0)
 
-                    audio_file = f"{filename}_{counter:05}_audio.wav"
-                    audio_path = os.path.join(
-                        folder_paths.get_temp_directory(),
-                        audio_file,
+                    audio_dir = folder_paths.get_temp_directory()
+                    fd, audio_path = tempfile.mkstemp(
+                        prefix=f"{filename}_{counter:05}_",
+                        suffix="_audio.wav",
+                        dir=audio_dir,
                     )
+                    os.close(fd)
                     torchaudio.save(audio_path, waveform, sample_rate)
             except Exception as exc:
                 print(
@@ -232,7 +252,7 @@ class SaveVideoByImage(io.ComfyNode):
                 )
         finally:
             if audio_path and os.path.exists(audio_path):
-                os.remove(audio_path)
+                await _remove_file_with_retries(audio_path)
 
         file_path = os.path.abspath(path)
 
@@ -360,6 +380,10 @@ class SaveVideoByImage(io.ComfyNode):
                     except Exception:
                         pass
                 process.stdin.close()
+                try:
+                    await process.stdin.wait_closed()
+                except Exception:
+                    pass
 
             async def log_stderr():
                 stderr_data = b""

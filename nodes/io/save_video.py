@@ -33,6 +33,41 @@ def _new_progress_bar(total: int):
         return None
 
 
+async def _remove_file_with_retries(
+    path: str,
+    *,
+    attempts: int = 20,
+    base_delay_s: float = 0.05,
+) -> None:
+    for attempt in range(attempts):
+        try:
+            os.remove(path)
+            return
+        except FileNotFoundError:
+            return
+        except PermissionError:
+            if attempt >= attempts - 1:
+                return
+            await asyncio.sleep(base_delay_s * (attempt + 1))
+
+
+async def _replace_file_with_retries(
+    src: str,
+    dst: str,
+    *,
+    attempts: int = 20,
+    base_delay_s: float = 0.05,
+) -> None:
+    for attempt in range(attempts):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if attempt >= attempts - 1:
+                raise
+            await asyncio.sleep(base_delay_s * (attempt + 1))
+
+
 class SaveVideo(io.ComfyNode):
     @classmethod
     def define_schema(cls):
@@ -272,17 +307,14 @@ class SaveVideo(io.ComfyNode):
             _, stderr = await process.communicate()
         finally:
             if ffmetadata_path and os.path.exists(ffmetadata_path):
-                try:
-                    os.remove(ffmetadata_path)
-                except Exception:
-                    pass
+                await _remove_file_with_retries(ffmetadata_path)
 
         if process.returncode != 0:
             if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+                await _remove_file_with_retries(tmp_path)
             raise Exception(f"FFmpeg remux failed: {stderr.decode()}")
 
-        os.replace(tmp_path, input_path)
+        await _replace_file_with_retries(tmp_path, input_path)
 
     @staticmethod
     async def check_has_alpha(path: str) -> bool:
