@@ -195,6 +195,113 @@ class VideoFromFile:
             "duration": duration,
         }
 
+    @classmethod
+    def _probe_audio_info_with_ffprobe(cls, path: str) -> dict:
+        ffmpeg_exe = cls._resolve_ffmpeg_exe()
+        ffprobe_exe = cls._resolve_ffprobe_exe(ffmpeg_exe)
+        command = [
+            ffprobe_exe,
+            "-v",
+            "error",
+            "-select_streams",
+            "a:0",
+            "-show_entries",
+            "stream=channels,sample_rate",
+            "-of",
+            "json",
+            path,
+        ]
+        try:
+            res = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError:
+            return {}
+
+        if res.returncode != 0:
+            return {}
+
+        try:
+            payload = json.loads(res.stdout or "{}")
+        except json.JSONDecodeError:
+            return {}
+
+        streams = payload.get("streams") or []
+        if not streams:
+            return {}
+
+        stream = streams[0] or {}
+        try:
+            channels = int(stream.get("channels") or 0)
+        except Exception:
+            channels = 0
+        try:
+            sample_rate = int(stream.get("sample_rate") or 0)
+        except Exception:
+            sample_rate = 0
+        return {"channels": channels, "sample_rate": sample_rate}
+
+    @classmethod
+    def _decode_audio_with_ffmpeg(cls, path: str) -> Optional[dict]:
+        info = cls._probe_audio_info_with_ffprobe(path)
+        channels = int(info.get("channels") or 0)
+        sample_rate = int(info.get("sample_rate") or 0)
+        if channels <= 0:
+            channels = 2
+        if sample_rate <= 0:
+            sample_rate = 44100
+
+        ffmpeg_exe = cls._resolve_ffmpeg_exe()
+        command = [
+            ffmpeg_exe,
+            "-v",
+            "error",
+            "-i",
+            path,
+            "-vn",
+            "-acodec",
+            "pcm_f32le",
+            "-f",
+            "f32le",
+            "-ac",
+            str(channels),
+            "-ar",
+            str(sample_rate),
+            "-",
+        ]
+        try:
+            res = subprocess.run(
+                command,
+                capture_output=True,
+                check=False,
+            )
+        except FileNotFoundError:
+            return None
+
+        if res.returncode != 0:
+            return None
+
+        raw = res.stdout or b""
+        if not raw:
+            return None
+
+        audio_1d = np.frombuffer(raw, dtype=np.float32)
+        if audio_1d.size <= 0:
+            return None
+
+        frame = int(channels)
+        usable = (audio_1d.size // frame) * frame
+        if usable <= 0:
+            return None
+
+        audio_1d = audio_1d[:usable]
+        audio_2d = audio_1d.reshape(-1, frame).T
+        waveform = torch.from_numpy(audio_2d.copy()).float().unsqueeze(0)
+        return {"waveform": waveform, "sample_rate": sample_rate}
+
     @staticmethod
     def _prefer_alpha_for_stream(stream) -> bool:
         try:
@@ -586,9 +693,22 @@ class VideoFromFile:
                 if audio_frames:
                     audio_data = np.concatenate(audio_frames, axis=1)
                     waveform = torch.from_numpy(audio_data).float().unsqueeze(0)
-                    audio = {"waveform": waveform, "sample_rate": stream.rate}
-            except Exception as exc:
-                print(f"Error decoding audio {path}: {exc}")
+                    sample_rate = int(getattr(stream, "rate", 0) or 0)
+                    if sample_rate <= 0:
+                        sample_rate = int(
+                            self._probe_audio_info_with_ffprobe(path).get(
+                                "sample_rate", 0
+                            )
+                            or 0
+                        )
+                    if sample_rate <= 0:
+                        sample_rate = 44100
+                    audio = {"waveform": waveform, "sample_rate": sample_rate}
+            except Exception:
+                audio = None
+
+        if audio is None:
+            audio = self._decode_audio_with_ffmpeg(path)
 
         return VideoComponents(
             images=video_tensor,
@@ -1309,7 +1429,7 @@ def _has_alpha_pix_fmt(pix_fmt: str) -> bool:
     return any(token in pix_fmt for token in ("yuva", "rgba", "bgra", "argb", "abgr"))
 
 
-def _ensure_preview_proxy_webm(source_path: str) -> str:
+def _ensure_preview_proxy_webm(source_path: str, include_audio: bool = True) -> str:
     source_path = os.path.abspath(source_path)
     try:
         mtime = os.path.getmtime(source_path)
@@ -1344,7 +1464,6 @@ def _ensure_preview_proxy_webm(source_path: str) -> str:
         "error",
         "-i",
         source_path,
-        "-an",
         "-vf",
         "scale=trunc(iw/2)*2:trunc(ih/2)*2",
         "-c:v",
@@ -1361,8 +1480,24 @@ def _ensure_preview_proxy_webm(source_path: str) -> str:
         "realtime",
         "-cpu-used",
         "5",
-        tmp_path,
     ]
+    if include_audio:
+        command.extend(
+            [
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a:0?",
+                "-c:a",
+                "libopus",
+                "-b:a",
+                "96k",
+                "-shortest",
+            ]
+        )
+    else:
+        command.append("-an")
+    command.append(tmp_path)
 
     try:
         res = subprocess.run(
@@ -1390,7 +1525,9 @@ def _ensure_preview_proxy_webm(source_path: str) -> str:
     return out_path
 
 
-def _ensure_preview_proxy(source_path: str) -> tuple[str, str]:
+def _ensure_preview_proxy(
+    source_path: str, include_audio: bool = True
+) -> tuple[str, str]:
     source_path = os.path.abspath(source_path)
     try:
         mtime = os.path.getmtime(source_path)
@@ -1402,7 +1539,7 @@ def _ensure_preview_proxy(source_path: str) -> tuple[str, str]:
     has_alpha = _has_alpha_pix_fmt(pix_fmt)
 
     if has_alpha:
-        out_path = _ensure_preview_proxy_webm(source_path)
+        out_path = _ensure_preview_proxy_webm(source_path, include_audio=include_audio)
         if not out_path:
             return "", ""
         return out_path, "video/webm"
@@ -1433,7 +1570,6 @@ def _ensure_preview_proxy(source_path: str) -> tuple[str, str]:
         "error",
         "-i",
         source_path,
-        "-an",
         "-vf",
         vf,
         "-c:v",
@@ -1446,8 +1582,24 @@ def _ensure_preview_proxy(source_path: str) -> tuple[str, str]:
         "28",
         "-movflags",
         "+faststart",
-        tmp_path,
     ]
+    if include_audio:
+        command.extend(
+            [
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a:0?",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
+                "-shortest",
+            ]
+        )
+    else:
+        command.append("-an")
+    command.append(tmp_path)
 
     try:
         res = subprocess.run(
@@ -1664,19 +1816,26 @@ async def view_video_from_folder(request):
         "true",
         "yes",
     }
+    want_audio = (request.query.get("audio") or "true").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
 
     if os.path.isfile(path):
         if want_raw:
             return web.FileResponse(path)
         if want_preview:
-            proxy_path, content_type = _ensure_preview_proxy(path)
+            proxy_path, content_type = _ensure_preview_proxy(
+                path, include_audio=want_audio
+            )
             if proxy_path and content_type:
                 return web.FileResponse(
                     proxy_path,
                     headers={"Content-Type": content_type},
                 )
         if path.lower().endswith(".mov"):
-            preview = _ensure_preview_proxy_webm(path)
+            preview = _ensure_preview_proxy_webm(path, include_audio=want_audio)
             if preview:
                 return web.FileResponse(preview, headers={"Content-Type": "video/webm"})
             return web.FileResponse(path, headers={"Content-Type": "video/mp4"})
@@ -1700,12 +1859,14 @@ async def view_video_from_folder(request):
     if want_raw:
         return web.FileResponse(selected)
     if want_preview:
-        proxy_path, content_type = _ensure_preview_proxy(selected)
+        proxy_path, content_type = _ensure_preview_proxy(
+            selected, include_audio=want_audio
+        )
         if proxy_path and content_type:
             return web.FileResponse(proxy_path, headers={"Content-Type": content_type})
 
     if selected.lower().endswith(".mov"):
-        preview = _ensure_preview_proxy_webm(selected)
+        preview = _ensure_preview_proxy_webm(selected, include_audio=want_audio)
         if preview:
             return web.FileResponse(preview, headers={"Content-Type": "video/webm"})
         return web.FileResponse(selected, headers={"Content-Type": "video/mp4"})

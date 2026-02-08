@@ -185,6 +185,113 @@ class VideoFromFile:
             "duration": duration,
         }
 
+    @classmethod
+    def _probe_audio_info_with_ffprobe(cls, path: str) -> dict:
+        ffmpeg_exe = cls._resolve_ffmpeg_exe()
+        ffprobe_exe = cls._resolve_ffprobe_exe(ffmpeg_exe)
+        command = [
+            ffprobe_exe,
+            "-v",
+            "error",
+            "-select_streams",
+            "a:0",
+            "-show_entries",
+            "stream=channels,sample_rate",
+            "-of",
+            "json",
+            path,
+        ]
+        try:
+            res = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError:
+            return {}
+
+        if res.returncode != 0:
+            return {}
+
+        try:
+            payload = json.loads(res.stdout or "{}")
+        except json.JSONDecodeError:
+            return {}
+
+        streams = payload.get("streams") or []
+        if not streams:
+            return {}
+
+        stream = streams[0] or {}
+        try:
+            channels = int(stream.get("channels") or 0)
+        except Exception:
+            channels = 0
+        try:
+            sample_rate = int(stream.get("sample_rate") or 0)
+        except Exception:
+            sample_rate = 0
+        return {"channels": channels, "sample_rate": sample_rate}
+
+    @classmethod
+    def _decode_audio_with_ffmpeg(cls, path: str) -> Optional[dict]:
+        info = cls._probe_audio_info_with_ffprobe(path)
+        channels = int(info.get("channels") or 0)
+        sample_rate = int(info.get("sample_rate") or 0)
+        if channels <= 0:
+            channels = 2
+        if sample_rate <= 0:
+            sample_rate = 44100
+
+        ffmpeg_exe = cls._resolve_ffmpeg_exe()
+        command = [
+            ffmpeg_exe,
+            "-v",
+            "error",
+            "-i",
+            path,
+            "-vn",
+            "-acodec",
+            "pcm_f32le",
+            "-f",
+            "f32le",
+            "-ac",
+            str(channels),
+            "-ar",
+            str(sample_rate),
+            "-",
+        ]
+        try:
+            res = subprocess.run(
+                command,
+                capture_output=True,
+                check=False,
+            )
+        except FileNotFoundError:
+            return None
+
+        if res.returncode != 0:
+            return None
+
+        raw = res.stdout or b""
+        if not raw:
+            return None
+
+        audio_1d = np.frombuffer(raw, dtype=np.float32)
+        if audio_1d.size <= 0:
+            return None
+
+        frame = int(channels)
+        usable = (audio_1d.size // frame) * frame
+        if usable <= 0:
+            return None
+
+        audio_1d = audio_1d[:usable]
+        audio_2d = audio_1d.reshape(-1, frame).T
+        waveform = torch.from_numpy(audio_2d.copy()).float().unsqueeze(0)
+        return {"waveform": waveform, "sample_rate": sample_rate}
+
     @staticmethod
     def _prefer_alpha_for_stream(stream) -> bool:
         try:
@@ -576,9 +683,22 @@ class VideoFromFile:
                 if audio_frames:
                     audio_data = np.concatenate(audio_frames, axis=1)
                     waveform = torch.from_numpy(audio_data).float().unsqueeze(0)
-                    audio = {"waveform": waveform, "sample_rate": stream.rate}
-            except Exception as exc:
-                print(f"Error decoding audio {path}: {exc}")
+                    sample_rate = int(getattr(stream, "rate", 0) or 0)
+                    if sample_rate <= 0:
+                        sample_rate = int(
+                            self._probe_audio_info_with_ffprobe(path).get(
+                                "sample_rate", 0
+                            )
+                            or 0
+                        )
+                    if sample_rate <= 0:
+                        sample_rate = 44100
+                    audio = {"waveform": waveform, "sample_rate": sample_rate}
+            except Exception:
+                audio = None
+
+        if audio is None:
+            audio = self._decode_audio_with_ffmpeg(path)
 
         return VideoComponents(
             images=video_tensor,
