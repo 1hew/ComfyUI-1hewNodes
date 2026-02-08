@@ -168,7 +168,10 @@ function setMuted(nodes, forcedMute) {
         for (const { videos } of listPreviewWidgets(node)) {
             for (const v of videos) {
                 v.dataset.comfy1hewForceMute = forcedMute ? "1" : "0";
-                v.muted = true;
+                v.muted = !!forcedMute;
+                if (!forcedMute) {
+                    v.volume = 1.0;
+                }
             }
         }
     }
