@@ -94,31 +94,266 @@ class TextCustomExtract(io.ComfyNode):
 
     @classmethod
     def _parse_json_data(cls, json_data):
-        text = cls._clean_input_text(json_data) if isinstance(json_data, str) else str(json_data)
+        text = (
+            cls._clean_input_text(json_data)
+            if isinstance(json_data, str)
+            else str(json_data)
+        )
         if not text:
             return {}
         try:
             return json.loads(text)
         except json.JSONDecodeError:
+            parsed = cls._try_literal_eval(text)
+            if parsed is not None:
+                return parsed
+
+            parsed = cls._try_json_loads(text.replace("'", '"'))
+            if parsed is not None:
+                return parsed
+
+            parsed = cls._try_loose_parse(text)
+            if parsed is not None:
+                return parsed
+
+            pattern = r'"([^"]+)"\s*:\s*"([^"]+)"'
+            matches = re.findall(pattern, text)
+            if matches:
+                return {key: value for key, value in matches}
+            return {}
+
+    @classmethod
+    def _try_json_loads(cls, text: str):
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return None
+
+    @classmethod
+    def _try_literal_eval(cls, text: str):
+        try:
+            return ast.literal_eval(text)
+        except (ValueError, SyntaxError):
+            return None
+
+    @classmethod
+    def _try_loose_parse(cls, text: str):
+        stripped = text.strip()
+        if not stripped:
+            return None
+
+        start_idx = None
+        start_char = None
+        for idx, ch in enumerate(stripped):
+            if ch in "[{":
+                start_idx = idx
+                start_char = ch
+                break
+        if start_idx is None or start_char is None:
+            return None
+
+        end_char = "}" if start_char == "{" else "]"
+        end_idx = stripped.rfind(end_char)
+        if end_idx == -1 or end_idx <= start_idx:
+            return None
+
+        container = stripped[start_idx : end_idx + 1]
+        try:
+            if start_char == "{":
+                parsed, _ = cls._loose_parse_dict(container, 0)
+                return parsed
+            parsed, _ = cls._loose_parse_list(container, 0)
+            return parsed
+        except Exception:
+            return None
+
+    @classmethod
+    def _loose_parse_dict(cls, text: str, start: int):
+        if start >= len(text) or text[start] != "{":
+            raise ValueError("Expected '{'")
+
+        idx = start + 1
+        result = {}
+        while idx < len(text):
+            idx = cls._skip_ws(text, idx)
+            if idx >= len(text):
+                break
+            if text[idx] == "}":
+                return result, idx + 1
+            if text[idx] == ",":
+                idx += 1
+                continue
+
+            key, idx = cls._read_key(text, idx)
+            idx = cls._skip_ws(text, idx)
+            if idx < len(text) and text[idx] == ":":
+                idx += 1
+            idx = cls._skip_ws(text, idx)
+
+            value, idx = cls._loose_parse_value(text, idx)
+            if key:
+                result[key] = value
+
+            idx = cls._skip_ws(text, idx)
+            if idx < len(text) and text[idx] == ",":
+                idx += 1
+        return result, idx
+
+    @classmethod
+    def _loose_parse_list(cls, text: str, start: int):
+        if start >= len(text) or text[start] != "[":
+            raise ValueError("Expected '['")
+
+        idx = start + 1
+        result = []
+        while idx < len(text):
+            idx = cls._skip_ws(text, idx)
+            if idx >= len(text):
+                break
+            if text[idx] == "]":
+                return result, idx + 1
+            if text[idx] == ",":
+                idx += 1
+                continue
+
+            value, idx = cls._loose_parse_value(text, idx)
+            result.append(value)
+
+            idx = cls._skip_ws(text, idx)
+            if idx < len(text) and text[idx] == ",":
+                idx += 1
+        return result, idx
+
+    @classmethod
+    def _loose_parse_value(cls, text: str, start: int):
+        idx = cls._skip_ws(text, start)
+        if idx >= len(text):
+            return None, idx
+
+        ch = text[idx]
+        if ch in ('"', "'"):
+            value, idx = cls._read_loose_quoted_string(text, idx)
+            return value, idx
+
+        if ch == "{":
+            value, idx = cls._loose_parse_dict(text, idx)
+            return value, idx
+
+        if ch == "[":
+            value, idx = cls._loose_parse_list(text, idx)
+            return value, idx
+
+        token, idx = cls._read_token(text, idx)
+        lowered = token.lower()
+        if lowered in {"null", "none"}:
+            return None, idx
+        if lowered == "true":
+            return True, idx
+        if lowered == "false":
+            return False, idx
+
+        if re.fullmatch(r"-?\d+", token):
             try:
-                return ast.literal_eval(text)
-            except (ValueError, SyntaxError):
-                try:
-                    fixed_text = text.replace("'", '"')
-                    return json.loads(fixed_text)
-                except json.JSONDecodeError:
-                    pattern = r'"([^"]+)"\s*:\s*"([^"]+)"'
-                    matches = re.findall(pattern, text)
-                    if matches:
-                        return {key: value for key, value in matches}
-        return {}
+                return int(token), idx
+            except ValueError:
+                return token, idx
+        if re.fullmatch(r"-?\d+\.\d+", token):
+            try:
+                return float(token), idx
+            except ValueError:
+                return token, idx
+        return token, idx
+
+    @classmethod
+    def _skip_ws(cls, text: str, idx: int) -> int:
+        while idx < len(text) and text[idx].isspace():
+            idx += 1
+        return idx
+
+    @classmethod
+    def _read_key(cls, text: str, start: int):
+        idx = start
+        ch = text[idx]
+        if ch in ('"', "'"):
+            quote = ch
+            idx += 1
+            buf = []
+            while idx < len(text):
+                cur = text[idx]
+                if cur == "\\" and idx + 1 < len(text):
+                    buf.append(text[idx + 1])
+                    idx += 2
+                    continue
+                if cur == quote:
+                    idx += 1
+                    break
+                buf.append(cur)
+                idx += 1
+            return "".join(buf).strip(), idx
+
+        buf = []
+        while idx < len(text):
+            cur = text[idx]
+            if cur == ":" or cur.isspace() or cur in ",}":
+                break
+            buf.append(cur)
+            idx += 1
+        return "".join(buf).strip(), idx
+
+    @classmethod
+    def _read_loose_quoted_string(cls, text: str, start: int):
+        quote = text[start]
+        idx = start + 1
+        buf = []
+        while idx < len(text):
+            cur = text[idx]
+            if cur == "\\" and idx + 1 < len(text):
+                buf.append(cur)
+                buf.append(text[idx + 1])
+                idx += 2
+                continue
+            if cur == quote:
+                look = cls._skip_ws(text, idx + 1)
+                if look >= len(text) or text[look] in ",}]":
+                    return cls._decode_string("".join(buf), quote), idx + 1
+                buf.append(cur)
+                idx += 1
+                continue
+            buf.append(cur)
+            idx += 1
+        return cls._decode_string("".join(buf), quote), idx
+
+    @classmethod
+    def _decode_string(cls, raw: str, quote: str) -> str:
+        candidate = f"{quote}{raw}{quote}"
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            return raw
+
+    @classmethod
+    def _read_token(cls, text: str, start: int):
+        idx = start
+        buf = []
+        while idx < len(text):
+            cur = text[idx]
+            if cur in ",}]":
+                break
+            buf.append(cur)
+            idx += 1
+        return "".join(buf).strip(), idx
 
     @classmethod
     def _get_enhanced_keys(cls, key_name: str) -> list[str]:
         if not key_name.strip():
             return []
         key_lower = key_name.lower().strip()
-        enhanced = [key_name, key_name.upper(), key_name.lower(), key_name.capitalize()]
+        enhanced = [
+            key_name,
+            key_name.upper(),
+            key_name.lower(),
+            key_name.capitalize(),
+        ]
         mappings = {
             "bbox": [
                 "bbox",
@@ -130,7 +365,15 @@ class TextCustomExtract(io.ComfyNode):
                 "coord",
                 "bbox_2d",
             ],
-            "label": ["label", "LABEL", "Label", "name", "title", "text", "class"],
+            "label": [
+                "label",
+                "LABEL",
+                "Label",
+                "name",
+                "title",
+                "text",
+                "class",
+            ],
             "confidence": [
                 "confidence",
                 "CONFIDENCE",
@@ -143,8 +386,23 @@ class TextCustomExtract(io.ComfyNode):
             "y": ["y", "Y", "pos_y", "position_y"],
             "width": ["width", "w", "W", "WIDTH"],
             "height": ["height", "h", "H", "HEIGHT"],
-            "zh": ["zh", "ZH", "chinese", "Chinese", "CHINESE", "中文"],
-            "en": ["en", "EN", "english", "English", "ENGLISH", "英文", "英语"],
+            "zh": [
+                "zh",
+                "ZH",
+                "chinese",
+                "Chinese",
+                "CHINESE",
+                "中文",
+            ],
+            "en": [
+                "en",
+                "EN",
+                "english",
+                "English",
+                "ENGLISH",
+                "英文",
+                "英语",
+            ],
         }
         for base, vars in mappings.items():
             if key_lower == base or key_name in vars:
@@ -201,5 +459,3 @@ class TextCustomExtract(io.ComfyNode):
             return False
         label_str = str(label_value).lower()
         return any(f.lower() in label_str for f in filters)
-
-

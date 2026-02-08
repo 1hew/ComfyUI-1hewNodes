@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.3.0**
+- feat(conversion): Add `Mask to SAM3 Box` and `Text to Any` nodes
+
 **v3.2.6**
 - refactor(condition): Optimize `Text Encode QwenImageEdit` node
 
@@ -442,9 +445,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image List to Batch | Convert image lists to batch images with automatic size normalization |
 | Mask Batch to List | Convert batch masks to mask lists for individual processing |
 | Mask List to Batch | Convert mask lists to batch masks with automatic size normalization |
+| Mask to SAM3 Box | Convert masks to SAM3 box prompts (normalized cx, cy, bw, bh), supporting positive/negative and merge/separate modes |
 | String Coordinate to BBoxes | Convert string format coordinates to BBOXES format with enhanced format support and improved SAM2 compatibility |
 | String Coordinate to BBox Mask | Convert string format coordinates to BBoxMask format with image dimension support and flexible output modes |
 | Text List to String | Merge a text list by applying per-item prefix/suffix and joining with a separator; supports escape sequences and composite separators |
+| Text to Any | Output text as a wildcard payload for flexible connections (e.g., COMBO inputs) |
 
 ### 🧠 Logic Nodes
 | Node Name | Description |

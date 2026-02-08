@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.3.0**
+- feat(conversion): 添加 `Mask to SAM3 Box`、`Text to Any` 节点
+
 **v3.2.6**
 - refactor(condition): 优化 `Text Encode QwenImageEdit` 节点
 
@@ -442,9 +445,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image List to Batch | 将图像列表转换为批量图像，自动进行尺寸标准化 |
 | Mask Batch to List | 将批量遮罩转换为遮罩列表，用于单独处理 |
 | Mask List to Batch | 将遮罩列表转换为批量遮罩，自动进行尺寸标准化 |
+| Mask to SAM3 Box | 将遮罩转换为 SAM3 框提示（归一化 cx,cy,bw,bh），支持正/负与合并/分离模式 |
 | String Coordinate to BBoxes | 将字符串格式坐标转换为BBOXES格式，增强格式支持并改进SAM2兼容性 |
 | String Coordinate to BBox Mask | 将字符串格式坐标转换为BBoxMask格式，支持图像尺寸获取和灵活的输出模式 |
 | Text List to String | 文本列表合并，逐项应用前后缀并按分隔符拼接，支持转义与复合分隔符 |
+| Text to Any | 将文本输出为通配类型，便于连接到更多输入端 |
 
 ### 🧠 逻辑节点
 | 节点名称 | 功能描述 |
