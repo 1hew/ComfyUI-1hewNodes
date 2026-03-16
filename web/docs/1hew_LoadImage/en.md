@@ -18,6 +18,7 @@
 |------|------|-------------|
 | `image` | IMAGE | Loaded image (single) or image batch (when `all=true`). |
 | `mask` | MASK | Mask aligned to `image`; derived from alpha/transparency and optional sidecar masks. |
+| `filename` | STRING | The filename stem of the loaded image(s). |
 
 ## Features
 

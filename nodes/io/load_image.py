@@ -45,6 +45,7 @@ class LoadImage(io.ComfyNode):
             outputs=[
                 io.Image.Output(display_name="image"),
                 io.Mask.Output(display_name="mask"),
+                io.String.Output(display_name="filename"),
             ],
         )
 
@@ -56,9 +57,12 @@ class LoadImage(io.ComfyNode):
         if img.mode == "I":
             img = img.point(lambda v: v * (1 / 255))
 
-        rgb = img.convert("RGB")
-        mask = LoadImage._extract_mask(img, rgb.size)
-        return rgb, mask
+        has_alpha = "A" in img.getbands() or (
+            img.mode == "P" and "transparency" in getattr(img, "info", {})
+        )
+        out_img = img.convert("RGBA") if has_alpha else img.convert("RGB")
+        mask = LoadImage._extract_mask(img, out_img.size)
+        return out_img, mask
 
     @staticmethod
     def _extract_mask(img: Image.Image, rgb_size: tuple[int, int]) -> torch.Tensor:
@@ -134,6 +138,25 @@ class LoadImage(io.ComfyNode):
     def pil2tensor(image):
         arr = np.array(image).astype(np.float32) / 255.0
         return torch.from_numpy(arr).unsqueeze(0)
+
+    @staticmethod
+    def ensure_tensor_channels(tensor: torch.Tensor, channels: int) -> torch.Tensor:
+        curr_channels = tensor.shape[-1]
+        if curr_channels == channels:
+            return tensor
+
+        if curr_channels == 3 and channels == 4:
+            alpha = torch.ones(
+                (*tensor.shape[:-1], 1),
+                dtype=tensor.dtype,
+                device=tensor.device,
+            )
+            return torch.cat([tensor, alpha], dim=-1)
+
+        if curr_channels == 4 and channels == 3:
+            return tensor[..., :3]
+
+        raise ValueError(f"unsupported channel conversion: {curr_channels} -> {channels}")
 
     @staticmethod
     def tensor2pil(image):
@@ -278,6 +301,12 @@ class LoadImage(io.ComfyNode):
         )
         return img_resized
 
+    @staticmethod
+    def get_filename_stem(path: str) -> str:
+        base_name = os.path.basename(str(path or "").strip())
+        stem, _ext = os.path.splitext(base_name)
+        return stem or "image"
+
     @classmethod
     async def execute(
         cls,
@@ -291,7 +320,7 @@ class LoadImage(io.ComfyNode):
         count = len(image_paths)
 
         if count == 0:
-            return io.NodeOutput(None, None)
+            return io.NodeOutput(None, None, "")
 
         target_h = 0
         target_w = 0
@@ -303,6 +332,8 @@ class LoadImage(io.ComfyNode):
         if all:
             images_tensors = []
             masks_tensors = []
+            output_names: list[str] = []
+            target_channels = 0
 
             # 如果没有参考图片，加载第一张图片来确定基准尺寸
             start_idx = 0
@@ -315,12 +346,14 @@ class LoadImage(io.ComfyNode):
                     )
 
                     target_h, target_w = first_tensor.shape[1:3]
+                    target_channels = first_tensor.shape[-1]
                     images_tensors.append(first_tensor)
                     masks_tensors.append(first_mask_tensor)
+                    output_names.append(cls.get_filename_stem(image_paths[0]))
                     start_idx = 1
                 except Exception as e:
                     print(f"Error loading first image {image_paths[0]}: {e}")
-                    return io.NodeOutput(None, None)
+                    return io.NodeOutput(None, None, "")
 
             for file_path in image_paths[start_idx:]:
                 try:
@@ -332,16 +365,29 @@ class LoadImage(io.ComfyNode):
                     tensor = cls.crop_and_resize(tensor, target_h, target_w)
                     mask_tensor = cls.crop_and_resize(mask_tensor, target_h, target_w)
 
+                    if target_channels == 0:
+                        target_channels = tensor.shape[-1]
+                    elif tensor.shape[-1] != target_channels:
+                        if target_channels == 3 and tensor.shape[-1] == 4:
+                            target_channels = 4
+                            images_tensors = [
+                                cls.ensure_tensor_channels(t, target_channels)
+                                for t in images_tensors
+                            ]
+                        tensor = cls.ensure_tensor_channels(tensor, target_channels)
+
                     images_tensors.append(tensor)
                     masks_tensors.append(mask_tensor)
+                    output_names.append(cls.get_filename_stem(file_path))
                 except Exception as e:
                     print(f"Error loading image {file_path}: {e}")
 
             if not images_tensors:
-                return io.NodeOutput(None, None)
+                return io.NodeOutput(None, None, "")
 
             output_image = torch.cat(images_tensors, dim=0)
             output_mask = torch.cat(masks_tensors, dim=0).squeeze(-1)
+            output_filename = "\n".join(output_names)
 
         else:
             idx = index % count
@@ -358,13 +404,15 @@ class LoadImage(io.ComfyNode):
 
                 output_image = tensor
                 output_mask = mask_tensor.squeeze(-1)
+                output_filename = cls.get_filename_stem(selected_path)
             except Exception as e:
                 print(f"Error loading image {selected_path}: {e}")
-                return io.NodeOutput(None, None)
+                return io.NodeOutput(None, None, "")
 
         return io.NodeOutput(
             output_image,
             output_mask,
+            output_filename,
         )
 
 

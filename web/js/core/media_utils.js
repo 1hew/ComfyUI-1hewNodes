@@ -286,6 +286,20 @@ export function installImagePreviewLayout({
     imageEl,
     allWidget,
 }) {
+    const estimateTopOffset = () => {
+        try {
+            if (node.widgets && node.widgets.length > 0) {
+                const widgetCount = node.widgets.filter(
+                    (w) => w !== imageWidget && w.type !== "hidden",
+                ).length;
+                let estimatedTop = 30 + widgetCount * 26 + 30;
+                if (estimatedTop < 130) estimatedTop = 130;
+                return estimatedTop;
+            }
+        } catch {}
+        return 130;
+    };
+
     const autoSizeToContent = () => {
         if (!imageWidget.aspectRatio) {
             return;
@@ -301,7 +315,14 @@ export function installImagePreviewLayout({
                 : imageWidget.aspectRatio;
 
         const width = node.size[0];
-        const desiredWidgetHeight = width * aspectRatio + 20;
+        let desiredWidgetHeight = width * aspectRatio + 20;
+        const maxPreviewHeight =
+            typeof imageWidget._comfy1hew_maxPreviewHeight === "number"
+                ? imageWidget._comfy1hew_maxPreviewHeight
+                : null;
+        if (maxPreviewHeight && isFinite(maxPreviewHeight)) {
+            desiredWidgetHeight = Math.min(desiredWidgetHeight, maxPreviewHeight);
+        }
 
         let desiredHeight;
         if (Number.isFinite(imageWidget.last_y)) {
@@ -321,8 +342,7 @@ export function installImagePreviewLayout({
                 }
             } catch {}
             if (!Number.isFinite(desiredHeight)) {
-                const estimatedTop = 130;
-                desiredHeight = estimatedTop + desiredWidgetHeight;
+                desiredHeight = estimateTopOffset() + desiredWidgetHeight;
             }
         }
 
@@ -376,6 +396,14 @@ export function installImagePreviewLayout({
                     : imageWidget.aspectRatio;
             const width = node.size[0];
             availableHeight = width * aspectRatio + 20;
+        }
+
+        const maxPreviewHeight =
+            typeof imageWidget._comfy1hew_maxPreviewHeight === "number"
+                ? imageWidget._comfy1hew_maxPreviewHeight
+                : null;
+        if (maxPreviewHeight && isFinite(maxPreviewHeight)) {
+            availableHeight = Math.min(availableHeight, maxPreviewHeight);
         }
 
         if (availableHeight < 0) availableHeight = 0;

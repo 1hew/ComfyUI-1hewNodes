@@ -4,22 +4,25 @@ from comfy_api.latest import io
 from PIL import Image
 import torch
 import torch.nn.functional as F
+from typing import Optional
 
 class ImageMaskCrop(io.ComfyNode):
     """
     图像遮罩裁剪（ImageMaskCrop）- 基于遮罩边界框进行裁剪，或保持原尺寸
 
     参数语义：
+    - mask：可选；若未提供，则使用输入 image 的 alpha 通道作为 mask。
     - output_alpha：是否输出带 alpha 通道的图像（由 mask 提供），
       True 输出 RGBA，False 时输入为 RGBA 则保持 RGBA。
     - output_crop：是否根据 mask 的边界框进行裁剪，
       True 裁剪到 bbox，False 保持原输入尺寸。
+    - pad_crop：仅在 output_crop=True 时生效，向外扩展裁剪框的像素值。
 
     批处理规则：图像与遮罩数量不一致时按最大批次循环使用。
     输出与公式：
     - 当 output_alpha=True：alpha = mask（0–255），图像输出为 RGBA；
       当 output_alpha=False：输入为 RGBA 则保持 RGBA，输入为 RGB 则输出 RGB。
-    - 当 output_crop=True：对图像与遮罩进行 bbox 裁剪后输出；
+    - 当 output_crop=True：对图像与遮罩进行 bbox 裁剪后输出（可由 pad_crop 向外扩展）；
       当 output_crop=False：保持原尺寸，整幅图应用 alpha 或保持 RGB。
     """
 
@@ -31,9 +34,10 @@ class ImageMaskCrop(io.ComfyNode):
             category="1hewNodes/image/crop",
             inputs=[
                 io.Image.Input("image"),
-                io.Mask.Input("mask"),
-                io.Boolean.Input("output_crop", default=True),
+                io.Mask.Input("mask", optional=True),
                 io.Boolean.Input("output_alpha", default=False),
+                io.Boolean.Input("output_crop", default=True),
+                io.Int.Input("pad_crop", default=0, min=0, max=4096, step=1),
             ],
             outputs=[
                 io.Image.Output(display_name="image"),
@@ -45,12 +49,20 @@ class ImageMaskCrop(io.ComfyNode):
     async def execute(
         cls,
         image: torch.Tensor,
-        mask: torch.Tensor,
-        output_crop: bool = True,
+        mask: Optional[torch.Tensor] = None,
         output_alpha: bool = False,
+        output_crop: bool = True,
+        pad_crop: int = 0,
     ) -> io.NodeOutput:
         image = image.to(torch.float32).clamp(0.0, 1.0)
-        mask = mask.to(torch.float32).clamp(0.0, 1.0)
+        if mask is None:
+            if image.shape[-1] < 4:
+                raise ValueError(
+                    "mask is required when input image has no alpha channel."
+                )
+            mask = image[..., 3]
+        else:
+            mask = mask.to(torch.float32).clamp(0.0, 1.0)
 
         batch_size, height, width, channels = image.shape
         mask_batch_size = mask.shape[0]
@@ -69,34 +81,32 @@ class ImageMaskCrop(io.ComfyNode):
                 mask_pil = Image.fromarray(mask_np).convert("L")
                 bbox = cls._get_bbox_from_mask(mask_pil)
                 if bbox is None:
-                    if output_alpha:
-                        base_rgba = img_pil.convert("RGBA")
-                        rgba_data = np.array(base_rgba)
-                        full_mask = mask_pil
-                        if full_mask.size != base_rgba.size:
-                            new_mask = Image.new("L", base_rgba.size, 0)
-                            paste_x = max(
-                                0, (base_rgba.width - full_mask.width) // 2
-                            )
-                            paste_y = max(
-                                0, (base_rgba.height - full_mask.height) // 2
-                            )
-                            new_mask.paste(full_mask, (paste_x, paste_y))
-                            full_mask = new_mask
-                        mask_data = np.array(full_mask)
-                        rgba_data[:, :, 3] = mask_data
-                        result_np = rgba_data.astype(np.float32) / 255.0
-                        img_t = torch.from_numpy(result_np)
-                    else:
-                        rgb_np = np.array(img_pil)
-                        if rgb_np.ndim == 2:
-                            rgb_np = np.stack([rgb_np] * 3, axis=-1)
-                        img_t = torch.from_numpy(
-                            rgb_np.astype(np.float32) / 255.0
+                    full_mask = mask_pil
+                    if full_mask.size != img_pil.size:
+                        new_mask = Image.new("L", img_pil.size, 0)
+                        paste_x = max(
+                            0, (img_pil.width - full_mask.width) // 2
                         )
-                    mk_t = torch.from_numpy(mask_np.astype(np.float32) / 255.0)
+                        paste_y = max(
+                            0, (img_pil.height - full_mask.height) // 2
+                        )
+                        new_mask.paste(full_mask, (paste_x, paste_y))
+                        full_mask = new_mask
+                    img_t = cls._compose_image_with_mask(
+                        img_pil, full_mask, output_alpha
+                    )
+                    mk_t = torch.from_numpy(
+                        np.array(full_mask).astype(np.float32) / 255.0
+                    )
                     return img_t, mk_t
                 x_min, y_min, x_max, y_max = bbox
+                if output_crop:
+                    pad_px = max(0, int(pad_crop))
+                    if pad_px > 0:
+                        x_min -= pad_px
+                        y_min -= pad_px
+                        x_max += pad_px
+                        y_max += pad_px
                 x_min = max(0, x_min)
                 y_min = max(0, y_min)
                 x_max = min(img_pil.width, x_max)
@@ -108,20 +118,9 @@ class ImageMaskCrop(io.ComfyNode):
                         np.array(cropped_mask).astype(np.float32) / 255.0
                     )
                     mk_t = torch.from_numpy(cropped_mask_np)
-                    if output_alpha:
-                        cropped_rgba = cropped_img.convert("RGBA")
-                        img_data = np.array(cropped_rgba)
-                        mask_data = np.array(cropped_mask)
-                        img_data[:, :, 3] = mask_data
-                        result_np = img_data.astype(np.float32) / 255.0
-                        img_t = torch.from_numpy(result_np)
-                    else:
-                        cropped_np = np.array(cropped_img)
-                        if cropped_np.ndim == 2:
-                            cropped_np = np.stack([cropped_np] * 3, axis=-1)
-                        img_t = torch.from_numpy(
-                            cropped_np.astype(np.float32) / 255.0
-                        )
+                    img_t = cls._compose_image_with_mask(
+                        cropped_img, cropped_mask, output_alpha
+                    )
                 else:
                     full_mask = mask_pil
                     if full_mask.size != img_pil.size:
@@ -134,20 +133,9 @@ class ImageMaskCrop(io.ComfyNode):
                         np.array(full_mask).astype(np.float32) / 255.0
                     )
                     mk_t = torch.from_numpy(full_mask_np)
-                    if output_alpha:
-                        base_rgba = img_pil.convert("RGBA")
-                        rgba_data = np.array(base_rgba)
-                        mask_data = np.array(full_mask)
-                        rgba_data[:, :, 3] = mask_data
-                        result_np = rgba_data.astype(np.float32) / 255.0
-                        img_t = torch.from_numpy(result_np)
-                    else:
-                        rgb_np = np.array(img_pil)
-                        if rgb_np.ndim == 2:
-                            rgb_np = np.stack([rgb_np] * 3, axis=-1)
-                        img_t = torch.from_numpy(
-                            rgb_np.astype(np.float32) / 255.0
-                        )
+                    img_t = cls._compose_image_with_mask(
+                        img_pil, full_mask, output_alpha
+                    )
                 return img_t, mk_t
             return await asyncio.to_thread(_do)
 
@@ -179,6 +167,43 @@ class ImageMaskCrop(io.ComfyNode):
             )
             return io.NodeOutput(output_image_tensor, output_mask_tensor)
         return io.NodeOutput(image, mask)
+
+    @staticmethod
+    def _compose_image_with_mask(
+        img_pil: Image.Image, mask_pil: Image.Image, output_alpha: bool
+    ) -> torch.Tensor:
+        """
+        将 mask 作用到图像可见内容：
+        - RGB 通道始终乘以 mask，保证非白区域不可见（变黑）
+        - 若输入有 alpha，则输出 alpha = input_alpha * mask
+        - 若 output_alpha=True，则即使输入无 alpha 也输出 RGBA（alpha=mask）
+        """
+        img_np = np.array(img_pil)
+        input_has_alpha = img_np.ndim == 3 and img_np.shape[2] == 4
+
+        rgba_np = np.array(img_pil.convert("RGBA"), dtype=np.uint8)
+        mask_l = np.array(mask_pil.convert("L"), dtype=np.uint8)
+        mask_f = mask_l.astype(np.float32) / 255.0
+
+        rgb = rgba_np[:, :, :3].astype(np.float32)
+        rgb = np.clip(np.round(rgb * mask_f[:, :, None]), 0, 255).astype(np.uint8)
+        rgba_np[:, :, :3] = rgb
+
+        if input_has_alpha:
+            src_alpha = rgba_np[:, :, 3].astype(np.float32) / 255.0
+            alpha = np.clip(np.round(src_alpha * mask_f * 255.0), 0, 255).astype(
+                np.uint8
+            )
+        else:
+            alpha = mask_l
+
+        if output_alpha or input_has_alpha:
+            rgba_np[:, :, 3] = alpha
+            out_np = rgba_np.astype(np.float32) / 255.0
+        else:
+            out_np = rgba_np[:, :, :3].astype(np.float32) / 255.0
+
+        return torch.from_numpy(out_np)
     
     @staticmethod
     def _get_bbox_from_mask(mask_pil):

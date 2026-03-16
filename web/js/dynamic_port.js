@@ -6,8 +6,10 @@ app.registerExtension({
         const configs = {
             "1hew_MultiStringJoin": { base: "string_", addType: "STRING", select: null, initial: 1 },
             "1hew_MultiImageBatch": { base: "image_", addType: "IMAGE", select: null, initial: 1 },
+            "1hew_MultiImageOverlay": { base: "image_", addType: "IMAGE", select: null, initial: 1 },
             "1hew_MultiMaskBatch": { base: "mask_", addType: "MASK", select: null, initial: 1 },
             "1hew_MultiImageStitch": { base: "image_", addType: "IMAGE", select: null, initial: 2 },
+            "1hew_MultiIndexSelect": { base: "input_", addType: "*", select: null, initial: 1, max: 10, outputBase: "output_", outputType: "*" },
             "1hew_ImageMainStitch": { base: "image_", addType: "IMAGE", select: null, initial: 3 },
             "1hew_AnySwitchInt": { base: "input_", addType: "*", select: "select", initial: 1, max: 10 },
             "1hew_TextEncodeQwenImageEdit": { base: "image_", addType: "IMAGE", select: null, initial: 1, max: 10 },
@@ -22,12 +24,16 @@ app.registerExtension({
         if (!cfg) return;
 
         const baseInput = cfg.base;
+        const baseOutput = cfg.outputBase;
+        const outputType = cfg.outputType || cfg.addType;
         const selectName = cfg.select;
         const cap = typeof cfg.max === "number" && cfg.max > 0 ? cfg.max : Infinity;
 
         const originalOnConnectionsChange = nodeType.prototype.onConnectionsChange;
 
-        const enableAutoCompact = typeName === "1hew_AnySwitchInt";
+        // 动态端口节点在移除输入后都应尝试自动收缩高度，
+        // 否则会出现端口数量减少但面板高度不回收的问题。
+        const enableAutoCompact = true;
 
         function compactNodeHeight(node) {
             if (!enableAutoCompact) {
@@ -89,6 +95,11 @@ app.registerExtension({
             return idxs;
         }
 
+        function listDynamicOutputs(node) {
+            if (!baseOutput) return [];
+            return node.outputs?.filter(out => out?.name?.startsWith(baseOutput)) || [];
+        }
+
         function isConnectedIndex(node, idx) {
             return (node.inputs?.[idx] ?? {}).link != null;
         }
@@ -119,6 +130,39 @@ app.registerExtension({
                 const slot = node.inputs?.[idx];
                 if (slot && slot.type !== cfg.addType) {
                     slot.type = cfg.addType;
+                }
+            }
+        }
+
+        function syncDynamicOutputs(node) {
+            if (!baseOutput) return;
+            const inputCount = listDynamicInputs(node).length;
+            const outputCount = listDynamicOutputs(node).length;
+            const target = Math.max(1, inputCount);
+
+            for (let i = outputCount + 1; i <= target; i++) {
+                node.addOutput(baseOutput + i, outputType);
+            }
+            while (listDynamicOutputs(node).length > target) {
+                const outs = node.outputs || [];
+                let lastIdx = -1;
+                for (let i = outs.length - 1; i >= 0; i--) {
+                    if (outs[i]?.name?.startsWith(baseOutput)) {
+                        lastIdx = i;
+                        break;
+                    }
+                }
+                if (lastIdx < 0) break;
+                node.removeOutput(lastIdx);
+            }
+
+            const outs = node.outputs || [];
+            let dynPos = 0;
+            for (let i = 0; i < outs.length; i++) {
+                if (outs[i]?.name?.startsWith(baseOutput)) {
+                    dynPos += 1;
+                    outs[i].name = baseOutput + dynPos;
+                    outs[i].type = outputType;
                 }
             }
         }
@@ -224,6 +268,7 @@ app.registerExtension({
             try {
                 if (type !== LiteGraph.INPUT) {
                     syncSelectRange(this);
+                    syncDynamicOutputs(this);
                     scheduleCompact(this);
                     return rv;
                 }
@@ -241,6 +286,7 @@ app.registerExtension({
                 ensureSingleTrailingEmpty(this);
                 syncSelectRange(this);
                 normalizeDynamicTypes(this);
+                syncDynamicOutputs(this);
                 this.setDirtyCanvas(true, true);
                 scheduleCompact(this);
             } catch (err) {
@@ -275,6 +321,7 @@ app.registerExtension({
                 ensureSingleTrailingEmpty(this);
                 syncSelectRange(this);
                 normalizeDynamicTypes(this);
+                syncDynamicOutputs(this);
                 this.setDirtyCanvas(true, true);
             } catch (err) {
                 console.error("[1hewNodesV3.DynamicPorts] onAdded error", err);
@@ -288,6 +335,7 @@ app.registerExtension({
         nodeType.prototype.onConfigure = function () {
             const r = originalOnConfigure?.apply(this, arguments);
             try {
+                syncDynamicOutputs(this);
                 scheduleCompact(this);
             } catch (_) {}
             return r;

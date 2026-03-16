@@ -10,6 +10,7 @@
 | `base_image` | - | IMAGE | - | - | Base image batch. |
 | `overlay_mask` | optional | MASK | - | - | Optional mask; modulates where the blended result replaces the base. |
 | `blend_mode` | - | COMBO | `normal` | `normal` / `dissolve` / `darken` / `multiply` / `color_burn` / `linear_burn` / `add` / `lighten` / `screen` / `color_dodge` / `linear_dodge` / `overlay` / `soft_light` / `hard_light` / `linear_light` / `vivid_light` / `pin_light` / `hard_mix` / `difference` / `exclusion` / `subtract` / `divide` / `hue` / `saturation` / `color` / `luminosity` | Blend algorithm to apply. |
+| `overlay_fit` | - | COMBO | `stretch` | `stretch` / `center` | Size fitting mode for the overlay image. |
 | `opacity` | - | FLOAT | 1.0 | 0.0–1.0 | Global blend strength; 0 leaves base unchanged, 1 fully applies overlay blend. |
 | `invert_mask` | - | BOOLEAN | false | - | Invert `overlay_mask` before application. |
 

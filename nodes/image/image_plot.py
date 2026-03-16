@@ -55,8 +55,9 @@ class ImagePlot(io.ComfyNode):
     @classmethod
     async def _process_standard_plot(cls, image, layout, spacing, grid_columns, background_color):
         """标准图像拼接处理"""
+        has_alpha = int(image.shape[-1]) == 4
         # 解析背景颜色
-        bg_color = cls._parse_color(background_color)
+        bg_color = cls._parse_color(background_color, has_alpha=has_alpha)
         
         # 获取图像数量
         num_images = image.shape[0]
@@ -64,7 +65,8 @@ class ImagePlot(io.ComfyNode):
         async def _to_pil(frame):
             def _do(frame_):
                 arr = 255.0 * frame_.cpu().numpy()
-                return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+                pil = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+                return pil.convert("RGBA" if has_alpha else "RGB")
             return await asyncio.to_thread(_do, frame)
 
         tasks = [_to_pil(image[i]) for i in range(num_images)]
@@ -142,16 +144,17 @@ class ImagePlot(io.ComfyNode):
         
         # 统一图片尺寸
         normalized_images = cls._normalize_image_sizes(frame_images)
+        has_alpha = any(int(img.shape[-1]) == 4 for img in normalized_images)
         
         # 转换为PIL图像
         pil_images = []
         for img_tensor in normalized_images:
             img_np = (img_tensor.cpu().numpy() * 255).astype(np.uint8)
-            pil_img = Image.fromarray(img_np)
+            pil_img = Image.fromarray(img_np).convert("RGBA" if has_alpha else "RGB")
             pil_images.append(pil_img)
         
         # 解析背景颜色
-        bg_color = cls._parse_color(background_color)
+        bg_color = cls._parse_color(background_color, has_alpha=has_alpha)
         
         # 合并图像
         result_img = cls._combine_images(
@@ -166,7 +169,17 @@ class ImagePlot(io.ComfyNode):
     def _combine_images(cls, pil_images, layout, spacing, grid_columns, bg_color):
         """统一的图像合并逻辑"""
         if not pil_images:
-            return Image.new('RGB', (256, 256), bg_color)
+            mode = "RGBA" if isinstance(bg_color, tuple) and len(bg_color) == 4 else "RGB"
+            return Image.new(mode, (256, 256), bg_color)
+        
+        has_alpha = any(img.mode == "RGBA" for img in pil_images)
+        mode = "RGBA" if has_alpha else "RGB"
+        if has_alpha:
+            pil_images = [img.convert("RGBA") for img in pil_images]
+            bg_color = cls._parse_color(bg_color, has_alpha=True)
+        else:
+            pil_images = [img.convert("RGB") for img in pil_images]
+            bg_color = cls._parse_color(bg_color, has_alpha=False)
         
         # 获取所有图像的尺寸
         widths = [img.width for img in pil_images]
@@ -177,24 +190,24 @@ class ImagePlot(io.ComfyNode):
             # 水平排列
             total_width = sum(widths) + spacing * (num_images - 1)
             max_height = max(heights)
-            result_img = Image.new("RGB", (total_width, max_height), bg_color)
+            result_img = Image.new(mode, (total_width, max_height), bg_color)
             
             x_offset = 0
             for img in pil_images:
                 y_offset = (max_height - img.height) // 2
-                result_img.paste(img, (x_offset, y_offset))
+                result_img.paste(img, (x_offset, y_offset), img if mode == "RGBA" else None)
                 x_offset += img.width + spacing
                 
         elif layout == "vertical":
             # 垂直排列
             max_width = max(widths)
             total_height = sum(heights) + spacing * (num_images - 1)
-            result_img = Image.new("RGB", (max_width, total_height), bg_color)
+            result_img = Image.new(mode, (max_width, total_height), bg_color)
             
             y_offset = 0
             for img in pil_images:
                 x_offset = (max_width - img.width) // 2
-                result_img.paste(img, (x_offset, y_offset))
+                result_img.paste(img, (x_offset, y_offset), img if mode == "RGBA" else None)
                 y_offset += img.height + spacing
                 
         else:  # "grid" - 网格模式
@@ -217,7 +230,7 @@ class ImagePlot(io.ComfyNode):
             total_width = sum(max_width_per_col) + spacing * (cols - 1)
             total_height = sum(max_height_per_row) + spacing * (rows - 1)
             
-            result_img = Image.new("RGB", (total_width, total_height), bg_color)
+            result_img = Image.new(mode, (total_width, total_height), bg_color)
             
             # 放置图像
             for i, img in enumerate(pil_images[:rows * cols]):
@@ -232,7 +245,11 @@ class ImagePlot(io.ComfyNode):
                 x_center = (max_width_per_col[col] - img.width) // 2
                 y_center = (max_height_per_row[row] - img.height) // 2
                 
-                result_img.paste(img, (x_offset + x_center, y_offset + y_center))
+                result_img.paste(
+                    img,
+                    (x_offset + x_center, y_offset + y_center),
+                    img if mode == "RGBA" else None,
+                )
         
         return result_img
     
@@ -258,9 +275,16 @@ class ImagePlot(io.ComfyNode):
         return normalized
     
     @classmethod
-    def _parse_color(cls, color_str):
+    def _parse_color(cls, color_str, has_alpha=False):
         """解析不同格式的颜色输入"""
-        color_str = color_str.strip()
+        if isinstance(color_str, tuple):
+            if has_alpha:
+                if len(color_str) == 4:
+                    return color_str
+                if len(color_str) == 3:
+                    return (color_str[0], color_str[1], color_str[2], 255)
+            return color_str[:3] if len(color_str) >= 3 else (255, 255, 255)
+        color_str = str(color_str).strip()
         
         # 尝试解析为灰度值 (0.0-1.0)
         try:
@@ -268,6 +292,8 @@ class ImagePlot(io.ComfyNode):
             if 0.0 <= gray_value <= 1.0:
                 # 灰度值转换为RGB
                 gray_int = int(gray_value * 255)
+                if has_alpha:
+                    return (gray_int, gray_int, gray_int, 255)
                 return (gray_int, gray_int, gray_int)
         except ValueError:
             pass
@@ -283,6 +309,8 @@ class ImagePlot(io.ComfyNode):
                 r = int(hex_color[0:2], 16)
                 g = int(hex_color[2:4], 16)
                 b = int(hex_color[4:6], 16)
+                if has_alpha:
+                    return (r, g, b, 255)
                 return (r, g, b)
             except ValueError:
                 pass
@@ -294,9 +322,11 @@ class ImagePlot(io.ComfyNode):
                 r = int(rgb[0].strip())
                 g = int(rgb[1].strip())
                 b = int(rgb[2].strip())
+                if has_alpha:
+                    return (r, g, b, 255)
                 return (r, g, b)
         except ValueError:
             pass
         
         # 默认返回白色
-        return (255, 255, 255)
+        return (255, 255, 255, 255) if has_alpha else (255, 255, 255)

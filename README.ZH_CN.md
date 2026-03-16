@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.4.0**
+- feat(nodes): 新增 `Image Resize Gemini30ProImage`、`Image Resize Gemini31FlashImage`、`Detect Remove BG`、`Detect Remove BG Refine`、`text_match_rownum` 节点；同时将 resize 相关能力独立整理为 `image_resize` 分组，并同步补齐对应文档与 README 节点列表说明。
+
 **v3.3.0**
 - feat(conversion): 添加 `Mask to SAM3 Box`、`Text to Any` 节点
 
@@ -371,9 +374,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Image Solid | 生成纯色图像，增强颜色参数支持多种输入格式和多种尺寸预设 |
-| Image Resize FluxKontext | 图像尺寸调整为FluxKontext尺寸，支持图像和遮罩的尺寸自动选择和手动选择 |
-| Image Resize Qwen Image | 专为 Qwen 视觉模型优化的图像尺寸调整，提供 7 种预设分辨率和自动宽高比选择 |
-| Image Resize Universal | 通用图像尺寸调整，支持多种算法和约束 |
 | Image Rotate with Mask | 高级图像旋转，支持遮罩集成、多种填充模式和遮罩中心旋转选项 |
 | Image Edit Stitch | 图像拼接与缝合，支持多种拼接模式 |
 | ImageMainStitch | 主画面拼接，支持动态 `image_2..image_N` 与方向/尺寸匹配/间距/填充 |
@@ -381,6 +381,17 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Plot | 图像绘制和可视化工具 |
 | Image Stroke by Mask | 对遮罩区域应用描边效果，支持自定义宽度和颜色 |
 | Image BBox Overlay by Mask | 基于遮罩的图像边界框叠加，支持独立和合并模式 |
+| Image Alpha Clean | 清理图像 alpha 透明边缘噪点，支持强度预设与仅检测模式 |
+
+### 📐 图像尺寸节点
+| 节点名称 | 功能描述 |
+|---------|----------|
+| Image Resize FluxKontext | 图像尺寸调整为 FluxKontext 预设尺寸，支持图像和遮罩的自动/手动尺寸选择 |
+| Image Resize QwenImage | 专为 Qwen 视觉模型优化的图像尺寸调整，支持预设分辨率与自动匹配 |
+| Image Resize Universal | 通用图像尺寸调整，支持多种比例来源、fit 策略与遮罩同步输出 |
+| Image Resize Jimeng | 适配即梦常用分辨率的图像尺寸调整，支持自动尺寸匹配 |
+| Image Resize Gemini30ProImage | 适配 Gemini 3.0 Pro 预设分辨率，支持 auto 档位与 image/mask 同步变换 |
+| Image Resize Gemini31FlashImage | 适配 Gemini 3.1 Flash 预设分辨率，扩展 0.5k/1k/2k/4k 档位与超宽比例 |
 
 ### 🌈 颜色节点
 | 节点名称 | 功能描述 |
@@ -420,14 +431,19 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎭 遮罩操作节点
 | 节点名称 | 功能描述 |
 |---------|----------|
+| Mask Math Ops | 遮罩数学运算（并集、交集、差集、异或） |
+| Mask Separate | 将遮罩分离为独立的连通区域，支持排序和面积过滤 |
 | Mask Fill Hole | 填充遮罩中的封闭区域孔洞，支持批量处理 |
 | Mask Crop by BBox Mask | 基于蒙版区域的遮罩边界框裁剪 |
 | Mask Paste by BBox Mask | 简化遮罩粘贴，支持自动基础遮罩创建和边界框检测 |
 | Mask Repeat | 批量重复遮罩，支持反转功能 |
+| Mask Alpha Clean | 清理遮罩 alpha 噪点与小孤岛，支持强度预设与仅检测模式 |
 
 ### 🔍 检测节点
 | 节点名称 | 功能描述 |
 |---------|----------|
+| Detect Remove BG | 多后端抠图节点，支持 RMBG/BiRefNet/Inspyrenet，输出前景图与 alpha 遮罩 |
+| Detect Remove BG Refine | RMBG 掩码后处理细化，输入原图+mask，输出 refined RGBA 与 alpha |
 | Detect Guide Line | 引导线检测，融合 Canny、HoughLinesP 与 DBSCAN 消失点聚类 |
 | Detect Yolo | YOLO模型目标检测，支持子文件夹模型、可自定义置信度阈值和可选标签显示控制 |
 
@@ -458,6 +474,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Any Empty Int | 通用空值检查节点（整数输出版本），检查任意类型输入是否为空，返回自定义的整数值 |
 | Any Switch Bool | 通用布尔切换节点，支持任意类型输入和惰性求值，根据布尔值条件选择输出 |
 | Any Switch Int | 多路整数切换节点，支持多个输入选项的切换，根据整数索引（1-5）选择对应的输入输出 |
+| text_match_rownum | 多行文本行号匹配，返回首个匹配项的行号（1-based），未命中返回 0 |
+| text_match_value | 在多行键值对中匹配单行文本并返回对应值 |
 
 ### 🔢 整数节点
 | 节点名称 | 功能描述 |
@@ -498,7 +516,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Multi String Join | 动态多输入字符串连接，支持 `{input}` 变量与注释/三引号过滤，可自定义分隔符 |
+| Multi Index Select | 动态多列索引选择器，支持 `input_1..input_N` 共用同一索引，对 list/batch 逐列取值并输出对应 `output_1..output_N` |
 | Multi Image Batch | 从动态 `image_X` 构建批次，支持 crop/pad/stretch 尺寸统一与边缘/颜色填充 |
+| Multi Image Overlay | 按顺序叠加多个图像图层，支持 alpha 合成和尺寸适应模式 |
 | Multi Image Stitch | 动态多图像拼接，支持方向、尺寸匹配、间距与填充颜色 |
 | Multi Mask Batch | 从动态 `mask_X` 构建批次，支持 crop/pad/stretch 尺寸统一与灰度填充 |
 | Multi Mask Math Ops | 动态多遮罩运算（交/并/差/异或），支持批次广播与统一尺寸 |

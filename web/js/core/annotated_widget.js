@@ -379,40 +379,36 @@ function mouseAnnotated(event, [x, y], node) {
             this._comfy1hew_arrow_incremented = false;
             
             const { step, mod } = getStepConfig();
-            
-            // Debug Log for Step Configuration
-            console.log("[AnnotatedWidget] Arrow Click", { 
-                isButton, 
-                step, 
-                mod, 
-                currentValue: this.value 
-            });
 
             const val = Number(this.value);
             let nextVal = val;
+            const s = Number(step) || 1;
+            const m = Number(mod) || 0;
 
             if (isButton == 1) {
-                const s = Number(step) || 1;
-                const m = Number(mod) || 0;
-                // Calculate distance to next step
-                // If current value is 1, step is 4, mod is 1.
-                // (1-1)%4 = 0. We want next to be 1+4=5.
-                // If current value is 2 (invalid?), (2-1)%4 = 1. d=1. inc = 4-1 = 3. next = 2+3 = 5. Correct.
-                let d = ((val - m) % s + s) % s;
-                // If d is very close to s, treat as 0
-                if (Math.abs(d - s) < 0.001) d = 0;
-                
-                const inc = d === 0 ? s : s - d;
-                nextVal = val + inc;
+                if (s > 1 || m > 0) {
+                    // Move to the next legal value in the sequence: step*k + mod
+                    if (val < m) {
+                        nextVal = m;
+                    } else {
+                        const k = Math.floor((val - m) / s) + 1;
+                        nextVal = s * k + m;
+                    }
+                } else {
+                    nextVal = val + s;
+                }
             } else {
-                const s = Number(step) || 1;
-                const m = Number(mod) || 0;
-                let d = ((val - m) % s + s) % s;
-                 // If d is very close to s, treat as 0
-                if (Math.abs(d - s) < 0.001) d = 0;
-                
-                const dec = d === 0 ? s : d;
-                nextVal = val - dec;
+                if (s > 1 || m > 0) {
+                    // Move to the previous legal value in the sequence.
+                    if (val <= m) {
+                        nextVal = 0;
+                    } else {
+                        const k = Math.ceil((val - m) / s) - 1;
+                        nextVal = s * k + m;
+                    }
+                } else {
+                    nextVal = val - s;
+                }
             }
 
             // Apply limits

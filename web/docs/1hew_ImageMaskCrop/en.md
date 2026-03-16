@@ -7,9 +7,10 @@
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | `image` | - | IMAGE | - | - | Input image batch. |
-| `mask` | - | MASK | - | - | Input mask batch. |
-| `output_crop` | - | BOOLEAN | true | - | Crop to the mask’s bbox; when false, keep original image size. |
+| `mask` | optional | MASK | - | - | Input mask batch. If not provided, uses the image's alpha channel. |
 | `output_alpha` | - | BOOLEAN | false | - | Output RGBA with alpha from the mask when true; otherwise output RGB. |
+| `output_crop` | - | BOOLEAN | true | - | Crop to the mask's bbox; when false, keep original image size. |
+| `pad_crop` | - | INT | `0` | 0-4096 | Pad the crop region by this many pixels (only applies when output_crop=true). |
 
 ## Outputs
 

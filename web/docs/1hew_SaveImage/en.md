@@ -7,8 +7,9 @@
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | `image` | optional | IMAGE | - | - | Image batch to save; when absent, the node finishes with an empty output. |
-| `filename_prefix` | - | STRING | `image/ComfyUI` | - | Save prefix passed to ComfyUI path generation; typically supports date placeholders (e.g. `%date:yyyy-MM-dd%`). |
-| `save_output` | - | BOOLEAN | `true` | - | Save to output directory when enabled; save to the temp directory when disabled. |
+| `filename` | - | STRING | `image/ComfyUI` | - | Save prefix or absolute path; typically supports date placeholders (e.g. `%date:yyyy-MM-dd%`). |
+| `auto_increment` | - | BOOLEAN | `true` | - | When true, uses auto-incrementing numbers; when false, uses fixed filename and overwrites. |
+| `save_output` | - | BOOLEAN | `true` | - | Save to output directory when enabled; skip saving to disk when disabled. |
 | `save_metadata` | - | BOOLEAN | `true` | - | Embed prompt/workflow metadata when enabled. |
 
 ## Outputs

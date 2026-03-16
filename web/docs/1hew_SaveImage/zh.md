@@ -7,8 +7,9 @@
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
 | `image` | 可选 | IMAGE | - | - | 要保存的图像批次；输入为空时节点输出空结果。 |
-| `filename_prefix` | - | STRING | `image/ComfyUI` | - | 保存文件前缀，交由 ComfyUI 路径生成处理；通常支持日期占位符（如 `%date:yyyy-MM-dd%`）。 |
-| `save_output` | - | BOOLEAN | `true` | - | 开启时保存到输出目录；未开启时保存到临时目录。 |
+| `filename` | - | STRING | `image/ComfyUI` | - | 保存文件前缀或绝对路径，支持日期占位符（如 `%date:yyyy-MM-dd%`）。 |
+| `auto_increment` | - | BOOLEAN | `true` | - | 为 true 时使用自动编号规则；为 false 时固定文件名并覆盖。 |
+| `save_output` | - | BOOLEAN | `true` | - | 开启时保存到输出目录；未开启时仅返回路径不写入磁盘。 |
 | `save_metadata` | - | BOOLEAN | `true` | - | 开启时写入 prompt 与 workflow 相关元数据。 |
 
 ## 输出

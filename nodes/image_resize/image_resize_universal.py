@@ -28,7 +28,7 @@ class ImageResizeUniversal(io.ComfyNode):
         return io.Schema(
             node_id="1hew_ImageResizeUniversal",
             display_name="Image Resize Universal",
-            category="1hewNodes/image",
+            category="1hewNodes/image/resize",
             inputs=[
                 io.Image.Input("image", optional=True),
                 io.Mask.Input("mask", optional=True),
@@ -185,9 +185,27 @@ class ImageResizeUniversal(io.ComfyNode):
         # 处理图像缩放
         if len(orig_images) > 0:
             for i in orig_images:
-                _image = cls.tensor2pil(i).convert('RGB')
-                _image = cls.fit_resize_image(_image, target_width, target_height, fit, resize_sampler, pad_color)
-                ret_images.append(cls.pil2tensor(_image))
+                src_image = cls.tensor2pil(i)
+
+                # 保持现有 RGB 流程；如果输入含 alpha，则在缩放后合并回 alpha 通道
+                if 'A' in src_image.getbands() or ('transparency' in src_image.info):
+                    rgba_image = src_image.convert('RGBA')
+                    rgb_image = rgba_image.convert('RGB')
+                    alpha_channel = rgba_image.getchannel('A')
+
+                    resized_rgb = cls.fit_resize_image(
+                        rgb_image, target_width, target_height, fit, resize_sampler, pad_color
+                    ).convert('RGB')
+                    resized_alpha = cls.fit_resize_mask(
+                        alpha_channel, target_width, target_height, fit, resize_sampler, orig_width, orig_height
+                    ).convert('L')
+
+                    resized_rgb.putalpha(resized_alpha)
+                    ret_images.append(cls.pil2tensor(resized_rgb))
+                else:
+                    _image = src_image.convert('RGB')
+                    _image = cls.fit_resize_image(_image, target_width, target_height, fit, resize_sampler, pad_color)
+                    ret_images.append(cls.pil2tensor(_image))
         else:
             # 无图像输入时也输出图像：按目标尺寸生成纯色图
             bg = ImageResizeUniversal.parse_color(pad_color) if pad_color is not None else (255, 255, 255)

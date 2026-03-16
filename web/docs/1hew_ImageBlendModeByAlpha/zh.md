@@ -10,6 +10,7 @@
 | `base_image` | - | IMAGE | - | - | 基础图层批次 |
 | `overlay_mask` | 可选 | MASK | - | - | 可选遮罩；控制在何处用融合结果替换基础图 |
 | `blend_mode` | - | COMBO | `normal` | `normal` / `dissolve` / `darken` / `multiply` / `color_burn` / `linear_burn` / `add` / `lighten` / `screen` / `color_dodge` / `linear_dodge` / `overlay` / `soft_light` / `hard_light` / `linear_light` / `vivid_light` / `pin_light` / `hard_mix` / `difference` / `exclusion` / `subtract` / `divide` / `hue` / `saturation` / `color` / `luminosity` | 混合算法选择 |
+| `overlay_fit` | - | COMBO | `stretch` | `stretch` / `center` | 叠加图层尺寸适应模式，支持拉伸或居中 |
 | `opacity` | - | FLOAT | 1.0 | 0.0–1.0 | 全局强度；0 仅基础图，1 完全应用叠加混合 |
 | `invert_mask` | - | BOOLEAN | false | - | 在应用前反转 `overlay_mask` |
 

@@ -5,55 +5,26 @@ import torch
 import torch.nn.functional as F
 
 
-class ImageResizeJimeng(io.ComfyNode):
+class ImageResizeQwenImage(io.ComfyNode):
     PRESET_RESOLUTIONS = [
-        # 1k_ratios
-        ("[1k] 2016×864 (21:9)", 2016, 864),
-        ("[1k] 1664×936 (16:9)", 1664, 936),
-        ("[1k] 1584×1056 (3:2)", 1584, 1056),
-        ("[1k] 1472×1104 (4:3)", 1472, 1104),
-        ("[1k] 1328×1328 (1:1)", 1328, 1328),
-        ("[1k] 1104×1472 (3:4)", 1104, 1472),
-        ("[1k] 1056×1584 (2:3)", 1056, 1584),
-        ("[1k] 936×1664 (9:16)", 936, 1664),
-        # 2k_ratios
-        ("[2k] 3024×1296 (21:9)", 3024, 1296),
-        ("[2k] 2560×1440 (16:9)", 2560, 1440),
-        ("[2k] 2496×1664 (3:2)", 2496, 1664),
-        ("[2k] 2304×1728 (4:3)", 2304, 1728),
-        ("[2k] 2048×2048 (1:1)", 2048, 2048),
-        ("[2k] 1728×2304 (3:4)", 1728, 2304),
-        ("[2k] 1664×2496 (2:3)", 1664, 2496),
-        ("[2k] 1440×2560 (9:16)", 1440, 2560),
-        # 4k_ratios
-        ("[4k] 6197×2656 (21:9)", 6197, 2656),
-        ("[4k] 5404×3040 (16:9)", 5404, 3040),
-        ("[4k] 4992×3328 (3:2)", 4992, 3328),
-        ("[4k] 4693×3520 (4:3)", 4693, 3520),
-        ("[4k] 4096×4096 (1:1)", 4096, 4096),
-        ("[4k] 3520×4693 (3:4)", 3520, 4693),
-        ("[4k] 3328×4992 (2:3)", 3328, 4992),
-        ("[4k] 3040×5404 (9:16)", 3040, 5404),
-        # 2.0_pro_ratios
-        ("[2.0_pro] 1195×512 (21:9)", 1195, 512),
-        ("[2.0_pro] 1024×576 (16:9)", 1024, 576),
-        ("[2.0_pro] 1024×682 (3:2)", 1024, 682),
-        ("[2.0_pro] 1024×768 (4:3)", 1024, 768),
-        ("[2.0_pro] 1024×1024 (1:1)", 1024, 1024),
-        ("[2.0_pro] 768×1024 (3:4)", 768, 1024),
-        ("[2.0_pro] 682×1024 (2:3)", 682, 1024),
-        ("[2.0_pro] 576×1024 (9:16)", 576, 1024),
+        ("928×1664 [1:1.79]", 928, 1664),
+        ("1056×1584 [1:1.50] (2:3)", 1056, 1584),
+        ("1140×1472 [1:1.29]", 1140, 1472),
+        ("1328×1328 [1:1.00] (1:1)", 1328, 1328),
+        ("1472×1140 [1.29:1]", 1472, 1140),
+        ("1584×1056 [1.50:1] (3:2)", 1584, 1056),
+        ("1664×928 [1.79:1]", 1664, 928),
     ]
-    PRESET_OPTIONS = ["auto", "auto (1k | 2k)", "auto (2k | 4k)"] + [name for name, _, _ in PRESET_RESOLUTIONS]
+    PRESET_OPTIONS = ["auto"] + [name for name, _, _ in PRESET_RESOLUTIONS]
 
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
-            node_id="1hew_ImageResizeJimeng",
-            display_name="Image Resize Jimeng",
-            category="1hewNodes/image",
+            node_id="1hew_ImageResizeQwenImage",
+            display_name="Image Resize QwenImage",
+            category="1hewNodes/image/resize",
             inputs=[
-                io.Combo.Input("preset_size", options=cls.PRESET_OPTIONS, default="auto (2k | 4k)"),
+                io.Combo.Input("preset_size", options=cls.PRESET_OPTIONS, default="auto"),
                 io.Combo.Input("fit", options=["crop", "pad", "stretch"], default="crop"),
                 io.String.Input("pad_color", default="1.0"),
                 io.Image.Input("image", optional=True),
@@ -98,26 +69,6 @@ class ImageResizeJimeng(io.ComfyNode):
         return f"{preset_size}|fit={fit}|pad={pad_color}|img={ib}x{ih}x{iw}|mask={mb}x{mh}x{mw}"
 
     @classmethod
-    def _find_best_resolution(cls, iw: int, ih: int, candidates: list) -> tuple[int, int]:
-        ar = iw / ih
-        
-        # Calculate aspect ratio difference in log space
-        ar_candidates = []
-        for _, w, h in candidates:
-            ar_diff = abs(math.log(ar) - math.log(w / h))
-            ar_candidates.append((ar_diff, w, h))
-        
-        # Find best aspect ratio matches within tolerance
-        min_ar_diff = min(c[0] for c in ar_candidates)
-        TOLERANCE = 0.02  # Allow small tolerance for aspect ratio matching
-        best_ar_candidates = [c for c in ar_candidates if c[0] <= min_ar_diff + TOLERANCE]
-        
-        # Among best AR matches, find closest area
-        area_in = iw * ih
-        best_match = min(best_ar_candidates, key=lambda x: abs(math.log(area_in) - math.log(x[1] * x[2])))
-        return best_match[1], best_match[2]
-
-    @classmethod
     async def execute(
         cls,
         preset_size: str,
@@ -126,30 +77,23 @@ class ImageResizeJimeng(io.ComfyNode):
         image: torch.Tensor | None = None,
         mask: torch.Tensor | None = None,
     ) -> io.NodeOutput:
-        if preset_size in ("auto", "auto (1k | 2k)", "auto (2k | 4k)"):
+        if preset_size == "auto":
             if isinstance(image, torch.Tensor):
                 iw = max(int(image.shape[2]), 1)
                 ih = max(int(image.shape[1]), 1)
-                
-                resolutions = cls.PRESET_RESOLUTIONS
-                if preset_size == "auto (1k | 2k)":
-                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[1k]") or r[0].startswith("[2k]")]
-                elif preset_size == "auto (2k | 4k)":
-                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[2k]") or r[0].startswith("[4k]")]
-                
-                width, height = cls._find_best_resolution(iw, ih, resolutions)
-
+                ar = iw / ih
+                _, width, height = min(
+                    ((abs(ar - w / h), w, h) for _, w, h in cls.PRESET_RESOLUTIONS),
+                    key=lambda x: x[0],
+                )
             elif isinstance(mask, torch.Tensor):
                 iw = max(int(mask.shape[2]), 1)
                 ih = max(int(mask.shape[1]), 1)
-                
-                resolutions = cls.PRESET_RESOLUTIONS
-                if preset_size == "auto (1k | 2k)":
-                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[1k]") or r[0].startswith("[2k]")]
-                elif preset_size == "auto (2k | 4k)":
-                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[2k]") or r[0].startswith("[4k]")]
-                
-                width, height = cls._find_best_resolution(iw, ih, resolutions)
+                ar = iw / ih
+                _, width, height = min(
+                    ((abs(ar - w / h), w, h) for _, w, h in cls.PRESET_RESOLUTIONS),
+                    key=lambda x: x[0],
+                )
             else:
                 width, height = 1328, 1328
         else:

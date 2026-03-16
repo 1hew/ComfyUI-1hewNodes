@@ -7,9 +7,10 @@
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
 | `image` | - | IMAGE | - | - | 输入图像批次 |
-| `mask` | - | MASK | - | - | 输入遮罩批次 |
-| `output_crop` | - | BOOLEAN | true | - | 按遮罩边界框裁剪；为 false 时保持原图尺寸 |
+| `mask` | 可选 | MASK | - | - | 输入遮罩批次，若未提供则使用图像的 alpha 通道 |
 | `output_alpha` | - | BOOLEAN | false | - | 为 true 时输出 RGBA（alpha 来自遮罩）；否则输出 RGB |
+| `output_crop` | - | BOOLEAN | true | - | 按遮罩边界框裁剪；为 false 时保持原图尺寸 |
+| `pad_crop` | - | INT | `0` | 0-4096 | 仅在 output_crop=true 时生效，向外扩展裁剪框的像素值 |
 
 ## 输出
 

@@ -41,6 +41,10 @@ class MultiImageBatch(io.ComfyNode):
             empty = torch.zeros((0, 64, 64, 3), dtype=torch.float32)
             return io.NodeOutput(empty)
 
+        # 任一输入含 alpha 时，统一所有输入为 RGBA，确保输出保留 alpha
+        target_channels = 4 if any(int(img.shape[3]) == 4 for img in images) else 3
+        images = [cls._ensure_channels(img, target_channels) for img in images]
+
         ref_h = int(images[0].shape[1])
         ref_w = int(images[0].shape[2])
         pad_rgb = cls._parse_color_string(pad_color)
@@ -165,10 +169,43 @@ class MultiImageBatch(io.ComfyNode):
             avg_color = avg.view(b, 1, 1, c)
             out[:] = avg_color.expand(b, target_h, target_w, c)
         else:
-            fill_t = torch.tensor(fill_rgb, dtype=img.dtype, device=img.device)
+            fill_value = MultiImageBatch._adapt_fill_to_channels(fill_rgb, c)
+            fill_t = torch.tensor(fill_value, dtype=img.dtype, device=img.device)
             out[:] = fill_t
         out[:, top:h_end, left:w_end, :] = img[:, : h_end - top, : w_end - left, :]
         return out
+
+    @staticmethod
+    def _ensure_channels(img, target_channels):
+        current_channels = int(img.shape[3])
+        if current_channels == target_channels:
+            return img
+        if current_channels == 3 and target_channels == 4:
+            alpha = torch.ones(
+                (img.shape[0], img.shape[1], img.shape[2], 1),
+                dtype=img.dtype,
+                device=img.device,
+            )
+            return torch.cat([img, alpha], dim=3)
+        if current_channels == 4 and target_channels == 3:
+            return img[:, :, :, :3]
+        return img
+
+    @staticmethod
+    def _adapt_fill_to_channels(fill_rgb, channels):
+        if isinstance(fill_rgb, str):
+            return fill_rgb
+        if not isinstance(fill_rgb, (tuple, list)):
+            return fill_rgb
+        values = list(fill_rgb)
+        if channels == 4:
+            if len(values) >= 4:
+                return tuple(values[:4])
+            if len(values) == 3:
+                return (values[0], values[1], values[2], 1.0)
+        if channels == 3 and len(values) >= 3:
+            return tuple(values[:3])
+        return tuple(values)
 
     @staticmethod
     def _parse_color_string(color_str):

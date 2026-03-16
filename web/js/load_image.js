@@ -299,7 +299,23 @@ app.registerExtension({
 
             this.imageWidget.computeSize = function (width) {
                 if (this.aspectRatio) {
-                    return [width, width * this.aspectRatio + 20];
+                    const maxAspectRatio =
+                        typeof this._comfy1hew_maxAspectRatio === "number"
+                            ? this._comfy1hew_maxAspectRatio
+                            : null;
+                    const aspectRatio =
+                        maxAspectRatio && isFinite(maxAspectRatio)
+                            ? Math.min(this.aspectRatio, maxAspectRatio)
+                            : this.aspectRatio;
+                    let height = width * aspectRatio + 20;
+                    const maxPreviewHeight =
+                        typeof this._comfy1hew_maxPreviewHeight === "number"
+                            ? this._comfy1hew_maxPreviewHeight
+                            : null;
+                    if (maxPreviewHeight && isFinite(maxPreviewHeight)) {
+                        height = Math.min(height, maxPreviewHeight);
+                    }
+                    return [width, height];
                 }
                 return [width, 0];
             };
@@ -314,6 +330,55 @@ app.registerExtension({
                 allWidget,
             });
 
+            const resetNodeHeightToBase = () => {
+                try {
+                    const baseH =
+                        Array.isArray(this._comfy1hewLoadImageBaseSize)
+                        && Number.isFinite(this._comfy1hewLoadImageBaseSize[1])
+                            ? this._comfy1hewLoadImageBaseSize[1]
+                            : null;
+                    if (typeof baseH === "number" && baseH > 0) {
+                        this.setSize([this.size[0], baseH]);
+                        return;
+                    }
+                } catch {}
+                // Fallback: avoid collapsing to zero-height which can make the DOM preview overflow the node frame
+                try {
+                    this.setSize([this.size[0], 130]);
+                } catch {}
+            };
+
+            const handleDomDragOver = (e) => {
+                if (!e) {
+                    return;
+                }
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.dataTransfer) {
+                    e.dataTransfer.dropEffect = "copy";
+                }
+            };
+
+            const handleDomDrop = (e) => {
+                if (!e) {
+                    return;
+                }
+                e.preventDefault();
+                e.stopPropagation();
+                (async () => {
+                    try {
+                        const payload = await collectDropPayload(e);
+                        const pairs = (payload?.pairs || []).filter((p) => p?.file);
+                        const hasDirectory = Boolean(payload?.hasDirectory);
+                        await uploadFilesAsFolder(pairs, hasDirectory);
+                    } catch {}
+                })();
+            };
+
+            container.addEventListener("dragenter", handleDomDragOver);
+            container.addEventListener("dragover", handleDomDragOver);
+            container.addEventListener("drop", handleDomDrop);
+
             this.updatePreview = async () => {
                 this._comfy1hewLoadImageReqId = (this._comfy1hewLoadImageReqId || 0) + 1;
                 const reqId = this._comfy1hewLoadImageReqId;
@@ -326,6 +391,7 @@ app.registerExtension({
                 const all = allWidget ? allWidget.value : false;
                 if (this.imageWidget) {
                     this.imageWidget._comfy1hew_maxAspectRatio = all ? 1.25 : null;
+                    this.imageWidget._comfy1hew_maxPreviewHeight = all ? 260 : 220;
                 }
                 const trimmedFile = String(file || "").trim();
                 if (trimmedFile === "") {
@@ -343,7 +409,7 @@ app.registerExtension({
                     this.imageWidget.aspectRatio = undefined;
                     infoEl.innerText = "";
                     updateLayout();
-                    this.setSize([this.size[0], 0]);
+                    resetNodeHeightToBase();
 
                     try {
                         const clipspace = window?.ComfyApp?.clipspace;
@@ -437,7 +503,7 @@ app.registerExtension({
                     this.imageWidget.aspectRatio = undefined;
                     infoEl.innerText = "";
                     container.style.display = "flex";
-                    this.setSize([this.size[0], 0]);
+                    resetNodeHeightToBase();
 
                     imageEl.onload = () => {
                         if (String(imageEl.dataset.comfy1hewReqId || "") !== String(reqId)) {
@@ -469,7 +535,7 @@ app.registerExtension({
                         infoEl.innerText = "";
                         this._comfy1hewLoadImageHadPreview = false;
                         updateLayout();
-                        this.setSize([this.size[0], 0]);
+                        resetNodeHeightToBase();
                     };
 
                     imageEl.dataset.comfy1hewReqId = String(reqId);
@@ -571,6 +637,11 @@ app.registerExtension({
             this.onRemoved = function () {
                 try {
                     document.removeEventListener("paste", onPaste, { capture: true });
+                } catch {}
+                try {
+                    container.removeEventListener("dragenter", handleDomDragOver);
+                    container.removeEventListener("dragover", handleDomDragOver);
+                    container.removeEventListener("drop", handleDomDrop);
                 } catch {}
                 try {
                     if (this._comfy1hewLoadImagePoller) {

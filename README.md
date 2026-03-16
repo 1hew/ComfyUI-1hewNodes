@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.4.0**
+- feat(nodes): Add `Image Resize Gemini30ProImage`, `Image Resize Gemini31FlashImage`, `Detect Remove BG`, `Detect Remove BG Refine`, and `text_match_rownum`; reorganize resize-related capabilities into the dedicated `image_resize` group, and sync related docs plus README node list updates.
+
 **v3.3.0**
 - feat(conversion): Add `Mask to SAM3 Box` and `Text to Any` nodes
 
@@ -370,10 +373,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🖼️ Image Processing Nodes
 | Node Name | Description |
 |-----------|--------------|
+| Image Solid | Generate solid color images with enhanced color parameter supporting multiple input formats and dimension presets |
 | Image Solid FluxKontext | Generate solid color images based on Flux Kontext dimension presets with flexible color input format support |
-| Image Resize FluxKontext | Resize images to FluxKontext dimensions with support for automatic and manual size selection for images and masks |
-| Image Resize Qwen Image | Image resizing optimized for Qwen vision models, providing 7 preset resolutions and automatic aspect ratio selection |
-| Image Resize Universal | Universal image resizing with multiple algorithms and constraints |
 | Image Rotate with Mask | Advanced image rotation with mask integration, multiple fill modes, and mask center rotation options |
 | Image Edit Stitch | Image stitching and merging with multiple stitching modes |
 | ImageMainStitch | Main-image stitcher supporting dynamic `image_2..image_N`, direction, size matching, spacing, and padding |
@@ -381,6 +382,17 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Plot | Image plotting and visualization tools |
 | Image Stroke by Mask | Apply stroke effects to mask regions with customizable width and color |
 | Image BBox Overlay by Mask | Mask-based image bounding box overlay with independent and merge modes |
+| Image Alpha Clean | Clean image alpha edge noise with simple strength presets and optional detection-only output |
+
+### 📐 Image Resize Nodes
+| Node Name | Description |
+|-----------|-------------|
+| Image Resize FluxKontext | Resize images/masks to FluxKontext preset sizes with auto/manual target selection |
+| Image Resize QwenImage | Qwen-oriented image resizing with preset resolutions and auto matching |
+| Image Resize Universal | Universal image resizing with ratio inference, fit strategies, and synchronized mask output |
+| Image Resize Jimeng | Resize for Jimeng-oriented presets with automatic nearest-size matching |
+| Image Resize Gemini30ProImage | Gemini 3.0 Pro preset size adapter with auto tiers and synchronized image/mask transforms |
+| Image Resize Gemini31FlashImage | Gemini 3.1 Flash preset size adapter with extended 0.5k/1k/2k/4k tiers and extreme aspect ratios |
 
 ### 🌈 Color Nodes
 | Node Name | Description |
@@ -420,14 +432,19 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎭 Mask Operation Nodes
 | Node Name | Description |
 |-----------|-------------|
+| Mask Math Ops | Mathematical operations for masks (union, intersection, difference, XOR) |
+| Mask Separate | Separate mask into individual connected regions with sorting and area filtering |
 | Mask Fill Hole | Fill holes in enclosed areas of masks with batch processing support |
 | Mask Crop by BBox Mask | Mask bounding box cropping based on mask regions |
 | Mask Paste by BBox Mask | Simplified mask pasting with automatic base mask creation and bounding box detection |
 | Mask Repeat | Batch repeat masks with optional inversion support |
+| Mask Alpha Clean | Clean mask alpha noise and tiny islands with strength presets and optional detection-only output |
 
 ### 🔍 Detection Nodes
 | Node Name | Description |
 |-----------|-------------|
+| Detect Remove BG | Multi-backend background removal (RMBG/BiRefNet/Inspyrenet) with image + alpha mask outputs |
+| Detect Remove BG Refine | RMBG mask post-refinement using original image + mask, outputs refined RGBA and alpha |
 | Detect Yolo | YOLO model object detection with subfolder model support, customizable confidence thresholds, and optional label display control |
 | Detect Guide Line | Guide line detection combining Canny, HoughLinesP, and DBSCAN vanishing-point clustering |
 
@@ -458,6 +475,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Any Empty Int | Universal empty value checker (integer output version) that checks if any type of input is empty and returns custom integer values |
 | Any Switch Bool | Universal boolean switch node supporting any type input with lazy evaluation, selecting output based on boolean condition |
 | Any Switch Int | Multi-way integer switch node supporting multiple input options, selecting corresponding input/output based on integer index (1-5) |
+| text_match_rownum | Match a single text against multi-line text and return first matched row number (1-based), or 0 when not found |
+| text_match_value | Match single-line text against multi-line key-value pairs and return corresponding value |
 
 ### 🔢 Integer Nodes
 | Node Name | Description |
@@ -498,7 +517,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|-------------|
 | Multi String Join | Concatenate dynamic `string_X` inputs with `{input}` variable support and comment/triple-quote filtering; customizable separator |
+| Multi Index Select | Dynamic per-column index selector for `input_1..input_N`; applies one shared index to list/batch inputs and outputs matched `output_1..output_N` |
 | Multi Image Batch | Build image batch from dynamic `image_X` with crop/pad/stretch size unification and edge/color padding |
+| Multi Image Overlay | Overlay multiple image layers sequentially with alpha compositing and fit modes |
 | Multi Image Stitch | Dynamic multi-image stitcher with direction, size matching, spacing, and padding color control |
 | Multi Mask Batch | Build mask batch from dynamic `mask_X` with crop/pad/stretch size unification and configurable gray padding |
 | Multi Mask Math Ops | Dynamic multi-mask operations (union/intersection/difference/XOR) with batch broadcasting and size alignment |

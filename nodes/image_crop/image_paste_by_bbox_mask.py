@@ -1,7 +1,7 @@
 import asyncio
 from comfy_api.latest import io
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageChops
 import torch
 
 
@@ -74,7 +74,10 @@ class ImagePasteByBBoxMask(io.ComfyNode):
                 bbox_np = (
                     bbox_mask[bbox_idx].detach().cpu().numpy() * 255
                 ).astype(np.uint8)
-                base_pil = Image.fromarray(base_np)
+                if base_np.ndim == 3 and base_np.shape[2] == 4:
+                    base_pil = Image.fromarray(base_np, "RGBA")
+                else:
+                    base_pil = Image.fromarray(base_np)
                 bbox_pil = Image.fromarray(bbox_np).convert("L")
                 if paste_np.shape[2] == 4:
                     paste_pil = Image.fromarray(paste_np, "RGBA")
@@ -84,14 +87,20 @@ class ImagePasteByBBoxMask(io.ComfyNode):
                 if bbox is None:
                     empty_mask = np.zeros((base_np.shape[0], base_np.shape[1]), dtype=np.float32)
                     return base_image[base_idx], torch.from_numpy(empty_mask)
+                alpha_mask_pil = paste_pil.split()[-1] if paste_pil.mode == "RGBA" else None
                 m_pil = None
                 if paste_mask is not None:
                     pm_np = (
                         paste_mask[mask_idx].detach().cpu().numpy() * 255
                     ).astype(np.uint8)
                     m_pil = Image.fromarray(pm_np).convert("L")
-                elif paste_pil.mode == "RGBA":
-                    m_pil = paste_pil.split()[-1]
+                if m_pil is not None and alpha_mask_pil is not None:
+                    if m_pil.size != alpha_mask_pil.size:
+                        m_pil = m_pil.resize(alpha_mask_pil.size, Image.Resampling.LANCZOS)
+                    # 叠加外部遮罩与图片自带 alpha，透明区域只会更多
+                    m_pil = ImageChops.multiply(m_pil, alpha_mask_pil)
+                elif alpha_mask_pil is not None:
+                    m_pil = alpha_mask_pil
                 result_pil, result_mask_pil = cls.paste_image_with_transform(
                     base_pil,
                     paste_pil,

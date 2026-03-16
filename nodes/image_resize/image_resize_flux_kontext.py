@@ -5,24 +5,34 @@ import torch
 import torch.nn.functional as F
 
 
-class ImageResizeQwenImage(io.ComfyNode):
+class ImageResizeFluxKontext(io.ComfyNode):
     PRESET_RESOLUTIONS = [
-        ("928×1664 [1:1.79]", 928, 1664),
-        ("1056×1584 [1:1.50] (2:3)", 1056, 1584),
-        ("1140×1472 [1:1.29]", 1140, 1472),
-        ("1328×1328 [1:1.00] (1:1)", 1328, 1328),
-        ("1472×1140 [1.29:1]", 1472, 1140),
-        ("1584×1056 [1.50:1] (3:2)", 1584, 1056),
-        ("1664×928 [1.79:1]", 1664, 928),
+        ("672×1568 [1:2.33] (3:7)", 672, 1568),
+        ("688×1504 [1:2.19]", 688, 1504),
+        ("720×1456 [1:2.00] (1:2)", 720, 1456),
+        ("752×1392 [1:1.85]", 752, 1392),
+        ("800×1328 [1:1.66]", 800, 1328),
+        ("832×1248 [1:1.50] (2:3)", 832, 1248),
+        ("880×1184 [1:1.35]", 880, 1184),
+        ("944×1104 [1:1.17]", 944, 1104),
+        ("1024×1024 [1:1.00] (1:1)", 1024, 1024),
+        ("1104×944 [1.17:1]", 1104, 944),
+        ("1184×880 [1.35:1]", 1184, 880),
+        ("1248×832 [1.50:1] (3:2)", 1248, 832),
+        ("1328×800 [1.66:1]", 1328, 800),
+        ("1392×752 [1.85:1]", 1392, 752),
+        ("1456×720 [2.00:1] (2:1)", 1456, 720),
+        ("1504×688 [2.19:1]", 1504, 688),
+        ("1568×672 [2.33:1] (7:3)", 1568, 672),
     ]
     PRESET_OPTIONS = ["auto"] + [name for name, _, _ in PRESET_RESOLUTIONS]
 
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
-            node_id="1hew_ImageResizeQwenImage",
-            display_name="Image Resize QwenImage",
-            category="1hewNodes/image",
+            node_id="1hew_ImageResizeFluxKontext",
+            display_name="Image Resize FluxKontext",
+            category="1hewNodes/image/resize",
             inputs=[
                 io.Combo.Input("preset_size", options=cls.PRESET_OPTIONS, default="auto"),
                 io.Combo.Input("fit", options=["crop", "pad", "stretch"], default="crop"),
@@ -95,13 +105,13 @@ class ImageResizeQwenImage(io.ComfyNode):
                     key=lambda x: x[0],
                 )
             else:
-                width, height = 1328, 1328
+                width, height = 1024, 1024
         else:
             found = [p for p in cls.PRESET_RESOLUTIONS if p[0] == preset_size]
             if found:
                 _, width, height = found[0]
             else:
-                width, height = 1328, 1328
+                width, height = 1024, 1024
 
         device = None
         if isinstance(image, torch.Tensor):

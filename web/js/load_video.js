@@ -191,6 +191,9 @@ app.registerExtension({
                 frameLimitWidget.callback = function () {
                     const args = Array.from(arguments);
                     let v = Number(args[0]);
+                    const lastCommitted = Number(
+                        this._comfy1hew_last_frame_limit_value
+                    );
                     
                     if (Number.isFinite(v)) {
                         let fmtConfig = this._comfy1hew_format_config;
@@ -216,11 +219,26 @@ app.registerExtension({
                         if (v > 0 && step) {
                             const currentMod = (v - mod) % step;
                             const isAligned = Math.abs(currentMod) < 0.001 || Math.abs(currentMod - step) < 0.001;
-                            
+
+                            // Direction-aware snapping:
+                            // when value increases (default right arrow), snap upward;
+                            // when value decreases (default left arrow), snap downward.
+                            // This keeps xn+1 stepping correct even if widget.mouse is overridden.
                             if (!isAligned) {
-                                v = Math.round((v - mod) / step) * step + mod;
+                                const q = (v - mod) / step;
+                                if (Number.isFinite(lastCommitted)) {
+                                    if (v > lastCommitted) {
+                                        v = Math.ceil(q - 1e-9) * step + mod;
+                                    } else if (v < lastCommitted) {
+                                        v = Math.floor(q + 1e-9) * step + mod;
+                                    } else {
+                                        v = Math.round(q) * step + mod;
+                                    }
+                                } else {
+                                    v = Math.round(q) * step + mod;
+                                }
                             }
-                            
+
                             if (v <= 0) {
                                 v = 0;
                             }
@@ -233,24 +251,8 @@ app.registerExtension({
                         if (this.options?.max != null && v > this.options.max) {
                             v = this.options.max;
                         }
-                        if (v > 0 && step) {
-                            if (v < mod) {
-                                v = 0;
-                            } else {
-                                v = Math.floor((v - mod) / step) * step + mod;
-                                if (v <= 0) {
-                                    v = 0;
-                                }
-                            }
-                            if (this.options?.min != null && v < this.options.min) {
-                                v = this.options.min;
-                            }
-                            // 对齐后可能再次超出上限，必须再钳位一次
-                            if (this.options?.max != null && v > this.options.max) {
-                                v = this.options.max;
-                            }
-                        }
                         this.value = v;
+                        this._comfy1hew_last_frame_limit_value = v;
                         args[0] = v;
                     }
                     if (originalFrameLimitCallback) {

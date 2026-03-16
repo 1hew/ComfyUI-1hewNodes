@@ -2,6 +2,7 @@ from comfy_api.latest import io
 import numpy as np
 from PIL import Image
 import torch
+import torch.nn.functional as F
 
 
 class ImageBlendModeByAlpha(io.ComfyNode):
@@ -29,6 +30,11 @@ class ImageBlendModeByAlpha(io.ComfyNode):
                     ],
                     default="normal",
                 ),
+                io.Combo.Input(
+                    "overlay_fit",
+                    options=["stretch", "center"],
+                    default="stretch",
+                ),
                 io.Float.Input("opacity", default=1.0, min=0.0, max=1.0, step=0.01),
                 io.Boolean.Input("invert_mask", default=False),
             ],
@@ -42,21 +48,36 @@ class ImageBlendModeByAlpha(io.ComfyNode):
         base_image: torch.Tensor,
         blend_mode: str,
         opacity: float,
+        overlay_fit: str,
         invert_mask: bool,
         overlay_mask: torch.Tensor | None = None,
     ) -> io.NodeOutput:
         # 归一化输入
         base_image = torch.clamp(base_image, 0.0, 1.0).to(torch.float32)
         overlay_image = torch.clamp(overlay_image, 0.0, 1.0).to(torch.float32)
+
+        # 若叠加图为 RGBA，单独保留其 alpha 参与叠加权重
+        overlay_alpha = cls._extract_alpha_channel(overlay_image)
+
         # 检查并转换 RGBA 图像为 RGB
         base_image = cls._convert_rgba_to_rgb(base_image)
-        overlay_image = cls._convert_rgba_to_rgb(overlay_image)
+        overlay_image = cls._drop_alpha_channel(overlay_image)
         batch_size = max(base_image.shape[0], overlay_image.shape[0])
         base_image = cls._repeat_to_batch_size(base_image, batch_size)
         overlay_image = cls._repeat_to_batch_size(overlay_image, batch_size)
+        if overlay_alpha is not None:
+            overlay_alpha = cls._repeat_to_batch_size(overlay_alpha, batch_size)
         
         # 处理叠加图层
-        blended = cls._apply_blend(base_image, overlay_image, blend_mode, opacity)
+        blended = cls._apply_blend(base_image, overlay_image, blend_mode, opacity, overlay_fit)
+
+        # 叠加图含 alpha 时，将 alpha 作为额外混合权重
+        if overlay_alpha is not None:
+            base_height, base_width = base_image.shape[1:3]
+            overlay_alpha = cls._fit_alpha_to_base(
+                overlay_alpha, base_height, base_width, overlay_fit
+            ).to(base_image.device)
+            blended = base_image * (1.0 - overlay_alpha) + blended * overlay_alpha
         
         # 如果提供了遮罩，则应用遮罩
         if overlay_mask is not None:
@@ -144,33 +165,50 @@ class ImageBlendModeByAlpha(io.ComfyNode):
         else:
             # 如果已经是RGB格式，直接返回
             return image
+
+    @staticmethod
+    def _extract_alpha_channel(image: torch.Tensor) -> torch.Tensor | None:
+        """提取 alpha 通道，非 RGBA 输入则返回 None"""
+        if image.shape[3] == 4:
+            return image[:, :, :, 3:4]
+        return None
+
+    @staticmethod
+    def _drop_alpha_channel(image: torch.Tensor) -> torch.Tensor:
+        """仅移除 alpha 通道，不做白底混合"""
+        if image.shape[3] == 4:
+            return image[:, :, :, :3]
+        return image
+
+    @classmethod
+    def _fit_alpha_to_base(
+        cls,
+        alpha: torch.Tensor,
+        base_height: int,
+        base_width: int,
+        overlay_fit: str,
+    ) -> torch.Tensor:
+        """将 alpha 尺寸对齐到 base 尺寸，规则与 overlay_fit 一致"""
+        alpha_height, alpha_width = alpha.shape[1:3]
+        if alpha_height == base_height and alpha_width == base_width:
+            return alpha
+        if overlay_fit == "center":
+            centered_alpha, _ = cls._center_fit_overlay(alpha, base_height, base_width)
+            return centered_alpha
+        return cls._stretch_overlay_to_base(alpha, base_height, base_width)
     
     @classmethod
-    def _apply_blend(cls, base, overlay, blend_mode, opacity):
+    def _apply_blend(cls, base, overlay, blend_mode, opacity, overlay_fit_mode):
         # 确保两个图像具有相同的尺寸
         base_height, base_width = base.shape[1:3]
         overlay_height, overlay_width = overlay.shape[1:3]
+        blend_region_mask = None
         
         if base_height != overlay_height or base_width != overlay_width:
-            # 调整叠加图层的大小以匹配基础图层
-            resized_overlay = []
-            
-            for i in range(overlay.shape[0]):
-                # 将张量转换为PIL图像
-                if overlay.shape[3] == 3:  # RGB
-                    img = Image.fromarray((overlay[i].detach().cpu().numpy() * 255).astype(np.uint8))
-                else:  # RGBA
-                    img = Image.fromarray((overlay[i].detach().cpu().numpy() * 255).astype(np.uint8), 'RGBA')
-                
-                # 调整大小
-                img = img.resize((base_width, base_height), Image.Resampling.LANCZOS)
-                
-                # 转换回张量并确保在正确的设备上
-                img_np = np.array(img).astype(np.float32) / 255.0
-                img_tensor = torch.from_numpy(img_np).to(base.device)  # 添加 .to(base.device)
-                resized_overlay.append(img_tensor)
-            
-            overlay = torch.stack(resized_overlay)
+            if overlay_fit_mode == "center":
+                overlay, blend_region_mask = cls._center_fit_overlay(overlay, base_height, base_width)
+            else:
+                overlay = cls._stretch_overlay_to_base(overlay, base_height, base_width)
         
         # 确保 overlay 在与 base 相同的设备上
         overlay = overlay.to(base.device)
@@ -232,8 +270,63 @@ class ImageBlendModeByAlpha(io.ComfyNode):
             result = cls._color_blend(base, overlay, opacity)
         elif blend_mode == "luminosity":
             result = cls._luminosity_blend(base, overlay, opacity)
+
+        # center 模式下，仅在叠加图层覆盖区域应用混合，避免未覆盖区域被影响
+        if blend_region_mask is not None:
+            blend_region_mask = blend_region_mask.to(base.device)
+            result = base * (1.0 - blend_region_mask) + result * blend_region_mask
         
         return result
+
+    @staticmethod
+    def _stretch_overlay_to_base(overlay: torch.Tensor, base_height: int, base_width: int) -> torch.Tensor:
+        """将叠加图层拉伸到基础图层尺寸"""
+        overlay_nchw = overlay.permute(0, 3, 1, 2)
+        resized = F.interpolate(
+            overlay_nchw,
+            size=(base_height, base_width),
+            mode="bilinear",
+            align_corners=False,
+        )
+        return resized.permute(0, 2, 3, 1)
+
+    @staticmethod
+    def _center_fit_overlay(
+        overlay: torch.Tensor, base_height: int, base_width: int
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        居中放置叠加图层：
+        - 比基础图层大时从中心裁切
+        - 比基础图层小时居中填充
+        """
+        batch, overlay_height, overlay_width, channels = overlay.shape
+        centered_overlay = torch.zeros(
+            (batch, base_height, base_width, channels),
+            device=overlay.device,
+            dtype=overlay.dtype,
+        )
+        blend_region_mask = torch.zeros(
+            (batch, base_height, base_width, 1),
+            device=overlay.device,
+            dtype=overlay.dtype,
+        )
+
+        copy_height = min(base_height, overlay_height)
+        copy_width = min(base_width, overlay_width)
+
+        src_y = max((overlay_height - base_height) // 2, 0)
+        src_x = max((overlay_width - base_width) // 2, 0)
+        dst_y = max((base_height - overlay_height) // 2, 0)
+        dst_x = max((base_width - overlay_width) // 2, 0)
+
+        centered_overlay[
+            :, dst_y : dst_y + copy_height, dst_x : dst_x + copy_width, :
+        ] = overlay[:, src_y : src_y + copy_height, src_x : src_x + copy_width, :]
+        blend_region_mask[
+            :, dst_y : dst_y + copy_height, dst_x : dst_x + copy_width, :
+        ] = 1.0
+
+        return centered_overlay, blend_region_mask
     
     # 以下是各种混合模式的实现
     

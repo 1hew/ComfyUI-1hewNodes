@@ -123,6 +123,11 @@ const CONFIGS = {
         delimiter: null,
         slots: [{ out: 1, value: 0, suffix: "count" }],
     },
+    "1hew_MaskSeparate": {
+        base: ["mask", "count"],
+        delimiter: null,
+        slots: [{ out: 1, value: 0, suffix: "count" }],
+    },
 };
 
 app.registerExtension({
