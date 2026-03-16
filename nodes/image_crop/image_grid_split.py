@@ -19,7 +19,7 @@ class ImageGridSplit(io.ComfyNode):
                 io.Int.Input("rows", default=2, min=1, max=10, step=1),
                 io.Int.Input("columns", default=2, min=1, max=10, step=1),
                 io.Int.Input("index", default=0, min=-100, max=100, step=1),
-                io.Boolean.Input("all", default=False),
+                io.Boolean.Input("all", default=True),
             ],
             outputs=[io.Image.Output(display_name="image")],
         )
