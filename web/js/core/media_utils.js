@@ -286,6 +286,20 @@ export function installImagePreviewLayout({
     imageEl,
     allWidget,
 }) {
+    const getMaxPreviewHeight = () => {
+        const maxPreviewHeight =
+            typeof imageWidget._comfy1hew_maxPreviewHeight === "number"
+                ? imageWidget._comfy1hew_maxPreviewHeight
+                : null;
+        if (
+            node._comfy1hewImagePreviewUserResized
+            && !(allWidget && allWidget.value)
+        ) {
+            return null;
+        }
+        return maxPreviewHeight;
+    };
+
     const estimateTopOffset = () => {
         try {
             if (node.widgets && node.widgets.length > 0) {
@@ -300,7 +314,7 @@ export function installImagePreviewLayout({
         return 130;
     };
 
-    const autoSizeToContent = () => {
+    const autoSizeToContent = ({ allowShrink = false } = {}) => {
         if (!imageWidget.aspectRatio) {
             return;
         }
@@ -316,10 +330,7 @@ export function installImagePreviewLayout({
 
         const width = node.size[0];
         let desiredWidgetHeight = width * aspectRatio + 20;
-        const maxPreviewHeight =
-            typeof imageWidget._comfy1hew_maxPreviewHeight === "number"
-                ? imageWidget._comfy1hew_maxPreviewHeight
-                : null;
+        const maxPreviewHeight = getMaxPreviewHeight();
         if (maxPreviewHeight && isFinite(maxPreviewHeight)) {
             desiredWidgetHeight = Math.min(desiredWidgetHeight, maxPreviewHeight);
         }
@@ -350,8 +361,16 @@ export function installImagePreviewLayout({
             desiredHeight = Math.min(desiredHeight, 420);
         }
 
-        if (node.size[1] + 1 < desiredHeight) {
-            node.setSize([node.size[0], desiredHeight]);
+        if (
+            (allowShrink && Math.abs(node.size[1] - desiredHeight) > 1)
+            || (!allowShrink && node.size[1] + 1 < desiredHeight)
+        ) {
+            node._comfy1hewInternalPreviewResize = true;
+            try {
+                node.setSize([node.size[0], desiredHeight]);
+            } finally {
+                node._comfy1hewInternalPreviewResize = false;
+            }
         }
     };
 
@@ -364,9 +383,10 @@ export function installImagePreviewLayout({
             return;
         }
         node._comfy1hewImageAutoSizeKey = key;
-        setTimeout(autoSizeToContent, 0);
+        setTimeout(() => autoSizeToContent(), 0);
     };
 
+    node._comfy1hewLastPreviewNodeWidth ??= node.size?.[0];
     const updateLayout = () => {
         if (container.dataset.comfy1hewForceHidden === "1") {
             container.style.height = "0px";
@@ -398,10 +418,7 @@ export function installImagePreviewLayout({
             availableHeight = width * aspectRatio + 20;
         }
 
-        const maxPreviewHeight =
-            typeof imageWidget._comfy1hew_maxPreviewHeight === "number"
-                ? imageWidget._comfy1hew_maxPreviewHeight
-                : null;
+        const maxPreviewHeight = getMaxPreviewHeight();
         if (maxPreviewHeight && isFinite(maxPreviewHeight)) {
             availableHeight = Math.min(availableHeight, maxPreviewHeight);
         }
@@ -418,6 +435,18 @@ export function installImagePreviewLayout({
             ? originalOnResize.apply(this, arguments)
             : undefined;
         try {
+            const nextWidth = Array.isArray(size) ? size[0] : node.size?.[0];
+            const prevWidth = node._comfy1hewLastPreviewNodeWidth;
+            node._comfy1hewLastPreviewNodeWidth = nextWidth;
+
+            if (
+                !node._comfy1hewInternalPreviewResize
+                && Number.isFinite(nextWidth)
+                && Number.isFinite(prevWidth)
+                && Math.abs(nextWidth - prevWidth) > 1
+            ) {
+                node._comfy1hewImagePreviewUserResized = true;
+            }
             updateLayout();
         } catch {}
         return r2;
@@ -433,13 +462,42 @@ export function installVideoPreviewLayout({
     container,
     videoEl,
 }) {
-    const autoSizeToContent = () => {
+    const getMaxPreviewHeight = () => {
+        const maxPreviewHeight =
+            typeof videoWidget._comfy1hew_maxPreviewHeight === "number"
+                ? videoWidget._comfy1hew_maxPreviewHeight
+                : null;
+        if (node._comfy1hewVideoPreviewUserResized) {
+            return null;
+        }
+        return maxPreviewHeight;
+    };
+
+    const estimateTopOffset = () => {
+        try {
+            if (node.widgets && node.widgets.length > 0) {
+                const widgetCount = node.widgets.filter(
+                    (w) => w !== videoWidget && w.type !== "hidden",
+                ).length;
+                let estimatedTop = 30 + widgetCount * 26 + 30;
+                if (estimatedTop < 130) estimatedTop = 130;
+                return estimatedTop;
+            }
+        } catch {}
+        return 130;
+    };
+
+    const autoSizeToContent = ({ allowShrink = false } = {}) => {
         if (!videoWidget.aspectRatio) {
             return;
         }
 
         const width = node.size[0];
-        const desiredWidgetHeight = width * videoWidget.aspectRatio + 20;
+        let desiredWidgetHeight = width * videoWidget.aspectRatio + 20;
+        const maxPreviewHeight = getMaxPreviewHeight();
+        if (maxPreviewHeight && isFinite(maxPreviewHeight)) {
+            desiredWidgetHeight = Math.min(desiredWidgetHeight, maxPreviewHeight);
+        }
 
         let desiredHeight;
         if (Number.isFinite(videoWidget.last_y)) {
@@ -459,20 +517,20 @@ export function installVideoPreviewLayout({
                 }
             } catch {}
             if (!Number.isFinite(desiredHeight)) {
-                let estimatedTop = 130;
-                if (node.widgets && node.widgets.length > 0) {
-                    const widgetCount = node.widgets.filter(
-                        (w) => w !== videoWidget && w.type !== "hidden",
-                    ).length;
-                    estimatedTop = 30 + widgetCount * 26 + 30;
-                }
-                if (estimatedTop < 130) estimatedTop = 130;
-                desiredHeight = estimatedTop + desiredWidgetHeight;
+                desiredHeight = estimateTopOffset() + desiredWidgetHeight;
             }
         }
 
-        if (node.size[1] + 1 < desiredHeight) {
-            node.setSize([node.size[0], desiredHeight]);
+        if (
+            (allowShrink && Math.abs(node.size[1] - desiredHeight) > 1)
+            || (!allowShrink && node.size[1] + 1 < desiredHeight)
+        ) {
+            node._comfy1hewInternalVideoPreviewResize = true;
+            try {
+                node.setSize([node.size[0], desiredHeight]);
+            } finally {
+                node._comfy1hewInternalVideoPreviewResize = false;
+            }
         }
     };
 
@@ -485,8 +543,10 @@ export function installVideoPreviewLayout({
             return;
         }
         node._comfy1hewVideoAutoSizeKey = key;
-        setTimeout(autoSizeToContent, 0);
+        setTimeout(() => autoSizeToContent(), 0);
     };
+
+    node._comfy1hewLastPreviewVideoNodeWidth ??= node.size?.[0];
 
     const updateLayout = () => {
         if (container.dataset.comfy1hewForceHidden === "1") {
@@ -509,10 +569,39 @@ export function installVideoPreviewLayout({
             availableHeight = width * videoWidget.aspectRatio + 20;
         }
 
+        const maxPreviewHeight = getMaxPreviewHeight();
+        if (maxPreviewHeight && isFinite(maxPreviewHeight)) {
+            availableHeight = Math.min(availableHeight, maxPreviewHeight);
+        }
+
         if (availableHeight < 0) availableHeight = 0;
         container.style.height = `${availableHeight}px`;
 
         app.graph.setDirtyCanvas(true, true);
+    };
+
+    const originalOnResize = node.onResize;
+    node.onResize = function (size) {
+        const r2 = originalOnResize
+            ? originalOnResize.apply(this, arguments)
+            : undefined;
+        try {
+            const nextWidth = Array.isArray(size) ? size[0] : node.size?.[0];
+            const prevWidth = node._comfy1hewLastPreviewVideoNodeWidth;
+            node._comfy1hewLastPreviewVideoNodeWidth = nextWidth;
+
+            if (
+                !node._comfy1hewInternalVideoPreviewResize
+                && Number.isFinite(nextWidth)
+                && Number.isFinite(prevWidth)
+                && Math.abs(nextWidth - prevWidth) > 1
+            ) {
+                node._comfy1hewVideoPreviewUserResized = true;
+            }
+
+            updateLayout();
+        } catch {}
+        return r2;
     };
 
     const ensurePreviewLayout = () => {
@@ -527,7 +616,6 @@ export function installVideoPreviewLayout({
 
         requestAutoSize();
         updateLayout();
-        autoSizeToContent();
     };
 
     node.updateVideoLayout = updateLayout;

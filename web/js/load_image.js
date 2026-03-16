@@ -128,6 +128,7 @@ app.registerExtension({
             this._comfy1hewLoadImageRedrawQueued = false;
             this._comfy1hewLoadImageHadPreview = false;
             this._comfy1hewLoadImageLastImgSrc = undefined;
+            this._comfy1hewImagePreviewUserResized = false;
 
             const isValidImageFile = (file) => {
                 if (!file) return false;
@@ -248,6 +249,12 @@ app.registerExtension({
             container.appendChild(imageEl);
             container.appendChild(infoEl);
 
+            let domDragDepth = 0;
+            const setDragPassthrough = (active) => {
+                imageEl.style.pointerEvents = active ? "none" : "";
+                infoEl.style.pointerEvents = active ? "none" : "";
+            };
+
             const fileInputEl = document.createElement("input");
             fileInputEl.type = "file";
             fileInputEl.accept = "image/*";
@@ -348,14 +355,37 @@ app.registerExtension({
                 } catch {}
             };
 
+            const handleDomDragEnter = (e) => {
+                if (!e) {
+                    return;
+                }
+                e.preventDefault();
+                domDragDepth += 1;
+                setDragPassthrough(true);
+                if (e.dataTransfer) {
+                    e.dataTransfer.dropEffect = "copy";
+                }
+            };
+
             const handleDomDragOver = (e) => {
                 if (!e) {
                     return;
                 }
                 e.preventDefault();
-                e.stopPropagation();
+                setDragPassthrough(true);
                 if (e.dataTransfer) {
                     e.dataTransfer.dropEffect = "copy";
+                }
+            };
+
+            const handleDomDragLeave = (e) => {
+                if (!e) {
+                    return;
+                }
+                e.preventDefault();
+                domDragDepth = Math.max(0, domDragDepth - 1);
+                if (domDragDepth === 0) {
+                    setDragPassthrough(false);
                 }
             };
 
@@ -365,6 +395,8 @@ app.registerExtension({
                 }
                 e.preventDefault();
                 e.stopPropagation();
+                domDragDepth = 0;
+                setDragPassthrough(false);
                 (async () => {
                     try {
                         const payload = await collectDropPayload(e);
@@ -375,9 +407,13 @@ app.registerExtension({
                 })();
             };
 
-            container.addEventListener("dragenter", handleDomDragOver);
-            container.addEventListener("dragover", handleDomDragOver);
-            container.addEventListener("drop", handleDomDrop);
+            const dragTargets = [container, imageEl, infoEl];
+            for (const target of dragTargets) {
+                target.addEventListener("dragenter", handleDomDragEnter);
+                target.addEventListener("dragover", handleDomDragOver);
+                target.addEventListener("dragleave", handleDomDragLeave);
+                target.addEventListener("drop", handleDomDrop);
+            }
 
             this.updatePreview = async () => {
                 this._comfy1hewLoadImageReqId = (this._comfy1hewLoadImageReqId || 0) + 1;
@@ -391,6 +427,8 @@ app.registerExtension({
                 const all = allWidget ? allWidget.value : false;
                 if (this.imageWidget) {
                     this.imageWidget._comfy1hew_maxAspectRatio = all ? 1.25 : null;
+                    // Match native Load Image more closely: keep a compact default
+                    // preview, but allow the user to enlarge it by resizing the node.
                     this.imageWidget._comfy1hew_maxPreviewHeight = all ? 260 : 220;
                 }
                 const trimmedFile = String(file || "").trim();
@@ -500,10 +538,7 @@ app.registerExtension({
 
                 if (currentNorm !== desiredNorm) {
                     this._comfy1hewImageAutoSizeKey = "";
-                    this.imageWidget.aspectRatio = undefined;
-                    infoEl.innerText = "";
                     container.style.display = "flex";
-                    resetNodeHeightToBase();
 
                     imageEl.onload = () => {
                         if (String(imageEl.dataset.comfy1hewReqId || "") !== String(reqId)) {
@@ -639,9 +674,13 @@ app.registerExtension({
                     document.removeEventListener("paste", onPaste, { capture: true });
                 } catch {}
                 try {
-                    container.removeEventListener("dragenter", handleDomDragOver);
-                    container.removeEventListener("dragover", handleDomDragOver);
-                    container.removeEventListener("drop", handleDomDrop);
+                    setDragPassthrough(false);
+                    for (const target of dragTargets) {
+                        target.removeEventListener("dragenter", handleDomDragEnter);
+                        target.removeEventListener("dragover", handleDomDragOver);
+                        target.removeEventListener("dragleave", handleDomDragLeave);
+                        target.removeEventListener("drop", handleDomDrop);
+                    }
                 } catch {}
                 try {
                     if (this._comfy1hewLoadImagePoller) {

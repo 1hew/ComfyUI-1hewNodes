@@ -59,6 +59,7 @@ app.registerExtension({
             const formatWidget = this.widgets.find((w) => w.name === "format");
 
             this._comfy1hewVideoInfo = null;
+            this._comfy1hewVideoPreviewUserResized = false;
 
             // --- Logic ported from VHS initializeLoadFormat ---
             // Allows format selection (e.g. AnimateDiff) to control other widget defaults/constraints
@@ -470,6 +471,12 @@ app.registerExtension({
             container.appendChild(infoEl);
             container.style.cursor = "pointer";
 
+            let domDragDepth = 0;
+            const setDragPassthrough = (active) => {
+                videoEl.style.pointerEvents = active ? "none" : "";
+                infoEl.style.pointerEvents = active ? "none" : "";
+            };
+
             applyLoopedHoverAudioPreview(videoEl);
 
             const fileInputEl = document.createElement("input");
@@ -620,17 +627,36 @@ app.registerExtension({
                 await uploadSingleFile(file);
             });
 
-            container.addEventListener("dragover", (e) => {
+            const handleDomDragEnter = (e) => {
                 e.preventDefault();
-            });
+                domDragDepth += 1;
+                setDragPassthrough(true);
+                if (e.dataTransfer) {
+                    e.dataTransfer.dropEffect = "copy";
+                }
+            };
 
-            container.addEventListener("dragleave", (e) => {
+            const handleDomDragOver = (e) => {
                 e.preventDefault();
-            });
+                setDragPassthrough(true);
+                if (e.dataTransfer) {
+                    e.dataTransfer.dropEffect = "copy";
+                }
+            };
 
-            container.addEventListener("drop", async (e) => {
+            const handleDomDragLeave = (e) => {
+                e.preventDefault();
+                domDragDepth = Math.max(0, domDragDepth - 1);
+                if (domDragDepth === 0) {
+                    setDragPassthrough(false);
+                }
+            };
+
+            const handleDomDrop = async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                domDragDepth = 0;
+                setDragPassthrough(false);
 
                 const payload = await collectDropPayload(e);
                 const files = (payload?.pairs || []).filter((p) => p?.file);
@@ -640,7 +666,15 @@ app.registerExtension({
                 }
 
                 await uploadSingleFile(files?.[0]?.file);
-            });
+            };
+
+            const dragTargets = [container, videoEl, infoEl];
+            for (const target of dragTargets) {
+                target.addEventListener("dragenter", handleDomDragEnter);
+                target.addEventListener("dragover", handleDomDragOver);
+                target.addEventListener("dragleave", handleDomDragLeave);
+                target.addEventListener("drop", handleDomDrop);
+            }
 
             this.videoWidget = this.addDOMWidget(
                 "video_preview",
@@ -654,7 +688,15 @@ app.registerExtension({
 
             this.videoWidget.computeSize = function (width) {
                 if (this.aspectRatio) {
-                    return [width, width * this.aspectRatio + 20];
+                    const maxPreviewHeight =
+                        typeof this._comfy1hew_maxPreviewHeight === "number"
+                            ? this._comfy1hew_maxPreviewHeight
+                            : null;
+                    let height = width * this.aspectRatio + 20;
+                    if (maxPreviewHeight && isFinite(maxPreviewHeight)) {
+                        height = Math.min(height, maxPreviewHeight);
+                    }
+                    return [width, height];
                 }
                 return [width, 0];
             };
@@ -701,6 +743,10 @@ app.registerExtension({
                 const index = indexWidget.value;
                 const includeSubdir = includeSubdirWidget.value;
 
+                if (this.videoWidget) {
+                    this.videoWidget._comfy1hew_maxPreviewHeight = 220;
+                }
+
                 const trimmedFile = String(file || "").trim();
                 if (trimmedFile === "") {
                     this._comfy1hewVideoInfo = null;
@@ -732,10 +778,7 @@ app.registerExtension({
                 const url = `/1hew/view_video_from_folder?${params.toString()}`;
                 if (videoEl.src.indexOf(url.split("&t=")[0]) === -1) {
                     this._comfy1hewVideoAutoSizeKey = "";
-                    this.videoWidget.aspectRatio = undefined;
-                    infoEl.innerText = "";
                     videoEl.src = url;
-                    updateLayout();
                     setTimeout(ensurePreviewLayout, 0);
                     setTimeout(ensurePreviewLayout, 200);
                 }
@@ -809,6 +852,22 @@ app.registerExtension({
             }
 
             setTimeout(updateLayout, 0);
+
+            const originalOnRemoved = this.onRemoved;
+            this.onRemoved = function () {
+                try {
+                    setDragPassthrough(false);
+                    for (const target of dragTargets) {
+                        target.removeEventListener("dragenter", handleDomDragEnter);
+                        target.removeEventListener("dragover", handleDomDragOver);
+                        target.removeEventListener("dragleave", handleDomDragLeave);
+                        target.removeEventListener("drop", handleDomDrop);
+                    }
+                } catch {}
+                if (originalOnRemoved) {
+                    return originalOnRemoved.apply(this, arguments);
+                }
+            };
 
             return r;
         };
