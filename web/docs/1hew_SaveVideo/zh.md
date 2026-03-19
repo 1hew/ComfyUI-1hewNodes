@@ -7,7 +7,8 @@
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
 | `video` | 可选 | VIDEO | - | - | 要保存的视频；输入为空时节点输出空结果。 |
-| `filename_prefix` | - | STRING | `video/ComfyUI` | - | 保存文件前缀，交由 ComfyUI 路径生成处理；通常支持日期占位符（如 `%date:yyyy-MM-dd%`）。 |
+| `filename` | - | STRING | `video/ComfyUI` | - | 保存文件前缀，交由 ComfyUI 路径生成处理；通常支持日期占位符（如 `%date:yyyy-MM-dd%`）。 |
+| `auto_increment` | - | BOOLEAN | `true` | - | 为 `true` 时自动编号生成新文件；为 `false` 时使用固定文件名并覆盖。 |
 | `save_output` | - | BOOLEAN | `true` | - | 开启时保存到输出目录；未开启时保存到临时目录。 |
 | `save_metadata` | - | BOOLEAN | `true` | - | 开启时将 prompt/workflow 元数据写入容器 `comment` 字段。 |
 

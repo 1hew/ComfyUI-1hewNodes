@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.5.0**
+- feat(io): Add `Load Txt` and `Save Txt` nodes
+
 **v3.4.0**
 - feat(nodes): Add `Image Resize Gemini30ProImage`, `Image Resize Gemini31FlashImage`, `Detect Remove BG`, `Detect Remove BG Refine`, and `text_match_rownum`; reorganize resize-related capabilities into the dedicated `image_resize` group, and sync related docs plus README node list updates.
 
@@ -40,7 +43,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - refactor(io): Refactor IO group
 
 **v3.1.0**
-- feat(io): Add `Save Video by Image` node for encoding IMAGE batches into video
+- feat(io): Add `Save Video by Image` node for turning IMAGE batches into video files
 - refactor(color): Enhance `Match Brightness Contrast` sequence consistency options
 
 **v3.0.8**
@@ -474,7 +477,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Any Empty Bool | Universal empty value checker (boolean output version) that checks if any type of input is empty and returns a boolean value |
 | Any Empty Int | Universal empty value checker (integer output version) that checks if any type of input is empty and returns custom integer values |
 | Any Switch Bool | Universal boolean switch node supporting any type input with lazy evaluation, selecting output based on boolean condition |
-| Any Switch Int | Multi-way integer switch node supporting multiple input options, selecting corresponding input/output based on integer index (1-5) |
+| Any Switch Select | Multi-way selector node supporting multiple input options, lazily routing the chosen `input_k` to `output` and returning the effective `select` value |
+| Multi Switch Select | Multi-output selector for `input_1..input_N`; uses 1-based `select` to route the chosen input to its matching `output_k` |
 | text_match_rownum | Match a single text against multi-line text and return first matched row number (1-based), or 0 when not found |
 | text_match_value | Match single-line text against multi-line key-value pairs and return corresponding value |
 
@@ -517,7 +521,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|-------------|
 | Multi String Join | Concatenate dynamic `string_X` inputs with `{input}` variable support and comment/triple-quote filtering; customizable separator |
-| Multi Index Select | Dynamic per-column index selector for `input_1..input_N`; applies one shared index to list/batch inputs and outputs matched `output_1..output_N` |
 | Multi Image Batch | Build image batch from dynamic `image_X` with crop/pad/stretch size unification and edge/color padding |
 | Multi Image Overlay | Overlay multiple image layers sequentially with alpha compositing and fit modes |
 | Multi Image Stitch | Dynamic multi-image stitcher with direction, size matching, spacing, and padding color control |
@@ -528,11 +531,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📁 IO Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Get File Count | Count image/video files in a folder with optional recursive scanning |
+| Get File Count | Count image/video/txt files in a folder with optional recursive scanning |
 | Load Image | Load images from a file or folder with batch mode, size unification, and derived masks |
+| Load Txt | Load `.txt` content from a file or folder with `encode` selection and indexed folder picking |
 | Load Video | Select a video from a file or folder and apply trimming/FPS settings during decoding |
 | Load Video to Image | Decode a video into an image batch, audio, fps, and frame count |
 | Save Image | Save image batches to output/temp and return absolute saved file paths |
+| Save Txt | Save any input as `.txt` with `encode` control, auto-increment naming, and preview-only mode |
 | Save Video by Image | Encode an image batch into a video with optional audio muxing and alpha support |
 | Save Video | Save a VIDEO object to disk with container extension preservation and alpha preview |
 

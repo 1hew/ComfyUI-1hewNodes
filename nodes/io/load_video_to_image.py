@@ -34,6 +34,12 @@ VALID_VIDEO_EXTENSIONS = {
 }
 
 
+def _get_filename_stem(path: str) -> str:
+    base_name = os.path.basename(str(path or "").strip())
+    stem, _ext = os.path.splitext(base_name)
+    return stem or "video"
+
+
 def _new_progress_bar(total: int):
     if ProgressBar is None:
         return None
@@ -730,6 +736,7 @@ class LoadVideoToImage(io.ComfyNode):
                 io.Audio.Output(display_name="audio"),
                 io.Float.Output(display_name="fps"),
                 io.Int.Output(display_name="frame_count"),
+                io.String.Output(display_name="filename"),
             ],
         )
 
@@ -750,10 +757,11 @@ class LoadVideoToImage(io.ComfyNode):
         count = len(video_paths)
 
         if count == 0:
-            return io.NodeOutput(None, None, 0.0, 0)
+            return io.NodeOutput(None, None, 0.0, 0, "")
 
         idx = video_index % count
         selected = video_paths[idx]
+        filename = _get_filename_stem(selected)
 
         video_helper = VideoFromFile(selected)
         components = video_helper.get_components()
@@ -785,6 +793,7 @@ class LoadVideoToImage(io.ComfyNode):
             audio,
             fps,
             frame_count,
+            filename,
         )
 
     @staticmethod

@@ -19,6 +19,78 @@ except Exception:
 _PATH_LOCK: Optional[asyncio.Lock] = None
 
 
+def _sanitize_filename_prefix(filename: str) -> str:
+    if not filename:
+        return "video/ComfyUI"
+
+    normalized = filename.replace("\\", "/").strip()
+    drive, tail = os.path.splitdrive(normalized)
+    if os.path.isabs(normalized) or drive:
+        if drive:
+            drive_token = drive.rstrip(":").replace("/", "_").replace("\\", "_")
+            tail = tail.lstrip("/\\")
+            normalized = f"{drive_token}/{tail}" if tail else drive_token
+        else:
+            normalized = normalized.lstrip("/\\")
+
+    parts: list[str] = []
+    for part in normalized.split("/"):
+        if not part or part in {".", ".."}:
+            continue
+        parts.append(part)
+
+    return "/".join(parts) if parts else "video/ComfyUI"
+
+
+def _is_absolute_like(path_value: str) -> bool:
+    raw = str(path_value or "").strip().replace("\\", "/")
+    if not raw:
+        return False
+    drive, _ = os.path.splitdrive(raw)
+    return bool(drive) or raw.startswith("/")
+
+
+def _sanitize_filename_stem(name: str) -> str:
+    stem = str(name or "").strip()
+    if not stem:
+        return "ComfyUI"
+    for ch in '<>:"/\\|?*':
+        stem = stem.replace(ch, "_")
+    stem = stem.rstrip(". ")
+    return stem if stem else "ComfyUI"
+
+
+def _split_prefix_to_dir_and_stem(prefix: str) -> tuple[str, str]:
+    raw = str(prefix or "").strip().replace("\\", "/")
+    if not raw:
+        return "", "ComfyUI"
+
+    is_trailing_sep = raw.endswith("/")
+    cleaned = raw.rstrip("/")
+    if not cleaned:
+        return "", "ComfyUI"
+
+    if is_trailing_sep:
+        return cleaned, "ComfyUI"
+    if "/" not in cleaned:
+        stem = os.path.splitext(cleaned)[0]
+        return "", _sanitize_filename_stem(stem)
+
+    dir_part, stem_part = cleaned.rsplit("/", 1)
+    stem = os.path.splitext(stem_part)[0]
+    return dir_part, _sanitize_filename_stem(stem)
+
+
+def _relative_subfolder(path: str, base_dir: str) -> str:
+    try:
+        rel = os.path.relpath(os.path.dirname(path), base_dir)
+    except ValueError:
+        return ""
+    if rel in {".", ""}:
+        return ""
+    return rel
+
+
 def _new_progress_bar(total: int):
     if ProgressBar is None:
         return None
@@ -66,7 +138,12 @@ class SaveVideoByImage(io.ComfyNode):
                 io.Image.Input("image"),
                 io.Audio.Input("audio", optional=True),
                 io.Float.Input("fps", default=8.0, min=0.01, max=120.0, step=0.01),
-                io.String.Input("filename_prefix", default="video/ComfyUI"),
+                io.String.Input("filename", default="video/ComfyUI"),
+                io.Boolean.Input(
+                    "auto_increment",
+                    default=True,
+                    tooltip="为 True 时自动编号；为 False 时固定文件名并覆盖。",
+                ),
                 io.Boolean.Input("save_output", default=True),
                 io.Boolean.Input("save_metadata", default=True),
             ],
@@ -82,7 +159,8 @@ class SaveVideoByImage(io.ComfyNode):
         cls,
         image: torch.Tensor,
         fps: float,
-        filename_prefix: str,
+        filename: str,
+        auto_increment: bool,
         save_output: bool,
         save_metadata: bool,
         audio: Optional[dict] = None,
@@ -107,40 +185,83 @@ class SaveVideoByImage(io.ComfyNode):
         if _PATH_LOCK is None:
             _PATH_LOCK = asyncio.Lock()
 
+        raw_prefix = str(filename or "").strip()
+        safe_filename_prefix = _sanitize_filename_prefix(filename)
         preview_file = ""
         preview_path = ""
         preview_subfolder = ""
+        counter = 0
 
         async with _PATH_LOCK:
-            (
-                full_output_folder,
-                filename,
-                counter,
-                subfolder,
-                filename_prefix,
-            ) = folder_paths.get_save_image_path(
-                filename_prefix, output_dir, width, height
-            )
-
-            if has_alpha and save_output:
-                output_file = f"{filename}_{counter:05}_.mov"
-                path = os.path.join(full_output_folder, output_file)
-
-                preview_dir = os.path.join(
-                    folder_paths.get_temp_directory(),
+            if auto_increment:
+                (
+                    full_output_folder,
+                    filename,
+                    counter,
                     subfolder,
+                    _resolved_prefix,
+                ) = folder_paths.get_save_image_path(
+                    safe_filename_prefix, output_dir, width, height
                 )
-                os.makedirs(preview_dir, exist_ok=True)
-                preview_file = f"{filename}_{counter:05}_.webm"
-                preview_path = os.path.join(preview_dir, preview_file)
-                preview_subfolder = subfolder
+
+                if has_alpha and save_output:
+                    output_file = f"{filename}_{counter:05}_.mov"
+                    path = os.path.join(full_output_folder, output_file)
+
+                    preview_dir = os.path.join(
+                        folder_paths.get_temp_directory(),
+                        subfolder,
+                    )
+                    os.makedirs(preview_dir, exist_ok=True)
+                    preview_file = f"{filename}_{counter:05}_.webm"
+                    preview_path = os.path.join(preview_dir, preview_file)
+                    preview_subfolder = subfolder
+                else:
+                    extension = "webm" if has_alpha else "mp4"
+                    output_file = f"{filename}_{counter:05}_.{extension}"
+                    path = os.path.join(full_output_folder, output_file)
+                    preview_file = output_file
+                    preview_path = path
+                    preview_subfolder = subfolder
             else:
-                extension = "webm" if has_alpha else "mp4"
-                file = f"{filename}_{counter:05}_.{extension}"
-                path = os.path.join(full_output_folder, file)
-                preview_file = file
-                preview_path = path
-                preview_subfolder = subfolder
+                if _is_absolute_like(raw_prefix):
+                    target_dir_raw, filename = _split_prefix_to_dir_and_stem(raw_prefix)
+                    full_output_folder = (
+                        os.path.abspath(target_dir_raw)
+                        if target_dir_raw
+                        else os.path.abspath(output_dir)
+                    )
+                else:
+                    rel_dir_raw, filename = _split_prefix_to_dir_and_stem(
+                        safe_filename_prefix
+                    )
+                    rel_dir = rel_dir_raw.replace("/", os.sep) if rel_dir_raw else ""
+                    full_output_folder = os.path.abspath(
+                        os.path.join(output_dir, rel_dir)
+                    )
+
+                os.makedirs(full_output_folder, exist_ok=True)
+                if has_alpha and save_output:
+                    output_file = f"{filename}.mov"
+                    path = os.path.join(full_output_folder, output_file)
+                    preview_subfolder = _relative_subfolder(path, output_dir)
+                    preview_dir = os.path.join(
+                        folder_paths.get_temp_directory(),
+                        preview_subfolder,
+                    )
+                    os.makedirs(preview_dir, exist_ok=True)
+                    preview_file = f"{filename}.webm"
+                    preview_path = os.path.join(preview_dir, preview_file)
+                    preview_subfolder = _relative_subfolder(
+                        preview_path, folder_paths.get_temp_directory()
+                    )
+                else:
+                    extension = "webm" if has_alpha else "mp4"
+                    output_file = f"{filename}.{extension}"
+                    path = os.path.join(full_output_folder, output_file)
+                    preview_file = output_file
+                    preview_path = path
+                    preview_subfolder = _relative_subfolder(path, output_dir)
 
             if not os.path.exists(path):
                 with open(path, "wb"):

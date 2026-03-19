@@ -1,13 +1,13 @@
 # Get File Count - Count files in a folder
 
-**Node Purpose:** `Get File Count` scans a folder and returns the number of image or video files found. It supports recursive scanning, stable sorting, and a change hash suitable for caching.
+**Node Purpose:** `Get File Count` scans a folder and returns the number of image, video, or txt files found. It supports recursive scanning, stable sorting, and a change hash suitable for caching.
 
 ## Inputs
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | `folder` | - | STRING | `""` | - | Target folder path. |
-| `type` | - | COMBO | `image` | `image` / `video` | File type group to count. |
+| `type` | - | COMBO | `image` | `image` / `video` / `txt` | File type group to count. |
 | `include_subdir` | - | BOOLEAN | `true` | - | Include subfolders in the scan. |
 
 ## Outputs
@@ -20,7 +20,7 @@
 
 ## Features
 
-- Extension filtering: counts common image or video extensions.
+- Extension filtering: counts common image, video, or txt extensions.
 - Deterministic order: paths are sorted case-insensitively for consistent results.
 - Change tracking: a path-list hash is used to support efficient downstream caching.
 

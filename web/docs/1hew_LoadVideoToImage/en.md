@@ -6,13 +6,13 @@
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `path` | - | STRING | `""` | - | Video file path or folder path. |
+| `file` | - | STRING | `""` | - | Video file path or folder path. |
 | `frame_limit` | - | INT | `0` | 0-100000 | Maximum output frame count; `0` keeps all frames after other settings. |
 | `fps` | - | FLOAT | `0.0` | 0-120 | Target FPS used for resampling; `0` keeps source FPS. |
 | `start_skip` | - | INT | `0` | 0-100000 | Number of frames to skip from the start. |
 | `end_skip` | - | INT | `0` | 0-100000 | Number of frames to skip from the end. |
 | `format` | - | COMBO | `4n+1` | `n` / `2n+1` / `4n+1` / `6n+1` / `8n+1` | Frame-count constraint pattern applied after resampling. |
-| `video_index` | - | INT | `0` | -8192-8192 | Selection index when `path` is a folder; supports negative indices via modulo selection. |
+| `video_index` | - | INT | `0` | -8192-8192 | Selection index when `file` is a folder; supports negative indices via modulo selection. |
 | `include_subdir` | - | BOOLEAN | `false` | - | Include subfolders when scanning a folder. |
 
 ## Outputs
@@ -23,6 +23,7 @@
 | `audio` | AUDIO | Decoded audio data when available. |
 | `fps` | FLOAT | Output FPS after resampling rules. |
 | `frame_count` | INT | Number of frames in `image`. |
+| `filename` | STRING | Filename stem of the selected video. |
 
 ## Features
 

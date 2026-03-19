@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.5.0**
+- feat(io): 添加 `Load Txt` 与 `Save Txt` 节点
+
 **v3.4.0**
 - feat(nodes): 新增 `Image Resize Gemini30ProImage`、`Image Resize Gemini31FlashImage`、`Detect Remove BG`、`Detect Remove BG Refine`、`text_match_rownum` 节点；同时将 resize 相关能力独立整理为 `image_resize` 分组，并同步补齐对应文档与 README 节点列表说明。
 
@@ -473,7 +476,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Any Empty Bool | 通用空值检查节点（布尔输出版本），检查任意类型输入是否为空，返回布尔值 |
 | Any Empty Int | 通用空值检查节点（整数输出版本），检查任意类型输入是否为空，返回自定义的整数值 |
 | Any Switch Bool | 通用布尔切换节点，支持任意类型输入和惰性求值，根据布尔值条件选择输出 |
-| Any Switch Int | 多路整数切换节点，支持多个输入选项的切换，根据整数索引（1-5）选择对应的输入输出 |
+| Any Switch Select | 多路选择节点，支持多个输入选项的惰性切换，将选中的 `input_k` 路由到 `output`，并返回实际生效的 `select` 值 |
+| Multi Switch Select | 多输出选择节点，使用 1-based 的 `select` 在 `input_1..input_N` 中选中一路，并输出到对应的 `output_k` |
 | text_match_rownum | 多行文本行号匹配，返回首个匹配项的行号（1-based），未命中返回 0 |
 | text_match_value | 在多行键值对中匹配单行文本并返回对应值 |
 
@@ -516,7 +520,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Multi String Join | 动态多输入字符串连接，支持 `{input}` 变量与注释/三引号过滤，可自定义分隔符 |
-| Multi Index Select | 动态多列索引选择器，支持 `input_1..input_N` 共用同一索引，对 list/batch 逐列取值并输出对应 `output_1..output_N` |
 | Multi Image Batch | 从动态 `image_X` 构建批次，支持 crop/pad/stretch 尺寸统一与边缘/颜色填充 |
 | Multi Image Overlay | 按顺序叠加多个图像图层，支持 alpha 合成和尺寸适应模式 |
 | Multi Image Stitch | 动态多图像拼接，支持方向、尺寸匹配、间距与填充颜色 |
@@ -527,11 +530,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📁 IO 节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Get File Count | 统计目录中图片或视频文件数量，支持递归扫描 |
+| Get File Count | 统计目录中图片/视频/文本文件数量，支持递归扫描 |
 | Load Image | 从文件/目录加载图片，支持批量加载、尺寸统一与遮罩输出 |
+| Load Txt | 从文件或目录读取 `.txt` 文本，支持 `encode` 选择与按索引取文件 |
 | Load Video | 从文件/目录选择视频并输出 VIDEO 对象，解码阶段应用裁切与 FPS 设置 |
 | Load Video to Image | 将视频解码为图像帧批次、音频、fps 与帧数信息 |
 | Save Image | 保存图像批次到输出/临时目录，并输出保存后的绝对路径 |
+| Save Txt | 将任意输入保存为 `.txt`，支持 `encode` 控制、自动编号与仅预览模式 |
 | Save Video by Image | 将图像批次编码为视频，支持可选音频混流与 Alpha 输出策略 |
 | Save Video | 保存 VIDEO 对象并返回路径，沿用容器扩展名并生成 Alpha 预览 |
 

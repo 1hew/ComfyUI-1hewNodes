@@ -27,7 +27,7 @@
 
 ## Typical Usage
 
-- Use as `filename_prefix` for save nodes: combine with image/video saving to organize outputs by workflow and date.
+- Use as `filename` for save nodes: combine with image/video saving to organize outputs by workflow and date.
 - Produce stable naming across sessions: set `strip_extension=True` and select a deterministic `date_format`.
 
 ## Notes & Tips

@@ -7,6 +7,12 @@ from comfy_api.latest import io
 
 from ...utils import make_ui_text
 
+FILE_TYPE_EXTENSIONS = {
+    "image": {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"},
+    "video": {".webm", ".mp4", ".mkv", ".gif", ".mov", ".avi"},
+    "txt": {".txt"},
+}
+
 
 class GetFileCount(io.ComfyNode):
     @classmethod
@@ -17,7 +23,7 @@ class GetFileCount(io.ComfyNode):
             category="1hewNodes/io",
             inputs=[
                 io.String.Input("folder", default=""),
-                io.Combo.Input("type", default="image", options=["image", "video"]),
+                io.Combo.Input("type", default="image", options=["image", "video", "txt"]),
                 io.Boolean.Input("include_subdir", default=True),
             ],
             outputs=[
@@ -56,12 +62,7 @@ class GetFileCount(io.ComfyNode):
         if not os.path.isdir(folder):
             return float("nan")
 
-        if type == "image":
-            extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp'}
-        elif type == "video":
-            extensions = {'.webm', '.mp4', '.mkv', '.gif', '.mov', '.avi'}
-        else:
-            extensions = set()
+        extensions = FILE_TYPE_EXTENSIONS.get(str(type or "").strip().lower(), set())
 
         paths = cls.get_paths(folder, include_subdir, extensions)
         m = hashlib.sha256()
@@ -77,14 +78,7 @@ class GetFileCount(io.ComfyNode):
 
     @classmethod
     def execute(cls, folder: str, type: str, include_subdir: bool) -> io.NodeOutput:
-        if type == "image":
-            # ComfyUI 常用图片格式
-            extensions = {'.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.webp'}
-        elif type == "video":
-            # ComfyUI 常用视频格式
-            extensions = {'.webm', '.mp4', '.mkv', '.mov', '.avi'}
-        else:
-            extensions = set()
+        extensions = FILE_TYPE_EXTENSIONS.get(str(type or "").strip().lower(), set())
 
         paths = cls.get_paths(folder, include_subdir, extensions)
         count = len(paths)

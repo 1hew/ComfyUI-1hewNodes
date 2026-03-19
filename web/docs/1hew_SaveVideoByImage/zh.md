@@ -9,7 +9,8 @@
 | `image` | - | IMAGE | - | - | 图像批次按时间顺序作为视频帧进行编码。 |
 | `audio` | 可选 | AUDIO | - | - | 音频输入；提供时混流进输出视频。 |
 | `fps` | - | FLOAT | `8.0` | 0.01-120.0 | 编码帧率。 |
-| `filename_prefix` | - | STRING | `video/ComfyUI` | - | 保存文件前缀，交由 ComfyUI 路径生成处理；通常支持日期占位符（如 `%date:yyyy-MM-dd%`）。 |
+| `filename` | - | STRING | `video/ComfyUI` | - | 保存文件前缀，交由 ComfyUI 路径生成处理；通常支持日期占位符（如 `%date:yyyy-MM-dd%`）。 |
+| `auto_increment` | - | BOOLEAN | `true` | - | 为 `true` 时自动编号生成新文件；为 `false` 时使用固定文件名并覆盖。 |
 | `save_output` | - | BOOLEAN | `true` | - | 开启时保存到输出目录；未开启时保存到临时目录。 |
 | `save_metadata` | - | BOOLEAN | `true` | - | 开启时将 prompt/workflow 元数据写入容器 `comment` 字段。 |
 

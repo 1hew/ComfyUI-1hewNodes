@@ -44,6 +44,12 @@ VALID_VIDEO_EXTENSIONS = {
 }
 
 
+def _get_filename_stem(path: str) -> str:
+    base_name = os.path.basename(str(path or "").strip())
+    stem, _ext = os.path.splitext(base_name)
+    return stem or "video"
+
+
 def _new_progress_bar(total: int):
     if ProgressBar is None:
         return None
@@ -1060,7 +1066,10 @@ class LoadVideo(io.ComfyNode):
                 io.Int.Input("video_index", default=0, min=-8192, max=8192, step=1),
                 io.Boolean.Input("include_subdir", default=False),
             ],
-            outputs=[io.Video.Output(display_name="video")],
+            outputs=[
+                io.Video.Output(display_name="video"),
+                io.String.Output(display_name="filename"),
+            ],
         )
 
     @classmethod
@@ -1080,10 +1089,11 @@ class LoadVideo(io.ComfyNode):
         count = len(video_paths)
 
         if count == 0:
-            return io.NodeOutput(None)
+            return io.NodeOutput(None, "")
 
         idx = video_index % count
         selected = video_paths[idx]
+        filename = _get_filename_stem(selected)
 
         start_skip = int(start_skip or 0)
         end_skip = int(end_skip or 0)
@@ -1111,8 +1121,8 @@ class LoadVideo(io.ComfyNode):
             and is_default_format
         ):
             if ComfyVideoFromFile is not None:
-                return io.NodeOutput(ComfyVideoFromFile(selected))
-            return io.NodeOutput(VideoFromFile(selected))
+                return io.NodeOutput(ComfyVideoFromFile(selected), filename)
+            return io.NodeOutput(VideoFromFile(selected), filename)
 
         video = VideoFromFileWithSettings(
             path=selected,
@@ -1125,7 +1135,7 @@ class LoadVideo(io.ComfyNode):
 
         components = video.get_components()
         if components is None or components.images is None:
-            return io.NodeOutput(None)
+            return io.NodeOutput(None, filename)
 
         settings_key = (
             f"video_index:{int(video_index)}|start_skip:{int(start_skip)}"
@@ -1150,8 +1160,8 @@ class LoadVideo(io.ComfyNode):
             await asyncio.to_thread(_encode_components_to_video_path, components, out_path)
 
         if ComfyVideoFromFile is not None:
-            return io.NodeOutput(ComfyVideoFromFile(out_path))
-        return io.NodeOutput(VideoFromFile(out_path))
+            return io.NodeOutput(ComfyVideoFromFile(out_path), filename)
+        return io.NodeOutput(VideoFromFile(out_path), filename)
 
     @staticmethod
     def apply_video_settings(

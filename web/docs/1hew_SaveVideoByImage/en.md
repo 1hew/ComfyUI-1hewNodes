@@ -8,8 +8,9 @@
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | `image` | - | IMAGE | - | - | Image batch interpreted as frames in time order. |
 | `audio` | optional | AUDIO | - | - | Optional audio input; muxed into the output when provided. |
-| `fps` | - | FLOAT | `8.0` | 0.01-120.0 | Frame rate for encoding. |
-| `filename_prefix` | - | STRING | `video/ComfyUI` | - | Save prefix passed to ComfyUI path generation; typically supports date placeholders (e.g. `%date:yyyy-MM-dd%`). |
+| `fps` | - | FLOAT | `8.0` | 0.01-120.0 | Frame rate used when writing the video. |
+| `filename` | - | STRING | `video/ComfyUI` | - | Save prefix passed to ComfyUI path generation; typically supports date placeholders (e.g. `%date:yyyy-MM-dd%`). |
+| `auto_increment` | - | BOOLEAN | `true` | - | When `true`, creates a new numbered file; when `false`, uses a fixed filename and overwrites it. |
 | `save_output` | - | BOOLEAN | `true` | - | Save to output directory when enabled; save to the temp directory when disabled. |
 | `save_metadata` | - | BOOLEAN | `true` | - | Write prompt/workflow metadata into the container `comment` field when enabled. |
 
@@ -21,10 +22,10 @@
 
 ## Features
 
-- Frame encoding: streams raw frames to `ffmpeg` via stdin for encoding.
+- Frame pipeline: streams raw frames to `ffmpeg` via stdin for video writing.
 - Audio muxing: converts the AUDIO input to a temporary WAV and muxes it into
   the output.
-- Even-size alignment: ensures width/height are even for stable encoding.
+- Even-size alignment: ensures width/height are even for stable video writing.
 - Alpha-aware outputs:
   - When frames include alpha: exports WEBM (VP9 + yuva420p) by default.
   - When frames include alpha and `save_output=true`: exports a preview WEBM to
@@ -41,6 +42,6 @@
 
 ## Notes & Tips
 
-- The node calls `ffmpeg` for encoding and muxing.
+- The node calls `ffmpeg` for video writing and muxing.
 - When `audio` is provided, an intermediate WAV is created in temp and removed
-  after encoding completes.
+  after video writing completes.

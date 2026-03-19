@@ -7,9 +7,9 @@
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | `get_image_size` | optional | IMAGE | - | - | Reference image used to unify output size (first frame size). |
-| `path` | - | STRING | `""` | - | File path or folder path. |
+| `file` | - | STRING | `""` | - | File path or folder path. |
 | `index` | - | INT | `0` | -8192-8192 | Image index when `all=false`; supports negative indices via modulo selection. |
-| `include_subdir` | - | BOOLEAN | `true` | - | Include subfolders when `path` is a folder. |
+| `include_subdir` | - | BOOLEAN | `true` | - | Include subfolders when `file` is a folder. |
 | `all` | - | BOOLEAN | `false` | - | Load all matched images as a batch. |
 
 ## Outputs
@@ -30,7 +30,7 @@
 
 ## Typical Usage
 
-- Load a directory of images as a batch, unify size with a reference, then feed into video encoding.
+- Load a directory of images as a batch, unify size with a reference, then feed into video export.
 - Load a single image by index from a folder and use its derived mask for downstream compositing.
 
 ## Notes & Tips

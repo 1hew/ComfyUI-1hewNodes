@@ -26,7 +26,7 @@
 
 - Switch indices: drive integer-controlled selectors or loop counts based on input presence.
 - Numeric flags: emit `0/1` or custom codes for downstream condition checks.
-- Pipeline defaults: pair with `Any Switch Int` or arithmetic nodes to route flows.
+- Pipeline defaults: pair with `Any Switch Select` or arithmetic nodes to route flows.
 
 ## Notes & Tips
 

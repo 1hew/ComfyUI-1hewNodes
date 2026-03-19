@@ -7,7 +7,8 @@
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | `video` | optional | VIDEO | - | - | Video to save; when absent, the node finishes with an empty output. |
-| `filename_prefix` | - | STRING | `video/ComfyUI` | - | Save prefix passed to ComfyUI path generation; typically supports date placeholders (e.g. `%date:yyyy-MM-dd%`). |
+| `filename` | - | STRING | `video/ComfyUI` | - | Save prefix passed to ComfyUI path generation; typically supports date placeholders (e.g. `%date:yyyy-MM-dd%`). |
+| `auto_increment` | - | BOOLEAN | `true` | - | When `true`, creates a new numbered file; when `false`, uses a fixed filename and overwrites it. |
 | `save_output` | - | BOOLEAN | `true` | - | Save to output directory when enabled; save to the temp directory when disabled. |
 | `save_metadata` | - | BOOLEAN | `true` | - | Write prompt/workflow metadata into the container `comment` field when enabled. |
 
