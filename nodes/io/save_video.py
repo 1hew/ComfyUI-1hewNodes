@@ -4,10 +4,11 @@ import asyncio
 import json
 import os
 import shutil
-import tempfile
 from typing import Optional
 
+import av
 import folder_paths
+import numpy as np
 from comfy.cli_args import args
 from comfy_api.input import VideoInput
 from comfy_api.latest import io, ui
@@ -382,91 +383,46 @@ class SaveVideo(io.ComfyNode):
         base, ext = os.path.splitext(input_path)
         tmp_path = f"{base}.tmp{ext}"
 
-        command = [
-            "ffmpeg",
-            "-y",
-            "-i",
-            input_path,
-        ]
+        def _remux():
+            with av.open(input_path) as inp:
+                with av.open(tmp_path, "w") as out:
+                    stream_map = {}
+                    for s in inp.streams:
+                        stream_map[s.index] = out.add_stream(template=s)
 
-        ffmetadata_path = None
-        if metadata_comment:
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                encoding="utf-8",
-                delete=False,
-                suffix=".ffmeta",
-            ) as meta_file:
-                ffmetadata_path = meta_file.name
-                escaped = metadata_comment.replace("\\", "\\\\")
-                for char in ("=", ";", "#", "\n", "\r"):
-                    escaped = escaped.replace(char, f"\\{char}")
-                meta_file.write(";FFMETADATA1\n")
-                meta_file.write(f"comment={escaped}\n")
-            command.extend(["-f", "ffmetadata", "-i", ffmetadata_path])
+                    if metadata_comment:
+                        out.metadata["comment"] = metadata_comment
 
-        command.extend(["-map", "0", "-c", "copy"])
-
-        if metadata_comment:
-            command.extend(["-map_metadata", "1"])
-        else:
-            command.extend(["-map_metadata", "-1"])
-
-        command.append(tmp_path)
+                    for packet in inp.demux():
+                        if packet.dts is None:
+                            continue
+                        packet.stream = stream_map[packet.stream.index]
+                        out.mux(packet)
 
         try:
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            _, stderr = await process.communicate()
-        finally:
-            if ffmetadata_path and os.path.exists(ffmetadata_path):
-                await _remove_file_with_retries(ffmetadata_path)
-
-        if process.returncode != 0:
+            await asyncio.to_thread(_remux)
+        except Exception as e:
             if os.path.exists(tmp_path):
                 await _remove_file_with_retries(tmp_path)
-            raise Exception(f"FFmpeg remux failed: {stderr.decode()}")
+            print(f"Info: Metadata remux skipped: {e}")
+            return
 
         await _replace_file_with_retries(tmp_path, input_path)
 
     @staticmethod
     async def check_has_alpha(path: str) -> bool:
         try:
-            command = [
-                "ffprobe",
-                "-v",
-                "error",
-                "-select_streams",
-                "v:0",
-                "-show_entries",
-                "stream=pix_fmt",
-                "-of",
-                "default=noprint_wrappers=1:nokey=1",
-                path,
-            ]
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, _ = await process.communicate()
-            pix_fmt = stdout.decode().strip()
-            # Common alpha pixel formats
-            alpha_formats = [
-                "yuva",
-                "rgba",
-                "argb",
-                "abgr",
-                "bgra",
-                "gbrap",
-                "ya8",
-                "ya16",
-                "ayuv",
-            ]
-            return any(fmt in pix_fmt for fmt in alpha_formats)
+            def _check():
+                with av.open(path) as container:
+                    if not container.streams.video:
+                        return False
+                    pix_fmt = container.streams.video[0].codec_context.pix_fmt or ""
+                    alpha_formats = [
+                        "yuva", "rgba", "argb", "abgr", "bgra",
+                        "gbrap", "ya8", "ya16", "ayuv",
+                    ]
+                    return any(fmt in pix_fmt for fmt in alpha_formats)
+            return await asyncio.to_thread(_check)
         except Exception:
             return False
 
@@ -506,25 +462,10 @@ class SaveVideo(io.ComfyNode):
     @staticmethod
     async def _has_audio_stream(path: str) -> bool:
         try:
-            command = [
-                "ffprobe",
-                "-v",
-                "error",
-                "-select_streams",
-                "a:0",
-                "-show_entries",
-                "stream=index",
-                "-of",
-                "default=noprint_wrappers=1:nokey=1",
-                path,
-            ]
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, _ = await process.communicate()
-            return bool(stdout.strip())
+            def _check():
+                with av.open(path) as container:
+                    return len(container.streams.audio) > 0
+            return await asyncio.to_thread(_check)
         except Exception:
             return False
 
@@ -539,39 +480,46 @@ class SaveVideo(io.ComfyNode):
         if ext in {".webm", ".mkv"}:
             audio_codec = "libopus"
 
-        command = [
-            "ffmpeg",
-            "-y",
-            "-i",
-            input_path,
-            "-f",
-            "lavfi",
-            "-i",
-            "anullsrc=channel_layout=stereo:sample_rate=44100",
-            "-shortest",
-            "-map",
-            "0:v:0",
-            "-map",
-            "1:a:0",
-            "-c:v",
-            "copy",
-            "-c:a",
-            audio_codec,
-        ]
+        def _mux():
+            container_options = {}
+            if audio_codec == "aac":
+                container_options["movflags"] = "+faststart"
 
-        if audio_codec == "aac":
-            command.extend(["-b:a", "128k", "-movflags", "+faststart"])
+            with av.open(input_path) as inp:
+                duration_sec = max((inp.duration or 0) / 1_000_000.0, 0.1)
 
-        command.append(output_path)
+                with av.open(output_path, "w", options=container_options) as out:
+                    in_video = inp.streams.video[0]
+                    out_video = out.add_stream(template=in_video)
 
-        process = await asyncio.create_subprocess_exec(
-            *command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        _, stderr = await process.communicate()
-        if process.returncode != 0:
-            raise Exception(f"FFmpeg silent-audio mux failed: {stderr.decode()}")
+                    sample_rate = 48000 if audio_codec == "libopus" else 44100
+                    out_audio = out.add_stream(audio_codec, rate=sample_rate, layout="stereo")
+                    if audio_codec == "aac":
+                        out_audio.bit_rate = 128_000
+
+                    for packet in inp.demux(in_video):
+                        if packet.dts is None:
+                            continue
+                        packet.stream = out_video
+                        out.mux(packet)
+
+                    samples_per_frame = 1024
+                    total_samples = int(sample_rate * duration_sec)
+                    pts = 0
+                    while pts < total_samples:
+                        n = min(samples_per_frame, total_samples - pts)
+                        silence = np.zeros((2, n), dtype=np.float32)
+                        frame = av.AudioFrame.from_ndarray(silence, format="fltp", layout="stereo")
+                        frame.sample_rate = sample_rate
+                        frame.pts = pts
+                        for pkt in out_audio.encode(frame):
+                            out.mux(pkt)
+                        pts += n
+
+                    for pkt in out_audio.encode(None):
+                        out.mux(pkt)
+
+        await asyncio.to_thread(_mux)
 
     @staticmethod
     async def generate_preview(
@@ -580,39 +528,44 @@ class SaveVideo(io.ComfyNode):
         strip_metadata: bool = False,
     ):
         try:
-            command = [
-                "ffmpeg",
-                "-y",
-                "-i",
-                input_path,
-                "-c:v",
-                "libvpx-vp9",
-                "-pix_fmt",
-                "yuva420p",
-                "-auto-alt-ref",
-                "0",
-                "-b:v",
-                "0",
-                "-crf",
-                "30",
-                "-c:a",
-                "libopus",
-            ]
+            def _generate():
+                with av.open(input_path) as inp:
+                    in_video = inp.streams.video[0]
 
-            if strip_metadata:
-                command.extend(["-map_metadata", "-1"])
+                    with av.open(output_path, "w") as out:
+                        out_video = out.add_stream("libvpx-vp9")
+                        out_video.width = in_video.width
+                        out_video.height = in_video.height
+                        out_video.pix_fmt = "yuva420p"
+                        out_video.rate = in_video.average_rate or 30
+                        out_video.options = {"crf": "30", "auto-alt-ref": "0"}
 
-            command.append(output_path)
+                        out_audio = None
+                        if inp.streams.audio:
+                            in_audio = inp.streams.audio[0]
+                            out_audio = out.add_stream("libopus", rate=in_audio.rate or 48000)
 
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            _, stderr = await process.communicate()
-            
-            if process.returncode != 0:
-                print(f"Info: Preview generation skipped: {stderr.decode()}")
-                
+                        if not strip_metadata:
+                            out.metadata.update(inp.metadata)
+
+                        for packet in inp.demux():
+                            if packet.stream.type == "video":
+                                for frame in packet.decode():
+                                    frame = frame.reformat(format="yuva420p")
+                                    for out_pkt in out_video.encode(frame):
+                                        out.mux(out_pkt)
+                            elif packet.stream.type == "audio" and out_audio:
+                                for frame in packet.decode():
+                                    frame.pts = None
+                                    for out_pkt in out_audio.encode(frame):
+                                        out.mux(out_pkt)
+
+                        for pkt in out_video.encode(None):
+                            out.mux(pkt)
+                        if out_audio:
+                            for pkt in out_audio.encode(None):
+                                out.mux(pkt)
+
+            await asyncio.to_thread(_generate)
         except Exception as e:
             print(f"Info: Preview generation skipped: {e}")

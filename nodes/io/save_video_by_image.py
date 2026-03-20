@@ -1,9 +1,11 @@
 import asyncio
+from fractions import Fraction
 import json
 import os
 import tempfile
 from typing import Optional
 
+import av
 import folder_paths
 from comfy.cli_args import args
 import torch
@@ -100,13 +102,6 @@ def _new_progress_bar(total: int):
         return ProgressBar(int(total))
     except Exception:
         return None
-
-
-def _escape_ffmetadata_value(value: str) -> str:
-    escaped = value.replace("\\", "\\\\")
-    for char in ("=", ";", "#", "\n", "\r"):
-        escaped = escaped.replace(char, f"\\{char}")
-    return escaped
 
 
 async def _remove_file_with_retries(
@@ -411,76 +406,76 @@ class SaveVideoByImage(io.ComfyNode):
         progress_bar: Optional[object] = None,
         metadata_comment: Optional[str] = None,
     ):
-        ffmpeg_path = "ffmpeg"
-        ffmetadata_path = None
+        def _parse_video_args(args_list: list[str]) -> tuple[dict, dict]:
+            codec_opts: dict[str, str] = {}
+            container_opts: dict[str, str] = {}
+            i = 0
+            while i < len(args_list):
+                arg = args_list[i]
+                if not arg.startswith("-"):
+                    i += 1
+                    continue
+                key = arg.lstrip("-")
+                value = ""
+                if i + 1 < len(args_list) and not args_list[i + 1].startswith("-"):
+                    value = args_list[i + 1]
+                    i += 2
+                else:
+                    i += 1
+                if key == "movflags":
+                    container_opts["movflags"] = value
+                elif key == "b:v":
+                    codec_opts["b"] = value
+                elif key == "profile:v":
+                    codec_opts["profile"] = value
+                else:
+                    codec_opts[key] = value
+            return codec_opts, container_opts
 
-        command = [
-            ffmpeg_path,
-            "-y",
-            "-f",
-            "rawvideo",
-            "-vcodec",
-            "rawvideo",
-            "-s",
-            f"{width}x{height}",
-            "-pix_fmt",
-            input_pix_fmt,
-            "-r",
-            str(fps),
-            "-i",
-            "-",
-        ]
+        def _encode():
+            codec_opts, container_opts = _parse_video_args(video_args)
 
-        if audio_path:
-            command.extend(["-i", audio_path])
+            with av.open(path, "w", options=container_opts) as output:
+                out_video = output.add_stream(video_codec)
+                out_video.width = width
+                out_video.height = height
+                out_video.pix_fmt = output_pix_fmt
+                out_video.rate = Fraction(fps).limit_denominator(10001)
+                out_video.options = codec_opts
 
-        if metadata_comment:
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                encoding="utf-8",
-                delete=False,
-                suffix=".ffmeta",
-            ) as meta_file:
-                ffmetadata_path = meta_file.name
-                meta_file.write(";FFMETADATA1\n")
-                meta_file.write(
-                    f"comment={_escape_ffmetadata_value(metadata_comment)}\n"
-                )
-            command.extend(["-f", "ffmetadata", "-i", ffmetadata_path])
+                out_audio = None
+                audio_container = None
+                try:
+                    if audio_path and os.path.isfile(audio_path):
+                        try:
+                            audio_container = av.open(audio_path)
+                            if audio_container.streams.audio:
+                                in_audio = audio_container.streams.audio[0]
+                                out_audio = output.add_stream(
+                                    audio_codec, rate=in_audio.rate or 44100,
+                                )
+                        except Exception:
+                            if audio_container is not None:
+                                audio_container.close()
+                            audio_container = None
 
-        command.extend(["-c:v", video_codec, "-pix_fmt", output_pix_fmt])
-        command.extend(video_args)
+                    if metadata_comment:
+                        output.metadata["comment"] = metadata_comment
 
-        if audio_path:
-            command.extend(["-c:a", audio_codec, "-shortest"])
+                    av_input_fmt = "rgba" if input_pix_fmt == "rgba" else "rgb24"
+                    total_frames = int(images.shape[0])
+                    update_every = max(1, int(total_frames // 200) or 1)
+                    last_reported = 0
+                    frames_written = 0
 
-        if metadata_comment:
-            metadata_input_index = 1 if not audio_path else 2
-            command.extend(["-map_metadata", str(metadata_input_index)])
-        else:
-            command.extend(["-map_metadata", "-1"])
+                    for i in range(total_frames):
+                        frame_np = (images[i] * 255).byte().cpu().numpy()
+                        av_frame = av.VideoFrame.from_ndarray(frame_np, format=av_input_fmt)
+                        av_frame = av_frame.reformat(format=output_pix_fmt)
 
-        command.append(path)
+                        for pkt in out_video.encode(av_frame):
+                            output.mux(pkt)
 
-        try:
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-
-            async def feed_stdin():
-                total_frames = int(images.shape[0])
-                update_every = max(1, int(total_frames // 200) or 1)
-                last_reported = 0
-                frames_written = 0
-                for i in range(total_frames):
-                    frame = images[i]
-                    frame = (frame * 255).byte().cpu().numpy()
-                    try:
-                        process.stdin.write(frame.tobytes())
-                        await process.stdin.drain()
                         frames_written += 1
                         if (
                             progress_bar is not None
@@ -492,46 +487,51 @@ class SaveVideoByImage(io.ComfyNode):
                             except Exception:
                                 pass
                             last_reported = frames_written
-                    except (BrokenPipeError, OSError):
-                        break
-                if progress_bar is not None and frames_written > last_reported:
-                    delta = frames_written - last_reported
-                    try:
-                        progress_bar.update(int(delta))
-                    except Exception:
-                        pass
-                process.stdin.close()
-                try:
-                    await process.stdin.wait_closed()
-                except Exception:
-                    pass
 
-            async def log_stderr():
-                stderr_data = b""
-                while True:
-                    chunk = await process.stderr.read(4096)
-                    if not chunk:
-                        break
-                    stderr_data += chunk
-                return stderr_data
+                    for pkt in out_video.encode(None):
+                        output.mux(pkt)
 
-            _, stderr_output = await asyncio.gather(feed_stdin(), log_stderr())
-            
-            await process.wait()
+                    if progress_bar is not None and frames_written > last_reported:
+                        delta = frames_written - last_reported
+                        try:
+                            progress_bar.update(int(delta))
+                        except Exception:
+                            pass
 
-            if process.returncode != 0:
-                raise Exception(f"FFmpeg encoding failed: {stderr_output.decode()}")
+                    if out_audio and audio_container:
+                        try:
+                            in_audio_stream = audio_container.streams.audio[0]
+                            video_duration = total_frames / fps if fps > 0 else 0.0
+                            max_samples = (
+                                int(video_duration * (in_audio_stream.rate or 44100))
+                                if video_duration > 0
+                                else 0
+                            )
+                            samples_encoded = 0
+                            for packet in audio_container.demux(in_audio_stream):
+                                for frame in packet.decode():
+                                    if max_samples > 0 and samples_encoded >= max_samples:
+                                        break
+                                    frame.pts = None
+                                    for pkt in out_audio.encode(frame):
+                                        output.mux(pkt)
+                                    samples_encoded += frame.samples
+                                if max_samples > 0 and samples_encoded >= max_samples:
+                                    break
+                            for pkt in out_audio.encode(None):
+                                output.mux(pkt)
+                        except Exception:
+                            pass
+                finally:
+                    if audio_container is not None:
+                        audio_container.close()
 
+        try:
+            await asyncio.to_thread(_encode)
         except Exception as e:
             if os.path.exists(path):
                 os.remove(path)
             raise e
-        finally:
-            if ffmetadata_path and os.path.exists(ffmetadata_path):
-                try:
-                    os.remove(ffmetadata_path)
-                except Exception:
-                    pass
 
     @staticmethod
     def _resize_images(images: torch.Tensor, height: int, width: int) -> torch.Tensor:

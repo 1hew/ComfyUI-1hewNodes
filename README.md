@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.5.1**
+- refactor(io): Optimize video load/save compatibility and keep `Save Image` preview available when `save_output` is disabled
+
 **v3.5.0**
 - feat(io): Add `Load Txt` and `Save Txt` nodes
 

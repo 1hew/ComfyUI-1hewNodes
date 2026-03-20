@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.5.1**
+- refactor(io): 优化视频加载/保存兼容性，并在 `save_output` 关闭时保留 `Save Image` 预览
+
 **v3.5.0**
 - feat(io): 添加 `Load Txt` 与 `Save Txt` 节点
 

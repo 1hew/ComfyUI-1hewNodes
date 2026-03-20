@@ -113,7 +113,7 @@ class SaveTxt(io.ComfyNode):
             display_name="Save Txt",
             category="1hewNodes/io",
             inputs=[
-                io.Custom("*").Input("any"),
+                io.Custom("*").Input("any", optional=True),
                 io.String.Input("filename", default="txt/ComfyUI"),
                 io.Boolean.Input(
                     "auto_increment",
@@ -144,12 +144,15 @@ class SaveTxt(io.ComfyNode):
     @classmethod
     async def execute(
         cls,
-        any,
-        filename: str,
-        auto_increment: bool,
-        save_output: bool,
-        encode: str,
+        any=None,
+        filename: str = "txt/ComfyUI",
+        auto_increment: bool = True,
+        save_output: bool = True,
+        encode: str = "utf-8",
     ) -> io.NodeOutput:
+        if any is None:
+            return io.NodeOutput()
+
         text_value = _stringify_value(any)
         if not save_output:
             return io.NodeOutput("", ui=cls._preview_ui(text_value))

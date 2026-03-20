@@ -612,15 +612,18 @@ class VideoFromFile:
                     pass
 
             if prefer_alpha and frames and frames[0].shape[-1] != 4:
-                ff_frames = self._decode_frames_with_ffmpeg(
-                    path=path,
-                    width=int(stream.width or 0),
-                    height=int(stream.height or 0),
-                    pix_fmt="rgba",
-                    expected_frames=expected_video_frames,
-                )
-                if ff_frames:
-                    frames = ff_frames
+                try:
+                    ff_frames = self._decode_frames_with_ffmpeg(
+                        path=path,
+                        width=int(stream.width or 0),
+                        height=int(stream.height or 0),
+                        pix_fmt="rgba",
+                        expected_frames=expected_video_frames,
+                    )
+                    if ff_frames:
+                        frames = ff_frames
+                except Exception:
+                    pass
 
             if not frames:
                 ff_pix_fmt = "rgba" if prefer_alpha else "rgb24"

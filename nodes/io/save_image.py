@@ -180,9 +180,6 @@ class SaveImage(io.ComfyNode):
         if image is None:
             return io.NodeOutput()
 
-        if not save_output:
-            return io.NodeOutput("")
-
         folder_type = io.FolderType.output
         safe_filename_prefix = _sanitize_filename_prefix(filename)
 
@@ -198,6 +195,17 @@ class SaveImage(io.ComfyNode):
             hidden = _Hidden()
 
         effective_cls = cls if save_metadata else _NoMetadataNode
+
+        if not save_output:
+            async with _PATH_LOCK:
+                results = ui.ImageSaveHelper.save_images(
+                    image,
+                    filename_prefix=safe_filename_prefix,
+                    folder_type=io.FolderType.temp,
+                    cls=effective_cls,
+                    compress_level=4,
+                )
+            return io.NodeOutput("", ui=ui.SavedImages(results))
 
         use_helper = (not _is_absolute_like(filename)) and bool(auto_increment)
 

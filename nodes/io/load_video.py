@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+from fractions import Fraction
 import hashlib
+from io import BytesIO
 import json
 import math
 import os
 import shutil
 import subprocess
-import tempfile
 import time
 from typing import Optional
 
@@ -765,100 +766,93 @@ class VideoFromFileWithSettings:
 
         images = components.images
         audio = components.audio
-        fps = components.frame_rate
-        
+        fps = float(components.frame_rate or 0.0)
+        if not (0.0 < fps < 1000.0):
+            fps = 1.0
+
         if images.device.type != "cpu":
             images = images.cpu()
             
         images_np = (images * 255.0).clamp(0, 255).byte().numpy()
         
         T, H, W, C = images_np.shape
-        pix_fmt = "rgba" if C == 4 else "rgb24"
-        
-        ffmpeg_exe = VideoFromFile._resolve_ffmpeg_exe()
-        
-        audio_tmp = None
-        audio_data = None
-        sample_rate = 44100
-        
-        if audio is not None and audio.get("waveform") is not None:
-             waveform = audio["waveform"]
-             sample_rate = audio.get("sample_rate", 44100)
-             if waveform.dim() == 2:
-                 waveform = waveform.unsqueeze(0)
-             
-             if waveform.device.type != "cpu":
-                 waveform = waveform.cpu()
-             waveform_np = waveform.numpy()
-             
-             if waveform_np.shape[0] > 0:
-                 audio_data = waveform_np[0]
-                 
-                 fd, audio_tmp = tempfile.mkstemp(suffix=".f32le")
-                 os.close(fd)
-                 
-                 with open(audio_tmp, "wb") as f:
-                     audio_data.T.tofile(f)
-        
-        cmd = [ffmpeg_exe, "-y"]
-        
-        cmd.extend([
-            "-f", "rawvideo",
-            "-vcodec", "rawvideo",
-            "-s", f"{W}x{H}",
-            "-pix_fmt", pix_fmt,
-            "-r", f"{fps}",
-            "-i", "-"
-        ])
-        
-        if audio_tmp:
-            channels = audio_data.shape[0]
-            cmd.extend([
-                "-f", "f32le",
-                "-ar", str(sample_rate),
-                "-ac", str(channels),
-                "-i", audio_tmp
-            ])
-            
-        if codec == "auto" or codec is None:
-            cmd.extend(["-c:v", "libx264", "-preset", "fast", "-crf", "23", "-pix_fmt", "yuv420p"])
-            cmd.extend(["-c:a", "aac", "-b:a", "128k"])
-        else:
-            cmd.extend(["-c:v", codec])
-            cmd.extend(["-c:a", "aac"])
+        has_alpha = C == 4
+        input_fmt = "rgba" if has_alpha else "rgb24"
 
-        cmd.extend(["-map", "0:v:0"])
-        if audio_tmp:
-            cmd.extend(["-map", "1:a:0"])
-            
-        cmd.append(path)
-        
-        try:
-            process = subprocess.Popen(
-                cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            
-            try:
-                process.stdin.write(images_np.tobytes())
-                process.stdin.close()
-            except Exception as e:
-                print(f"Error writing to ffmpeg stdin: {e}")
-            
-            stdout, stderr = process.communicate()
-            
-            if process.returncode != 0:
-                print(f"FFmpeg encoding failed: {stderr.decode('utf-8', 'replace')}")
-                
-        finally:
-            if audio_tmp and os.path.exists(audio_tmp):
-                try:
-                    os.remove(audio_tmp)
-                except:
-                    pass
-                    
+        _, path_ext = os.path.splitext(path)
+        use_alpha = has_alpha or path_ext.lower() == ".webm"
+
+        out_audio = None
+        audio_np = None
+        a_sr = 44100
+        ch = 2
+        layout = "stereo"
+        audio_codec_name = "libopus" if use_alpha else "aac"
+
+        if audio is not None and audio.get("waveform") is not None:
+            waveform = audio["waveform"]
+            a_sr = int(audio.get("sample_rate", 44100))
+            if waveform.dim() == 2:
+                waveform = waveform.unsqueeze(0)
+            if waveform.device.type != "cpu":
+                waveform = waveform.cpu()
+            waveform_np = waveform.numpy()
+            if waveform_np.shape[0] > 0:
+                audio_np = waveform_np[0]
+                if audio_np.shape[0] > 2:
+                    audio_np = audio_np[:2]
+                ch = audio_np.shape[0]
+                layout = "stereo" if ch >= 2 else "mono"
+
+        with av.open(path, "w") as output:
+            if use_alpha:
+                out_video = output.add_stream("libvpx-vp9")
+                out_video.pix_fmt = "yuva420p"
+                out_video.options = {"auto-alt-ref": "0", "b": "0", "crf": "23"}
+            elif codec not in ("auto", None):
+                out_video = output.add_stream(codec)
+                out_video.pix_fmt = "yuv420p"
+            else:
+                out_video = output.add_stream("libx264")
+                out_video.pix_fmt = "yuv420p"
+                out_video.options = {"preset": "fast", "crf": "23"}
+            out_video.width = W
+            out_video.height = H
+            out_video.rate = Fraction(fps).limit_denominator(10001)
+
+            if audio_np is not None:
+                out_audio = output.add_stream(audio_codec_name, rate=a_sr, layout=layout)
+                if audio_codec_name == "aac":
+                    out_audio.bit_rate = 128_000
+
+            for i in range(T):
+                frame = av.VideoFrame.from_ndarray(images_np[i], format=input_fmt)
+                frame = frame.reformat(format=out_video.pix_fmt)
+                for pkt in out_video.encode(frame):
+                    output.mux(pkt)
+
+            for pkt in out_video.encode(None):
+                output.mux(pkt)
+
+            if out_audio is not None and audio_np is not None:
+                video_dur = T / fps if fps > 0 else 0.0
+                max_s = int(video_dur * a_sr) if video_dur > 0 else audio_np.shape[1]
+                total_s = min(audio_np.shape[1], max_s)
+
+                pts = 0
+                while pts < total_s:
+                    n = min(1024, total_s - pts)
+                    chunk = audio_np[:ch, pts:pts + n].copy().astype(np.float32)
+                    af = av.AudioFrame.from_ndarray(chunk, format="fltp", layout=layout)
+                    af.sample_rate = a_sr
+                    af.pts = pts
+                    for pkt in out_audio.encode(af):
+                        output.mux(pkt)
+                    pts += n
+
+                for pkt in out_audio.encode(None):
+                    output.mux(pkt)
+
         return path
 
     def get_components(self) -> Optional[VideoComponents]:
@@ -906,7 +900,7 @@ def _encode_components_to_video_path(components: VideoComponents, out_path: str)
     images = components.images
     audio = components.audio
     fps = float(components.frame_rate or 0.0)
-    if fps <= 0.0:
+    if not (0.0 < fps < 1000.0):
         fps = 1.0
 
     if images.device.type != "cpu":
@@ -918,127 +912,87 @@ def _encode_components_to_video_path(components: VideoComponents, out_path: str)
     has_alpha = int(channels) == 4
     input_pix_fmt = "rgba" if has_alpha else "rgb24"
 
-    ffmpeg_exe = VideoFromFile._resolve_ffmpeg_exe()
+    out_ext = ext.lower()
 
-    audio_tmp = None
-    audio_data = None
-    sample_rate = 44100
+    out_audio_obj = None
+    audio_np = None
+    a_sr = 44100
+    ch = 2
+    layout = "stereo"
+
+    if has_alpha or out_ext == ".webm":
+        audio_codec_name = "libopus"
+    else:
+        audio_codec_name = "aac"
 
     if audio is not None and audio.get("waveform") is not None:
         waveform = audio["waveform"]
-        sample_rate = audio.get("sample_rate", 44100)
+        a_sr = int(audio.get("sample_rate", 44100))
         if waveform.dim() == 2:
             waveform = waveform.unsqueeze(0)
-
         if waveform.device.type != "cpu":
             waveform = waveform.cpu()
         waveform_np = waveform.numpy()
-
         if waveform_np.shape[0] > 0:
-            audio_data = waveform_np[0]
+            audio_np = waveform_np[0]
+            if audio_np.shape[0] > 2:
+                audio_np = audio_np[:2]
+            ch = audio_np.shape[0]
+            layout = "stereo" if ch >= 2 else "mono"
 
-            fd, audio_tmp = tempfile.mkstemp(suffix=".f32le")
-            os.close(fd)
+    with av.open(tmp_path, "w") as output:
+        if has_alpha or out_ext == ".webm":
+            out_video = output.add_stream("libvpx-vp9")
+            out_video.pix_fmt = "yuva420p"
+            out_video.options = {
+                "auto-alt-ref": "0",
+                "b": "0",
+                "crf": "33",
+                "deadline": "realtime",
+                "cpu-used": "5",
+            }
+        else:
+            out_video = output.add_stream("libx264")
+            out_video.pix_fmt = "yuv420p"
+            out_video.options = {"preset": "fast", "crf": "23"}
 
-            with open(audio_tmp, "wb") as f:
-                audio_data.T.tofile(f)
+        out_video.width = width
+        out_video.height = height
+        out_video.rate = Fraction(fps).limit_denominator(10001)
 
-    cmd = [ffmpeg_exe, "-y"]
-    cmd.extend(
-        [
-            "-f",
-            "rawvideo",
-            "-vcodec",
-            "rawvideo",
-            "-s",
-            f"{width}x{height}",
-            "-pix_fmt",
-            input_pix_fmt,
-            "-r",
-            f"{fps}",
-            "-i",
-            "-",
-        ]
-    )
+        if audio_np is not None:
+            out_audio_obj = output.add_stream(audio_codec_name, rate=a_sr, layout=layout)
+            if audio_codec_name == "aac":
+                out_audio_obj.bit_rate = 128_000
 
-    if audio_tmp:
-        channels = audio_data.shape[0]
-        cmd.extend(
-            [
-                "-f",
-                "f32le",
-                "-ar",
-                str(sample_rate),
-                "-ac",
-                str(channels),
-                "-i",
-                audio_tmp,
-            ]
-        )
+        T = images_np.shape[0]
+        for i in range(T):
+            frame = av.VideoFrame.from_ndarray(images_np[i], format=input_pix_fmt)
+            frame = frame.reformat(format=out_video.pix_fmt)
+            for pkt in out_video.encode(frame):
+                output.mux(pkt)
 
-    out_ext = ext.lower()
-    if has_alpha or out_ext == ".webm":
-        cmd.extend(
-            [
-                "-c:v",
-                "libvpx-vp9",
-                "-pix_fmt",
-                "yuva420p",
-                "-auto-alt-ref",
-                "0",
-                "-b:v",
-                "0",
-                "-crf",
-                "33",
-                "-deadline",
-                "realtime",
-                "-cpu-used",
-                "5",
-            ]
-        )
-        if audio_tmp:
-            cmd.extend(["-c:a", "libopus"])
-    else:
-        cmd.extend(
-            [
-                "-c:v",
-                "libx264",
-                "-preset",
-                "fast",
-                "-crf",
-                "23",
-                "-pix_fmt",
-                "yuv420p",
-            ]
-        )
-        if audio_tmp:
-            cmd.extend(["-c:a", "aac", "-b:a", "128k"])
+        for pkt in out_video.encode(None):
+            output.mux(pkt)
 
-    cmd.extend(["-map", "0:v:0"])
-    if audio_tmp:
-        cmd.extend(["-map", "1:a:0"])
+        if out_audio_obj is not None and audio_np is not None:
+            video_dur = T / fps if fps > 0 else 0.0
+            max_s = int(video_dur * a_sr) if video_dur > 0 else audio_np.shape[1]
+            total_s = min(audio_np.shape[1], max_s)
 
-    cmd.append(tmp_path)
+            pts = 0
+            while pts < total_s:
+                n = min(1024, total_s - pts)
+                chunk = audio_np[:ch, pts:pts + n].copy().astype(np.float32)
+                af = av.AudioFrame.from_ndarray(chunk, format="fltp", layout=layout)
+                af.sample_rate = a_sr
+                af.pts = pts
+                for pkt in out_audio_obj.encode(af):
+                    output.mux(pkt)
+                pts += n
 
-    try:
-        process = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        try:
-            process.stdin.write(images_np.tobytes())
-            process.stdin.close()
-        except Exception:
-            pass
-        process.communicate()
-    finally:
-        if audio_tmp and os.path.exists(audio_tmp):
-            try:
-                os.remove(audio_tmp)
-            except OSError:
-                pass
+            for pkt in out_audio_obj.encode(None):
+                output.mux(pkt)
 
     try:
         os.replace(tmp_path, out_path)
@@ -1757,27 +1711,27 @@ async def video_info_from_folder(request):
     duration = 0.0
 
     try:
-        container = av.open(selected)
-        if len(container.streams.video) > 0:
-            stream = container.streams.video[0]
-            width = int(stream.width or 0)
-            height = int(stream.height or 0)
+        with av.open(selected) as container:
+            if len(container.streams.video) > 0:
+                stream = container.streams.video[0]
+                width = int(stream.width or 0)
+                height = int(stream.height or 0)
 
-            try:
-                fps = float(stream.average_rate)
-            except Exception:
-                fps = 0.0
+                try:
+                    fps = float(stream.average_rate)
+                except Exception:
+                    fps = 0.0
 
-            frame_count = int(stream.frames or 0)
+                frame_count = int(stream.frames or 0)
 
-            try:
-                if stream.duration and stream.time_base:
-                    duration = float(stream.duration * stream.time_base)
-            except Exception:
-                duration = 0.0
+                try:
+                    if stream.duration and stream.time_base:
+                        duration = float(stream.duration * stream.time_base)
+                except Exception:
+                    duration = 0.0
 
-            if frame_count <= 0 and duration > 0.0 and fps > 0.0:
-                frame_count = int(round(duration * fps))
+                if frame_count <= 0 and duration > 0.0 and fps > 0.0:
+                    frame_count = int(round(duration * fps))
     except Exception:
         pass
 
@@ -1931,33 +1885,28 @@ async def _extract_video_frame_png(
     path: str,
     timestamp_s: float,
 ) -> bytes:
-    ffmpeg_exe = VideoFromFile._resolve_ffmpeg_exe()
-    ts = max(0.0, float(timestamp_s or 0.0))
-    command = [
-        ffmpeg_exe,
-        "-v",
-        "error",
-        "-ss",
-        f"{ts:.6f}",
-        "-i",
-        path,
-        "-frames:v",
-        "1",
-        "-f",
-        "image2pipe",
-        "-vcodec",
-        "png",
-        "-",
-    ]
-    process = await asyncio.create_subprocess_exec(
-        *command,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, _ = await process.communicate()
-    if process.returncode != 0:
+    try:
+        def _extract():
+            with av.open(path) as container:
+                stream = container.streams.video[0]
+                ts = max(0.0, float(timestamp_s or 0.0))
+                if ts > 0:
+                    container.seek(int(ts * 1_000_000))
+                best = None
+                for frame in container.decode(stream):
+                    best = frame
+                    ft = frame.time
+                    if ft is not None and ft >= ts:
+                        break
+                if best is None:
+                    return b""
+                img = best.to_image()
+                buf = BytesIO()
+                img.save(buf, format="PNG")
+                return buf.getvalue()
+        return await asyncio.to_thread(_extract)
+    except Exception:
         return b""
-    return stdout or b""
 
 
 @PromptServer.instance.routes.get("/1hew/video_frame_from_folder")
