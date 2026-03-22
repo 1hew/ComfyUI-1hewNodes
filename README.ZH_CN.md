@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.5.2**
+- refactor(io): 调整 `Save Txt` 节点命名设置与文件名生成逻辑
+
 **v3.5.1**
 - refactor(io): 优化视频加载/保存兼容性，并在 `save_output` 关闭时保留 `Save Image` 预览
 

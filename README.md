@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.5.2**
+- refactor(io): Adjust `Save Txt` naming settings and filename generation logic
+
 **v3.5.1**
 - refactor(io): Optimize video load/save compatibility and keep `Save Image` preview available when `save_output` is disabled
 

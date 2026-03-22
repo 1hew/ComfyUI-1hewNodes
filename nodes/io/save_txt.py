@@ -6,7 +6,7 @@ import os
 from typing import Optional
 
 import folder_paths
-from comfy_api.latest import io
+from comfy_api.latest import io, ui
 
 _PATH_LOCK: Optional[asyncio.Lock] = None
 
@@ -103,8 +103,42 @@ def _stringify_value(value) -> str:
 
 class SaveTxt(io.ComfyNode):
     @staticmethod
-    def _preview_ui(text: str) -> dict:
-        return {"text": (str(text),)}
+    def _preview_ui(
+        text: str,
+        output_path: str = "",
+        base_dir: Optional[str] = None,
+    ) -> dict:
+        text_value = str(text)
+        ui_data = {
+            "text": [text_value],
+            "output": [text_value],
+        }
+        if not output_path:
+            return ui_data
+
+        abs_output = os.path.abspath(output_path)
+        ui_data["file_path"] = [abs_output]
+        if not base_dir:
+            return ui_data
+
+        try:
+            rel_path = os.path.relpath(abs_output, os.path.abspath(base_dir))
+            if rel_path.startswith("..") or os.path.isabs(rel_path):
+                return ui_data
+            rel_path = rel_path.replace("\\", "/")
+            subfolder, filename = os.path.split(rel_path)
+            if filename:
+                ui_data["texts"] = [
+                    ui.SavedResult(
+                        filename,
+                        "" if subfolder == "." else subfolder,
+                        io.FolderType.output,
+                    )
+                ]
+        except Exception:
+            return ui_data
+
+        return ui_data
 
     @classmethod
     def define_schema(cls):
@@ -189,9 +223,14 @@ class SaveTxt(io.ComfyNode):
 
             await asyncio.to_thread(cls._write_text_file, out_path, text_value, encode)
 
+        abs_out_path = os.path.abspath(out_path)
         return io.NodeOutput(
-            os.path.abspath(out_path),
-            ui=cls._preview_ui(text_value),
+            abs_out_path,
+            ui=cls._preview_ui(
+                text_value,
+                output_path=abs_out_path,
+                base_dir=base_dir,
+            ),
         )
 
     @staticmethod
