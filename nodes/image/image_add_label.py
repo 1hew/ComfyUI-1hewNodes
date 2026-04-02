@@ -84,6 +84,9 @@ class ImageAddLabel(io.ComfyNode):
 
         result = []
         total_batches = len(image)
+        preserve_alpha = int(image.shape[-1]) == 4
+        image_mode = "RGBA" if preserve_alpha else "RGB"
+        canvas_fill = (0, 0, 0, 0) if preserve_alpha else label_color
         
         # 缓存字体对象和文本尺寸
         font_cache = {}
@@ -105,8 +108,7 @@ class ImageAddLabel(io.ComfyNode):
             all_current_texts.append(current_text)
             
             # 获取当前图像尺寸并计算缩放因子
-            img_data = 255. * image[i].cpu().numpy()
-            img_pil = Image.fromarray(np.clip(img_data, 0, 255).astype(np.uint8))
+            img_pil = cls._tensor_to_pil_image(image[i])
             width, height = img_pil.size
             
             # 使用缓存的缩放因子计算
@@ -131,8 +133,7 @@ class ImageAddLabel(io.ComfyNode):
         # 批量转换图像为PIL格式，减少重复转换
         pil_images = []
         for i, img in enumerate(image):
-            img_data = 255. * img.cpu().numpy()
-            img_pil = Image.fromarray(np.clip(img_data, 0, 255).astype(np.uint8))
+            img_pil = cls._tensor_to_pil_image(img)
             pil_images.append(img_pil)
         
         def _render_single(i):
@@ -163,33 +164,33 @@ class ImageAddLabel(io.ComfyNode):
             min_padding = max(scaled_height_pad, 4)
             label_height = text_height + min_padding
             if direction in ["top", "bottom"]:
-                label_img = Image.new("RGB", (width, label_height), label_color)
+                label_img = Image.new(image_mode, (width, label_height), label_color)
                 draw = ImageDraw.Draw(label_img)
                 text_x = text_margin
                 text_y = min_padding // 2 + text_top_offset
                 cls._draw_multiline_text(draw, wrapped_text, text_x, text_y, font_obj, font_color, line_heights)
                 if direction == "top":
-                    new_img = Image.new("RGB", (width, orig_height + label_height))
+                    new_img = Image.new(image_mode, (width, orig_height + label_height), canvas_fill)
                     new_img.paste(label_img, (0, 0))
                     new_img.paste(img_pil, (0, label_height))
                 else:
-                    new_img = Image.new("RGB", (width, orig_height + label_height))
+                    new_img = Image.new(image_mode, (width, orig_height + label_height), canvas_fill)
                     new_img.paste(img_pil, (0, 0))
                     new_img.paste(label_img, (0, orig_height))
             else:
-                temp_label_img = Image.new("RGB", (orig_height, label_height), label_color)
+                temp_label_img = Image.new(image_mode, (orig_height, label_height), label_color)
                 draw = ImageDraw.Draw(temp_label_img)
                 text_x = text_margin
                 text_y = min_padding // 2 + text_top_offset
                 cls._draw_multiline_text(draw, wrapped_text, text_x, text_y, font_obj, font_color, line_heights)
                 if direction == "left":
                     label_img = temp_label_img.rotate(90, expand=True)
-                    new_img = Image.new("RGB", (width + label_height, orig_height))
+                    new_img = Image.new(image_mode, (width + label_height, orig_height), canvas_fill)
                     new_img.paste(label_img, (0, 0))
                     new_img.paste(img_pil, (label_height, 0))
                 else:
                     label_img = temp_label_img.rotate(270, expand=True)
-                    new_img = Image.new("RGB", (width + label_height, orig_height))
+                    new_img = Image.new(image_mode, (width + label_height, orig_height), canvas_fill)
                     new_img.paste(img_pil, (0, 0))
                     new_img.paste(label_img, (width, 0))
             img_np = np.array(new_img).astype(np.float32) / 255.0
@@ -204,6 +205,20 @@ class ImageAddLabel(io.ComfyNode):
         out_t = torch.cat(result, dim=0).to(torch.float32)
         out_t = out_t.clamp(0.0, 1.0).to(image.device)
         return io.NodeOutput(out_t)
+
+    @staticmethod
+    def _tensor_to_pil_image(image_tensor: torch.Tensor) -> Image.Image:
+        image_np = np.clip(image_tensor.detach().cpu().numpy() * 255.0, 0, 255).astype(
+            np.uint8
+        )
+        channels = int(image_np.shape[2]) if image_np.ndim == 3 else 1
+        if channels == 4:
+            return Image.fromarray(image_np, mode="RGBA")
+        if channels == 3:
+            return Image.fromarray(image_np, mode="RGB")
+        if channels == 1:
+            return Image.fromarray(image_np[:, :, 0], mode="L")
+        return Image.fromarray(image_np[:, :, :3], mode="RGB")
 
 
     @classmethod

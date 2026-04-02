@@ -1,6 +1,6 @@
 # Image Blend Mode by CSS - CSS-Compatible Image Blending
 
-**Node Purpose:** `Image Blend Mode by CSS` reproduces CSS blending semantics between a base image and an overlay image, with explicit `blend_mode`, overall `blend_percentage`, and optional `overlay_mask` control. Includes HSL-based modes for `hue`, `saturation`, `color`, and `luminosity`.
+**Node Purpose:** `Image Blend Mode by CSS` reproduces CSS blending semantics between a base image and an overlay image, with explicit `blend_mode`, overall `blend_percentage`, and optional `overlay_mask` control. Includes HSL-based modes for `hue`, `saturation`, `color`, and `luminosity`, with RGBA-aware blending.
 
 ## Inputs
 
@@ -24,7 +24,8 @@
 - CSS-accurate formulas: match typical CSS semantics for multiply, screen, overlay, darken, lighten, color dodge/burn, hard/soft light, difference, exclusion.
 - HSL modes: `hue`, `saturation`, `color`, `luminosity` implemented via RGB↔HSL conversion.
 - Opacity control: `blend_percentage` (0–100) linearly mixes base and blended results.
-- RGBA normalization: flattens alpha to white background for consistent RGB blending.
+- RGBA support: both `overlay_image` and `base_image` may contain alpha, and the overlay alpha participates in blending.
+- Output rule: if `base_image` has alpha, the node outputs RGBA; otherwise it outputs RGB.
 - Size alignment and masking: overlay is resized to base; optional mask is resized and broadcast to RGB.
 - Robust batching: mismatched base/overlay/mask batch sizes loop across the maximum batch size.
 
@@ -38,5 +39,5 @@
 ## Notes & Tips
 
 - When overlay size differs, it is resized with Lanczos before blending.
-- HSL conversion clamps values to valid ranges; results are returned in RGB.
+- If you want the final result to keep transparency, feed `base_image` as RGBA.
 - `color_dodge` and `color_burn` handle boundary cases to avoid infinities and negatives.

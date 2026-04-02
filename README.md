@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.6.0**
+- feat(mask): Add `Mask To Image` with configurable black/white area colors, `fill_hole`, and optional RGBA output
+
 **v3.5.2**
 - refactor(io): Adjust `Save Txt` naming settings and filename generation logic
 
@@ -387,8 +390,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Rotate with Mask | Advanced image rotation with mask integration, multiple fill modes, and mask center rotation options |
 | Image Edit Stitch | Image stitching and merging with multiple stitching modes |
 | ImageMainStitch | Main-image stitcher supporting dynamic `image_2..image_N`, direction, size matching, spacing, and padding |
-| Image Add Label | Add text labels to images |
-| Image Plot | Image plotting and visualization tools |
+| Image Add Label | Add text labels to images with automatic alpha preservation for RGBA inputs |
+| Image Plot | Image plotting and visualization tools with automatic RGBA preservation for alpha inputs |
 | Image Stroke by Mask | Apply stroke effects to mask regions with customizable width and color |
 | Image BBox Overlay by Mask | Mask-based image bounding box overlay with independent and merge modes |
 | Image Alpha Clean | Clean image alpha edge noise with simple strength presets and optional detection-only output |
@@ -441,6 +444,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎭 Mask Operation Nodes
 | Node Name | Description |
 |-----------|-------------|
+| Mask To Image | Convert a mask into RGB/RGBA image output with hole filling, configurable black/white color mapping, and optional transparent background |
 | Mask Math Ops | Mathematical operations for masks (union, intersection, difference, XOR) |
 | Mask Separate | Separate mask into individual connected regions with sorting and area filtering |
 | Mask Fill Hole | Fill holes in enclosed areas of masks with batch processing support |
@@ -527,9 +531,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|-------------|
 | Multi String Join | Concatenate dynamic `string_X` inputs with `{input}` variable support and comment/triple-quote filtering; customizable separator |
-| Multi Image Batch | Build image batch from dynamic `image_X` with crop/pad/stretch size unification and edge/color padding |
-| Multi Image Overlay | Overlay multiple image layers sequentially with alpha compositing and fit modes |
-| Multi Image Stitch | Dynamic multi-image stitcher with direction, size matching, spacing, and padding color control |
+| Multi Image Batch | Build image batches from dynamic `image_X` with crop/pad/stretch size unification and automatic RGBA preservation when any input has alpha |
+| Multi Image Overlay | Overlay multiple image layers sequentially with alpha compositing, fit modes, and automatic RGBA preservation when any input has alpha |
+| Multi Image Stitch | Dynamic multi-image stitcher with direction, size matching, spacing, padding color control, and automatic RGBA preservation when any input has alpha |
 | Multi Mask Batch | Build mask batch from dynamic `mask_X` with crop/pad/stretch size unification and configurable gray padding |
 | Multi Mask Math Ops | Dynamic multi-mask operations (union/intersection/difference/XOR) with batch broadcasting and size alignment |
 

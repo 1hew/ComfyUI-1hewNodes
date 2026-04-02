@@ -72,6 +72,12 @@ class ImageMainStitch(io.ComfyNode):
             else:
                 others.append(torch.zeros_like(a))
 
+        target_channels = 4 if any(
+            int(t.shape[3]) == 4 for t in [a, *others]
+        ) else 3
+        a = cls._ensure_channels(a, target_channels)
+        others = [cls._ensure_channels(t, target_channels) for t in others]
+
         if len(others) == 0:
             image = a.to(dtype=torch.float32).clamp(0.0, 1.0)
             mask = torch.ones(
@@ -172,7 +178,7 @@ class ImageMainStitch(io.ComfyNode):
         _, hh2, ww2, _ = img2.shape
         _, hh3, ww3, _ = img3.shape
         strip = cls._make_strip(
-            hh2, spacing_width, space_rgb, axis="v", dtype=img2.dtype,
+            hh2, spacing_width, space_rgb, axis="v", channels=int(img2.shape[3]), dtype=img2.dtype,
             device=img2.device, batch_size=batch_size,
         )
 
@@ -199,7 +205,7 @@ class ImageMainStitch(io.ComfyNode):
         _, hh2, ww2, _ = img2.shape
         _, hh3, ww3, _ = img3.shape
         strip = cls._make_strip(
-            spacing_width, ww2, space_rgb, axis="h", dtype=img2.dtype,
+            spacing_width, ww2, space_rgb, axis="h", channels=int(img2.shape[3]), dtype=img2.dtype,
             device=img2.device, batch_size=batch_size,
         )
 
@@ -234,7 +240,7 @@ class ImageMainStitch(io.ComfyNode):
         _, h1, w1, _ = img1.shape
         _, hp, wp, _ = pair.shape
         # 间隔条宽度与最终统一宽度一致
-        strip = cls._make_strip(spacing_width, w1 if match else unified_w, space_rgb, axis="h", dtype=img1.dtype, device=img1.device, batch_size=batch_size)
+        strip = cls._make_strip(spacing_width, w1 if match else unified_w, space_rgb, axis="h", channels=int(img1.shape[3]), dtype=img1.dtype, device=img1.device, batch_size=batch_size)
 
         # mask
         b = img1.shape[0]
@@ -280,7 +286,7 @@ class ImageMainStitch(io.ComfyNode):
         _, h1, w1, _ = img1.shape
         _, hp, wp, _ = pair.shape
         # 间隔条高度与最终统一高度一致
-        strip = cls._make_strip(h1 if match else unified_h, spacing_width, space_rgb, axis="v", dtype=img1.dtype, device=img1.device, batch_size=batch_size)
+        strip = cls._make_strip(h1 if match else unified_h, spacing_width, space_rgb, axis="v", channels=int(img1.shape[3]), dtype=img1.dtype, device=img1.device, batch_size=batch_size)
 
         # mask
         b = img1.shape[0]
@@ -323,7 +329,7 @@ class ImageMainStitch(io.ComfyNode):
 
     @staticmethod
     def _pad_to_rgb(img, target_h, target_w, fill_rgb):
-        """居中填充到指定尺寸，使用 RGB 填充颜色。"""
+        """居中填充到指定尺寸，自动适配当前图像通道数。"""
         b, h, w, c = img.shape
         top = max((target_h - h) // 2, 0)
         left = max((target_w - w) // 2, 0)
@@ -385,7 +391,8 @@ class ImageMainStitch(io.ComfyNode):
             avg_color = avg.view(b, 1, 1, c)
             out[:] = avg_color.expand(b, target_h, target_w, c)
         else:
-            fill_t = torch.tensor(fill_rgb, dtype=img.dtype, device=img.device)
+            fill_value = ImageMainStitch._adapt_fill_to_channels(fill_rgb, c)
+            fill_t = torch.tensor(fill_value, dtype=img.dtype, device=img.device)
             out[:] = fill_t
         out[:, top:h_end, left:w_end, :] = img[:, : h_end - top, : w_end - left, :]
         return out
@@ -401,7 +408,8 @@ class ImageMainStitch(io.ComfyNode):
         out = torch.zeros(
             (b, target_h, target_w, c), dtype=img.dtype, device=img.device
         )
-        fill_t = torch.tensor(fill_rgb, dtype=img.dtype, device=img.device)
+        fill_value = ImageMainStitch._adapt_fill_to_channels(fill_rgb, c)
+        fill_t = torch.tensor(fill_value, dtype=img.dtype, device=img.device)
         out[:] = fill_t
 
         # 计算源裁剪窗口（居中裁剪）
@@ -420,16 +428,18 @@ class ImageMainStitch(io.ComfyNode):
         return out
 
     @staticmethod
-    def _make_strip(h, w, fill_rgb, axis, dtype, device, batch_size=1):
+    def _make_strip(h, w, fill_rgb, axis, channels, dtype, device, batch_size=1):
         """生成间隔条：axis='v' 垂直条，axis='h' 水平条。"""
         if w <= 0:
-            return torch.zeros((batch_size, h, 0, 3), dtype=dtype, device=device)
+            return torch.zeros((batch_size, h, 0, channels), dtype=dtype, device=device)
+        fill_value = ImageMainStitch._adapt_fill_to_channels(fill_rgb, channels)
+        fill_t = torch.tensor(fill_value, dtype=dtype, device=device)
         if axis == "v":
-            out = torch.zeros((batch_size, h, w, 3), dtype=dtype, device=device)
-            out[:] = torch.tensor(fill_rgb, dtype=dtype, device=device)
+            out = torch.zeros((batch_size, h, w, channels), dtype=dtype, device=device)
+            out[:] = fill_t
             return out
-        out = torch.zeros((batch_size, w, h, 3), dtype=dtype, device=device)
-        out[:] = torch.tensor(fill_rgb, dtype=dtype, device=device)
+        out = torch.zeros((batch_size, w, h, channels), dtype=dtype, device=device)
+        out[:] = fill_t
         return out.permute(0, 2, 1, 3)
 
     @staticmethod
@@ -442,6 +452,38 @@ class ImageMainStitch(io.ComfyNode):
         reps = int(math.ceil(batch_size / b))
         tiled = img.repeat(reps, 1, 1, 1)[:batch_size]
         return tiled
+
+    @staticmethod
+    def _ensure_channels(img, target_channels):
+        current_channels = int(img.shape[3])
+        if current_channels == target_channels:
+            return img
+        if current_channels == 3 and target_channels == 4:
+            alpha = torch.ones(
+                (img.shape[0], img.shape[1], img.shape[2], 1),
+                dtype=img.dtype,
+                device=img.device,
+            )
+            return torch.cat([img, alpha], dim=3)
+        if current_channels == 4 and target_channels == 3:
+            return img[:, :, :, :3]
+        return img
+
+    @staticmethod
+    def _adapt_fill_to_channels(fill_rgb, channels):
+        if isinstance(fill_rgb, str):
+            return fill_rgb
+        if not isinstance(fill_rgb, (tuple, list)):
+            return fill_rgb
+        values = list(fill_rgb)
+        if channels == 4:
+            if len(values) >= 4:
+                return tuple(values[:4])
+            if len(values) == 3:
+                return (values[0], values[1], values[2], 1.0)
+        if channels == 3 and len(values) >= 3:
+            return tuple(values[:3])
+        return tuple(values)
     @staticmethod
     def _parse_pad_color(color_str):
         if color_str is None:
@@ -459,7 +501,7 @@ class ImageMainStitch(io.ComfyNode):
             text = text[1:-1].strip()
         single = {
             "r": "red",
-            "g": "green",
+            "g": "lime",
             "b": "blue",
             "c": "cyan",
             "m": "magenta",
@@ -523,7 +565,7 @@ class ImageMainStitch(io.ComfyNode):
             text = text[1:-1].strip()
         single = {
             "r": "red",
-            "g": "green",
+            "g": "lime",
             "b": "blue",
             "c": "cyan",
             "m": "magenta",

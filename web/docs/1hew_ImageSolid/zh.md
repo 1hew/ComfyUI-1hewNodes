@@ -10,7 +10,7 @@
 | `preset_size` | - | COMBO | `custom` | 预设 | 目标尺寸预设；非 `custom` 时覆盖 `width`/`height` |
 | `width` | - | INT | 1024 | 1–8192 | `preset_size=custom` 时的目标宽度 |
 | `height` | - | INT | 1024 | 1–8192 | `preset_size=custom` 时的目标高度 |
-| `color` | - | STRING | `1.0` | 灰度/HEX/RGB | 基础颜色；支持灰度 `0..1`、`R,G,B` 与 HEX |
+| `color` | - | STRING | `1.0` | 灰度/HEX/RGB/名称/单字母 | 基础颜色；支持灰度 `0..1`、`R,G,B`、HEX、颜色名与单字母颜色简写 |
 | `alpha` | - | FLOAT | 1.0 | 0.0–1.0 | 对颜色通道施加的全局透明度系数 |
 | `invert` | - | BOOLEAN | False | - | 颜色通道在应用 `alpha` 前进行反转 |
 | `mask_opacity` | - | FLOAT | 1.0 | 0.0–1.0 | 输出遮罩的不透明度强度 |
@@ -26,7 +26,8 @@
 ## 功能说明
 
 - 尺寸灵活：选择 `preset_size` 或自定义 `width`/`height`；也可按批次从 `get_image_size` 推断每帧尺寸。
-- 颜色解析：支持灰度（`0..1`）、HEX（`#RRGGBB`）、`R,G,B` 与命名颜色。
+- 颜色解析：支持灰度（`0..1`）、HEX（`#RRGGBB`）、`R,G,B`、命名颜色与单字母颜色简写。
+- 单字母简写：如 `r/b/c/m/y/k/w`；其中 `g` 对应 `lime`（亮绿色），不是 `green`。
 - 透明与反转：应用 `alpha`；`invert=True` 在应用 `alpha` 前反转通道。
 - 倍数约束：将尺寸向上取整到可被 `divisible_by` 整除。
 

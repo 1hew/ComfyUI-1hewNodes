@@ -58,7 +58,16 @@ function fitNodeHeight(node) {
     try {
         const computed = node?.computeSize?.([node.size?.[0], node.size?.[1]]);
         if (Array.isArray(computed) && computed.length >= 2) {
-            node.setSize([node.size[0], computed[1]]);
+            let nextH = computed[1];
+            const preserve = node?._comfy1hewPreserveFrameHeightUntilPreview;
+            if (
+                Number.isFinite(preserve)
+                && Number.isFinite(nextH)
+                && nextH < preserve
+            ) {
+                nextH = preserve;
+            }
+            node.setSize([node.size[0], nextH]);
         }
         node?.graph?.setDirtyCanvas?.(true, true);
     } catch (e) {}
@@ -80,6 +89,7 @@ function setPreviewHidden(
     node.properties[PREVIEW_HIDDEN_PROPERTY] = hidden ? 1 : 0;
 
     const items = listPreviewWidgets(node);
+    let layoutChanged = false;
     for (const { widget, element, videos } of items) {
         element.dataset[FORCE_HIDDEN_DATASET_KEY] = hidden ? "1" : "0";
 
@@ -92,6 +102,7 @@ function setPreviewHidden(
                     ),
                     value: widget.computeSize,
                 };
+                layoutChanged = true;
             }
             widget.computeSize = (width) => [width, -4];
         } else if (widget[PREV_COMPUTE_SIZE_STATE_KEY]) {
@@ -102,13 +113,22 @@ function setPreviewHidden(
                 delete widget.computeSize;
             }
             delete widget[PREV_COMPUTE_SIZE_STATE_KEY];
+            layoutChanged = true;
         }
 
         if (hidden) {
-            element.dataset[PREV_DISPLAY_DATASET_KEY] ??= element.style.display ?? "";
+            const prevDisplay = element.style.display ?? "";
+            element.dataset[PREV_DISPLAY_DATASET_KEY] ??= prevDisplay;
+            if (prevDisplay !== "none") {
+                layoutChanged = true;
+            }
             element.style.display = "none";
         } else {
-            element.style.display = element.dataset[PREV_DISPLAY_DATASET_KEY] ?? "";
+            const restoredDisplay = element.dataset[PREV_DISPLAY_DATASET_KEY] ?? "";
+            if ((element.style.display ?? "") !== restoredDisplay) {
+                layoutChanged = true;
+            }
+            element.style.display = restoredDisplay;
             delete element.dataset[PREV_DISPLAY_DATASET_KEY];
         }
 
@@ -124,7 +144,12 @@ function setPreviewHidden(
     try {
         node?.updateVideoLayout?.();
     } catch (e) {}
-    fitNodeHeight(node);
+    try {
+        node?.updateImageLayout?.();
+    } catch (e) {}
+    if (layoutChanged) {
+        fitNodeHeight(node);
+    }
 }
 
 function syncPreview(nodes) {

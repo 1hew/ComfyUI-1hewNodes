@@ -56,63 +56,108 @@ class ImageBlendModeByCSS(io.ComfyNode):
     ) -> io.NodeOutput:
         pct = float(max(0.0, min(100.0, blend_percentage)))
         opacity = pct / 100.0
-
-        base_image = cls._rgba_to_rgb(base_image)
-        overlay_image = cls._rgba_to_rgb(overlay_image)
-
         base_image = base_image.to(torch.float32).clamp(0.0, 1.0)
         overlay_image = overlay_image.to(torch.float32).clamp(0.0, 1.0)
+        base_has_alpha = int(base_image.shape[-1]) == 4
 
-        bs_base = base_image.shape[0]
-        bs_ov = overlay_image.shape[0]
+        base_rgba = cls._ensure_rgba(base_image)
+        overlay_rgba = cls._ensure_rgba(overlay_image)
+
+        bs_base = base_rgba.shape[0]
+        bs_ov = overlay_rgba.shape[0]
         max_bs = max(bs_base, bs_ov)
 
-        device = base_image.device
+        device = base_rgba.device
         out_imgs: list[torch.Tensor] = []
 
         for b in range(max_bs):
             i_base = b % bs_base
             i_ov = b % bs_ov
 
-            base = base_image[i_base]
-            ov = overlay_image[i_ov]
+            base = base_rgba[i_base]
+            ov = overlay_rgba[i_ov]
 
             if base.shape[:2] != ov.shape[:2]:
                 ov = cls._resize_tensor_image(ov, (base.shape[1], base.shape[0]))
                 ov = ov.to(base.device)
 
-            blended = cls._apply_css_blend(base, ov, blend_mode)
-            blended = base * (1.0 - opacity) + blended * opacity
+            base_rgb = base[:, :, :3]
+            base_alpha = base[:, :, 3:4]
+            ov_rgb = ov[:, :, :3]
+            ov_alpha = ov[:, :, 3:4]
+
+            blended_rgb = cls._apply_css_blend(base_rgb, ov_rgb, blend_mode)
+            effective_alpha = ov_alpha * opacity
 
             if overlay_mask is not None:
-                bs_mask = overlay_mask.shape[0]
-                m = overlay_mask[b % bs_mask]
+                current_mask_batch = overlay_mask
+                if current_mask_batch.ndim == 2:
+                    current_mask_batch = current_mask_batch.unsqueeze(0)
+                if current_mask_batch.ndim == 4 and int(current_mask_batch.shape[-1]) >= 1:
+                    current_mask_batch = current_mask_batch[:, :, :, 0]
+                if current_mask_batch.ndim != 3:
+                    raise ValueError("overlay_mask shape must be [H,W], [B,H,W], or [B,H,W,C]")
+                bs_mask = current_mask_batch.shape[0]
+                m = current_mask_batch[b % bs_mask]
                 if invert_mask:
                     m = 1.0 - m
                 if m.shape[:2] != base.shape[:2]:
                     m = cls._resize_tensor_mask(m, (base.shape[1], base.shape[0]))
-                m = m.to(base.device).unsqueeze(-1).expand_as(base)
-                blended = base * (1.0 - m) + blended * m
+                m = m.to(base.device).unsqueeze(-1)
+                effective_alpha = effective_alpha * m
 
-            out_imgs.append(blended)
+            out_alpha = effective_alpha + base_alpha * (1.0 - effective_alpha)
+            out_rgb_premult = (
+                blended_rgb * effective_alpha
+                + base_rgb * base_alpha * (1.0 - effective_alpha)
+            )
+            safe_alpha = torch.where(
+                out_alpha > 1e-6,
+                out_alpha,
+                torch.ones_like(out_alpha),
+            )
+            out_rgb = torch.where(
+                out_alpha > 1e-6,
+                out_rgb_premult / safe_alpha,
+                torch.zeros_like(out_rgb_premult),
+            )
+            result_rgba = torch.cat([out_rgb, out_alpha], dim=2)
+            out_imgs.append(result_rgba if base_has_alpha else result_rgba[:, :, :3])
 
         result = torch.stack(out_imgs).to(device).clamp(0.0, 1.0).to(torch.float32)
         return io.NodeOutput(result)
 
     @staticmethod
-    def _rgba_to_rgb(img: torch.Tensor) -> torch.Tensor:
-        if img.shape[-1] == 4:
-            rgb = img[:, :, :, :3]
-            a = img[:, :, :, 3:4]
-            white = torch.ones_like(rgb)
-            return (rgb * a + white * (1.0 - a)).to(torch.float32)
-        return img
+    def _ensure_rgba(img: torch.Tensor) -> torch.Tensor:
+        channels = int(img.shape[-1])
+        if channels == 4:
+            return img
+        if channels == 3:
+            alpha = torch.ones(
+                (img.shape[0], img.shape[1], img.shape[2], 1),
+                dtype=img.dtype,
+                device=img.device,
+            )
+            return torch.cat([img, alpha], dim=3)
+        if channels == 1:
+            rgb = img.repeat(1, 1, 1, 3)
+            alpha = torch.ones(
+                (img.shape[0], img.shape[1], img.shape[2], 1),
+                dtype=img.dtype,
+                device=img.device,
+            )
+            return torch.cat([rgb, alpha], dim=3)
+        if channels > 4:
+            return img[:, :, :, :4]
+        raise ValueError(f"unsupported image channels: {channels}")
 
     @staticmethod
     def _resize_tensor_image(t: torch.Tensor, size: tuple[int, int]) -> torch.Tensor:
         np_img = (t.detach().cpu().numpy() * 255).astype(np.uint8)
         pil = Image.fromarray(np_img)
-        if pil.mode != "RGB":
+        if int(t.shape[-1]) == 4:
+            pil = pil.convert("RGBA")
+        elif pil.mode != "RGB":
             pil = pil.convert("RGB")
         pil = pil.resize(size, Image.Resampling.LANCZOS)
         out = np.array(pil).astype(np.float32) / 255.0

@@ -10,7 +10,7 @@
 | `preset_size` | - | COMBO | `custom` | presets | Target size preset; when not `custom`, overrides `width`/`height`. |
 | `width` | - | INT | 1024 | 1–8192 | Target width when `preset_size=custom`. |
 | `height` | - | INT | 1024 | 1–8192 | Target height when `preset_size=custom`. |
-| `color` | - | STRING | `1.0` | Gray/HEX/RGB | Base color; supports `0..1` gray, `R,G,B`, HEX, and names. |
+| `color` | - | STRING | `1.0` | Gray/HEX/RGB/name/single-letter | Base color; supports `0..1` gray, `R,G,B`, HEX, named colors, and single-letter color aliases. |
 | `alpha` | - | FLOAT | 1.0 | 0.0–1.0 | Global alpha applied to `color` channels. |
 | `invert` | - | BOOLEAN | False | - | Invert color channels before applying `alpha`. |
 | `mask_opacity` | - | FLOAT | 1.0 | 0.0–1.0 | Mask intensity for output mask. |
@@ -26,7 +26,8 @@
 ## Features
 
 - Flexible sizing: use `preset_size` or custom `width`/`height`; optionally infer size from `get_image_size` per frame.
-- Color parsing: supports gray (`0..1`), HEX (`#RRGGBB`), `R,G,B`, and named colors.
+- Color parsing: supports gray (`0..1`), HEX (`#RRGGBB`), `R,G,B`, named colors, and single-letter aliases.
+- Single-letter aliases include entries such as `r/b/c/m/y/k/w`; note that `g` maps to `lime` rather than `green`.
 - Alpha/invert: applies `alpha` scaling; `invert=True` flips channels before alpha.
 - Divisibility: rounds up dimensions to be divisible by `divisible_by`.
 

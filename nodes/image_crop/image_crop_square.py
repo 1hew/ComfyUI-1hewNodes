@@ -425,7 +425,7 @@ class ImageCropSquare(io.ComfyNode):
         # 单字母映射到颜色名称
         single = {
             "r": "red",
-            "g": "green",
+            "g": "lime",
             "b": "blue",
             "c": "cyan",
             "m": "magenta",

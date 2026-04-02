@@ -134,6 +134,11 @@ class DetectRemoveBG(io.ComfyNode):
                 edge_softness=1.0,
             )
         else:
+            if model_bundle is None:
+                raise RuntimeError(
+                    f"Model '{model}' could not be loaded. Check the console for [WARNING] messages "
+                    "(download failure, missing dependencies, or ONNX/session init errors)."
+                )
             alpha = cls._infer_model_alpha(rgb, model, model_bundle)
             if alpha is None:
                 raise RuntimeError(f"Model inference returned no alpha for model={model}.")
@@ -256,9 +261,13 @@ class DetectRemoveBG(io.ComfyNode):
                     return None
             try:
                 import onnxruntime as ort
-            except Exception:
+            except Exception as e:
                 cls.log("Missing dependency 'onnxruntime' for RMBG-2.0 single-file mode.", "warning")
-                return None
+                raise RuntimeError(
+                    "RMBG-2.0 requires the 'onnxruntime' package. "
+                    "Install it in the same Python environment as ComfyUI: pip install onnxruntime "
+                    "(or onnxruntime-gpu for CUDA; match your CUDA version)."
+                ) from e
             providers = ["CPUExecutionProvider"]
             sess_options = ort.SessionOptions()
             sess_options.log_severity_level = 3

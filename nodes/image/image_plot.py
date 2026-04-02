@@ -64,8 +64,7 @@ class ImagePlot(io.ComfyNode):
         
         async def _to_pil(frame):
             def _do(frame_):
-                arr = 255.0 * frame_.cpu().numpy()
-                pil = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+                pil = cls._tensor_to_pil_image(frame_)
                 return pil.convert("RGBA" if has_alpha else "RGB")
             return await asyncio.to_thread(_do, frame)
 
@@ -149,8 +148,9 @@ class ImagePlot(io.ComfyNode):
         # 转换为PIL图像
         pil_images = []
         for img_tensor in normalized_images:
-            img_np = (img_tensor.cpu().numpy() * 255).astype(np.uint8)
-            pil_img = Image.fromarray(img_np).convert("RGBA" if has_alpha else "RGB")
+            pil_img = cls._tensor_to_pil_image(img_tensor).convert(
+                "RGBA" if has_alpha else "RGB"
+            )
             pil_images.append(pil_img)
         
         # 解析背景颜色
@@ -185,29 +185,29 @@ class ImagePlot(io.ComfyNode):
         widths = [img.width for img in pil_images]
         heights = [img.height for img in pil_images]
         num_images = len(pil_images)
+
+        placements: list[tuple[Image.Image, int, int]] = []
         
         if layout == "horizontal":
             # 水平排列
             total_width = sum(widths) + spacing * (num_images - 1)
-            max_height = max(heights)
-            result_img = Image.new(mode, (total_width, max_height), bg_color)
+            total_height = max(heights)
             
             x_offset = 0
             for img in pil_images:
-                y_offset = (max_height - img.height) // 2
-                result_img.paste(img, (x_offset, y_offset), img if mode == "RGBA" else None)
+                y_offset = (total_height - img.height) // 2
+                placements.append((img, x_offset, y_offset))
                 x_offset += img.width + spacing
                 
         elif layout == "vertical":
             # 垂直排列
-            max_width = max(widths)
+            total_width = max(widths)
             total_height = sum(heights) + spacing * (num_images - 1)
-            result_img = Image.new(mode, (max_width, total_height), bg_color)
             
             y_offset = 0
             for img in pil_images:
-                x_offset = (max_width - img.width) // 2
-                result_img.paste(img, (x_offset, y_offset), img if mode == "RGBA" else None)
+                x_offset = (total_width - img.width) // 2
+                placements.append((img, x_offset, y_offset))
                 y_offset += img.height + spacing
                 
         else:  # "grid" - 网格模式
@@ -229,9 +229,7 @@ class ImagePlot(io.ComfyNode):
             # 计算总宽度和总高度
             total_width = sum(max_width_per_col) + spacing * (cols - 1)
             total_height = sum(max_height_per_row) + spacing * (rows - 1)
-            
-            result_img = Image.new(mode, (total_width, total_height), bg_color)
-            
+
             # 放置图像
             for i, img in enumerate(pil_images[:rows * cols]):
                 row = i // cols
@@ -244,13 +242,28 @@ class ImagePlot(io.ComfyNode):
                 # 在当前单元格内居中
                 x_center = (max_width_per_col[col] - img.width) // 2
                 y_center = (max_height_per_row[row] - img.height) // 2
-                
-                result_img.paste(
-                    img,
-                    (x_offset + x_center, y_offset + y_center),
-                    img if mode == "RGBA" else None,
+
+                placements.append((img, x_offset + x_center, y_offset + y_center))
+
+        canvas_size = (total_width, total_height)
+        if mode == "RGBA":
+            result_img = Image.new(mode, canvas_size, (0, 0, 0, 0))
+            for img, x_offset, y_offset in placements:
+                result_img.paste(img, (x_offset, y_offset), img)
+
+            fill_mask = Image.new("L", canvas_size, 255)
+            for img, x_offset, y_offset in placements:
+                fill_mask.paste(
+                    0,
+                    (x_offset, y_offset, x_offset + img.width, y_offset + img.height),
                 )
-        
+            background_img = Image.new(mode, canvas_size, bg_color)
+            result_img.paste(background_img, (0, 0), fill_mask)
+            return result_img
+
+        result_img = Image.new(mode, canvas_size, bg_color)
+        for img, x_offset, y_offset in placements:
+            result_img.paste(img, (x_offset, y_offset), None)
         return result_img
     
     @classmethod
@@ -273,6 +286,20 @@ class ImagePlot(io.ComfyNode):
             normalized.append(img)
         
         return normalized
+
+    @staticmethod
+    def _tensor_to_pil_image(image_tensor: torch.Tensor) -> Image.Image:
+        image_np = np.clip(
+            image_tensor.detach().cpu().numpy() * 255.0, 0, 255
+        ).astype(np.uint8)
+        channels = int(image_np.shape[2]) if image_np.ndim == 3 else 1
+        if channels == 4:
+            return Image.fromarray(image_np, mode="RGBA")
+        if channels == 3:
+            return Image.fromarray(image_np, mode="RGB")
+        if channels == 1:
+            return Image.fromarray(image_np[:, :, 0], mode="L")
+        return Image.fromarray(image_np[:, :, :3], mode="RGB")
     
     @classmethod
     def _parse_color(cls, color_str, has_alpha=False):
@@ -285,6 +312,10 @@ class ImagePlot(io.ComfyNode):
                     return (color_str[0], color_str[1], color_str[2], 255)
             return color_str[:3] if len(color_str) >= 3 else (255, 255, 255)
         color_str = str(color_str).strip()
+        lower_text = color_str.lower()
+
+        if has_alpha and lower_text in {"", "transparent", "none", "null", "off", "disable", "disabled"}:
+            return (0, 0, 0, 0)
         
         # 尝试解析为灰度值 (0.0-1.0)
         try:
@@ -314,8 +345,17 @@ class ImagePlot(io.ComfyNode):
                 return (r, g, b)
             except ValueError:
                 pass
+        if has_alpha and len(hex_color) == 8:
+            try:
+                r = int(hex_color[0:2], 16)
+                g = int(hex_color[2:4], 16)
+                b = int(hex_color[4:6], 16)
+                a = int(hex_color[6:8], 16)
+                return (r, g, b, a)
+            except ValueError:
+                pass
         
-        # 尝试解析为RGB格式 (R,G,B)
+        # 尝试解析为RGB/RGBA格式
         try:
             rgb = color_str.split(',')
             if len(rgb) == 3:
@@ -325,6 +365,12 @@ class ImagePlot(io.ComfyNode):
                 if has_alpha:
                     return (r, g, b, 255)
                 return (r, g, b)
+            if has_alpha and len(rgb) == 4:
+                r = int(rgb[0].strip())
+                g = int(rgb[1].strip())
+                b = int(rgb[2].strip())
+                a = int(rgb[3].strip())
+                return (r, g, b, a)
         except ValueError:
             pass
         

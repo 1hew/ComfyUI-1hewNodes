@@ -1,6 +1,6 @@
 # Image Main Stitch - Main-image anchored stitching
 
-**Node Purpose:** `Image Main Stitch` stitches `image_2..image_N` into a group, then attaches the group to `image_1` along a chosen direction with optional spacing. It outputs a mask that marks the `image_1` region as `1` and the stitched-group/spacing region as `0`.
+**Node Purpose:** `Image Main Stitch` stitches `image_2..image_N` into a group, then attaches the group to `image_1` along a chosen direction with optional spacing. It outputs a mask that marks the `image_1` region as `1` and the stitched-group/spacing region as `0`. If any input has alpha, the node switches to RGBA processing and automatically outputs RGBA.
 
 ## Inputs
 
@@ -28,6 +28,7 @@
 - Dynamic inputs: accepts `image_2..image_N` and stitches them in ascending index order.
 - Two-stage layout: builds the group first, then attaches it to `image_1` based on `direction`.
 - Batch broadcasting: repeats smaller batches to the maximum batch size across all inputs.
+- Channel rule: if any input has alpha, the main image, stitched group, spacing strips, and padded areas are all handled in RGBA and the output preserves alpha automatically.
 - Size reconciliation:
   - `match_image_size=True`: resizes with bicubic interpolation while preserving aspect ratio.
   - `match_image_size=False`: uses centered padding with `pad_color` for size alignment.
@@ -45,3 +46,4 @@
 
 - When only `image_1` is provided, the node returns `image_1` and a full-white mask.
 - `spacing_width=0` yields a direct adjacency between regions.
+- When the output is RGBA, explicit `spacing_color` and `pad_color` values are automatically extended with opaque alpha.

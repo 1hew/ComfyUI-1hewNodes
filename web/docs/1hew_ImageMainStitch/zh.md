@@ -1,6 +1,6 @@
 # Image Main Stitch - 主画面拼接
 
-**节点功能：** `Image Main Stitch` 节点以 `image_1` 为主画面锚点，将 `image_2..image_N` 先拼接成组合，再按 `direction` 与主画面合并，并可添加间隔条。输出的 `mask` 将 `image_1` 区域标记为 `1`，组合与间隔区域标记为 `0`。
+**节点功能：** `Image Main Stitch` 节点以 `image_1` 为主画面锚点，将 `image_2..image_N` 先拼接成组合，再按 `direction` 与主画面合并，并可添加间隔条。输出的 `mask` 将 `image_1` 区域标记为 `1`，组合与间隔区域标记为 `0`。任一输入带 alpha 时，节点会统一按 RGBA 处理并自动输出 RGBA。
 
 ## 输入
 
@@ -28,6 +28,7 @@
 - 动态输入：支持 `image_2..image_N`，并按编号从小到大顺序拼接。
 - 两阶段布局：先构建组合，再按 `direction` 与主画面合并。
 - 批次广播：输入批次大小自动扩展到最大批次，便于批处理。
+- 通道规则：任一输入带 alpha 时，主图、组合图、间隔条与补边区域都会按 RGBA 处理，输出自动保留 alpha。
 - 尺寸对齐：
   - `match_image_size=True`：使用双三次插值等比缩放并保持比例。
   - `match_image_size=False`：使用 `pad_color` 进行居中填充对齐尺寸。
@@ -45,3 +46,4 @@
 
 - 仅连接 `image_1` 时，节点输出 `image_1` 与全白 `mask`。
 - `spacing_width=0` 时区域之间直接贴合。
+- 当输出为 RGBA 时，显式 `spacing_color` / `pad_color` 会自动补成不透明 alpha。

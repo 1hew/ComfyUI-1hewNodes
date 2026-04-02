@@ -285,6 +285,7 @@ export function installImagePreviewLayout({
     container,
     imageEl,
     allWidget,
+    fileWidget,
 }) {
     const getMaxPreviewHeight = () => {
         const maxPreviewHeight =
@@ -361,6 +362,15 @@ export function installImagePreviewLayout({
             desiredHeight = Math.min(desiredHeight, 420);
         }
 
+        const preserve = node._comfy1hewPreserveFrameHeightUntilPreview;
+        if (
+            Number.isFinite(preserve)
+            && Number.isFinite(desiredHeight)
+            && desiredHeight < preserve
+        ) {
+            desiredHeight = preserve;
+        }
+
         if (
             (allowShrink && Math.abs(node.size[1] - desiredHeight) > 1)
             || (!allowShrink && node.size[1] + 1 < desiredHeight)
@@ -374,19 +384,57 @@ export function installImagePreviewLayout({
         }
     };
 
-    const requestAutoSize = () => {
+    const requestAutoSize = ({ allowShrink = false, force = false } = {}) => {
         if (!imageEl.naturalWidth || !imageEl.naturalHeight) {
             return;
         }
         const key = `${imageEl.naturalWidth}x${imageEl.naturalHeight}`;
-        if (node._comfy1hewImageAutoSizeKey === key) {
+        if (!force && node._comfy1hewImageAutoSizeKey === key) {
             return;
         }
         node._comfy1hewImageAutoSizeKey = key;
-        setTimeout(() => autoSizeToContent(), 0);
+        setTimeout(() => autoSizeToContent({ allowShrink }), 0);
     };
 
     node._comfy1hewLastPreviewNodeWidth ??= node.size?.[0];
+
+    const minPreviewHeightFromPreservedFrame = (fallback) => {
+        const p = node._comfy1hewPreserveFrameHeightUntilPreview;
+        if (!Number.isFinite(p) || !Number.isFinite(fallback)) {
+            return fallback;
+        }
+        if (Number.isFinite(imageWidget?.last_y)) {
+            const slice = p - imageWidget.last_y - 15;
+            return slice > 0 ? Math.max(fallback, slice) : fallback;
+        }
+        const baseGuess = 130;
+        const slice = p - baseGuess - 15;
+        if (slice > 40) {
+            return Math.max(fallback, Math.min(220, slice));
+        }
+        return fallback;
+    };
+
+    const computePlaceholderPreviewHeight = () => {
+        let placeholderH = 100;
+        if (Number.isFinite(imageWidget?.last_y)) {
+            placeholderH = Math.max(
+                0,
+                node.size[1] - imageWidget.last_y - 15,
+            );
+        } else if (Array.isArray(node.size) && node.size[1] > 140) {
+            const baseGuess = 130;
+            placeholderH = Math.max(
+                40,
+                Math.min(220, node.size[1] - baseGuess),
+            );
+        }
+        if (placeholderH < 40) {
+            placeholderH = 100;
+        }
+        return minPreviewHeightFromPreservedFrame(placeholderH);
+    };
+
     const updateLayout = () => {
         if (container.dataset.comfy1hewForceHidden === "1") {
             container.style.height = "0px";
@@ -394,7 +442,36 @@ export function installImagePreviewLayout({
             app.graph.setDirtyCanvas(true, true);
             return;
         }
+        // 复制节点 / 刚设置 src 时：DOM 上可能已有 <img> 尺寸，但 widget.aspectRatio 尚未写入。
+        // 若此时走「无比例则 display:none」，会出现整段预览被关掉再打开的可见闪烁。
+        if (
+            !imageWidget?.aspectRatio
+            && imageEl?.naturalWidth > 0
+            && imageEl?.naturalHeight > 0
+        ) {
+            imageWidget.aspectRatio = imageEl.naturalHeight / imageEl.naturalWidth;
+        }
+
+        const hasSrc = Boolean(
+            imageEl?.src && String(imageEl.src).trim() !== "",
+        );
+        const stillDecoding =
+            hasSrc
+            && (!imageEl.naturalWidth || !imageEl.naturalHeight);
+        const filePathTrim = String(fileWidget?.value ?? "").trim();
+        const awaitingFileLoad = Boolean(filePathTrim && !hasSrc);
+
         if (!imageWidget?.aspectRatio) {
+            const holdPlaceholder =
+                stillDecoding
+                || awaitingFileLoad
+                || Number.isFinite(node._comfy1hewPreserveFrameHeightUntilPreview);
+            if (holdPlaceholder) {
+                container.style.display = "flex";
+                container.style.height = `${computePlaceholderPreviewHeight()}px`;
+                app.graph.setDirtyCanvas(true, true);
+                return;
+            }
             container.style.height = "0px";
             container.style.display = "none";
             app.graph.setDirtyCanvas(true, true);
@@ -424,6 +501,7 @@ export function installImagePreviewLayout({
         }
 
         if (availableHeight < 0) availableHeight = 0;
+        availableHeight = minPreviewHeightFromPreservedFrame(availableHeight);
         container.style.height = `${availableHeight}px`;
 
         app.graph.setDirtyCanvas(true, true);
@@ -452,7 +530,27 @@ export function installImagePreviewLayout({
         return r2;
     };
 
-    return { autoSizeToContent, requestAutoSize, updateLayout };
+    const ensurePreviewLayout = ({
+        allowShrink = false,
+        forceAutoSize = false,
+    } = {}) => {
+        if (container.dataset.comfy1hewForceHidden === "1") {
+            updateLayout();
+            return;
+        }
+
+        if (imageEl.naturalWidth && imageEl.naturalHeight) {
+            imageWidget.aspectRatio = imageEl.naturalHeight / imageEl.naturalWidth;
+        }
+
+        requestAutoSize({ allowShrink, force: forceAutoSize });
+        updateLayout();
+    };
+
+    node.updateImageLayout = updateLayout;
+    node._comfy1hewEnsurePreviewLayout = ensurePreviewLayout;
+
+    return { autoSizeToContent, requestAutoSize, updateLayout, ensurePreviewLayout };
 }
 
 export function installVideoPreviewLayout({

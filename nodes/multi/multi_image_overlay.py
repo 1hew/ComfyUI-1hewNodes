@@ -9,7 +9,7 @@ from comfy_api.latest import io
 class MultiImageOverlay(io.ComfyNode):
     """
     多图层叠加：
-    - 按 image_1 -> image_2 -> image_3... 顺序依次叠加
+    - image_1 为最上层，数字越大越靠底层
     - RGBA 输入使用 alpha 做正常图层合成
     - RGB 输入视为不透明图层
     """
@@ -27,7 +27,6 @@ class MultiImageOverlay(io.ComfyNode):
                     default="center",
                 ),
                 io.String.Input("color", default="1.0"),
-                io.Boolean.Input("output_alpha", default=False),
                 io.Image.Input("image_1"),
             ],
             outputs=[io.Image.Output(display_name="image")],
@@ -38,7 +37,6 @@ class MultiImageOverlay(io.ComfyNode):
         cls,
         fit_mode: str,
         color: str = "1.0",
-        output_alpha: bool = False,
         **kwargs,
     ) -> io.NodeOutput:
         ordered = []
@@ -56,19 +54,20 @@ class MultiImageOverlay(io.ComfyNode):
                 images.append(value.to(dtype=torch.float32).clamp(0.0, 1.0))
 
         if not images:
-            empty_channels = 4 if bool(output_alpha) else 3
-            empty = torch.zeros((0, 64, 64, empty_channels), dtype=torch.float32)
+            empty = torch.zeros((0, 64, 64, 3), dtype=torch.float32)
             return io.NodeOutput(empty)
 
+        preserve_alpha = any(int(image.shape[3]) == 4 for image in images)
         batch_size = max(int(image.shape[0]) for image in images)
         images = [cls._broadcast_image(image, batch_size) for image in images]
+        stack_images = list(reversed(images))
 
-        canvas = cls._ensure_rgba(images[0])
+        canvas = cls._ensure_rgba(stack_images[0])
         target_h = int(canvas.shape[1])
         target_w = int(canvas.shape[2])
 
         result = canvas
-        for image in images[1:]:
+        for image in stack_images[1:]:
             overlay = cls._ensure_rgba(image)
             overlay = cls._fit_to_canvas(overlay, target_h, target_w, fit_mode)
             result = cls._alpha_composite(result, overlay)
@@ -80,7 +79,7 @@ class MultiImageOverlay(io.ComfyNode):
             result,
             background_rgb=background_rgb,
             background_enabled=background_enabled,
-            output_alpha=bool(output_alpha),
+            preserve_alpha=preserve_alpha,
         )
 
         result = result.clamp(0.0, 1.0).to(torch.float32)
@@ -214,10 +213,10 @@ class MultiImageOverlay(io.ComfyNode):
         image: torch.Tensor,
         background_rgb: tuple[float, float, float],
         background_enabled: bool,
-        output_alpha: bool,
+        preserve_alpha: bool,
     ) -> torch.Tensor:
         image = image.clamp(0.0, 1.0)
-        if output_alpha:
+        if preserve_alpha:
             return image
 
         background = background_rgb if background_enabled else (1.0, 1.0, 1.0)
@@ -257,7 +256,7 @@ class MultiImageOverlay(io.ComfyNode):
 
         single = {
             "r": "red",
-            "g": "green",
+            "g": "lime",
             "b": "blue",
             "c": "cyan",
             "m": "magenta",

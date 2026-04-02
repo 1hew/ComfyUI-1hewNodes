@@ -33,4 +33,5 @@
 ## Notes & Tips
 
 - Backend dependencies vary; missing packages will be reported in logs.
+- `RMBG-2.0` single-file mode requires `onnxruntime`; when missing, the node now raises a direct install hint for the current ComfyUI Python environment.
 - For cleaner edges and decontamination, feed the output mask into `Detect Remove BG Refine` as a post-processing step.

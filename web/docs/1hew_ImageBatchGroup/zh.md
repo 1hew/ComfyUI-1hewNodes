@@ -10,7 +10,7 @@
 | `batch_size` | - | INT | 81 | 1-1024 | 每组窗口大小 |
 | `overlap` | - | INT | 0 | 0-1024 | 相邻窗口的重叠帧数 |
 | `last_batch_mode` | - | COMBO | `backtrack_last` | `drop_incomplete` / `keep_remaining` / `backtrack_last` / `fill_color` | 最后窗口处理策略 |
-| `color` | - | STRING | `1.0` | 灰度/HEX/RGB/名称 | 当使用 `fill_color` 时的填充颜色；支持 `0.0-1.0`、`R,G,B`、HEX 与名称（如 `red`、`white`） |
+| `color` | - | STRING | `1.0` | 灰度/HEX/RGB/名称/单字母 | 当使用 `fill_color` 时的填充颜色；支持 `0.0-1.0`、`R,G,B`、HEX、颜色名与单字母颜色简写 |
 
 ## 输出
 
@@ -32,6 +32,7 @@
   - `backtrack_last`：回溯调整最后窗口起点，使最后一窗完整对齐末尾。
   - `fill_color`：用纯色帧填充，使所有窗口满大小；输出包含填充后的批次。
 - 颜色解析：支持灰度浮点、`R,G,B`（0–1 自动转换）、HEX、单字母缩写（`r/g/b/c/m/y/k/w`）与常见颜色名。
+- 单字母简写中，`g` 对应 `lime`（亮绿色），不是 `green`。
 - 有效帧数：最后一组会反映真实（非填充）帧数量。
 
 ## 典型用法

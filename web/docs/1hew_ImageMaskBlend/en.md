@@ -43,4 +43,4 @@
 
 - Provide masks at or near image size for best fidelity; resizing is handled automatically.
 - Negative `expansion` shrinks selections; combine with small `feather` to avoid aliasing.
-- Named colors and shorthand codes are supported; invalid inputs fall back to white.
+- Named colors and shorthand codes are supported; note that single-letter `g` maps to `lime` rather than `green`; invalid inputs fall back to white.

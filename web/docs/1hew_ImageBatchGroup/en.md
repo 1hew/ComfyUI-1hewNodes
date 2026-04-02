@@ -10,7 +10,7 @@
 | `batch_size` | - | INT | 81 | 1-1024 | Window size per group. |
 | `overlap` | - | INT | 0 | 0-1024 | Overlap frames between consecutive windows. |
 | `last_batch_mode` | - | COMBO | `backtrack_last` | `drop_incomplete` / `keep_remaining` / `backtrack_last` / `fill_color` | Strategy for the final window. |
-| `color` | - | STRING | `1.0` | grayscale/HEX/RGB/named | Background color when `fill_color` is used; supports `0.0-1.0`, `R,G,B`, HEX, and names (`red`, `white`, etc.). |
+| `color` | - | STRING | `1.0` | grayscale/HEX/RGB/name/single-letter | Background color when `fill_color` is used; supports `0.0-1.0`, `R,G,B`, HEX, named colors, and single-letter aliases. |
 
 ## Outputs
 
@@ -32,6 +32,7 @@
   - `backtrack_last`: shift final start to align the last full window to the end.
   - `fill_color`: pad with solid frames so all windows are full-size; returns the padded batch.
 - Color parsing: accepts grayscale floats, `R,G,B` (0–1 auto-converted), HEX, single-letter shortcuts (`r/g/b/c/m/y/k/w`), and named colors.
+- In the single-letter shortcuts, `g` maps to `lime` rather than `green`.
 - Valid counts: last window reflects actual, non-padded frames when applicable.
 
 ## Typical Usage

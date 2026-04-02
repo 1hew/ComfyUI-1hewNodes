@@ -1,6 +1,6 @@
 # Image Blend Mode by Alpha - Alpha-driven Layer Blending
 
-**Node Purpose:** `Image Blend Mode by Alpha` blends an overlay image onto a base image using a wide set of professional blend modes and an overall `opacity`. Supports optional per-pixel `overlay_mask`, RGBA-to-RGB normalization, size alignment, and robust batch handling.
+**Node Purpose:** `Image Blend Mode by Alpha` blends an overlay image onto a base image using a wide set of professional blend modes and an overall `opacity`. Supports optional per-pixel `overlay_mask`, RGBA-aware blending, size alignment, and robust batch handling.
 
 ## Inputs
 
@@ -23,7 +23,8 @@
 ## Features
 
 - Professional blend set: normal, dissolve, darken/lighten, multiply/screen, burn/dodge (color/linear), add/subtract/divide, overlay/soft/hard/linear/vivid/pin/hard mix, difference/exclusion, plus HSL-based hue/saturation/color/luminosity.
-- RGBA normalization: flattens alpha against white to ensure consistent RGB blending.
+- RGBA support: both `overlay_image` and `base_image` may contain alpha, and the overlay alpha participates in blending.
+- Output rule: if `base_image` has alpha, the node outputs RGBA; otherwise it outputs RGB.
 - Size alignment: overlay is resized to match base dimensions when needed.
 - Masked blending: optional `overlay_mask` replaces base with blended result only where mask>0; `invert_mask` flips selection.
 - Batch robustness: mismatched batch sizes are expanded by repeating smaller batches; mask batches loop over images.
@@ -41,4 +42,4 @@
 - `opacity` scales the blended result against the base; combine with masks for precise control.
 - `divide` guards against division by zero internally; results are clamped to valid ranges.
 - `dissolve` introduces randomness; higher `opacity` increases the proportion of overlay pixels.
-- RGBA inputs are flattened to white; for different background assumptions, pre-process images accordingly.
+- If you want the final result to keep transparency, feed `base_image` as RGBA.

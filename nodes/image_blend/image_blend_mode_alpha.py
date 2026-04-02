@@ -52,84 +52,67 @@ class ImageBlendModeByAlpha(io.ComfyNode):
         invert_mask: bool,
         overlay_mask: torch.Tensor | None = None,
     ) -> io.NodeOutput:
-        # 归一化输入
         base_image = torch.clamp(base_image, 0.0, 1.0).to(torch.float32)
         overlay_image = torch.clamp(overlay_image, 0.0, 1.0).to(torch.float32)
+        base_has_alpha = int(base_image.shape[-1]) == 4
 
-        # 若叠加图为 RGBA，单独保留其 alpha 参与叠加权重
-        overlay_alpha = cls._extract_alpha_channel(overlay_image)
+        base_rgba = cls._ensure_rgba(base_image)
+        overlay_rgba = cls._ensure_rgba(overlay_image)
 
-        # 检查并转换 RGBA 图像为 RGB
-        base_image = cls._convert_rgba_to_rgb(base_image)
-        overlay_image = cls._drop_alpha_channel(overlay_image)
-        batch_size = max(base_image.shape[0], overlay_image.shape[0])
-        base_image = cls._repeat_to_batch_size(base_image, batch_size)
-        overlay_image = cls._repeat_to_batch_size(overlay_image, batch_size)
-        if overlay_alpha is not None:
-            overlay_alpha = cls._repeat_to_batch_size(overlay_alpha, batch_size)
-        
-        # 处理叠加图层
-        blended = cls._apply_blend(base_image, overlay_image, blend_mode, opacity, overlay_fit)
+        batch_size = max(base_rgba.shape[0], overlay_rgba.shape[0])
+        base_rgba = cls._repeat_to_batch_size(base_rgba, batch_size)
+        overlay_rgba = cls._repeat_to_batch_size(overlay_rgba, batch_size)
 
-        # 叠加图含 alpha 时，将 alpha 作为额外混合权重
-        if overlay_alpha is not None:
-            base_height, base_width = base_image.shape[1:3]
-            overlay_alpha = cls._fit_alpha_to_base(
-                overlay_alpha, base_height, base_width, overlay_fit
-            ).to(base_image.device)
-            blended = base_image * (1.0 - overlay_alpha) + blended * overlay_alpha
-        
-        # 如果提供了遮罩，则应用遮罩
+        base_height, base_width = base_rgba.shape[1:3]
+        overlay_rgba = cls._fit_rgba_to_base(
+            overlay_rgba, base_height, base_width, overlay_fit
+        ).to(base_rgba.device)
+
+        base_rgb = base_rgba[:, :, :, :3]
+        base_alpha = base_rgba[:, :, :, 3:4]
+        overlay_rgb = overlay_rgba[:, :, :, :3]
+        overlay_alpha = overlay_rgba[:, :, :, 3:4]
+
+        blended_rgb = cls._apply_blend(
+            base_rgb,
+            overlay_rgb,
+            blend_mode,
+            1.0,
+            "stretch",
+        )
+
+        effective_alpha = overlay_alpha * float(opacity)
         if overlay_mask is not None:
-            # 获取批次大小
-            base_batch_size = blended.shape[0]
-            mask_batch_size = overlay_mask.shape[0]
-            
-            # 创建输出图像列表
-            output_images = []
-            
-            for b in range(base_batch_size):
-                # 获取当前批次的图像
-                current_base = base_image[b]
-                current_blended = blended[b]
-                
-                # 确定使用哪个遮罩（如果遮罩数量少于图像数量，则循环使用）
-                mask_index = b % mask_batch_size
-                current_mask = overlay_mask[mask_index]
-                
-                # 如果需要反转遮罩
-                if invert_mask:
-                    current_mask = 1.0 - current_mask
-                
-                # 将遮罩调整为与图像相同的尺寸
-                if current_mask.shape[:2] != current_base.shape[:2]:
-                    # 将遮罩转换为PIL格式
-                    mask_np = (current_mask.detach().cpu().numpy() * 255).astype(np.uint8)
-                    mask_pil = Image.fromarray(mask_np).convert("L")
-                    
-                    # 调整大小
-                    mask_pil = mask_pil.resize((current_base.shape[1], current_base.shape[0]), Image.Resampling.LANCZOS)
-                    
-                    # 转换回numpy格式并确保在正确的设备上
-                    mask_np = np.array(mask_pil).astype(np.float32) / 255.0
-                    current_mask = torch.from_numpy(mask_np).to(current_base.device)
-                
-                # 确保遮罩在正确的设备上
-                current_mask = current_mask.to(current_base.device)
-                
-                # 扩展遮罩维度以匹配图像通道
-                current_mask = current_mask.unsqueeze(-1).expand_as(current_base)
-                
-                # 应用遮罩混合
-                masked_result = current_base * (1.0 - current_mask) + current_blended * current_mask
-                output_images.append(masked_result)
-            
-            # 合并批次
-            result = torch.stack(output_images)
-        else:
-            result = blended
-        
-        return io.NodeOutput(result)
+            prepared_mask = cls._prepare_overlay_mask(
+                overlay_mask=overlay_mask,
+                batch_size=batch_size,
+                target_height=base_height,
+                target_width=base_width,
+                invert_mask=bool(invert_mask),
+                device=base_rgba.device,
+            )
+            effective_alpha = effective_alpha * prepared_mask
+
+        out_alpha = effective_alpha + base_alpha * (1.0 - effective_alpha)
+        out_rgb_premult = (
+            blended_rgb * effective_alpha
+            + base_rgb * base_alpha * (1.0 - effective_alpha)
+        )
+        safe_alpha = torch.where(
+            out_alpha > 1e-6,
+            out_alpha,
+            torch.ones_like(out_alpha),
+        )
+        out_rgb = torch.where(
+            out_alpha > 1e-6,
+            out_rgb_premult / safe_alpha,
+            torch.zeros_like(out_rgb_premult),
+        )
+
+        result_rgba = torch.cat([out_rgb, out_alpha], dim=3).clamp(0.0, 1.0)
+        if base_has_alpha:
+            return io.NodeOutput(result_rgba.to(torch.float32))
+        return io.NodeOutput(result_rgba[:, :, :, :3].to(torch.float32))
 
     @staticmethod
     def _repeat_to_batch_size(images: torch.Tensor, batch_size: int) -> torch.Tensor:
@@ -140,62 +123,87 @@ class ImageBlendModeByAlpha(io.ComfyNode):
         repeat_factor = batch_size // current_batch_size
         remainder = batch_size % current_batch_size
 
-        repeated = images.repeat(repeat_factor, 1, 1, 1)
+        repeat_dims = [repeat_factor] + [1] * (images.dim() - 1)
+        repeated = images.repeat(*repeat_dims)
         if remainder > 0:
             repeated = torch.cat([repeated, images[:remainder]], dim=0)
 
         return repeated
 
     @staticmethod
-    def _convert_rgba_to_rgb(image):
-        """将RGBA图像转换为RGB图像"""
-        # 检查图像是否为RGBA格式（4通道）
-        if image.shape[3] == 4:
-            # 提取RGB通道
-            rgb_image = image[:, :, :, :3]
-            
-            # 获取Alpha通道
-            alpha_channel = image[:, :, :, 3:4]
-            
-            # 使用Alpha通道混合RGB与白色背景
-            white_bg = torch.ones_like(rgb_image)
-            rgb_image = rgb_image * alpha_channel + white_bg * (1 - alpha_channel)
-            
-            return rgb_image
-        else:
-            # 如果已经是RGB格式，直接返回
+    def _ensure_rgba(image: torch.Tensor) -> torch.Tensor:
+        channels = int(image.shape[3])
+        if channels == 4:
             return image
-
-    @staticmethod
-    def _extract_alpha_channel(image: torch.Tensor) -> torch.Tensor | None:
-        """提取 alpha 通道，非 RGBA 输入则返回 None"""
-        if image.shape[3] == 4:
-            return image[:, :, :, 3:4]
-        return None
-
-    @staticmethod
-    def _drop_alpha_channel(image: torch.Tensor) -> torch.Tensor:
-        """仅移除 alpha 通道，不做白底混合"""
-        if image.shape[3] == 4:
-            return image[:, :, :, :3]
-        return image
+        if channels == 3:
+            alpha = torch.ones(
+                (image.shape[0], image.shape[1], image.shape[2], 1),
+                dtype=image.dtype,
+                device=image.device,
+            )
+            return torch.cat([image, alpha], dim=3)
+        if channels == 1:
+            rgb = image.repeat(1, 1, 1, 3)
+            alpha = torch.ones(
+                (image.shape[0], image.shape[1], image.shape[2], 1),
+                dtype=image.dtype,
+                device=image.device,
+            )
+            return torch.cat([rgb, alpha], dim=3)
+        if channels > 4:
+            return image[:, :, :, :4]
+        raise ValueError(f"unsupported image channels: {channels}")
 
     @classmethod
-    def _fit_alpha_to_base(
+    def _fit_rgba_to_base(
         cls,
-        alpha: torch.Tensor,
+        overlay_rgba: torch.Tensor,
         base_height: int,
         base_width: int,
         overlay_fit: str,
     ) -> torch.Tensor:
-        """将 alpha 尺寸对齐到 base 尺寸，规则与 overlay_fit 一致"""
-        alpha_height, alpha_width = alpha.shape[1:3]
-        if alpha_height == base_height and alpha_width == base_width:
-            return alpha
+        overlay_height, overlay_width = overlay_rgba.shape[1:3]
+        if overlay_height == base_height and overlay_width == base_width:
+            return overlay_rgba
         if overlay_fit == "center":
-            centered_alpha, _ = cls._center_fit_overlay(alpha, base_height, base_width)
-            return centered_alpha
-        return cls._stretch_overlay_to_base(alpha, base_height, base_width)
+            centered_overlay, _ = cls._center_fit_overlay(
+                overlay_rgba, base_height, base_width
+            )
+            return centered_overlay
+        return cls._stretch_overlay_to_base(overlay_rgba, base_height, base_width)
+
+    @classmethod
+    def _prepare_overlay_mask(
+        cls,
+        overlay_mask: torch.Tensor,
+        batch_size: int,
+        target_height: int,
+        target_width: int,
+        invert_mask: bool,
+        device: torch.device,
+    ) -> torch.Tensor:
+        mask = overlay_mask.to(torch.float32)
+        if mask.ndim == 2:
+            mask = mask.unsqueeze(0)
+        if mask.ndim == 4 and int(mask.shape[-1]) >= 1:
+            mask = mask[:, :, :, 0]
+        if mask.ndim != 3:
+            raise ValueError("overlay_mask shape must be [H,W], [B,H,W], or [B,H,W,C]")
+        mask = cls._repeat_to_batch_size(mask, batch_size)
+        prepared: list[torch.Tensor] = []
+        for current_mask in mask:
+            if bool(invert_mask):
+                current_mask = 1.0 - current_mask
+            if current_mask.shape[:2] != (target_height, target_width):
+                mask_np = (current_mask.detach().cpu().numpy() * 255).astype(np.uint8)
+                mask_pil = Image.fromarray(mask_np).convert("L")
+                mask_pil = mask_pil.resize(
+                    (target_width, target_height), Image.Resampling.LANCZOS
+                )
+                mask_np = np.array(mask_pil).astype(np.float32) / 255.0
+                current_mask = torch.from_numpy(mask_np)
+            prepared.append(current_mask.unsqueeze(0).unsqueeze(-1))
+        return torch.cat(prepared, dim=0).to(device=device, dtype=torch.float32)
     
     @classmethod
     def _apply_blend(cls, base, overlay, blend_mode, opacity, overlay_fit_mode):

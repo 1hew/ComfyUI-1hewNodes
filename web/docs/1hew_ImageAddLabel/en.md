@@ -1,6 +1,6 @@
 # Image Add Label - Adaptive text labeling
 
-**Node Purpose:** `Image Add Label` adds text labels to images with auto-scaling based on image size and placement direction. Supports batch images and batch texts, dynamic variable substitution, dashed section separators, and multi-line wrapping that fits available space.
+**Node Purpose:** `Image Add Label` adds text labels to images with auto-scaling based on image size and placement direction. Supports batch images and batch texts, dynamic variable substitution, dashed section separators, and multi-line wrapping that fits available space. When the input image batch is RGBA, the node preserves alpha and outputs RGBA.
 
 ## Inputs
 
@@ -20,7 +20,7 @@
 
 | Name | Type | Description |
 |------|------|-------------|
-| `image` | IMAGE | Labeled image batch (`B×H×W×3`). |
+| `image` | IMAGE | Labeled image batch; RGB inputs stay RGB, while RGBA inputs automatically preserve RGBA. |
 
 ## Features
 
@@ -29,6 +29,7 @@
 - Fixed line height: consistent line spacing from font metrics, avoiding layout jitter across lines.
 - Variable templates: supports `{input1}`, `{input2}`, and per-frame expressions `{index}`, `{idx}`, `{range±K}`, with zero-padding for `{range}` depending on batch length.
 - Direction-aware layout: top/bottom create horizontal label bars; left/right rotate a temporary label and attach vertically.
+- Alpha rule: when input images contain alpha, the original transparency is preserved and newly added label areas use opaque alpha.
 - Async rendering: per-frame rendering runs in worker threads to keep UI responsive.
 
 ## Typical Usage

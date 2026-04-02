@@ -9,6 +9,65 @@ import {
 } from "./core/media_utils.js";
 import { saveMaskFromClipspaceToSidecar } from "./core/image_mask_sidecar.js";
 
+const managedLoadImageNodes = new Set();
+let globalLoadImagePasteInstalled = false;
+
+/** LiteGraph 可能晚于当前帧写入 size，延后补一次保留框高刷新 */
+const LOAD_IMAGE_PRESERVE_REFRESH_LATE_MS = 160;
+
+function collectPastedImageFiles(e) {
+    const items = e?.clipboardData?.items;
+    if (!items) {
+        return [];
+    }
+
+    const files = [];
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].kind === "file" && items[i].type.startsWith("image/")) {
+            const file = items[i].getAsFile();
+            if (file) {
+                const name = file.name || "pasted_image.png";
+                files.push({ file, relativePath: name });
+            }
+        }
+    }
+    return files;
+}
+
+function installGlobalLoadImagePasteHandler() {
+    if (globalLoadImagePasteInstalled) {
+        return;
+    }
+    globalLoadImagePasteInstalled = true;
+
+    document.addEventListener(
+        "paste",
+        (e) => {
+            const files = collectPastedImageFiles(e);
+            if (files.length === 0) {
+                return;
+            }
+
+            const selectedNodes = app?.canvas?.selected_nodes || {};
+            const candidates = Array.from(managedLoadImageNodes).filter(
+                (node) =>
+                    selectedNodes[node?.id]
+                    && typeof node?._comfy1hewHandlePasteFiles === "function"
+            );
+            if (candidates.length === 0) {
+                return;
+            }
+
+            const targetNode = candidates[candidates.length - 1];
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            targetNode._comfy1hewHandlePasteFiles(files);
+        },
+        { capture: true }
+    );
+}
+
 app.registerExtension({
     name: "ComfyUI-1hewNodes.load_image",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
@@ -16,8 +75,100 @@ app.registerExtension({
             return;
         }
 
-        const applyPreviewStyle = (node) => {
-            applyPreviewHiddenState(node);
+        /** 父类 configure 可能先收框：用序列化 size 与 current 取 max 再设 `_comfy1hewPreserveFrameHeightUntilPreview`。 */
+        const refreshLoadImagePreserveFrameHeight = (node, opts = {}) => {
+            try {
+                const fw = node?.widgets?.find((w) => w.name === "file");
+                if (!fw || !String(fw.value || "").trim()) {
+                    return;
+                }
+                const w = Array.isArray(node.size) ? node.size[0] : 200;
+                const currentH = Array.isArray(node.size) ? node.size[1] : 0;
+                const desiredSize = node.computeSize?.([w, currentH]);
+                const baseH =
+                    Array.isArray(desiredSize) && Number.isFinite(desiredSize[1])
+                        ? desiredSize[1]
+                        : 0;
+
+                const ser = opts.serializedSize;
+                const serializedH =
+                    Array.isArray(ser) && ser.length >= 2 && Number.isFinite(ser[1])
+                        ? ser[1]
+                        : null;
+
+                const heights = [currentH, serializedH].filter(
+                    (x) => Number.isFinite(x),
+                );
+                const frameH = heights.length > 0 ? Math.max(...heights) : currentH;
+
+                if (
+                    !Number.isFinite(frameH)
+                    || !Number.isFinite(baseH)
+                    || frameH <= baseH + 5
+                ) {
+                    return;
+                }
+                const prev = node._comfy1hewPreserveFrameHeightUntilPreview;
+                node._comfy1hewPreserveFrameHeightUntilPreview = Number.isFinite(prev)
+                    ? Math.max(prev, frameH)
+                    : frameH;
+                node.updateImageLayout?.();
+            } catch {}
+        };
+
+        /** 同步 + 下一任务 + 延后一拍，覆盖 LiteGraph 异步写 size */
+        const scheduleLoadImagePreserveRefresh = (node, opts = {}) => {
+            refreshLoadImagePreserveFrameHeight(node, opts);
+            setTimeout(() => refreshLoadImagePreserveFrameHeight(node, opts), 0);
+            setTimeout(
+                () => refreshLoadImagePreserveFrameHeight(node, opts),
+                LOAD_IMAGE_PRESERVE_REFRESH_LATE_MS,
+            );
+        };
+
+        // 复制后偏小的 computeSize 会调 setSize 收扁；保留高度有效时拦截（内部 _comfy1hewInternalPreviewResize 仍放行）。
+        if (!nodeType.prototype._comfy1hewLoadImageSetSizePatched) {
+            nodeType.prototype._comfy1hewLoadImageSetSizePatched = true;
+            const origSetSize = nodeType.prototype.setSize;
+            nodeType.prototype.setSize = function (size) {
+                const p = this._comfy1hewPreserveFrameHeightUntilPreview;
+                if (
+                    !this._comfy1hewInternalPreviewResize
+                    && !this._comfy1hewInternalVideoPreviewResize
+                    && Number.isFinite(p)
+                    && Array.isArray(size)
+                    && size.length >= 2
+                    && Number.isFinite(size[1])
+                    && size[1] < p - 1
+                ) {
+                    return origSetSize.call(this, [size[0], p]);
+                }
+                return origSetSize.apply(this, arguments);
+            };
+        }
+
+        const schedulePreviewStyleSync = (node, delays = [0]) => {
+            if (!node) {
+                return;
+            }
+            try {
+                if (Array.isArray(node._comfy1hewPreviewStyleTimers)) {
+                    for (const timer of node._comfy1hewPreviewStyleTimers) {
+                        clearTimeout(timer);
+                    }
+                }
+            } catch {}
+
+            node._comfy1hewPreviewStyleTimers = [];
+            for (const delay of delays) {
+                const timer = setTimeout(() => {
+                    try {
+                        node._comfy1hewEnsurePreviewLayout?.({ allowShrink: true });
+                        applyPreviewHiddenState(node);
+                    } catch {}
+                }, delay);
+                node._comfy1hewPreviewStyleTimers.push(timer);
+            }
         };
 
         const getExtraMenuOptions = nodeType.prototype.getExtraMenuOptions;
@@ -70,31 +221,24 @@ app.registerExtension({
 
         const onConfigure = nodeType.prototype.onConfigure;
         nodeType.prototype.onConfigure = function () {
+            const data = arguments[0];
+            const serializedSize =
+                data && Array.isArray(data.size) && data.size.length >= 2
+                    ? [data.size[0], data.size[1]]
+                    : null;
+
             const r = onConfigure ? onConfigure.apply(this, arguments) : undefined;
+
             if (this.widgets) {
                 const fileWidget = this.widgets.find((w) => w.name === "file");
                 if (fileWidget && fileWidget.value) {
                     this._comfy1hewLoadImagePendingPreview = true;
-                    setTimeout(() => {
-                        const update = this.updatePreview;
-                        if (typeof update === "function") {
-                            this._comfy1hewLoadImagePendingPreview = false;
-                            update.call(this);
-                        }
-                    }, 0);
+                    this._comfy1hewSchedulePreviewUpdate?.(0);
+                } else {
+                    schedulePreviewStyleSync(this, [0]);
                 }
             }
-            setTimeout(() => applyPreviewStyle(this), 0);
-            const ensurePreviewLayout = () => {
-                if (this.imageWidget.aspectRatio) {
-                    requestAutoSize();
-                    updateLayout();
-                }
-            };
-            
-            // 初始多次尝试触发布局更新，解决首次加载出画框问题
-            setTimeout(ensurePreviewLayout, 100);
-            setTimeout(ensurePreviewLayout, 500);
+            scheduleLoadImagePreserveRefresh(this, { serializedSize });
 
             return r;
         };
@@ -123,12 +267,50 @@ app.registerExtension({
                         ? desiredSize[1]
                         : 0;
                 this._comfy1hewLoadImageBaseSize = [baseW, baseH];
+                const currentH = Array.isArray(this.size) ? this.size[1] : 0;
+                const hasPath =
+                    fileWidget && String(fileWidget.value || "").trim() !== "";
+                if (
+                    hasPath
+                    && Number.isFinite(currentH)
+                    && Number.isFinite(baseH)
+                    && currentH > baseH + 5
+                ) {
+                    this._comfy1hewPreserveFrameHeightUntilPreview = currentH;
+                }
             } catch {}
             this._comfy1hewLoadImageWasEmptyPath = true;
             this._comfy1hewLoadImageRedrawQueued = false;
             this._comfy1hewLoadImageHadPreview = false;
             this._comfy1hewLoadImageLastImgSrc = undefined;
             this._comfy1hewImagePreviewUserResized = false;
+            this._comfy1hewLoadImageUpdateTimer = null;
+            this._comfy1hewPreviewStyleTimers = [];
+
+            const computeStateKey = () => {
+                const p = String(fileWidget ? fileWidget.value : "");
+                const i = String(indexWidget ? indexWidget.value : 0);
+                const s = String(includeSubdirWidget ? includeSubdirWidget.value : true);
+                const a = String(allWidget ? allWidget.value : false);
+                return `${p}||${i}||${s}||${a}`;
+            };
+
+            const schedulePreviewUpdate = (delay = 0) => {
+                try {
+                    if (this._comfy1hewLoadImageUpdateTimer) {
+                        clearTimeout(this._comfy1hewLoadImageUpdateTimer);
+                    }
+                } catch {}
+                this._comfy1hewLoadImageUpdateTimer = setTimeout(() => {
+                    this._comfy1hewLoadImageUpdateTimer = null;
+                    this._comfy1hewLoadImagePendingPreview = false;
+                    this._comfy1hewLoadImageStateKey = computeStateKey();
+                    if (typeof this.updatePreview === "function") {
+                        this.updatePreview();
+                    }
+                }, delay);
+            };
+            this._comfy1hewSchedulePreviewUpdate = schedulePreviewUpdate;
 
             const isValidImageFile = (file) => {
                 if (!file) return false;
@@ -178,31 +360,27 @@ app.registerExtension({
 
                 if (fileWidget) {
                     fileWidget.value = finalPath;
-                    if (typeof fileWidget.callback === "function") {
-                        fileWidget.callback();
-                    }
                 }
 
                 if (indexWidget) {
                     indexWidget.value = 0;
-                    if (typeof indexWidget.callback === "function") {
-                        indexWidget.callback();
-                    }
                 }
 
                 if (includeSubdirWidget && hasDirectory) {
                     includeSubdirWidget.value = true;
-                    if (typeof includeSubdirWidget.callback === "function") {
-                        includeSubdirWidget.callback();
-                    }
                 }
 
+                this._comfy1hewLoadImageStateKey = computeStateKey();
                 if (this.updatePreview) {
                     await this.updatePreview();
                 }
 
                 app.graph.setDirtyCanvas(true, true);
             };
+            this._comfy1hewHandlePasteFiles = (files) =>
+                uploadFilesAsFolder(files, false);
+            managedLoadImageNodes.add(this);
+            installGlobalLoadImagePasteHandler();
 
             const imageEl = document.createElement("img");
             Object.assign(imageEl.style, {
@@ -328,13 +506,14 @@ app.registerExtension({
             };
 
             this._comfy1hewImageAutoSizeKey = "";
-            const { requestAutoSize, updateLayout } = installImagePreviewLayout({
+            const { ensurePreviewLayout, updateLayout } = installImagePreviewLayout({
                 app,
                 node: this,
                 imageWidget: this.imageWidget,
                 container,
                 imageEl,
                 allWidget,
+                fileWidget,
             });
 
             const resetNodeHeightToBase = () => {
@@ -353,6 +532,45 @@ app.registerExtension({
                 try {
                     this.setSize([this.size[0], 130]);
                 } catch {}
+            };
+
+            const ensureProvisionalPreviewAspect = () => {
+                try {
+                    if (
+                        this.imageWidget?.aspectRatio
+                        || !Array.isArray(this.size)
+                        || !Number.isFinite(this.size[0])
+                        || !Number.isFinite(this.size[1])
+                        || this.size[0] <= 0
+                    ) {
+                        return false;
+                    }
+
+                    let availableHeight = null;
+                    if (Number.isFinite(this.imageWidget?.last_y)) {
+                        availableHeight = this.size[1] - this.imageWidget.last_y - 15;
+                    } else {
+                        const baseH =
+                            Array.isArray(this._comfy1hewLoadImageBaseSize)
+                            && Number.isFinite(this._comfy1hewLoadImageBaseSize[1])
+                                ? this._comfy1hewLoadImageBaseSize[1]
+                                : 130;
+                        availableHeight = this.size[1] - baseH;
+                    }
+
+                    if (!Number.isFinite(availableHeight) || availableHeight <= 20) {
+                        return false;
+                    }
+
+                    const provisionalAspect = Math.max(
+                        0.05,
+                        Math.min(8, (availableHeight - 20) / this.size[0])
+                    );
+                    this.imageWidget.aspectRatio = provisionalAspect;
+                    return true;
+                } catch {
+                    return false;
+                }
             };
 
             const handleDomDragEnter = (e) => {
@@ -446,6 +664,7 @@ app.registerExtension({
 
                     this.imageWidget.aspectRatio = undefined;
                     infoEl.innerText = "";
+                    this._comfy1hewPreserveFrameHeightUntilPreview = undefined;
                     updateLayout();
                     resetNodeHeightToBase();
 
@@ -538,6 +757,7 @@ app.registerExtension({
 
                 if (currentNorm !== desiredNorm) {
                     this._comfy1hewImageAutoSizeKey = "";
+                    ensureProvisionalPreviewAspect();
                     container.style.display = "flex";
 
                     imageEl.onload = () => {
@@ -557,8 +777,12 @@ app.registerExtension({
                             } catch {
                                 this._comfy1hewLoadImageLastImgSrc = imageEl.src;
                             }
-                            requestAutoSize();
-                            updateLayout();
+                            ensurePreviewLayout({
+                                allowShrink: true,
+                                forceAutoSize: true,
+                            });
+                            this._comfy1hewPreserveFrameHeightUntilPreview = undefined;
+                            schedulePreviewStyleSync(this, [0]);
                         }
                     };
 
@@ -569,6 +793,7 @@ app.registerExtension({
                         this.imageWidget.aspectRatio = undefined;
                         infoEl.innerText = "";
                         this._comfy1hewLoadImageHadPreview = false;
+                        this._comfy1hewPreserveFrameHeightUntilPreview = undefined;
                         updateLayout();
                         resetNodeHeightToBase();
                     };
@@ -576,6 +801,35 @@ app.registerExtension({
                     imageEl.dataset.comfy1hewReqId = String(reqId);
                     imageEl.src = url;
                     updateLayout();
+                } else {
+                    // 归一化后已是同一张图：不要反复改 imageEl.src，否则整段重载，观感像「重新添加图片」先收紧再展开。
+                    if (
+                        imageEl.complete
+                        && imageEl.naturalWidth
+                        && imageEl.naturalHeight
+                    ) {
+                        if (!this.imageWidget.aspectRatio) {
+                            this.imageWidget.aspectRatio =
+                                imageEl.naturalHeight / imageEl.naturalWidth;
+                        }
+                        infoEl.innerText = `${imageEl.naturalWidth} x ${imageEl.naturalHeight}`;
+                        this._comfy1hewLoadImageHadPreview = true;
+                        ensurePreviewLayout({
+                            allowShrink: true,
+                            forceAutoSize: true,
+                        });
+                        this._comfy1hewPreserveFrameHeightUntilPreview = undefined;
+                        schedulePreviewStyleSync(this, [0]);
+                    } else {
+                        const hasSrcEl =
+                            Boolean(imageEl?.src && String(imageEl.src).trim() !== "");
+                        const decoding =
+                            hasSrcEl
+                            && (!imageEl.naturalWidth || !imageEl.naturalHeight);
+                        if (decoding) {
+                            updateLayout();
+                        }
+                    }
                 }
             };
 
@@ -608,18 +862,12 @@ app.registerExtension({
             };
 
             // 监听 widget 变化
-            if (fileWidget) fileWidget.callback = this.updatePreview;
-            if (indexWidget) indexWidget.callback = this.updatePreview;
-            if (includeSubdirWidget) includeSubdirWidget.callback = this.updatePreview;
-            if (allWidget) allWidget.callback = this.updatePreview;
-
-            const computeStateKey = () => {
-                const p = String(fileWidget ? fileWidget.value : "");
-                const i = String(indexWidget ? indexWidget.value : 0);
-                const s = String(includeSubdirWidget ? includeSubdirWidget.value : true);
-                const a = String(allWidget ? allWidget.value : false);
-                return `${p}||${i}||${s}||${a}`;
-            };
+            if (fileWidget) fileWidget.callback = () => schedulePreviewUpdate(0);
+            if (indexWidget) indexWidget.callback = () => schedulePreviewUpdate(0);
+            if (includeSubdirWidget) {
+                includeSubdirWidget.callback = () => schedulePreviewUpdate(0);
+            }
+            if (allWidget) allWidget.callback = () => schedulePreviewUpdate(0);
 
             this._comfy1hewLoadImageStateKey = computeStateKey();
             if (!this._comfy1hewLoadImagePoller) {
@@ -630,49 +878,13 @@ app.registerExtension({
                             return;
                         }
                         this._comfy1hewLoadImageStateKey = nextKey;
-                        if (typeof this.updatePreview === "function") {
-                            this.updatePreview();
-                        }
+                        schedulePreviewUpdate(0);
                     } catch {}
                 }, 200);
             }
 
-            const onPaste = (e) => {
-                if (!e.clipboardData) return;
-                
-                // Check if this node is selected
-                if (!app.canvas.selected_nodes || !app.canvas.selected_nodes[this.id]) {
-                    return;
-                }
-
-                const items = e.clipboardData.items;
-                if (!items) return;
-
-                const files = [];
-                for (let i = 0; i < items.length; i++) {
-                    if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
-                        const file = items[i].getAsFile();
-                        if (file) {
-                            const name = file.name || "pasted_image.png";
-                            files.push({ file: file, relativePath: name });
-                        }
-                    }
-                }
-                
-                if (files.length > 0) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    e.stopImmediatePropagation();
-                    uploadFilesAsFolder(files, false);
-                }
-            };
-            document.addEventListener("paste", onPaste, { capture: true });
-
             const originalOnRemoved = this.onRemoved;
             this.onRemoved = function () {
-                try {
-                    document.removeEventListener("paste", onPaste, { capture: true });
-                } catch {}
                 try {
                     setDragPassthrough(false);
                     for (const target of dragTargets) {
@@ -683,9 +895,21 @@ app.registerExtension({
                     }
                 } catch {}
                 try {
+                    managedLoadImageNodes.delete(this);
+                    this._comfy1hewHandlePasteFiles = null;
                     if (this._comfy1hewLoadImagePoller) {
                         clearInterval(this._comfy1hewLoadImagePoller);
                         this._comfy1hewLoadImagePoller = null;
+                    }
+                    if (this._comfy1hewLoadImageUpdateTimer) {
+                        clearTimeout(this._comfy1hewLoadImageUpdateTimer);
+                        this._comfy1hewLoadImageUpdateTimer = null;
+                    }
+                    if (Array.isArray(this._comfy1hewPreviewStyleTimers)) {
+                        for (const timer of this._comfy1hewPreviewStyleTimers) {
+                            clearTimeout(timer);
+                        }
+                        this._comfy1hewPreviewStyleTimers = [];
                     }
                 } catch {}
                 if (originalOnRemoved) {
@@ -693,32 +917,13 @@ app.registerExtension({
                 }
             };
 
-            const ensurePreviewLayout = () => {
-                if (this.imageWidget.aspectRatio) {
-                    requestAutoSize();
-                    updateLayout();
-                }
-            };
-            
-            // 初始多次尝试触发布局更新，解决首次加载出画框问题
-            setTimeout(ensurePreviewLayout, 100);
-            setTimeout(ensurePreviewLayout, 500);
+            if (fileWidget && fileWidget.value || this._comfy1hewLoadImagePendingPreview) {
+                schedulePreviewUpdate(0);
+            } else {
+                schedulePreviewStyleSync(this, [0, 200]);
+            }
 
-            // 初始加载
-            if (fileWidget && fileWidget.value) {
-                this.updatePreview();
-            }
-            if (this._comfy1hewLoadImagePendingPreview) {
-                this._comfy1hewLoadImagePendingPreview = false;
-                setTimeout(() => {
-                    if (this.updatePreview) {
-                        this.updatePreview();
-                    }
-                }, 0);
-            }
-            setTimeout(() => applyPreviewStyle(this), 0);
-            setTimeout(() => applyPreviewStyle(this), 120);
-            setTimeout(() => applyPreviewStyle(this), 600);
+            scheduleLoadImagePreserveRefresh(this);
 
             return r;
         };

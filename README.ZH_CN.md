@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.6.0**
+- feat(mask): 添加 `Mask To Image` 节点，支持黑白区域颜色映射、`fill_hole` 与可选 RGBA 输出
+
 **v3.5.2**
 - refactor(io): 调整 `Save Txt` 节点命名设置与文件名生成逻辑
 
@@ -386,8 +389,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Rotate with Mask | 高级图像旋转，支持遮罩集成、多种填充模式和遮罩中心旋转选项 |
 | Image Edit Stitch | 图像拼接与缝合，支持多种拼接模式 |
 | ImageMainStitch | 主画面拼接，支持动态 `image_2..image_N` 与方向/尺寸匹配/间距/填充 |
-| Image Add Label | 为图像添加文本标签 |
-| Image Plot | 图像绘制和可视化工具 |
+| Image Add Label | 为图像添加文本标签，并在 RGBA 输入时自动保留 alpha |
+| Image Plot | 图像绘制和可视化工具，输入含 alpha 时自动保留 RGBA |
 | Image Stroke by Mask | 对遮罩区域应用描边效果，支持自定义宽度和颜色 |
 | Image BBox Overlay by Mask | 基于遮罩的图像边界框叠加，支持独立和合并模式 |
 | Image Alpha Clean | 清理图像 alpha 透明边缘噪点，支持强度预设与仅检测模式 |
@@ -440,6 +443,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎭 遮罩操作节点
 | 节点名称 | 功能描述 |
 |---------|----------|
+| Mask To Image | 将 mask 映射为 RGB/RGBA 图像，支持孔洞填充、黑白区域颜色映射和透明输出 |
 | Mask Math Ops | 遮罩数学运算（并集、交集、差集、异或） |
 | Mask Separate | 将遮罩分离为独立的连通区域，支持排序和面积过滤 |
 | Mask Fill Hole | 填充遮罩中的封闭区域孔洞，支持批量处理 |
@@ -526,9 +530,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Multi String Join | 动态多输入字符串连接，支持 `{input}` 变量与注释/三引号过滤，可自定义分隔符 |
-| Multi Image Batch | 从动态 `image_X` 构建批次，支持 crop/pad/stretch 尺寸统一与边缘/颜色填充 |
-| Multi Image Overlay | 按顺序叠加多个图像图层，支持 alpha 合成和尺寸适应模式 |
-| Multi Image Stitch | 动态多图像拼接，支持方向、尺寸匹配、间距与填充颜色 |
+| Multi Image Batch | 从动态 `image_X` 构建批次，支持 crop/pad/stretch 尺寸统一，并在任一输入带 alpha 时自动保留 RGBA |
+| Multi Image Overlay | 按顺序叠加多个图像图层，支持 alpha 合成、尺寸适应，并在任一输入带 alpha 时自动保留 RGBA |
+| Multi Image Stitch | 动态多图像拼接，支持方向、尺寸匹配、间距与填充颜色，并在任一输入带 alpha 时自动保留 RGBA |
 | Multi Mask Batch | 从动态 `mask_X` 构建批次，支持 crop/pad/stretch 尺寸统一与灰度填充 |
 | Multi Mask Math Ops | 动态多遮罩运算（交/并/差/异或），支持批次广播与统一尺寸 |
 

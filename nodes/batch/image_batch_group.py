@@ -129,7 +129,7 @@ class ImageBatchGroup(io.ComfyNode):
             color_str = color_str[1:-1].strip()
         shortcuts = {
             "r": "red",
-            "g": "green",
+            "g": "lime",
             "b": "blue",
             "c": "cyan",
             "m": "magenta",

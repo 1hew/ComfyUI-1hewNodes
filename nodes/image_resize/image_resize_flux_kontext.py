@@ -314,7 +314,7 @@ class ImageResizeFluxKontext(io.ComfyNode):
             text = text[1:-1].strip()
         single = {
             "r": "red",
-            "g": "green",
+            "g": "lime",
             "b": "blue",
             "c": "cyan",
             "m": "magenta",

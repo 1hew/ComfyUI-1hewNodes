@@ -1,6 +1,6 @@
 # Multi Image Stitch - 方向拼接与间距控制
 
-**节点功能：** `Multi Image Stitch` 在指定方向（`top`/`bottom`/`left`/`right`）拼接多张图像，并可配置间距宽度与颜色。支持“尺寸匹配（按比例缩放）”与“补边匹配”，并安全处理批次。
+**节点功能：** `Multi Image Stitch` 在指定方向（`top`/`bottom`/`left`/`right`）拼接多张图像，并可配置间距宽度与颜色。支持“尺寸匹配（按比例缩放）”与“补边匹配”，并安全处理批次。任一输入带 alpha 时，会统一按 RGBA 处理并自动输出 RGBA。
 
 ## 输入
 
@@ -24,6 +24,7 @@
 
 - 迭代拼接：按顺序将 `image_1..N` 逐对拼接。
 - 批次广播：自动对齐不同批次数量。
+- 通道规则：任一输入带 alpha 时，所有输入、间距条与补边区域都会按 RGBA 处理，输出自动保留 alpha。
 - 两种匹配：
 - 比例缩放匹配：`match_image_size=True`。
 - 补边统一：`match_image_size=False`，使用 `pad_color` 策略。
@@ -39,4 +40,5 @@
 ## 注意与建议
 
 - `spacing_color` 支持灰度浮点、`R,G,B`（`0..1` 或 `0..255`）、`#hex` 与常见颜色名。
+- 当输出为 RGBA 时，显式 `spacing_color` / `pad_color` 会自动补成不透明 alpha。
 - 左/右方向统一高度，顶/底方向统一宽度以保证对齐。
