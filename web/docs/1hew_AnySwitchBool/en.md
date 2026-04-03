@@ -20,6 +20,7 @@
 
 - Lazy ports: only the active input port is evaluated.
 - Simple selection: returns `on_true` when `boolean=True`, otherwise `on_false`.
+- Unconnected fallback: if the selected branch is not connected, the node returns `None` immediately instead of waiting for that branch.
 - Robust fallback: on exceptions, returns `None`.
 
 ## Typical Usage

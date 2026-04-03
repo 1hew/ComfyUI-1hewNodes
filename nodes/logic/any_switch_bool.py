@@ -21,17 +21,23 @@ class AnySwitchBool(io.ComfyNode):
         return True
 
     @classmethod
-    async def execute(
-        cls, boolean: bool, on_true=None, on_false=None
-    ) -> io.NodeOutput:
+    async def execute(cls, boolean: bool, **kwargs) -> io.NodeOutput:
         try:
-            return io.NodeOutput(on_true if boolean else on_false)
+            key = cls._selected_key(boolean)
+            return io.NodeOutput(kwargs.get(key))
         except Exception as e:
             print(f"AnySwitchBool error: {e}")
             return io.NodeOutput(None)
 
     @classmethod
-    def check_lazy_status(cls, boolean, on_true=None, on_false=None):
-        if boolean:
-            return ["on_true"]
-        return ["on_false"]
+    def check_lazy_status(cls, boolean, **kwargs):
+        key = cls._selected_key(boolean)
+        if key not in kwargs:
+            return []
+        if kwargs.get(key) is None:
+            return [key]
+        return []
+
+    @staticmethod
+    def _selected_key(boolean):
+        return "on_true" if bool(boolean) else "on_false"

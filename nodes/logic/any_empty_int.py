@@ -11,7 +11,7 @@ class AnyEmptyInt(io.ComfyNode):
             display_name="Any Empty Int",
             category="1hewNodes/logic",
             inputs=[
-                io.Custom("*").Input("any"),
+                io.Custom("*").Input("any", optional=True),
                 io.Int.Input("empty", default=0, min=-999999, max=999999, step=1),
                 io.Int.Input(
                     "not_empty", default=1, min=-999999, max=999999, step=1
@@ -25,7 +25,7 @@ class AnyEmptyInt(io.ComfyNode):
         return True
 
     @classmethod
-    async def execute(cls, any, empty=0, not_empty=1) -> io.NodeOutput:
+    async def execute(cls, any=None, empty=0, not_empty=1) -> io.NodeOutput:
         try:
             is_empty = cls._is_empty(any)
             return io.NodeOutput(int(empty if is_empty else not_empty))

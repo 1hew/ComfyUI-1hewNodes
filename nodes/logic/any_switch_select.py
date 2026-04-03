@@ -31,14 +31,18 @@ class AnySwitchSelect(io.ComfyNode):
 
     @classmethod
     def check_lazy_status(cls, select, **kwargs):
-        idx = cls._clamp_select(select)
-        return [f"input_{idx}"]
+        key = cls._selected_key(select)
+        if key not in kwargs:
+            return []
+        if kwargs.get(key) is None:
+            return [key]
+        return []
 
     @classmethod
     async def execute(cls, select: int, **kwargs) -> io.NodeOutput:
         try:
             idx = cls._clamp_select(select)
-            key = f"input_{idx}"
+            key = cls._selected_key(select)
             if key in kwargs:
                 return io.NodeOutput(kwargs[key], idx)
             return io.NodeOutput(None, idx)
@@ -53,3 +57,7 @@ class AnySwitchSelect(io.ComfyNode):
         except Exception:
             idx = 1
         return max(1, min(idx, cls.SELECT_MAX))
+
+    @classmethod
+    def _selected_key(cls, select):
+        return f"input_{cls._clamp_select(select)}"

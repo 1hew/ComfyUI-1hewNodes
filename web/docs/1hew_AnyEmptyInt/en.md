@@ -6,7 +6,7 @@
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `any` | - | ANY (`*`) | - | - | Value to test. |
+| `any` | optional | ANY (`*`) | - | - | Value to test; when unconnected, it is treated as empty. |
 | `empty` | - | INT | 0 | -999999–999999 | Output when input is empty. |
 | `not_empty` | - | INT | 1 | -999999–999999 | Output when input is non-empty.
 
@@ -19,6 +19,7 @@
 ## Features
 
 - Type-aware emptiness identical to `Any Empty Bool`.
+- When `any` is unconnected, runtime treats it as `None`, so the node outputs `empty`.
 - Configurable mapping: set `empty` and `not_empty` to suit downstream logic.
 - Robust fallback: on exceptions, outputs `empty`.
 

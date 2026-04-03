@@ -20,7 +20,7 @@
 
 - 1-based selection: `select=1` targets `input_1`, `select=2` targets `input_2`.
 - Fixed routing: `input_k` always maps to `output_k`.
-- Lazy evaluation: only the selected input branch is requested.
+- Lazy evaluation: only the selected input branch is requested; if that input is unconnected, the node does not keep waiting and the matching output stays `None`.
 - Safe bounds: `select` is automatically clamped to the `1..10` range.
 
 ## Typical Usage

@@ -31,8 +31,9 @@ class MultiSwitchSelect(io.ComfyNode):
 
     @classmethod
     def check_lazy_status(cls, select, **kwargs):
-        idx = cls._clamp_select(select)
-        key = f"input_{idx}"
+        key = cls._selected_key(select)
+        if key not in kwargs:
+            return []
         if kwargs.get(key) is None:
             return [key]
         return []
@@ -40,7 +41,7 @@ class MultiSwitchSelect(io.ComfyNode):
     @classmethod
     async def execute(cls, select, **kwargs) -> io.NodeOutput:
         idx = cls._clamp_select(select)
-        key = f"input_{idx}"
+        key = cls._selected_key(select)
         value = kwargs.get(key)
 
         results = [None] * cls.SELECT_MAX
@@ -54,3 +55,7 @@ class MultiSwitchSelect(io.ComfyNode):
         except Exception:
             idx = 1
         return max(1, min(idx, cls.SELECT_MAX))
+
+    @classmethod
+    def _selected_key(cls, select):
+        return f"input_{cls._clamp_select(select)}"

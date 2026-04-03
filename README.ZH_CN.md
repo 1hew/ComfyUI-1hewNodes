@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.7.0**
+- feat(image_resize): 添加 `Image Resize Square` 节点，提供 256/512/1024/2048/4096 方形预设，并支持 `auto` 与 `auto (0.5k | 1k)` 自动匹配
+
 **v3.6.0**
 - feat(mask): 添加 `Mask To Image` 节点，支持黑白区域颜色映射、`fill_hole` 与可选 RGBA 输出
 
@@ -404,6 +407,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Resize Jimeng | 适配即梦常用分辨率的图像尺寸调整，支持自动尺寸匹配 |
 | Image Resize Gemini30ProImage | 适配 Gemini 3.0 Pro 预设分辨率，支持 auto 档位与 image/mask 同步变换 |
 | Image Resize Gemini31FlashImage | 适配 Gemini 3.1 Flash 预设分辨率，扩展 0.5k/1k/2k/4k 档位与超宽比例 |
+| Image Resize Square | 通用方形尺寸适配节点，支持 256/512/1024/2048/4096 与 `auto`、`auto (0.5k \| 1k)` |
 
 ### 🌈 颜色节点
 | 节点名称 | 功能描述 |

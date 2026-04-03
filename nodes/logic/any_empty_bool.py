@@ -11,7 +11,7 @@ class AnyEmptyBool(io.ComfyNode):
             display_name="Any Empty Bool",
             category="1hewNodes/logic",
             inputs=[
-                io.Custom("*").Input("any"),
+                io.Custom("*").Input("any", optional=True),
             ],
             outputs=[io.Boolean.Output(display_name="bool")],
         )
@@ -21,7 +21,7 @@ class AnyEmptyBool(io.ComfyNode):
         return True
 
     @classmethod
-    async def execute(cls, any) -> io.NodeOutput:
+    async def execute(cls, any=None) -> io.NodeOutput:
         try:
             return io.NodeOutput(bool(cls._is_empty(any)))
         except Exception as e:

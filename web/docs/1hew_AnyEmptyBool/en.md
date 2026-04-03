@@ -6,7 +6,7 @@
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `any` | - | ANY (`*`) | - | - | Value to test for emptiness. |
+| `any` | optional | ANY (`*`) | - | - | Value to test for emptiness; when unconnected, it is treated as empty. |
 
 ## Outputs
 
@@ -18,6 +18,7 @@
 
 - Type-aware rules:
 - `None` → empty.
+- Unconnected input → evaluated as `None` at runtime, therefore also empty.
 - `str` → empty when `len(value.strip()) == 0`.
 - `bool` → empty when `False`.
 - `int/float` → empty when `== 0`.

@@ -20,7 +20,7 @@
 
 - Select range: `select` is clamped to `[1, 10]`.
 - Lazy ports: evaluation is restricted to the selected input.
-- Robust behavior: emits `None` if the selected input is not connected.
+- Robust behavior: emits `None` immediately if the selected input is not connected, without waiting for that branch.
 - Consistent naming: node, file, and parameter names all use `select`.
 
 ## Typical Usage

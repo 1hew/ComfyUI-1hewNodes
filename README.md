@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.7.0**
+- feat(image_resize): Add `Image Resize Square` with square presets for 256/512/1024/2048/4096, plus `auto` and `auto (0.5k | 1k)` matching
+
 **v3.6.0**
 - feat(mask): Add `Mask To Image` with configurable black/white area colors, `fill_hole`, and optional RGBA output
 
@@ -405,6 +408,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Resize Jimeng | Resize for Jimeng-oriented presets with automatic nearest-size matching |
 | Image Resize Gemini30ProImage | Gemini 3.0 Pro preset size adapter with auto tiers and synchronized image/mask transforms |
 | Image Resize Gemini31FlashImage | Gemini 3.1 Flash preset size adapter with extended 0.5k/1k/2k/4k tiers and extreme aspect ratios |
+| Image Resize Square | General square size adapter with 256/512/1024/2048/4096 plus `auto` and `auto (0.5k \| 1k)` |
 
 ### 🌈 Color Nodes
 | Node Name | Description |
