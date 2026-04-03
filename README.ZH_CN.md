@@ -21,7 +21,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
-**v3.7.0**
+**v3.7.1**
 - feat(image_resize): 添加 `Image Resize Square` 节点，提供 256/512/1024/2048/4096 方形预设，并支持 `auto` 与 `auto (0.5k | 1k)` 自动匹配
 
 **v3.6.0**

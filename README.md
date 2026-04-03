@@ -21,7 +21,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
-**v3.7.0**
+**v3.7.1**
 - feat(image_resize): Add `Image Resize Square` with square presets for 256/512/1024/2048/4096, plus `auto` and `auto (0.5k | 1k)` matching
 
 **v3.6.0**
