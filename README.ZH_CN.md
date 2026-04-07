@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.8.0**
+- feat(conversion): 添加 `Image to URL` 节点，支持 `auto` / `kefan` / `data` 三种模式输出 URL
+
 **v3.7.2**
 - build(repo): 将历史中的 `fonts/*.otf` 迁入 Git LFS 以减小克隆体积，无节点行为变更
 
@@ -477,6 +480,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | 节点名称 | 功能描述 |
 |---------|----------|
 | URL to Video | 将视频URL转换为ComfyUI VIDEO对象，改进错误处理、超时控制，支持同步和异步下载方法 |
+| Image to URL | 将图像转换为 URL 字符串，支持 `auto`、`kefan`、`data` 三种模式 |
 | Image Batch to List | 将批量图像转换为图像列表，用于单独处理 |
 | Image List to Batch | 将图像列表转换为批量图像，自动进行尺寸标准化 |
 | Mask Batch to List | 将批量遮罩转换为遮罩列表，用于单独处理 |

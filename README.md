@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.8.0**
+- feat(conversion): Add `Image to URL` with `auto`, `kefan`, and `data` URL output modes
+
 **v3.7.2**
 - build(repo): rewrite legacy `fonts/*.otf` history into Git LFS to reduce clone size; no node behavior change
 
@@ -478,6 +481,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|-------------|
 | URL to Video | Convert video URLs to ComfyUI VIDEO objects with improved error handling, timeout control, and support for both synchronous and asynchronous download methods |
+| Image to URL | Convert image tensors into URL strings with `auto`, `kefan`, and `data` modes |
 | Image Batch to List | Convert batch images to image lists for individual processing |
 | Image List to Batch | Convert image lists to batch images with automatic size normalization |
 | Mask Batch to List | Convert batch masks to mask lists for individual processing |
