@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.7.2**
+- build(repo): 将历史中的 `fonts/*.otf` 迁入 Git LFS 以减小克隆体积，无节点行为变更
+
 **v3.7.1**
 - feat(image_resize): 添加 `Image Resize Square` 节点，提供 256/512/1024/2048/4096 方形预设，并支持 `auto` 与 `auto (0.5k | 1k)` 自动匹配
 
