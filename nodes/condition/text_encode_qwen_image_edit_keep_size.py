@@ -53,19 +53,9 @@ class TextEncodeQwenImageEdit(io.ComfyNode):
 
         image_prompt = ""
 
-        # 收集动态图像输入，仅支持 image_1、image_2、...（下划线风格）
-        ordered = []
-        for k in kwargs.keys():
-            if k.startswith("image_"):
-                suf = k[len("image_") :]
-                if suf.isdigit():
-                    ordered.append((int(suf), k))
-        ordered.sort(key=lambda x: x[0])
+        valid_images = cls._collect_valid_images(kwargs)
 
-        for i, key in enumerate([k for _, k in ordered]):
-            image = kwargs.get(key)
-            if image is None:
-                continue
+        for i, image in enumerate(valid_images):
             samples = image.movedim(-1, 1)
             in_h = int(samples.shape[2])
             in_w = int(samples.shape[3])
@@ -151,3 +141,16 @@ class TextEncodeQwenImageEdit(io.ComfyNode):
                 conditioning, {"reference_latents": ref_latents}, append=True
             )
         return io.NodeOutput(conditioning)
+
+    @staticmethod
+    def _collect_valid_images(kwargs):
+        ordered = []
+        for key, value in kwargs.items():
+            if not isinstance(key, str) or not key.startswith("image_"):
+                continue
+            suf = key[len("image_") :]
+            if not suf.isdigit() or value is None:
+                continue
+            ordered.append((int(suf), value))
+        ordered.sort(key=lambda x: x[0])
+        return [image for _, image in ordered]

@@ -72,10 +72,10 @@ class NodesV3Extension(ComfyExtension):
 async def comfy_entrypoint() -> ComfyExtension:
     return NodesV3Extension()
 
-WEB_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)), "web", "js")
+WEB_DIRECTORY = os.path.join(os.path.dirname(os.path.realpath(__file__)), "web")
 
 
-# 前端脚本注册，确保浏览器加载扩展 JS
+# 前端静态目录注册，确保浏览器同时加载扩展 JS 与节点 docs
 try:
     import nodes
 

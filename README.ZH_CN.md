@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.9.0**
+- feat(image): 添加 `Image Alpha Split` 节点，支持提取 alpha 为 `mask`，并将透明图按可调 `background_color` 铺到底色
+
 **v3.8.0**
 - feat(conversion): 添加 `Image to URL` 节点，支持 `auto` / `kefan` / `data` 三种模式输出 URL
 
@@ -395,6 +398,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Image Solid | 生成纯色图像，增强颜色参数支持多种输入格式和多种尺寸预设 |
+| Image Alpha Split | 提取 alpha 作为 `mask`，同时将 RGBA 或带 alpha 的图像铺到可配置底色上 |
 | Image Rotate with Mask | 高级图像旋转，支持遮罩集成、多种填充模式和遮罩中心旋转选项 |
 | Image Edit Stitch | 图像拼接与缝合，支持多种拼接模式 |
 | ImageMainStitch | 主画面拼接，支持动态 `image_2..image_N` 与方向/尺寸匹配/间距/填充 |
