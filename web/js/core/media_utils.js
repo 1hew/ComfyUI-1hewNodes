@@ -278,6 +278,223 @@ export function addCopyMediaFrameMenuOption(
     });
 }
 
+function estimatePreviewTopOffset(node, widget) {
+    try {
+        if (node.widgets && node.widgets.length > 0) {
+            const widgetCount = node.widgets.filter(
+                (currentWidget) =>
+                    currentWidget !== widget && currentWidget.type !== "hidden",
+            ).length;
+            let estimatedTop = 30 + widgetCount * 26 + 30;
+            if (estimatedTop < 130) estimatedTop = 130;
+            return estimatedTop;
+        }
+    } catch {}
+    return 130;
+}
+
+function getDesiredNodeHeight(node, widget, desiredWidgetHeight) {
+    if (Number.isFinite(widget?.last_y)) {
+        return widget.last_y + desiredWidgetHeight;
+    }
+
+    try {
+        const computed = node.computeSize?.([
+            node.size[0],
+            node.size[1],
+        ]);
+        if (
+            Array.isArray(computed) &&
+            computed.length >= 2 &&
+            Number.isFinite(computed[1])
+        ) {
+            return computed[1];
+        }
+    } catch {}
+
+    return estimatePreviewTopOffset(node, widget) + desiredWidgetHeight;
+}
+
+function bindPreviewResizeHandler(node, {
+    prevWidthKey,
+    userResizedKey,
+    internalResizeFlagKey,
+    updateLayout,
+}) {
+    const originalOnResize = node.onResize;
+    node.onResize = function (size) {
+        const result = originalOnResize
+            ? originalOnResize.apply(this, arguments)
+            : undefined;
+        try {
+            const nextWidth = Array.isArray(size) ? size[0] : node.size?.[0];
+            const prevWidth = node[prevWidthKey];
+            node[prevWidthKey] = nextWidth;
+
+            if (
+                !node[internalResizeFlagKey]
+                && Number.isFinite(nextWidth)
+                && Number.isFinite(prevWidth)
+                && Math.abs(nextWidth - prevWidth) > 1
+            ) {
+                node[userResizedKey] = true;
+            }
+
+            updateLayout();
+        } catch {}
+        return result;
+    };
+}
+
+function setPreviewVisibility(container, {
+    visible,
+    height = 0,
+    app,
+}) {
+    container.style.height = `${height}px`;
+    container.style.display = visible ? "flex" : "none";
+    app?.graph?.setDirtyCanvas?.(true, true);
+}
+
+function getAvailablePreviewHeight(node, widget, aspectRatio, maxPreviewHeight) {
+    let availableHeight;
+    if (Number.isFinite(widget?.last_y)) {
+        availableHeight = node.size[1] - widget.last_y - 15;
+    } else {
+        const width = node.size[0];
+        availableHeight = width * aspectRatio + 20;
+    }
+
+    if (maxPreviewHeight && isFinite(maxPreviewHeight)) {
+        availableHeight = Math.min(availableHeight, maxPreviewHeight);
+    }
+
+    if (availableHeight < 0) {
+        return 0;
+    }
+    return availableHeight;
+}
+
+function getCappedAspectRatio(aspectRatio, maxAspectRatio = null) {
+    if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) {
+        return null;
+    }
+    if (maxAspectRatio && isFinite(maxAspectRatio)) {
+        return Math.min(aspectRatio, maxAspectRatio);
+    }
+    return aspectRatio;
+}
+
+function syncPreviewAspectRatio(widget, {
+    width,
+    height,
+    maxAspectRatio = null,
+}) {
+    if (!width || !height) {
+        return null;
+    }
+    const nextAspectRatio = getCappedAspectRatio(height / width, maxAspectRatio);
+    if (nextAspectRatio) {
+        widget.aspectRatio = nextAspectRatio;
+    }
+    return nextAspectRatio;
+}
+
+function resizeNodeToPreviewContent({
+    node,
+    widget,
+    aspectRatio,
+    maxPreviewHeight,
+    allowShrink = false,
+    internalResizeFlagKey,
+    adjustDesiredHeight,
+}) {
+    if (!aspectRatio) {
+        return;
+    }
+
+    const width = node.size[0];
+    let desiredWidgetHeight = width * aspectRatio + 20;
+    if (maxPreviewHeight && isFinite(maxPreviewHeight)) {
+        desiredWidgetHeight = Math.min(desiredWidgetHeight, maxPreviewHeight);
+    }
+
+    let desiredHeight = getDesiredNodeHeight(
+        node,
+        widget,
+        desiredWidgetHeight,
+    );
+
+    if (typeof adjustDesiredHeight === "function") {
+        desiredHeight = adjustDesiredHeight(desiredHeight);
+    }
+
+    if (
+        (allowShrink && Math.abs(node.size[1] - desiredHeight) > 1)
+        || (!allowShrink && node.size[1] + 1 < desiredHeight)
+    ) {
+        node[internalResizeFlagKey] = true;
+        try {
+            node.setSize([node.size[0], desiredHeight]);
+        } finally {
+            node[internalResizeFlagKey] = false;
+        }
+    }
+}
+
+function requestPreviewAutoSize({
+    node,
+    width,
+    height,
+    autoSizeKey,
+    autoSizeToContent,
+    allowShrink = false,
+    force = false,
+}) {
+    if (!width || !height) {
+        return;
+    }
+    const key = `${width}x${height}`;
+    if (!force && node[autoSizeKey] === key) {
+        return;
+    }
+    node[autoSizeKey] = key;
+    setTimeout(() => autoSizeToContent({ allowShrink }), 0);
+}
+
+function updatePreviewContainerLayout({
+    app,
+    container,
+    previewStrategy,
+}) {
+    if (container.dataset.comfy1hewForceHidden === "1") {
+        setPreviewVisibility(container, { visible: false, app });
+        return;
+    }
+
+    if (!previewStrategy.getAspectRatio()) {
+        previewStrategy.syncAspectRatioFromMedia();
+    }
+
+    if (!previewStrategy.getAspectRatio()) {
+        const placeholderState =
+            typeof previewStrategy.getPlaceholderState === "function"
+                ? previewStrategy.getPlaceholderState()
+                : null;
+        if (placeholderState) {
+            setPreviewVisibility(container, { ...placeholderState, app });
+            return;
+        }
+        setPreviewVisibility(container, { visible: false, app });
+        return;
+    }
+
+    setPreviewVisibility(container, {
+        ...previewStrategy.getVisibleState(),
+        app,
+    });
+}
+
 export function installImagePreviewLayout({
     app,
     node,
@@ -287,6 +504,11 @@ export function installImagePreviewLayout({
     allWidget,
     fileWidget,
 }) {
+    const getMaxAspectRatio = () =>
+        typeof imageWidget._comfy1hew_maxAspectRatio === "number"
+            ? imageWidget._comfy1hew_maxAspectRatio
+            : null;
+
     const getMaxPreviewHeight = () => {
         const maxPreviewHeight =
             typeof imageWidget._comfy1hew_maxPreviewHeight === "number"
@@ -301,119 +523,96 @@ export function installImagePreviewLayout({
         return maxPreviewHeight;
     };
 
-    const estimateTopOffset = () => {
-        try {
-            if (node.widgets && node.widgets.length > 0) {
-                const widgetCount = node.widgets.filter(
-                    (w) => w !== imageWidget && w.type !== "hidden",
-                ).length;
-                let estimatedTop = 30 + widgetCount * 26 + 30;
-                if (estimatedTop < 130) estimatedTop = 130;
-                return estimatedTop;
+    const previewStrategy = {
+        getAspectRatio() {
+            return getCappedAspectRatio(
+                imageWidget.aspectRatio,
+                getMaxAspectRatio(),
+            );
+        },
+        syncAspectRatioFromMedia() {
+            return syncPreviewAspectRatio(imageWidget, {
+                width: imageEl?.naturalWidth,
+                height: imageEl?.naturalHeight,
+                maxAspectRatio: getMaxAspectRatio(),
+            });
+        },
+        getPlaceholderState() {
+            const hasSrc = Boolean(
+                imageEl?.src && String(imageEl.src).trim() !== "",
+            );
+            const stillDecoding =
+                hasSrc
+                && (!imageEl.naturalWidth || !imageEl.naturalHeight);
+            const filePathTrim = String(fileWidget?.value ?? "").trim();
+            const awaitingFileLoad = Boolean(filePathTrim && !hasSrc);
+            const holdPlaceholder =
+                stillDecoding
+                || awaitingFileLoad
+                || Number.isFinite(node._comfy1hewPreserveFrameHeightUntilPreview);
+            if (!holdPlaceholder) {
+                return null;
             }
-        } catch {}
-        return 130;
+            return {
+                visible: true,
+                height: computePlaceholderPreviewHeight(),
+            };
+        },
+        getVisibleState() {
+            const availableHeight = getAvailablePreviewHeight(
+                node,
+                imageWidget,
+                this.getAspectRatio(),
+                getMaxPreviewHeight(),
+            );
+            return {
+                visible: true,
+                height: availableHeight,
+            };
+        },
     };
 
     const autoSizeToContent = ({ allowShrink = false } = {}) => {
-        if (!imageWidget.aspectRatio) {
-            return;
-        }
-
-        const maxAspectRatio =
-            typeof imageWidget._comfy1hew_maxAspectRatio === "number"
-                ? imageWidget._comfy1hew_maxAspectRatio
-                : null;
-        const aspectRatio =
-            maxAspectRatio && isFinite(maxAspectRatio)
-                ? Math.min(imageWidget.aspectRatio, maxAspectRatio)
-                : imageWidget.aspectRatio;
-
-        const width = node.size[0];
-        let desiredWidgetHeight = width * aspectRatio + 20;
-        const maxPreviewHeight = getMaxPreviewHeight();
-        if (maxPreviewHeight && isFinite(maxPreviewHeight)) {
-            desiredWidgetHeight = Math.min(desiredWidgetHeight, maxPreviewHeight);
-        }
-
-        let desiredHeight;
-        if (Number.isFinite(imageWidget.last_y)) {
-            desiredHeight = imageWidget.last_y + desiredWidgetHeight;
-        } else {
-            try {
-                const computed = node.computeSize?.([
-                    node.size[0],
-                    node.size[1],
-                ]);
-                if (
-                    Array.isArray(computed) &&
-                    computed.length >= 2 &&
-                    Number.isFinite(computed[1])
-                ) {
-                    desiredHeight = computed[1];
+        const aspectRatio = previewStrategy.getAspectRatio();
+        resizeNodeToPreviewContent({
+            node,
+            widget: imageWidget,
+            aspectRatio,
+            maxPreviewHeight: getMaxPreviewHeight(),
+            allowShrink,
+            internalResizeFlagKey: "_comfy1hewInternalPreviewResize",
+            adjustDesiredHeight: (desiredHeight) => {
+                let nextDesiredHeight = desiredHeight;
+                if (allWidget && allWidget.value) {
+                    nextDesiredHeight = Math.min(nextDesiredHeight, 420);
                 }
-            } catch {}
-            if (!Number.isFinite(desiredHeight)) {
-                desiredHeight = estimateTopOffset() + desiredWidgetHeight;
-            }
-        }
 
-        if (allWidget && allWidget.value) {
-            desiredHeight = Math.min(desiredHeight, 420);
-        }
-
-        const preserve = node._comfy1hewPreserveFrameHeightUntilPreview;
-        if (
-            Number.isFinite(preserve)
-            && Number.isFinite(desiredHeight)
-            && desiredHeight < preserve
-        ) {
-            desiredHeight = preserve;
-        }
-
-        if (
-            (allowShrink && Math.abs(node.size[1] - desiredHeight) > 1)
-            || (!allowShrink && node.size[1] + 1 < desiredHeight)
-        ) {
-            node._comfy1hewInternalPreviewResize = true;
-            try {
-                node.setSize([node.size[0], desiredHeight]);
-            } finally {
-                node._comfy1hewInternalPreviewResize = false;
-            }
-        }
+                const preserve = node._comfy1hewPreserveFrameHeightUntilPreview;
+                if (
+                    Number.isFinite(preserve)
+                    && Number.isFinite(nextDesiredHeight)
+                    && nextDesiredHeight < preserve
+                ) {
+                    nextDesiredHeight = preserve;
+                }
+                return nextDesiredHeight;
+            },
+        });
     };
 
     const requestAutoSize = ({ allowShrink = false, force = false } = {}) => {
-        if (!imageEl.naturalWidth || !imageEl.naturalHeight) {
-            return;
-        }
-        const key = `${imageEl.naturalWidth}x${imageEl.naturalHeight}`;
-        if (!force && node._comfy1hewImageAutoSizeKey === key) {
-            return;
-        }
-        node._comfy1hewImageAutoSizeKey = key;
-        setTimeout(() => autoSizeToContent({ allowShrink }), 0);
+        requestPreviewAutoSize({
+            node,
+            width: imageEl.naturalWidth,
+            height: imageEl.naturalHeight,
+            autoSizeKey: "_comfy1hewImageAutoSizeKey",
+            autoSizeToContent,
+            allowShrink,
+            force,
+        });
     };
 
     node._comfy1hewLastPreviewNodeWidth ??= node.size?.[0];
-
-    const minPreviewHeightFromPreservedFrame = (fallback) => {
-        const p = node._comfy1hewPreserveFrameHeightUntilPreview;
-        if (!Number.isFinite(p) || !Number.isFinite(fallback)) {
-            return fallback;
-        }
-        if (Number.isFinite(imageWidget?.last_y)) {
-            const slice = p - imageWidget.last_y - 15;
-            return slice > 0 ? Math.max(fallback, slice) : fallback;
-        }
-        const baseGuess = 130;
-        const slice = p - baseGuess - 15;
-        if (slice > 40) {
-            return Math.max(fallback, Math.min(220, slice));
-        }
-        return fallback;
-    };
 
     const computePlaceholderPreviewHeight = () => {
         let placeholderH = 100;
@@ -432,103 +631,25 @@ export function installImagePreviewLayout({
         if (placeholderH < 40) {
             placeholderH = 100;
         }
-        return minPreviewHeightFromPreservedFrame(placeholderH);
+        return placeholderH;
     };
 
     const updateLayout = () => {
-        if (container.dataset.comfy1hewForceHidden === "1") {
-            container.style.height = "0px";
-            container.style.display = "none";
-            app.graph.setDirtyCanvas(true, true);
-            return;
-        }
         // 复制节点 / 刚设置 src 时：DOM 上可能已有 <img> 尺寸，但 widget.aspectRatio 尚未写入。
         // 若此时走「无比例则 display:none」，会出现整段预览被关掉再打开的可见闪烁。
-        if (
-            !imageWidget?.aspectRatio
-            && imageEl?.naturalWidth > 0
-            && imageEl?.naturalHeight > 0
-        ) {
-            imageWidget.aspectRatio = imageEl.naturalHeight / imageEl.naturalWidth;
-        }
-
-        const hasSrc = Boolean(
-            imageEl?.src && String(imageEl.src).trim() !== "",
-        );
-        const stillDecoding =
-            hasSrc
-            && (!imageEl.naturalWidth || !imageEl.naturalHeight);
-        const filePathTrim = String(fileWidget?.value ?? "").trim();
-        const awaitingFileLoad = Boolean(filePathTrim && !hasSrc);
-
-        if (!imageWidget?.aspectRatio) {
-            const holdPlaceholder =
-                stillDecoding
-                || awaitingFileLoad
-                || Number.isFinite(node._comfy1hewPreserveFrameHeightUntilPreview);
-            if (holdPlaceholder) {
-                container.style.display = "flex";
-                container.style.height = `${computePlaceholderPreviewHeight()}px`;
-                app.graph.setDirtyCanvas(true, true);
-                return;
-            }
-            container.style.height = "0px";
-            container.style.display = "none";
-            app.graph.setDirtyCanvas(true, true);
-            return;
-        }
-        container.style.display = "flex";
-
-        let availableHeight;
-        if (Number.isFinite(imageWidget?.last_y)) {
-            availableHeight = node.size[1] - imageWidget.last_y - 15;
-        } else {
-            const maxAspectRatio =
-                typeof imageWidget._comfy1hew_maxAspectRatio === "number"
-                    ? imageWidget._comfy1hew_maxAspectRatio
-                    : null;
-            const aspectRatio =
-                maxAspectRatio && isFinite(maxAspectRatio)
-                    ? Math.min(imageWidget.aspectRatio, maxAspectRatio)
-                    : imageWidget.aspectRatio;
-            const width = node.size[0];
-            availableHeight = width * aspectRatio + 20;
-        }
-
-        const maxPreviewHeight = getMaxPreviewHeight();
-        if (maxPreviewHeight && isFinite(maxPreviewHeight)) {
-            availableHeight = Math.min(availableHeight, maxPreviewHeight);
-        }
-
-        if (availableHeight < 0) availableHeight = 0;
-        availableHeight = minPreviewHeightFromPreservedFrame(availableHeight);
-        container.style.height = `${availableHeight}px`;
-
-        app.graph.setDirtyCanvas(true, true);
+        updatePreviewContainerLayout({
+            app,
+            container,
+            previewStrategy,
+        });
     };
 
-    const originalOnResize = node.onResize;
-    node.onResize = function (size) {
-        const r2 = originalOnResize
-            ? originalOnResize.apply(this, arguments)
-            : undefined;
-        try {
-            const nextWidth = Array.isArray(size) ? size[0] : node.size?.[0];
-            const prevWidth = node._comfy1hewLastPreviewNodeWidth;
-            node._comfy1hewLastPreviewNodeWidth = nextWidth;
-
-            if (
-                !node._comfy1hewInternalPreviewResize
-                && Number.isFinite(nextWidth)
-                && Number.isFinite(prevWidth)
-                && Math.abs(nextWidth - prevWidth) > 1
-            ) {
-                node._comfy1hewImagePreviewUserResized = true;
-            }
-            updateLayout();
-        } catch {}
-        return r2;
-    };
+    bindPreviewResizeHandler(node, {
+        prevWidthKey: "_comfy1hewLastPreviewNodeWidth",
+        userResizedKey: "_comfy1hewImagePreviewUserResized",
+        internalResizeFlagKey: "_comfy1hewInternalPreviewResize",
+        updateLayout,
+    });
 
     const ensurePreviewLayout = ({
         allowShrink = false,
@@ -539,9 +660,7 @@ export function installImagePreviewLayout({
             return;
         }
 
-        if (imageEl.naturalWidth && imageEl.naturalHeight) {
-            imageWidget.aspectRatio = imageEl.naturalHeight / imageEl.naturalWidth;
-        }
+        previewStrategy.syncAspectRatioFromMedia();
 
         requestAutoSize({ allowShrink, force: forceAutoSize });
         updateLayout();
@@ -569,20 +688,6 @@ export function installVideoPreviewLayout({
             return null;
         }
         return maxPreviewHeight;
-    };
-
-    const estimateTopOffset = () => {
-        try {
-            if (node.widgets && node.widgets.length > 0) {
-                const widgetCount = node.widgets.filter(
-                    (w) => w !== videoWidget && w.type !== "hidden",
-                ).length;
-                let estimatedTop = 30 + widgetCount * 26 + 30;
-                if (estimatedTop < 130) estimatedTop = 130;
-                return estimatedTop;
-            }
-        } catch {}
-        return 130;
     };
 
     const autoSizeToContent = ({ allowShrink = false } = {}) => {
@@ -615,7 +720,7 @@ export function installVideoPreviewLayout({
                 }
             } catch {}
             if (!Number.isFinite(desiredHeight)) {
-                desiredHeight = estimateTopOffset() + desiredWidgetHeight;
+                desiredHeight = estimatePreviewTopOffset(node, videoWidget) + desiredWidgetHeight;
             }
         }
 
@@ -632,16 +737,20 @@ export function installVideoPreviewLayout({
         }
     };
 
-    const requestAutoSize = () => {
-        if (!videoEl.videoWidth || !videoEl.videoHeight) {
+    const requestAutoSize = ({ allowShrink = false, force = false } = {}) => {
+        const fallbackWidth = Number(node?._comfy1hewVideoInfo?.width) || 0;
+        const fallbackHeight = Number(node?._comfy1hewVideoInfo?.height) || 0;
+        const width = videoEl.videoWidth || fallbackWidth;
+        const height = videoEl.videoHeight || fallbackHeight;
+        if (!width || !height) {
             return;
         }
-        const key = `${videoEl.videoWidth}x${videoEl.videoHeight}`;
-        if (node._comfy1hewVideoAutoSizeKey === key) {
+        const key = `${width}x${height}`;
+        if (!force && node._comfy1hewVideoAutoSizeKey === key) {
             return;
         }
         node._comfy1hewVideoAutoSizeKey = key;
-        setTimeout(() => autoSizeToContent(), 0);
+        setTimeout(() => autoSizeToContent({ allowShrink }), 0);
     };
 
     node._comfy1hewLastPreviewVideoNodeWidth ??= node.size?.[0];
@@ -672,7 +781,9 @@ export function installVideoPreviewLayout({
             availableHeight = Math.min(availableHeight, maxPreviewHeight);
         }
 
-        if (availableHeight < 0) availableHeight = 0;
+        if (availableHeight < 0) {
+            availableHeight = 0;
+        }
         container.style.height = `${availableHeight}px`;
 
         app.graph.setDirtyCanvas(true, true);
@@ -702,7 +813,10 @@ export function installVideoPreviewLayout({
         return r2;
     };
 
-    const ensurePreviewLayout = () => {
+    const ensurePreviewLayout = ({
+        allowShrink = false,
+        forceAutoSize = false,
+    } = {}) => {
         if (container.dataset.comfy1hewForceHidden === "1") {
             updateLayout();
             return;
@@ -710,9 +824,15 @@ export function installVideoPreviewLayout({
 
         if (videoEl.videoWidth && videoEl.videoHeight) {
             videoWidget.aspectRatio = videoEl.videoHeight / videoEl.videoWidth;
+        } else {
+            const fallbackWidth = Number(node?._comfy1hewVideoInfo?.width) || 0;
+            const fallbackHeight = Number(node?._comfy1hewVideoInfo?.height) || 0;
+            if (fallbackWidth > 0 && fallbackHeight > 0) {
+                videoWidget.aspectRatio = fallbackHeight / fallbackWidth;
+            }
         }
 
-        requestAutoSize();
+        requestAutoSize({ allowShrink, force: forceAutoSize });
         updateLayout();
     };
 

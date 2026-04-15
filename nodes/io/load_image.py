@@ -50,6 +50,19 @@ class LoadImage(io.ComfyNode):
         )
 
     @staticmethod
+    def _resolve_input_relative_path(path_value: str) -> str:
+        raw = str(path_value or "").strip().strip('"').strip("'")
+        if not raw:
+            return ""
+        drive, _tail = os.path.splitdrive(raw)
+        if drive or os.path.isabs(raw):
+            return raw
+        get_input_dir = getattr(folder_paths, "get_input_directory", None)
+        base_dir = get_input_dir() if callable(get_input_dir) else folder_paths.get_temp_directory()
+        normalized = raw.replace("\\", os.sep).replace("/", os.sep)
+        return os.path.abspath(os.path.join(base_dir, normalized))
+
+    @staticmethod
     def load_image(path):
         img = Image.open(path)
         img = ImageOps.exif_transpose(img)
@@ -219,7 +232,7 @@ class LoadImage(io.ComfyNode):
         if not folder:
             return []
 
-        folder = folder.strip().strip('"').strip("'")
+        folder = LoadImage._resolve_input_relative_path(folder)
         if os.path.isfile(folder):
             ext = os.path.splitext(folder)[1].lower()
             if ext in VALID_IMAGE_EXTENSIONS:

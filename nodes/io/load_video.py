@@ -1388,6 +1388,18 @@ def _preview_cache_dir() -> str:
     return os.path.join(folder_paths.get_temp_directory(), "1hew_video_previews")
 
 
+def _preview_content_type_for_path(path: str) -> str:
+    ext = os.path.splitext(str(path or "").strip())[1].lower()
+    if ext == ".webm":
+        return "video/webm"
+    return "video/mp4"
+
+
+def _is_direct_preview_video(path: str) -> bool:
+    ext = os.path.splitext(str(path or "").strip())[1].lower()
+    return ext in {".mp4", ".webm", ".m4v"}
+
+
 def _has_alpha_pix_fmt(pix_fmt: str) -> bool:
     pix_fmt = (pix_fmt or "").lower()
     return any(token in pix_fmt for token in ("yuva", "rgba", "bgra", "argb", "abgr"))
@@ -1790,6 +1802,11 @@ async def view_video_from_folder(request):
         if want_raw:
             return web.FileResponse(path)
         if want_preview:
+            if _is_direct_preview_video(path):
+                return web.FileResponse(
+                    path,
+                    headers={"Content-Type": _preview_content_type_for_path(path)},
+                )
             proxy_path, content_type = _ensure_preview_proxy(
                 path, include_audio=want_audio
             )
@@ -1823,6 +1840,11 @@ async def view_video_from_folder(request):
     if want_raw:
         return web.FileResponse(selected)
     if want_preview:
+        if _is_direct_preview_video(selected):
+            return web.FileResponse(
+                selected,
+                headers={"Content-Type": _preview_content_type_for_path(selected)},
+            )
         proxy_path, content_type = _ensure_preview_proxy(
             selected, include_audio=want_audio
         )

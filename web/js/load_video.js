@@ -8,9 +8,17 @@ import {
     collectDropPayload,
     installVideoPreviewLayout,
 } from "./core/media_utils.js";
+import { createLoadVideoDom } from "./core/load_video_dom.js";
+import { extendLoadVideoMenu } from "./core/load_video_menu.js";
+import { scheduleLoadVideoPreviewRestore } from "./core/load_video_node_runtime.js";
+import { createLoadVideoPreviewController } from "./core/load_video_preview.js";
+import { createLoadVideoUploader } from "./core/load_video_upload.js";
 import { installVideoPlaybackState } from "./core/video_playback_state.js";
+import { createDomWidgetInteractionManager } from "./core/dom_widget_runtime.js";
+import { chainOnRemoved, createDisposer, registerExtensionOnce } from "./core/runtime.js";
+import { attachCanvasUploadHandlers, bindDomUploadDropTargets } from "./core/upload_drop_runtime.js";
 
-app.registerExtension({
+registerExtensionOnce("__comfy1hewLoadVideoExtensionRegistered", () => app.registerExtension({
     name: "ComfyUI-1hewNodes.LoadVideo",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         if (
@@ -28,16 +36,7 @@ app.registerExtension({
             if (this.widgets) {
                 const fileWidget = this.widgets.find((w) => w.name === "file");
                 if (fileWidget && fileWidget.value) {
-                    setTimeout(() => {
-                        const update = this.updatePreview;
-                        if (update) update();
-                    }, 100);
-                    setTimeout(() => {
-                        this._comfy1hewEnsurePreviewLayout?.();
-                    }, 200);
-                    setTimeout(() => {
-                        this._comfy1hewEnsurePreviewLayout?.();
-                    }, 800);
+                    scheduleLoadVideoPreviewRestore(this);
                 }
             }
             return r;
@@ -60,6 +59,20 @@ app.registerExtension({
 
             this._comfy1hewVideoInfo = null;
             this._comfy1hewVideoPreviewUserResized = false;
+            try {
+                const baseW =
+                    Array.isArray(this.size) &&
+                    typeof this.size[0] === "number" &&
+                    this.size[0] > 0
+                        ? this.size[0]
+                        : 200;
+                const desiredSize = this.computeSize();
+                const baseH =
+                    Array.isArray(desiredSize) && typeof desiredSize[1] === "number"
+                        ? desiredSize[1]
+                        : 0;
+                this._comfy1hewLoadVideoBaseSize = [baseW, baseH];
+            } catch {}
 
             // --- Logic ported from VHS initializeLoadFormat ---
             // Allows format selection (e.g. AnimateDiff) to control other widget defaults/constraints
@@ -283,7 +296,6 @@ app.registerExtension({
                 }
 
                 const applyFormat = (formatName) => {
-                    // console.log("[Debug] applyFormat called with", formatName);
                     const resolvedName = resolveFormatName(formatName) || "4n+1";
                     const formatConfig = resolveFormatConfig(resolvedName) || resolveFormatConfig("4n+1");
                     if (!formatConfig) return;
@@ -425,201 +437,65 @@ app.registerExtension({
             }
             // --- End VHS Logic ---
 
-            const videoEl = document.createElement("video");
-            Object.assign(videoEl.style, {
-                width: "100%",
-                maxWidth: "100%",
-                height: "auto",
-                maxHeight: "calc(100% - 20px)",
-                display: "block",
-                flex: "0 0 auto",
-                objectFit: "contain",
-                minHeight: "0",
-            });
-
-            const infoEl = document.createElement("div");
-            Object.assign(infoEl.style, {
-                width: "100%",
-                height: "20px",
-                lineHeight: "20px",
-                textAlign: "center",
-                fontSize: "12px",
-                color: "#aaa",
-                fontFamily: "sans-serif",
-                flex: "0 0 20px",
-                background: "transparent",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-            });
-            infoEl.innerText = "";
-
-            const container = document.createElement("div");
-            Object.assign(container.style, {
-                display: "none",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "100%",
-                height: "100%",
-                minHeight: "0",
-                overflow: "hidden",
-                boxSizing: "border-box",
-            });
-
-            container.appendChild(videoEl);
-            container.appendChild(infoEl);
-            container.style.cursor = "pointer";
-
-            let domDragDepth = 0;
-            const setDragPassthrough = (active) => {
-                videoEl.style.pointerEvents = active ? "none" : "";
-                infoEl.style.pointerEvents = active ? "none" : "";
-            };
-
-            applyLoopedHoverAudioPreview(videoEl);
-
-            const fileInputEl = document.createElement("input");
-            fileInputEl.type = "file";
-            fileInputEl.accept = ".mp4,.webm,.mkv,.mov,.avi,video/*";
-            fileInputEl.style.display = "none";
-            container.appendChild(fileInputEl);
-
-            // Add upload button widget
-            const uploadWidget = this.addWidget("button", "choose file to upload", "image", () => {
-                app.canvas.node_widget = null; // Clear active widget
-                fileInputEl.click();
-            });
-            uploadWidget.serialize = false;
-
-            const uploadSingleFile = async (file) => {
-                if (!file) return;
-
-                infoEl.innerText = "uploading...";
-                const form = new FormData();
-                form.append("file", file, file.name);
-
-                const res = await api.fetchApi("/1hew/upload_video", {
-                    method: "POST",
-                    body: form,
-                });
-                if (res.status !== 200) {
-                    infoEl.innerText = "upload failed";
-                    return;
-                }
-
-                const data = await res.json();
-                const newPath = data?.path;
-                if (!newPath) {
-                    infoEl.innerText = "upload failed";
-                    return;
-                }
-
-                if (fileWidget) {
-                    fileWidget.value = newPath;
-                    if (typeof fileWidget.callback === "function") {
-                        fileWidget.callback();
-                    }
-                }
-                if (this.updatePreview) {
-                    await this.updatePreview();
-                }
-
-                app.graph.setDirtyCanvas(true, true);
-            };
-
-            const uploadFilesAsFolder = async (pairs) => {
-                if (!pairs || pairs.length === 0) return;
-
-                infoEl.innerText = "uploading...";
-
-                const form = new FormData();
-                for (const p of pairs) {
-                    if (!p?.file) continue;
-                    const name = p.relativePath || p.file.name;
-                    form.append("files", p.file, name);
-                }
-
-                const res = await api.fetchApi("/1hew/upload_videos", {
-                    method: "POST",
-                    body: form,
-                });
-                if (res.status !== 200) {
-                    infoEl.innerText = "upload failed";
-                    return;
-                }
-
-                const data = await res.json();
-                const folder = data?.folder;
-                if (!folder) {
-                    infoEl.innerText = "upload failed";
-                    return;
-                }
-
-                if (fileWidget) {
-                    fileWidget.value = folder;
-                    if (typeof fileWidget.callback === "function") {
-                        fileWidget.callback();
-                    }
-                }
-
-                if (indexWidget) {
-                    indexWidget.value = 0;
-                    if (typeof indexWidget.callback === "function") {
-                        indexWidget.callback();
-                    }
-                }
-
-                if (this.updatePreview) {
-                    await this.updatePreview();
-                }
-
-                app.graph.setDirtyCanvas(true, true);
-            };
-
-            this.onDropFile = function (file) {
-                try {
-                    uploadSingleFile(file);
-                } catch (err) {
-                    console.error("[LoadVideoFromPath] Upload failed:", err);
-                }
-                return true;
-            };
-
-            this.onDragDrop = function (e, graphCanvas) {
-                if (
-                    e.dataTransfer &&
-                    e.dataTransfer.files &&
-                    e.dataTransfer.files.length > 0
-                ) {
-                    const file = e.dataTransfer.files[0];
-                    try {
-                        uploadSingleFile(file);
-                    } catch (err) {
-                        console.error("[LoadVideoFromPath] Upload failed:", err);
-                    }
-                    return true;
-                }
-                return false;
-            };
-
-            this.onDragOver = function (e) {
-                if (e.dataTransfer) {
-                    e.dataTransfer.dropEffect = "copy";
-                }
-                return true;
-            };
-
-            this.onDragEnter = function (e) {
-                return true;
-            };
-
-            container.addEventListener("click", (e) => {
-                if (e?.target === videoEl) return;
+            const openFilePicker = () => {
                 try {
                     fileInputEl.value = "";
                 } catch {}
                 fileInputEl.click();
+            };
+            const {
+                container,
+                videoEl,
+                infoEl,
+                fileInputEl,
+            } = createLoadVideoDom({
+                app,
+                node: this,
+                openFilePicker,
+            });
+
+            applyLoopedHoverAudioPreview(videoEl);
+
+            const disposables = createDisposer();
+            const interaction = createDomWidgetInteractionManager({
+                getWidgetElement: () => this.videoWidget?.element,
+                container,
+                interactiveElements: [videoEl, infoEl],
+                idlePointerEvents: "auto",
+                dragPointerEvents: "auto",
+            });
+            const { setDragPassthrough, resetDragPassthrough } = interaction;
+            disposables.add(interaction.bindGlobalDragCleanup());
+
+            const { uploadSingleFile, uploadFilesAsFolder } = createLoadVideoUploader({
+                app,
+                api,
+                node: this,
+                fileWidget,
+                indexWidget,
+                infoEl,
+            });
+
+            attachCanvasUploadHandlers({
+                node: this,
+                setDragPassthrough,
+                resetDragPassthrough,
+                includeDragEnter: true,
+                onFileDrop: (file) => {
+                    void uploadSingleFile(file);
+                },
+                onEventDrop: (event) => {
+                    if (
+                        event.dataTransfer
+                        && event.dataTransfer.files
+                        && event.dataTransfer.files.length > 0
+                    ) {
+                        const file = event.dataTransfer.files[0];
+                        void uploadSingleFile(file);
+                        return true;
+                    }
+                    return false;
+                },
             });
 
             fileInputEl.addEventListener("change", async () => {
@@ -627,54 +503,31 @@ app.registerExtension({
                 await uploadSingleFile(file);
             });
 
-            const handleDomDragEnter = (e) => {
-                e.preventDefault();
-                domDragDepth += 1;
-                setDragPassthrough(true);
-                if (e.dataTransfer) {
-                    e.dataTransfer.dropEffect = "copy";
-                }
-            };
-
-            const handleDomDragOver = (e) => {
-                e.preventDefault();
-                setDragPassthrough(true);
-                if (e.dataTransfer) {
-                    e.dataTransfer.dropEffect = "copy";
-                }
-            };
-
-            const handleDomDragLeave = (e) => {
-                e.preventDefault();
-                domDragDepth = Math.max(0, domDragDepth - 1);
-                if (domDragDepth === 0) {
-                    setDragPassthrough(false);
-                }
-            };
-
-            const handleDomDrop = async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                domDragDepth = 0;
-                setDragPassthrough(false);
-
-                const payload = await collectDropPayload(e);
-                const files = (payload?.pairs || []).filter((p) => p?.file);
-                if (payload?.hasDirectory || files.length > 1) {
-                    await uploadFilesAsFolder(files);
+            container.addEventListener("click", (event) => {
+                if (event?.target === videoEl) {
                     return;
                 }
-
-                await uploadSingleFile(files?.[0]?.file);
-            };
+                try {
+                    fileInputEl.value = "";
+                } catch {}
+                openFilePicker();
+            });
 
             const dragTargets = [container, videoEl, infoEl];
-            for (const target of dragTargets) {
-                target.addEventListener("dragenter", handleDomDragEnter);
-                target.addEventListener("dragover", handleDomDragOver);
-                target.addEventListener("dragleave", handleDomDragLeave);
-                target.addEventListener("drop", handleDomDrop);
-            }
+            bindDomUploadDropTargets({
+                disposables,
+                interaction,
+                dragTargets,
+                onDrop: async (event) => {
+                    const payload = await collectDropPayload(event);
+                    const files = (payload?.pairs || []).filter((pair) => pair?.file);
+                    if (payload?.hasDirectory || files.length > 1) {
+                        await uploadFilesAsFolder(files);
+                        return;
+                    }
+                    await uploadSingleFile(files?.[0]?.file);
+                },
+            });
 
             this.videoWidget = this.addDOMWidget(
                 "video_preview",
@@ -710,6 +563,23 @@ app.registerExtension({
                 videoEl,
             });
 
+            const resetNodeHeightToBase = () => {
+                try {
+                    const baseH =
+                        Array.isArray(this._comfy1hewLoadVideoBaseSize)
+                        && Number.isFinite(this._comfy1hewLoadVideoBaseSize[1])
+                            ? this._comfy1hewLoadVideoBaseSize[1]
+                            : null;
+                    if (typeof baseH === "number" && baseH > 0) {
+                        this.setSize([this.size[0], baseH]);
+                        return;
+                    }
+                } catch {}
+                try {
+                    this.setSize([this.size[0], 130]);
+                } catch {}
+            };
+
             videoEl.addEventListener("loadedmetadata", () => {
                 const info = this?._comfy1hewVideoInfo;
                 const w = Number(info?.width) || 0;
@@ -719,14 +589,17 @@ app.registerExtension({
                 } else {
                     infoEl.innerText = `${videoEl.videoWidth} x ${videoEl.videoHeight}`;
                 }
-                ensurePreviewLayout();
+                ensurePreviewLayout({
+                    allowShrink: true,
+                    forceAutoSize: true,
+                });
             });
 
             videoEl.addEventListener("error", () => {
                 this.videoWidget.aspectRatio = undefined;
                 infoEl.innerText = "";
                 updateLayout();
-                this.setSize([this.size[0], 0]);
+                resetNodeHeightToBase();
             });
 
             videoEl.addEventListener("loadeddata", updateLayout);
@@ -734,89 +607,34 @@ app.registerExtension({
             videoEl.addEventListener("pause", updateLayout);
 
             applyPreviewHiddenState(this, { respectFrameAccurateOnShow: true });
-            setTimeout(ensurePreviewLayout, 0);
-            setTimeout(ensurePreviewLayout, 200);
-            setTimeout(ensurePreviewLayout, 800);
+            setTimeout(
+                () => ensurePreviewLayout({ allowShrink: true, forceAutoSize: true }),
+                0
+            );
+            setTimeout(
+                () => ensurePreviewLayout({ allowShrink: true, forceAutoSize: true }),
+                200
+            );
+            setTimeout(
+                () => ensurePreviewLayout({ allowShrink: true, forceAutoSize: true }),
+                800
+            );
 
-            this.updatePreview = async () => {
-                const file = fileWidget.value;
-                const index = indexWidget.value;
-                const includeSubdir = includeSubdirWidget.value;
-
-                if (this.videoWidget) {
-                    this.videoWidget._comfy1hew_maxPreviewHeight = 220;
-                }
-
-                const trimmedFile = String(file || "").trim();
-                if (trimmedFile === "") {
-                    this._comfy1hewVideoInfo = null;
-                    this.videoWidget.aspectRatio = undefined;
-                    infoEl.innerText = "";
-                    container.style.display = "none";
-                    try {
-                        videoEl.pause();
-                    } catch {}
-                    videoEl.removeAttribute("src");
-                    try {
-                        videoEl.load();
-                    } catch {}
-                    updateLayout();
-                    this.setSize([this.size[0], 0]);
-                    setTimeout(ensurePreviewLayout, 0);
-                    return;
-                }
-
-                container.style.display = "flex";
-                const params = new URLSearchParams({
-                    file: trimmedFile,
-                    index: index,
-                    include_subdir: includeSubdir,
-                    preview: "true",
-                    t: Date.now(),
-                });
-
-                const url = `/1hew/view_video_from_folder?${params.toString()}`;
-                if (videoEl.src.indexOf(url.split("&t=")[0]) === -1) {
-                    this._comfy1hewVideoAutoSizeKey = "";
-                    videoEl.src = url;
-                    setTimeout(ensurePreviewLayout, 0);
-                    setTimeout(ensurePreviewLayout, 200);
-                }
-
-                try {
-                    const infoParams = new URLSearchParams({
-                        file: trimmedFile,
-                        index: index,
-                        include_subdir: includeSubdir,
-                    });
-                    const infoRes = await api.fetchApi(
-                        `/1hew/video_info_from_folder?${infoParams.toString()}`,
-                        { cache: "no-store" }
-                    );
-                    if (infoRes && infoRes.status === 200) {
-                        this._comfy1hewVideoInfo = await infoRes.json();
-                    } else {
-                        this._comfy1hewVideoInfo = null;
-                    }
-                } catch {
-                    this._comfy1hewVideoInfo = null;
-                }
-
-                const info = this._comfy1hewVideoInfo;
-                const w = Number(info?.width) || 0;
-                const h = Number(info?.height) || 0;
-                if (w > 0 && h > 0) {
-                    infoEl.innerText = `${w} x ${h}`;
-                    this.videoWidget.aspectRatio = h / w;
-                    ensurePreviewLayout();
-                }
-                
-                if (this.updateVideoPlaybackState) {
-                    this.updateVideoPlaybackState();
-                }
-
-                app.graph.setDirtyCanvas(true, true);
-            };
+            this.updatePreview = createLoadVideoPreviewController({
+                app,
+                api,
+                node: this,
+                videoEl,
+                infoEl,
+                container,
+                videoWidget: this.videoWidget,
+                fileWidget,
+                indexWidget,
+                includeSubdirWidget,
+                updateLayout,
+                ensurePreviewLayout,
+                resetNodeHeightToBase,
+            });
 
             const playback = installVideoPlaybackState({
                 node: this,
@@ -853,153 +671,23 @@ app.registerExtension({
 
             setTimeout(updateLayout, 0);
 
-            const originalOnRemoved = this.onRemoved;
-            this.onRemoved = function () {
+            chainOnRemoved(this, function () {
                 try {
-                    setDragPassthrough(false);
-                    for (const target of dragTargets) {
-                        target.removeEventListener("dragenter", handleDomDragEnter);
-                        target.removeEventListener("dragover", handleDomDragOver);
-                        target.removeEventListener("dragleave", handleDomDragLeave);
-                        target.removeEventListener("drop", handleDomDrop);
-                    }
+                    resetDragPassthrough();
+                    disposables.dispose();
                 } catch {}
-                if (originalOnRemoved) {
-                    return originalOnRemoved.apply(this, arguments);
-                }
-            };
+            });
 
             return r;
         };
 
         const getExtraMenuOptions = nodeType.prototype.getExtraMenuOptions;
         nodeType.prototype.getExtraMenuOptions = function(_, options) {
-            if (getExtraMenuOptions) {
-                getExtraMenuOptions.apply(this, arguments);
-            }
-            addPreviewMenuOptions(options, {
-                app,
-                currentNode: this,
-                respectFrameAccurateOnShow: true,
-            });
-
-            let videoEl = null;
-            if (this.videoWidget && this.videoWidget.element) {
-                 videoEl = this.videoWidget.element.querySelector("video");
-                 if (!videoEl && this.videoWidget.element.tagName === "VIDEO") {
-                     videoEl = this.videoWidget.element;
-                 }
-            }
-
-            const getVideoElFromNode = (node) => {
-                if (!node?.videoWidget?.element) {
-                    return null;
-                }
-                const el = node.videoWidget.element;
-                return el.tagName === "VIDEO" ? el : el.querySelector("video");
-            };
-
-            const getTargets = () => {
-                const canvas = app.canvas;
-                const selected = canvas.selected_nodes || {};
-                const selection = Object.values(selected);
-                if (selection.length > 0 && selection.includes(this)) {
-                    return selection;
-                }
-                return [this];
-            };
-
-            const basename = (p) => {
-                if (!p) return "";
-                const normalized = String(p).replace(/\\/g, "/");
-                const parts = normalized.split("/");
-                return parts.length ? parts[parts.length - 1] : normalized;
-            };
-
-            const getNodeParams = (node) => {
-                const fileWidget = node?.widgets?.find((w) => w.name === "file");
-                const indexWidget = node?.widgets?.find(
-                    (w) => w.name === "video_index",
-                );
-                const includeSubdirWidget = node?.widgets?.find(
-                    (w) => w.name === "include_subdir",
-                );
-                const file = String(fileWidget?.value || "").trim();
-                if (!file) {
-                    return null;
-                }
-                return {
-                    file,
-                    index: String(indexWidget?.value ?? "0"),
-                    includeSubdir: String(includeSubdirWidget?.value ?? true),
-                };
-            };
-
-            options.push({
-                content: "Save Video",
-                callback: () => {
-                    const targets = getTargets();
-                    for (const node of targets) {
-                        const params = getNodeParams(node);
-                        if (!params) {
-                            continue;
-                        }
-                        const urlParams = new URLSearchParams({
-                            file: params.file,
-                            index: params.index,
-                            include_subdir: params.includeSubdir,
-                            raw: "1",
-                            t: Date.now(),
-                        });
-                        const url = `/1hew/view_video_from_folder?${urlParams.toString()}`;
-                        const suggested =
-                            basename(node?._comfy1hewVideoInfo?.path)
-                            || `video_${node.id}_${Date.now()}.mp4`;
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = suggested;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                    }
-                },
-            });
-
-            if (videoEl) {
-                options.push({
-                    content: "Copy Frame",
-                    callback: async () => {
-                        const params = getNodeParams(this);
-                        if (!params) {
-                            return;
-                        }
-                        const urlParams = new URLSearchParams({
-                            file: params.file,
-                            index: params.index,
-                            include_subdir: params.includeSubdir,
-                            t: String(videoEl.currentTime || 0),
-                            r: String(Date.now()),
-                        });
-                        try {
-                            const res = await api.fetchApi(
-                                `/1hew/video_frame_from_folder?${urlParams.toString()}`,
-                                { cache: "no-store" },
-                            );
-                            if (!res || res.status !== 200) {
-                                return;
-                            }
-                            const blob = await res.blob();
-                            const item = new ClipboardItem({ "image/png": blob });
-                            await navigator.clipboard.write([item]);
-                        } catch (err) {
-                            console.error(
-                                "Failed to copy frame to clipboard:",
-                                err,
-                            );
-                        }
-                    },
-                });
-            }
+            const r = getExtraMenuOptions
+                ? getExtraMenuOptions.apply(this, arguments)
+                : undefined;
+            extendLoadVideoMenu({ app, api, node: this, options });
+            return r;
         };
     },
-});
+}));

@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.10.0**
+- feat(image): Add `Image Alpha Join`
+
 **v3.9.0**
 - feat(image): Add `Image Alpha Split` for extracting alpha masks while flattening transparent images onto configurable solid backgrounds
 
@@ -398,6 +401,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|--------------|
 | Image Solid | Generate solid color images with enhanced color parameter supporting multiple input formats and dimension presets |
+| Image Alpha Join | Combine optional `image` and `mask` into a 4-channel image; supports empty output, transparent canvas, and full-alpha fallback |
 | Image Alpha Split | Extract alpha as `mask` while flattening RGBA or alpha images onto a configurable solid background |
 | Image Solid FluxKontext | Generate solid color images based on Flux Kontext dimension presets with flexible color input format support |
 | Image Rotate with Mask | Advanced image rotation with mask integration, multiple fill modes, and mask center rotation options |

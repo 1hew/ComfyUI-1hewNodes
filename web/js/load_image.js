@@ -1,221 +1,37 @@
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
-import { addPreviewMenuOptions, applyPreviewHiddenState } from "./core/preview_menu.js";
-import {
-    addCopyMediaFrameMenuOption,
-    addSaveMediaMenuOption,
-    collectDropPayload,
-    installImagePreviewLayout,
-} from "./core/media_utils.js";
+import { applyPreviewHiddenState } from "./core/preview_menu.js";
+import { collectDropPayload, installImagePreviewLayout } from "./core/media_utils.js";
 import { saveMaskFromClipspaceToSidecar } from "./core/image_mask_sidecar.js";
+import { createLoadImageDom } from "./core/load_image_dom.js";
+import { extendLoadImageMenu } from "./core/load_image_menu.js";
+import { createLoadImagePreviewController } from "./core/load_image_preview.js";
+import {
+    installLoadImageClipspacePatch,
+    registerLoadImagePasteTarget,
+} from "./core/load_image_runtime.js";
+import { createLoadImageUploader } from "./core/load_image_upload.js";
+import {
+    installLoadImageSetSizeGuard,
+    scheduleLoadImagePreserveRefresh,
+    scheduleLoadImagePreviewStyleSync,
+} from "./core/load_image_node_runtime.js";
+import { createDomWidgetInteractionManager } from "./core/dom_widget_runtime.js";
+import { chainOnRemoved, createDisposer, registerExtensionOnce } from "./core/runtime.js";
+import { attachCanvasUploadHandlers, bindDomUploadDropTargets } from "./core/upload_drop_runtime.js";
 
-const managedLoadImageNodes = new Set();
-let globalLoadImagePasteInstalled = false;
-
-/** LiteGraph 可能晚于当前帧写入 size，延后补一次保留框高刷新 */
-const LOAD_IMAGE_PRESERVE_REFRESH_LATE_MS = 160;
-
-function collectPastedImageFiles(e) {
-    const items = e?.clipboardData?.items;
-    if (!items) {
-        return [];
-    }
-
-    const files = [];
-    for (let i = 0; i < items.length; i++) {
-        if (items[i].kind === "file" && items[i].type.startsWith("image/")) {
-            const file = items[i].getAsFile();
-            if (file) {
-                const name = file.name || "pasted_image.png";
-                files.push({ file, relativePath: name });
-            }
-        }
-    }
-    return files;
-}
-
-function installGlobalLoadImagePasteHandler() {
-    if (globalLoadImagePasteInstalled) {
-        return;
-    }
-    globalLoadImagePasteInstalled = true;
-
-    document.addEventListener(
-        "paste",
-        (e) => {
-            const files = collectPastedImageFiles(e);
-            if (files.length === 0) {
-                return;
-            }
-
-            const selectedNodes = app?.canvas?.selected_nodes || {};
-            const candidates = Array.from(managedLoadImageNodes).filter(
-                (node) =>
-                    selectedNodes[node?.id]
-                    && typeof node?._comfy1hewHandlePasteFiles === "function"
-            );
-            if (candidates.length === 0) {
-                return;
-            }
-
-            const targetNode = candidates[candidates.length - 1];
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-            targetNode._comfy1hewHandlePasteFiles(files);
-        },
-        { capture: true }
-    );
-}
-
-app.registerExtension({
+registerExtensionOnce("__comfy1hewLoadImageExtensionRegistered", () => app.registerExtension({
     name: "ComfyUI-1hewNodes.load_image",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         if (nodeData.name !== "1hew_LoadImage") {
             return;
         }
-
-        /** 父类 configure 可能先收框：用序列化 size 与 current 取 max 再设 `_comfy1hewPreserveFrameHeightUntilPreview`。 */
-        const refreshLoadImagePreserveFrameHeight = (node, opts = {}) => {
-            try {
-                const fw = node?.widgets?.find((w) => w.name === "file");
-                if (!fw || !String(fw.value || "").trim()) {
-                    return;
-                }
-                const w = Array.isArray(node.size) ? node.size[0] : 200;
-                const currentH = Array.isArray(node.size) ? node.size[1] : 0;
-                const desiredSize = node.computeSize?.([w, currentH]);
-                const baseH =
-                    Array.isArray(desiredSize) && Number.isFinite(desiredSize[1])
-                        ? desiredSize[1]
-                        : 0;
-
-                const ser = opts.serializedSize;
-                const serializedH =
-                    Array.isArray(ser) && ser.length >= 2 && Number.isFinite(ser[1])
-                        ? ser[1]
-                        : null;
-
-                const heights = [currentH, serializedH].filter(
-                    (x) => Number.isFinite(x),
-                );
-                const frameH = heights.length > 0 ? Math.max(...heights) : currentH;
-
-                if (
-                    !Number.isFinite(frameH)
-                    || !Number.isFinite(baseH)
-                    || frameH <= baseH + 5
-                ) {
-                    return;
-                }
-                const prev = node._comfy1hewPreserveFrameHeightUntilPreview;
-                node._comfy1hewPreserveFrameHeightUntilPreview = Number.isFinite(prev)
-                    ? Math.max(prev, frameH)
-                    : frameH;
-                node.updateImageLayout?.();
-            } catch {}
-        };
-
-        /** 同步 + 下一任务 + 延后一拍，覆盖 LiteGraph 异步写 size */
-        const scheduleLoadImagePreserveRefresh = (node, opts = {}) => {
-            refreshLoadImagePreserveFrameHeight(node, opts);
-            setTimeout(() => refreshLoadImagePreserveFrameHeight(node, opts), 0);
-            setTimeout(
-                () => refreshLoadImagePreserveFrameHeight(node, opts),
-                LOAD_IMAGE_PRESERVE_REFRESH_LATE_MS,
-            );
-        };
-
-        // 复制后偏小的 computeSize 会调 setSize 收扁；保留高度有效时拦截（内部 _comfy1hewInternalPreviewResize 仍放行）。
-        if (!nodeType.prototype._comfy1hewLoadImageSetSizePatched) {
-            nodeType.prototype._comfy1hewLoadImageSetSizePatched = true;
-            const origSetSize = nodeType.prototype.setSize;
-            nodeType.prototype.setSize = function (size) {
-                const p = this._comfy1hewPreserveFrameHeightUntilPreview;
-                if (
-                    !this._comfy1hewInternalPreviewResize
-                    && !this._comfy1hewInternalVideoPreviewResize
-                    && Number.isFinite(p)
-                    && Array.isArray(size)
-                    && size.length >= 2
-                    && Number.isFinite(size[1])
-                    && size[1] < p - 1
-                ) {
-                    return origSetSize.call(this, [size[0], p]);
-                }
-                return origSetSize.apply(this, arguments);
-            };
-        }
-
-        const schedulePreviewStyleSync = (node, delays = [0]) => {
-            if (!node) {
-                return;
-            }
-            try {
-                if (Array.isArray(node._comfy1hewPreviewStyleTimers)) {
-                    for (const timer of node._comfy1hewPreviewStyleTimers) {
-                        clearTimeout(timer);
-                    }
-                }
-            } catch {}
-
-            node._comfy1hewPreviewStyleTimers = [];
-            for (const delay of delays) {
-                const timer = setTimeout(() => {
-                    try {
-                        node._comfy1hewEnsurePreviewLayout?.({ allowShrink: true });
-                        applyPreviewHiddenState(node);
-                    } catch {}
-                }, delay);
-                node._comfy1hewPreviewStyleTimers.push(timer);
-            }
-        };
+        installLoadImageSetSizeGuard(nodeType);
 
         const getExtraMenuOptions = nodeType.prototype.getExtraMenuOptions;
         nodeType.prototype.getExtraMenuOptions = function (_, options) {
             const r = getExtraMenuOptions ? getExtraMenuOptions.apply(this, arguments) : undefined;
-
-            // Remove "Save Mask" option if present (robust check)
-            if (Array.isArray(options)) {
-                for (let i = options.length - 1; i >= 0; i--) {
-                    const opt = options[i];
-                    if (opt && typeof opt.content === "string" && opt.content.trim() === "Save Mask") {
-                        options.splice(i, 1);
-                    }
-                }
-            }
-
-            // Add standard preview options (Hide/Show, etc.)
-            addPreviewMenuOptions(options, { app, currentNode: this });
-
-            let imgEl = null;
-            if (this.imageWidget && this.imageWidget.element) {
-                imgEl = this.imageWidget.element.querySelector("img");
-            }
-
-            const getImgElFromNode = (node) =>
-                node?.imageWidget?.element?.querySelector("img");
-
-            addSaveMediaMenuOption(options, {
-                app,
-                currentNode: this,
-                content: "Save Image",
-                getMediaElFromNode: getImgElFromNode,
-                filenamePrefix: "image",
-                filenameExt: "png",
-            });
-
-            if (imgEl && imgEl.src) {
-                addCopyMediaFrameMenuOption(options, {
-                    content: "Copy Image",
-                    getWidth: () => imgEl.naturalWidth,
-                    getHeight: () => imgEl.naturalHeight,
-                    drawToCanvas: (ctx) => ctx.drawImage(imgEl, 0, 0),
-                    copyErrorMessage: "Failed to copy image to clipboard:",
-                    prepareErrorMessage: "Error preparing image copy:",
-                });
-            }
-
+            extendLoadImageMenu({ app, node: this, options });
             return r;
         };
 
@@ -235,7 +51,11 @@ app.registerExtension({
                     this._comfy1hewLoadImagePendingPreview = true;
                     this._comfy1hewSchedulePreviewUpdate?.(0);
                 } else {
-                    schedulePreviewStyleSync(this, [0]);
+                    scheduleLoadImagePreviewStyleSync(
+                        this,
+                        applyPreviewHiddenState,
+                        [0]
+                    );
                 }
             }
             scheduleLoadImagePreserveRefresh(this, { serializedSize });
@@ -312,146 +132,37 @@ app.registerExtension({
             };
             this._comfy1hewSchedulePreviewUpdate = schedulePreviewUpdate;
 
-            const isValidImageFile = (file) => {
-                if (!file) return false;
-                if (file.type && file.type.startsWith("image/")) return true;
-                const name = (file.name || "").toLowerCase();
-                return (
-                    name.endsWith(".png") ||
-                    name.endsWith(".jpg") ||
-                    name.endsWith(".jpeg") ||
-                    name.endsWith(".webp") ||
-                    name.endsWith(".bmp") ||
-                    name.endsWith(".tiff") ||
-                    name.endsWith(".gif")
-                );
-            };
-
-            const uploadFilesAsFolder = async (pairs, hasDirectory) => {
-                const files = (pairs || []).filter((p) => isValidImageFile(p?.file));
-                if (files.length === 0) return;
-
-                const form = new FormData();
-                for (const p of files) {
-                    const name = p.relativePath || p.file.name;
-                    form.append("files", p.file, name);
-                }
-
-                const res = await api.fetchApi("/1hew/upload_images", {
-                    method: "POST",
-                    body: form,
-                });
-                if (res.status !== 200) return;
-
-                const data = await res.json();
-                const uploadedFolder = data?.folder;
-                const uploadedFiles = data?.files;
-
-                if (!uploadedFolder && (!uploadedFiles || uploadedFiles.length === 0)) return;
-
-                let finalPath = uploadedFolder;
-                // If backend returns specific file paths and we uploaded files, try to use the direct file path
-                if (Array.isArray(uploadedFiles) && uploadedFiles.length > 0) {
-                    // If we only have one file, use its full path
-                    if (uploadedFiles.length === 1) {
-                        finalPath = uploadedFiles[0];
-                    }
-                }
-
-                if (fileWidget) {
-                    fileWidget.value = finalPath;
-                }
-
-                if (indexWidget) {
-                    indexWidget.value = 0;
-                }
-
-                if (includeSubdirWidget && hasDirectory) {
-                    includeSubdirWidget.value = true;
-                }
-
-                this._comfy1hewLoadImageStateKey = computeStateKey();
-                if (this.updatePreview) {
-                    await this.updatePreview();
-                }
-
-                app.graph.setDirtyCanvas(true, true);
-            };
-            this._comfy1hewHandlePasteFiles = (files) =>
-                uploadFilesAsFolder(files, false);
-            managedLoadImageNodes.add(this);
-            installGlobalLoadImagePasteHandler();
-
-            const imageEl = document.createElement("img");
-            Object.assign(imageEl.style, {
-                width: "100%",
-                maxWidth: "100%",
-                height: "auto",
-                maxHeight: "calc(100% - 20px)",
-                display: "block",
-                flex: "0 0 auto",
-                objectFit: "contain",
-                minHeight: "0",
+            const { uploadFilesAsFolder } = createLoadImageUploader({
+                app,
+                api,
+                node: this,
+                fileWidget,
+                indexWidget,
+                includeSubdirWidget,
+                computeStateKey,
+            });
+            const unregisterPasteTarget = registerLoadImagePasteTarget({
+                app,
+                node: this,
+                handlePasteFiles: (files) => uploadFilesAsFolder(files, false),
             });
 
-            const infoEl = document.createElement("div");
-            Object.assign(infoEl.style, {
-                width: "100%",
-                height: "20px",
-                lineHeight: "20px",
-                textAlign: "center",
-                fontSize: "12px",
-                color: "#aaa",
-                fontFamily: "sans-serif",
-                flex: "0 0 20px",
-                background: "transparent",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-            });
-            infoEl.innerText = "";
-
-            const container = document.createElement("div");
-            Object.assign(container.style, {
-                display: "none",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "100%",
-                height: "100%",
-                minHeight: "0",
-                overflow: "hidden",
-                boxSizing: "border-box",
-            });
-
-            container.appendChild(imageEl);
-            container.appendChild(infoEl);
-
-            let domDragDepth = 0;
-            const setDragPassthrough = (active) => {
-                imageEl.style.pointerEvents = active ? "none" : "";
-                infoEl.style.pointerEvents = active ? "none" : "";
+            const openFilePicker = () => {
+                try {
+                    fileInputEl.value = "";
+                } catch {}
+                fileInputEl.click();
             };
-
-            const fileInputEl = document.createElement("input");
-            fileInputEl.type = "file";
-            fileInputEl.accept = "image/*";
-            fileInputEl.style.display = "none";
-            container.appendChild(fileInputEl);
-
-            const uploadWidget = this.addWidget(
-                "button",
-                "choose file to upload",
-                "image",
-                () => {
-                    app.canvas.node_widget = null;
-                    try {
-                        fileInputEl.value = "";
-                    } catch {}
-                    fileInputEl.click();
-                }
-            );
-            uploadWidget.serialize = false;
+            const {
+                container,
+                imageEl,
+                infoEl,
+                fileInputEl,
+            } = createLoadImageDom({
+                app,
+                node: this,
+                openFilePicker,
+            });
 
             fileInputEl.addEventListener("change", async () => {
                 const file = fileInputEl.files && fileInputEl.files[0];
@@ -464,14 +175,6 @@ app.registerExtension({
                 } catch {}
             });
 
-            imageEl.addEventListener("contextmenu", (e) => {
-                e.preventDefault();
-                const node = this;
-                if (app.canvas) {
-                    app.canvas.processContextMenu(node, e);
-                }
-            });
-
             this.imageWidget = this.addDOMWidget(
                 "image_preview",
                 "div",
@@ -481,6 +184,18 @@ app.registerExtension({
                     hideOnZoom: false,
                 }
             );
+            if (this.imageWidget?.element?.style) {
+                this.imageWidget.element.style.pointerEvents = "none";
+            }
+
+            const disposables = createDisposer();
+            const interaction = createDomWidgetInteractionManager({
+                getWidgetElement: () => this.imageWidget?.element,
+                container,
+                interactiveElements: [imageEl, infoEl],
+            });
+            const { setDragPassthrough, resetDragPassthrough } = interaction;
+            disposables.add(interaction.bindGlobalDragCleanup());
 
             this.imageWidget.computeSize = function (width) {
                 if (this.aspectRatio) {
@@ -573,293 +288,63 @@ app.registerExtension({
                 }
             };
 
-            const handleDomDragEnter = (e) => {
-                if (!e) {
-                    return;
-                }
-                e.preventDefault();
-                domDragDepth += 1;
-                setDragPassthrough(true);
-                if (e.dataTransfer) {
-                    e.dataTransfer.dropEffect = "copy";
-                }
-            };
-
-            const handleDomDragOver = (e) => {
-                if (!e) {
-                    return;
-                }
-                e.preventDefault();
-                setDragPassthrough(true);
-                if (e.dataTransfer) {
-                    e.dataTransfer.dropEffect = "copy";
-                }
-            };
-
-            const handleDomDragLeave = (e) => {
-                if (!e) {
-                    return;
-                }
-                e.preventDefault();
-                domDragDepth = Math.max(0, domDragDepth - 1);
-                if (domDragDepth === 0) {
-                    setDragPassthrough(false);
-                }
-            };
-
-            const handleDomDrop = (e) => {
-                if (!e) {
-                    return;
-                }
-                e.preventDefault();
-                e.stopPropagation();
-                domDragDepth = 0;
-                setDragPassthrough(false);
-                (async () => {
-                    try {
-                        const payload = await collectDropPayload(e);
-                        const pairs = (payload?.pairs || []).filter((p) => p?.file);
-                        const hasDirectory = Boolean(payload?.hasDirectory);
-                        await uploadFilesAsFolder(pairs, hasDirectory);
-                    } catch {}
-                })();
-            };
-
             const dragTargets = [container, imageEl, infoEl];
-            for (const target of dragTargets) {
-                target.addEventListener("dragenter", handleDomDragEnter);
-                target.addEventListener("dragover", handleDomDragOver);
-                target.addEventListener("dragleave", handleDomDragLeave);
-                target.addEventListener("drop", handleDomDrop);
-            }
-
-            this.updatePreview = async () => {
-                this._comfy1hewLoadImageReqId = (this._comfy1hewLoadImageReqId || 0) + 1;
-                const reqId = this._comfy1hewLoadImageReqId;
-
-                const file = fileWidget.value;
-                const index = indexWidget.value;
-                const includeSubdir = includeSubdirWidget
-                    ? includeSubdirWidget.value
-                    : true;
-                const all = allWidget ? allWidget.value : false;
-                if (this.imageWidget) {
-                    this.imageWidget._comfy1hew_maxAspectRatio = all ? 1.25 : null;
-                    // Match native Load Image more closely: keep a compact default
-                    // preview, but allow the user to enlarge it by resizing the node.
-                    this.imageWidget._comfy1hew_maxPreviewHeight = all ? 260 : 220;
-                }
-                const trimmedFile = String(file || "").trim();
-                if (trimmedFile === "") {
-                    this._comfy1hewLoadImageWasEmptyPath = true;
-                    const lastImgSrc = this._comfy1hewLoadImageLastImgSrc;
-
+            bindDomUploadDropTargets({
+                disposables,
+                interaction,
+                dragTargets,
+                onDrop: async (event) => {
                     try {
-                        imageEl.onload = null;
-                        imageEl.onerror = null;
-                        imageEl.removeAttribute("src");
-                    } catch {}
-                    this._comfy1hewLoadImageHadPreview = false;
-                    this._comfy1hewImageAutoSizeKey = "";
-
-                    this.imageWidget.aspectRatio = undefined;
-                    infoEl.innerText = "";
-                    this._comfy1hewPreserveFrameHeightUntilPreview = undefined;
-                    updateLayout();
-                    resetNodeHeightToBase();
-
-                    try {
-                        const clipspace = window?.ComfyApp?.clipspace;
-                        const clipspaceNode = window?.ComfyApp?.clipspace_return_node;
-                        const clipspaceImgs = clipspace?.imgs;
-
-                        const normalizeSrc = (src) => {
-                            try {
-                                const u = new URL(src);
-                                u.searchParams.delete("t");
-                                u.searchParams.delete("preview");
-                                return u.toString();
-                            } catch {
-                                return src;
-                            }
-                        };
-                        const lastSrcNorm =
-                            typeof lastImgSrc === "string"
-                                ? normalizeSrc(lastImgSrc)
-                                : undefined;
-
-                        const shouldClearClipspace =
-                            clipspaceNode === this ||
-                            (typeof lastSrcNorm === "string" &&
-                                Array.isArray(clipspaceImgs) &&
-                                clipspaceImgs.some((i) => {
-                                    if (!i?.src) return false;
-                                    return normalizeSrc(i.src) === lastSrcNorm;
-                                }));
-
-                        if (shouldClearClipspace) {
-                            window.ComfyApp.clipspace = null;
-                            window.ComfyApp.clipspace_return_node = null;
-
-                            const dialog =
-                                window?.comfyAPI?.clipspace?.ClipspaceDialog;
-                            if (dialog?.instance?.close) {
-                                dialog.instance.close();
-                            }
-
-                            const maskEditor =
-                                window?.comfyAPI?.maskEditorOld
-                                    ?.MaskEditorDialogOld;
-                            if (maskEditor?.instance?.close) {
-                                maskEditor.instance.close();
-                            } else if (maskEditor?.getInstance) {
-                                const inst = maskEditor.getInstance();
-                                if (inst?.close) {
-                                    inst.close();
-                                }
-                            }
-                        }
-                    } catch {}
-                    this._comfy1hewLoadImageLastImgSrc = undefined;
-
-                    if (app?.graph?.setDirtyCanvas) {
-                        app.graph.setDirtyCanvas(true, true);
-                    }
-                    return;
-                }
-
-                this._comfy1hewLoadImageWasEmptyPath = false;
-
-                const params = new URLSearchParams({
-                    file: file,
-                    include_subdir: includeSubdir,
-                    t: Date.now(),
-                });
-                if (!all) {
-                    params.set("index", index);
-                }
-                params.set("all", all ? "true" : "false");
-
-                const url = `/1hew/view_image_from_folder?${params.toString()}`;
-                const normalizeUrl = (src) => {
-                    if (!src) return "";
-                    try {
-                        const u = new URL(src, window.location.href);
-                        u.searchParams.delete("t");
-                        u.searchParams.delete("preview");
-                        return u.toString();
-                    } catch {
-                        return String(src);
-                    }
-                };
-                const desiredNorm = normalizeUrl(url);
-                const currentNorm = normalizeUrl(imageEl.src);
-
-                if (currentNorm !== desiredNorm) {
-                    this._comfy1hewImageAutoSizeKey = "";
-                    ensureProvisionalPreviewAspect();
-                    container.style.display = "flex";
-
-                    imageEl.onload = () => {
-                        if (String(imageEl.dataset.comfy1hewReqId || "") !== String(reqId)) {
-                            return;
-                        }
-                        if (imageEl.naturalWidth && imageEl.naturalHeight) {
-                            this.imageWidget.aspectRatio =
-                                imageEl.naturalHeight / imageEl.naturalWidth;
-                            infoEl.innerText = `${imageEl.naturalWidth} x ${imageEl.naturalHeight}`;
-                            this._comfy1hewLoadImageHadPreview = true;
-                            try {
-                                const u = new URL(imageEl.src);
-                                u.searchParams.delete("t");
-                                u.searchParams.delete("preview");
-                                this._comfy1hewLoadImageLastImgSrc = u.toString();
-                            } catch {
-                                this._comfy1hewLoadImageLastImgSrc = imageEl.src;
-                            }
-                            ensurePreviewLayout({
-                                allowShrink: true,
-                                forceAutoSize: true,
-                            });
-                            this._comfy1hewPreserveFrameHeightUntilPreview = undefined;
-                            schedulePreviewStyleSync(this, [0]);
-                        }
-                    };
-
-                    imageEl.onerror = () => {
-                        if (String(imageEl.dataset.comfy1hewReqId || "") !== String(reqId)) {
-                            return;
-                        }
-                        this.imageWidget.aspectRatio = undefined;
-                        infoEl.innerText = "";
-                        this._comfy1hewLoadImageHadPreview = false;
-                        this._comfy1hewPreserveFrameHeightUntilPreview = undefined;
-                        updateLayout();
-                        resetNodeHeightToBase();
-                    };
-
-                    imageEl.dataset.comfy1hewReqId = String(reqId);
-                    imageEl.src = url;
-                    updateLayout();
-                } else {
-                    // 归一化后已是同一张图：不要反复改 imageEl.src，否则整段重载，观感像「重新添加图片」先收紧再展开。
-                    if (
-                        imageEl.complete
-                        && imageEl.naturalWidth
-                        && imageEl.naturalHeight
-                    ) {
-                        if (!this.imageWidget.aspectRatio) {
-                            this.imageWidget.aspectRatio =
-                                imageEl.naturalHeight / imageEl.naturalWidth;
-                        }
-                        infoEl.innerText = `${imageEl.naturalWidth} x ${imageEl.naturalHeight}`;
-                        this._comfy1hewLoadImageHadPreview = true;
-                        ensurePreviewLayout({
-                            allowShrink: true,
-                            forceAutoSize: true,
-                        });
-                        this._comfy1hewPreserveFrameHeightUntilPreview = undefined;
-                        schedulePreviewStyleSync(this, [0]);
-                    } else {
-                        const hasSrcEl =
-                            Boolean(imageEl?.src && String(imageEl.src).trim() !== "");
-                        const decoding =
-                            hasSrcEl
-                            && (!imageEl.naturalWidth || !imageEl.naturalHeight);
-                        if (decoding) {
-                            updateLayout();
-                        }
-                    }
-                }
-            };
-
-            this.onDropFile = function (file) {
-                (async () => {
-                    try {
-                        await uploadFilesAsFolder([{ file, relativePath: file?.name }], false);
-                    } catch {}
-                })();
-                return true;
-            };
-
-            this.onDragDrop = function (e, graphCanvas) {
-                (async () => {
-                    try {
-                        const payload = await collectDropPayload(e);
-                        const pairs = (payload?.pairs || []).filter((p) => p?.file);
+                        const payload = await collectDropPayload(event);
+                        const pairs = (payload?.pairs || []).filter((pair) => pair?.file);
                         const hasDirectory = Boolean(payload?.hasDirectory);
                         await uploadFilesAsFolder(pairs, hasDirectory);
                     } catch {}
-                })();
-                return true;
-            };
+                },
+            });
 
-            this.onDragOver = function (e) {
-                if (e.dataTransfer) {
-                    e.dataTransfer.dropEffect = "copy";
-                }
-                return true;
-            };
+            this.updatePreview = createLoadImagePreviewController({
+                app,
+                node: this,
+                imageEl,
+                infoEl,
+                container,
+                imageWidget: this.imageWidget,
+                fileWidget,
+                indexWidget,
+                includeSubdirWidget,
+                allWidget,
+                updateLayout,
+                ensurePreviewLayout,
+                resetNodeHeightToBase,
+                ensureProvisionalPreviewAspect,
+                schedulePreviewStyleSync: () =>
+                    scheduleLoadImagePreviewStyleSync(
+                        this,
+                        applyPreviewHiddenState,
+                        [0]
+                    ),
+            });
+
+            attachCanvasUploadHandlers({
+                node: this,
+                setDragPassthrough,
+                resetDragPassthrough,
+                onFileDrop: (file) => {
+                    void uploadFilesAsFolder([{ file, relativePath: file?.name }], false);
+                },
+                onEventDrop: (event) => {
+                    void (async () => {
+                        try {
+                            const payload = await collectDropPayload(event);
+                            const pairs = (payload?.pairs || []).filter((pair) => pair?.file);
+                            const hasDirectory = Boolean(payload?.hasDirectory);
+                            await uploadFilesAsFolder(pairs, hasDirectory);
+                        } catch {}
+                    })();
+                    return true;
+                },
+            });
 
             // 监听 widget 变化
             if (fileWidget) fileWidget.callback = () => schedulePreviewUpdate(0);
@@ -883,20 +368,13 @@ app.registerExtension({
                 }, 200);
             }
 
-            const originalOnRemoved = this.onRemoved;
-            this.onRemoved = function () {
+            chainOnRemoved(this, function () {
                 try {
-                    setDragPassthrough(false);
-                    for (const target of dragTargets) {
-                        target.removeEventListener("dragenter", handleDomDragEnter);
-                        target.removeEventListener("dragover", handleDomDragOver);
-                        target.removeEventListener("dragleave", handleDomDragLeave);
-                        target.removeEventListener("drop", handleDomDrop);
-                    }
+                    resetDragPassthrough();
+                    disposables.dispose();
                 } catch {}
                 try {
-                    managedLoadImageNodes.delete(this);
-                    this._comfy1hewHandlePasteFiles = null;
+                    unregisterPasteTarget?.();
                     if (this._comfy1hewLoadImagePoller) {
                         clearInterval(this._comfy1hewLoadImagePoller);
                         this._comfy1hewLoadImagePoller = null;
@@ -912,53 +390,27 @@ app.registerExtension({
                         this._comfy1hewPreviewStyleTimers = [];
                     }
                 } catch {}
-                if (originalOnRemoved) {
-                    return originalOnRemoved.apply(this, arguments);
-                }
-            };
+            });
 
             if (fileWidget && fileWidget.value || this._comfy1hewLoadImagePendingPreview) {
                 schedulePreviewUpdate(0);
             } else {
-                schedulePreviewStyleSync(this, [0, 200]);
+                scheduleLoadImagePreviewStyleSync(
+                    this,
+                    applyPreviewHiddenState,
+                    [0, 200]
+                );
             }
 
             scheduleLoadImagePreserveRefresh(this);
 
             return r;
         };
-
-
-
-        if (!window.__comfy1hewLoadImageClipspacePatched) {
-            window.__comfy1hewLoadImageClipspacePatched = true;
-            const install = () => {
-                const comfyApp = window?.ComfyApp;
-                if (!comfyApp) {
-                    return;
-                }
-                const originalPaste = comfyApp.pasteFromClipspace;
-                if (typeof originalPaste !== "function") {
-                    return;
-                }
-                if (comfyApp.__comfy1hewPasteFromClipspaceWrapped) {
-                    return;
-                }
-                comfyApp.__comfy1hewPasteFromClipspaceWrapped = true;
-                comfyApp.pasteFromClipspace = function () {
-                    const r2 = originalPaste.apply(this, arguments);
-                    setTimeout(() => {
-                        const node = window?.ComfyApp?.clipspace_return_node;
-                        if (node?.type !== "load_image") {
-                            return;
-                        }
-                        saveMaskFromClipspaceToSidecar({ node, api, app });
-                    }, 0);
-                    return r2;
-                };
-            };
-            setTimeout(install, 0);
-        }
+        installLoadImageClipspacePatch({
+            app,
+            api,
+            saveMaskFromClipspaceToSidecar,
+        });
 
     },
-});
+}));

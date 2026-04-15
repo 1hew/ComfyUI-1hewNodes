@@ -26,6 +26,7 @@
 ## Features
 
 - Flexible sizing: use `preset_size` or custom `width`/`height`; optionally infer size from `get_image_size` per frame.
+- Preset addition: now includes a `256×256` square preset for quick thumbnails or small-canvas testing.
 - Color parsing: supports gray (`0..1`), HEX (`#RRGGBB`), `R,G,B`, named colors, and single-letter aliases.
 - Single-letter aliases include entries such as `r/b/c/m/y/k/w`; note that `g` maps to `lime` rather than `green`.
 - Alpha/invert: applies `alpha` scaling; `invert=True` flips channels before alpha.
