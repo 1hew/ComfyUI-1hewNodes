@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.11.0**
+- feat(image): 添加 `Image Batch Interleave` 节点，支持将图像批次按连续分段后做列优先交错重排
+
 **v3.10.0**
 - feat(image): 添加 `Image Alpha Join`
 
@@ -526,6 +529,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Batch Split | 智能图像批次拆分器，支持正向/反向拆分模式和增强的边界条件处理 |
 | Image Batch Group | 智能图像批次分组器，支持可配置的批次大小、重叠处理和灵活的填充策略 |
 | Image Batch Range | 从图像批次选择连续范围，支持起始索引与数量，越界安全 |
+| Image Batch Interleave | 将图像批次按连续分段后做列优先交错重排，适合打散顺序为跨段轮询 |
 | Image PingPong | 批量往返帧生成，支持预反转、拼接处去重与帧数截取 |
 | Image List Append | 图像列表追加器，智能合并图像到列表中 |
 | Mask Batch Math Ops | 批量遮罩数学运算 |

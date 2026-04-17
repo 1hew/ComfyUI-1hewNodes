@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.11.0**
+- feat(image): Add `Image Batch Interleave` for contiguous segment splitting followed by column-first interleaved batch reordering
+
 **v3.10.0**
 - feat(image): Add `Image Alpha Join`
 
@@ -527,6 +530,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Batch Split | Intelligent image batch splitter with forward/backward splitting modes and enhanced boundary condition handling |
 | Image Batch Group | Intelligent image batch grouper with configurable batch sizes, overlap handling, and flexible padding strategies |
 | Image Batch Range | Select a contiguous range from an image batch using start index and count; out-of-bounds safe |
+| Image Batch Interleave | Reorder an image batch by splitting it into contiguous segments and reading them back in column-first interleaved order |
 | Image PingPong | Bidirectional frame repeat over batch, supports pre-reverse, link-frame removal, and frame truncation |
 | Image List Append | Image list appender for intelligently merging images into lists |
 | Mask Batch Math Ops | Batch mask mathematical operations |

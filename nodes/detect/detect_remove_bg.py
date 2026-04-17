@@ -1,5 +1,4 @@
 import asyncio
-import importlib.util
 import os
 import urllib.request
 
@@ -7,10 +6,259 @@ import cv2
 import folder_paths
 import numpy as np
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from comfy_api.latest import io
 from PIL import Image
 
-_BRIA_MODULE_CACHE = None
+
+class REBNCONV(nn.Module):
+    def __init__(self, in_ch=3, out_ch=3, dirate=1, stride=1):
+        super().__init__()
+        self.conv_s1 = nn.Conv2d(in_ch, out_ch, 3, padding=dirate, dilation=dirate, stride=stride)
+        self.bn_s1 = nn.BatchNorm2d(out_ch)
+        self.relu_s1 = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        return self.relu_s1(self.bn_s1(self.conv_s1(x)))
+
+
+def _upsample_like(src, tar):
+    return F.interpolate(src, size=tar.shape[2:], mode="bilinear", align_corners=False)
+
+
+class RSU7(nn.Module):
+    def __init__(self, in_ch=3, mid_ch=12, out_ch=3):
+        super().__init__()
+        self.rebnconvin = REBNCONV(in_ch, out_ch, dirate=1)
+        self.rebnconv1 = REBNCONV(out_ch, mid_ch, dirate=1)
+        self.pool1 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.rebnconv2 = REBNCONV(mid_ch, mid_ch, dirate=1)
+        self.pool2 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.rebnconv3 = REBNCONV(mid_ch, mid_ch, dirate=1)
+        self.pool3 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.rebnconv4 = REBNCONV(mid_ch, mid_ch, dirate=1)
+        self.pool4 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.rebnconv5 = REBNCONV(mid_ch, mid_ch, dirate=1)
+        self.pool5 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.rebnconv6 = REBNCONV(mid_ch, mid_ch, dirate=1)
+        self.rebnconv7 = REBNCONV(mid_ch, mid_ch, dirate=2)
+        self.rebnconv6d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
+        self.rebnconv5d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
+        self.rebnconv4d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
+        self.rebnconv3d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
+        self.rebnconv2d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
+        self.rebnconv1d = REBNCONV(mid_ch * 2, out_ch, dirate=1)
+
+    def forward(self, x):
+        hxin = self.rebnconvin(x)
+        hx1 = self.rebnconv1(hxin)
+        hx2 = self.rebnconv2(self.pool1(hx1))
+        hx3 = self.rebnconv3(self.pool2(hx2))
+        hx4 = self.rebnconv4(self.pool3(hx3))
+        hx5 = self.rebnconv5(self.pool4(hx4))
+        hx6 = self.rebnconv6(self.pool5(hx5))
+        hx7 = self.rebnconv7(hx6)
+        hx6d = self.rebnconv6d(torch.cat((hx7, hx6), 1))
+        hx5d = self.rebnconv5d(torch.cat((_upsample_like(hx6d, hx5), hx5), 1))
+        hx4d = self.rebnconv4d(torch.cat((_upsample_like(hx5d, hx4), hx4), 1))
+        hx3d = self.rebnconv3d(torch.cat((_upsample_like(hx4d, hx3), hx3), 1))
+        hx2d = self.rebnconv2d(torch.cat((_upsample_like(hx3d, hx2), hx2), 1))
+        hx1d = self.rebnconv1d(torch.cat((_upsample_like(hx2d, hx1), hx1), 1))
+        return hx1d + hxin
+
+
+class RSU6(nn.Module):
+    def __init__(self, in_ch=3, mid_ch=12, out_ch=3):
+        super().__init__()
+        self.rebnconvin = REBNCONV(in_ch, out_ch, dirate=1)
+        self.rebnconv1 = REBNCONV(out_ch, mid_ch, dirate=1)
+        self.pool1 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.rebnconv2 = REBNCONV(mid_ch, mid_ch, dirate=1)
+        self.pool2 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.rebnconv3 = REBNCONV(mid_ch, mid_ch, dirate=1)
+        self.pool3 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.rebnconv4 = REBNCONV(mid_ch, mid_ch, dirate=1)
+        self.pool4 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.rebnconv5 = REBNCONV(mid_ch, mid_ch, dirate=1)
+        self.rebnconv6 = REBNCONV(mid_ch, mid_ch, dirate=2)
+        self.rebnconv5d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
+        self.rebnconv4d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
+        self.rebnconv3d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
+        self.rebnconv2d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
+        self.rebnconv1d = REBNCONV(mid_ch * 2, out_ch, dirate=1)
+
+    def forward(self, x):
+        hxin = self.rebnconvin(x)
+        hx1 = self.rebnconv1(hxin)
+        hx2 = self.rebnconv2(self.pool1(hx1))
+        hx3 = self.rebnconv3(self.pool2(hx2))
+        hx4 = self.rebnconv4(self.pool3(hx3))
+        hx5 = self.rebnconv5(self.pool4(hx4))
+        hx6 = self.rebnconv6(hx5)
+        hx5d = self.rebnconv5d(torch.cat((hx6, hx5), 1))
+        hx4d = self.rebnconv4d(torch.cat((_upsample_like(hx5d, hx4), hx4), 1))
+        hx3d = self.rebnconv3d(torch.cat((_upsample_like(hx4d, hx3), hx3), 1))
+        hx2d = self.rebnconv2d(torch.cat((_upsample_like(hx3d, hx2), hx2), 1))
+        hx1d = self.rebnconv1d(torch.cat((_upsample_like(hx2d, hx1), hx1), 1))
+        return hx1d + hxin
+
+
+class RSU5(nn.Module):
+    def __init__(self, in_ch=3, mid_ch=12, out_ch=3):
+        super().__init__()
+        self.rebnconvin = REBNCONV(in_ch, out_ch, dirate=1)
+        self.rebnconv1 = REBNCONV(out_ch, mid_ch, dirate=1)
+        self.pool1 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.rebnconv2 = REBNCONV(mid_ch, mid_ch, dirate=1)
+        self.pool2 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.rebnconv3 = REBNCONV(mid_ch, mid_ch, dirate=1)
+        self.pool3 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.rebnconv4 = REBNCONV(mid_ch, mid_ch, dirate=1)
+        self.rebnconv5 = REBNCONV(mid_ch, mid_ch, dirate=2)
+        self.rebnconv4d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
+        self.rebnconv3d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
+        self.rebnconv2d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
+        self.rebnconv1d = REBNCONV(mid_ch * 2, out_ch, dirate=1)
+
+    def forward(self, x):
+        hxin = self.rebnconvin(x)
+        hx1 = self.rebnconv1(hxin)
+        hx2 = self.rebnconv2(self.pool1(hx1))
+        hx3 = self.rebnconv3(self.pool2(hx2))
+        hx4 = self.rebnconv4(self.pool3(hx3))
+        hx5 = self.rebnconv5(hx4)
+        hx4d = self.rebnconv4d(torch.cat((hx5, hx4), 1))
+        hx3d = self.rebnconv3d(torch.cat((_upsample_like(hx4d, hx3), hx3), 1))
+        hx2d = self.rebnconv2d(torch.cat((_upsample_like(hx3d, hx2), hx2), 1))
+        hx1d = self.rebnconv1d(torch.cat((_upsample_like(hx2d, hx1), hx1), 1))
+        return hx1d + hxin
+
+
+class RSU4(nn.Module):
+    def __init__(self, in_ch=3, mid_ch=12, out_ch=3):
+        super().__init__()
+        self.rebnconvin = REBNCONV(in_ch, out_ch, dirate=1)
+        self.rebnconv1 = REBNCONV(out_ch, mid_ch, dirate=1)
+        self.pool1 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.rebnconv2 = REBNCONV(mid_ch, mid_ch, dirate=1)
+        self.pool2 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.rebnconv3 = REBNCONV(mid_ch, mid_ch, dirate=1)
+        self.rebnconv4 = REBNCONV(mid_ch, mid_ch, dirate=2)
+        self.rebnconv3d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
+        self.rebnconv2d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
+        self.rebnconv1d = REBNCONV(mid_ch * 2, out_ch, dirate=1)
+
+    def forward(self, x):
+        hxin = self.rebnconvin(x)
+        hx1 = self.rebnconv1(hxin)
+        hx2 = self.rebnconv2(self.pool1(hx1))
+        hx3 = self.rebnconv3(self.pool2(hx2))
+        hx4 = self.rebnconv4(hx3)
+        hx3d = self.rebnconv3d(torch.cat((hx4, hx3), 1))
+        hx2d = self.rebnconv2d(torch.cat((_upsample_like(hx3d, hx2), hx2), 1))
+        hx1d = self.rebnconv1d(torch.cat((_upsample_like(hx2d, hx1), hx1), 1))
+        return hx1d + hxin
+
+
+class RSU4F(nn.Module):
+    def __init__(self, in_ch=3, mid_ch=12, out_ch=3):
+        super().__init__()
+        self.rebnconvin = REBNCONV(in_ch, out_ch, dirate=1)
+        self.rebnconv1 = REBNCONV(out_ch, mid_ch, dirate=1)
+        self.rebnconv2 = REBNCONV(mid_ch, mid_ch, dirate=2)
+        self.rebnconv3 = REBNCONV(mid_ch, mid_ch, dirate=4)
+        self.rebnconv4 = REBNCONV(mid_ch, mid_ch, dirate=8)
+        self.rebnconv3d = REBNCONV(mid_ch * 2, mid_ch, dirate=4)
+        self.rebnconv2d = REBNCONV(mid_ch * 2, mid_ch, dirate=2)
+        self.rebnconv1d = REBNCONV(mid_ch * 2, out_ch, dirate=1)
+
+    def forward(self, x):
+        hxin = self.rebnconvin(x)
+        hx1 = self.rebnconv1(hxin)
+        hx2 = self.rebnconv2(hx1)
+        hx3 = self.rebnconv3(hx2)
+        hx4 = self.rebnconv4(hx3)
+        hx3d = self.rebnconv3d(torch.cat((hx4, hx3), 1))
+        hx2d = self.rebnconv2d(torch.cat((hx3d, hx2), 1))
+        hx1d = self.rebnconv1d(torch.cat((hx2d, hx1), 1))
+        return hx1d + hxin
+
+
+class BriaRMBG(nn.Module):
+    def __init__(self, in_ch=3, out_ch=1):
+        super().__init__()
+        self.conv_in = nn.Conv2d(in_ch, 64, 3, stride=2, padding=1)
+        self.pool_in = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.stage1 = RSU7(64, 32, 64)
+        self.pool12 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.stage2 = RSU6(64, 32, 128)
+        self.pool23 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.stage3 = RSU5(128, 64, 256)
+        self.pool34 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.stage4 = RSU4(256, 128, 512)
+        self.pool45 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.stage5 = RSU4F(512, 256, 512)
+        self.pool56 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.stage6 = RSU4F(512, 256, 512)
+        self.stage5d = RSU4F(1024, 256, 512)
+        self.stage4d = RSU4(1024, 128, 256)
+        self.stage3d = RSU5(512, 64, 128)
+        self.stage2d = RSU6(256, 32, 64)
+        self.stage1d = RSU7(128, 16, 64)
+        self.side1 = nn.Conv2d(64, out_ch, 3, padding=1)
+        self.side2 = nn.Conv2d(64, out_ch, 3, padding=1)
+        self.side3 = nn.Conv2d(128, out_ch, 3, padding=1)
+        self.side4 = nn.Conv2d(256, out_ch, 3, padding=1)
+        self.side5 = nn.Conv2d(512, out_ch, 3, padding=1)
+        self.side6 = nn.Conv2d(512, out_ch, 3, padding=1)
+
+    def forward(self, x):
+        hxin = self.conv_in(x)
+        hx1 = self.stage1(hxin)
+        hx2 = self.stage2(self.pool12(hx1))
+        hx3 = self.stage3(self.pool23(hx2))
+        hx4 = self.stage4(self.pool34(hx3))
+        hx5 = self.stage5(self.pool45(hx4))
+        hx6 = self.stage6(self.pool56(hx5))
+        hx6up = _upsample_like(hx6, hx5)
+        hx5d = self.stage5d(torch.cat((hx6up, hx5), 1))
+        hx4d = self.stage4d(torch.cat((_upsample_like(hx5d, hx4), hx4), 1))
+        hx3d = self.stage3d(torch.cat((_upsample_like(hx4d, hx3), hx3), 1))
+        hx2d = self.stage2d(torch.cat((_upsample_like(hx3d, hx2), hx2), 1))
+        hx1d = self.stage1d(torch.cat((_upsample_like(hx2d, hx1), hx1), 1))
+        d1 = _upsample_like(self.side1(hx1d), x)
+        d2 = _upsample_like(self.side2(hx2d), x)
+        d3 = _upsample_like(self.side3(hx3d), x)
+        d4 = _upsample_like(self.side4(hx4d), x)
+        d5 = _upsample_like(self.side5(hx5d), x)
+        d6 = _upsample_like(self.side6(hx6), x)
+        return [torch.sigmoid(d1), torch.sigmoid(d2), torch.sigmoid(d3), torch.sigmoid(d4), torch.sigmoid(d5), torch.sigmoid(d6)], [hx1d, hx2d, hx3d, hx4d, hx5d, hx6]
+
+
+def _bria_preprocess_image(im: Image.Image | np.ndarray, model_input_size: list[int]) -> torch.Tensor:
+    if isinstance(im, Image.Image):
+        im = np.array(im.convert("RGB"))
+    if im.ndim < 3:
+        im = im[:, :, np.newaxis]
+    im_tensor = torch.tensor(im, dtype=torch.float32).permute(2, 0, 1)
+    im_tensor = F.interpolate(torch.unsqueeze(im_tensor, 0), size=model_input_size, mode="bilinear", align_corners=False)
+    image = torch.clamp(im_tensor / 255.0, 0.0, 1.0)
+    mean = torch.tensor([0.5, 0.5, 0.5], dtype=image.dtype, device=image.device).view(1, 3, 1, 1)
+    return image - mean
+
+
+def _bria_postprocess_image(result: torch.Tensor, im_size: tuple[int, int] | list[int]) -> np.ndarray:
+    result = torch.squeeze(F.interpolate(result, size=im_size, mode="bilinear", align_corners=False), 0)
+    ma = torch.max(result)
+    mi = torch.min(result)
+    denom = ma - mi
+    if torch.abs(denom).item() < 1e-8:
+        result = torch.zeros_like(result)
+    else:
+        result = (result - mi) / denom
+    im_array = (result * 255.0).permute(1, 2, 0).detach().cpu().numpy().astype(np.uint8)
+    return np.squeeze(im_array)
 
 
 class DetectRemoveBG(io.ComfyNode):
@@ -76,7 +324,7 @@ class DetectRemoveBG(io.ComfyNode):
         bg_mode = (add_background or "alpha").strip().lower()
         if bg_mode not in {"alpha", "white", "black"}:
             bg_mode = "alpha"
-        concurrency = max(1, min(len(image), os.cpu_count() or 1))
+        concurrency = cls._get_inference_concurrency(image=image, model=model, model_bundle=model_bundle)
         sem = asyncio.Semaphore(concurrency)
         tasks = []
 
@@ -103,6 +351,23 @@ class DetectRemoveBG(io.ComfyNode):
             else torch.zeros((1, 512, 512), dtype=torch.float32)
         )
         return io.NodeOutput(out_image, out_mask)
+
+    @classmethod
+    def _get_inference_concurrency(cls, image: torch.Tensor, model: str, model_bundle: dict | None) -> int:
+        concurrency = max(1, min(len(image), os.cpu_count() or 1))
+        if not model_bundle:
+            return concurrency
+
+        # Sharing a single CUDA-backed RMBG-1.4 model across worker threads is unstable on the cloud runtime.
+        # Keep this backend serial on GPU while preserving parallelism for the lighter backends.
+        if model_bundle.get("type") == "rmbg1_4_pth" and str(model_bundle.get("device", "")).lower().startswith("cuda"):
+            if concurrency > 1:
+                cls.log(
+                    f"Using serial inference for model={model} on CUDA to avoid device allocation failures.",
+                    "info",
+                )
+            return 1
+        return concurrency
 
     @classmethod
     def _infer_one(
@@ -202,9 +467,15 @@ class DetectRemoveBG(io.ComfyNode):
             return bundle
 
         if mode == "RMBG-1.4":
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            local_pth = os.path.join(rembg_dir, "RMBG-1.4.pth")
-            if not os.path.isfile(local_pth):
+            device = cls._get_worker_device()
+            local_pth = cls._resolve_model_file(
+                rembg_dir=rembg_dir,
+                preferred_name="RMBG-1.4.pth",
+                candidate_names=["RMBG-1.4.pth", "model.pth"],
+                required_tokens=["rmbg", "1.4"],
+            )
+            if local_pth is None:
+                local_pth = os.path.join(rembg_dir, "RMBG-1.4.pth")
                 ok = cls._download_single_model_file(
                     dest_path=local_pth,
                     urls=["https://huggingface.co/briaai/RMBG-1.4/resolve/main/model.pth"],
@@ -213,29 +484,11 @@ class DetectRemoveBG(io.ComfyNode):
                 if not ok:
                     return None
             try:
-                bria_module = cls._load_bria_module_from_easyuse()
-                model_inst = bria_module.BriaRMBG()
-                state_dict = torch.load(local_pth, map_location=device)
-                if isinstance(state_dict, dict) and isinstance(state_dict.get("state_dict"), dict):
-                    state_dict = state_dict["state_dict"]
-                if isinstance(state_dict, dict):
-                    if any(k.startswith("module.") for k in state_dict.keys()):
-                        state_dict = {k.replace("module.", "", 1): v for k, v in state_dict.items()}
-                    if any(k.startswith("_orig_mod.") for k in state_dict.keys()):
-                        state_dict = {k.replace("_orig_mod.", "", 1): v for k, v in state_dict.items()}
-                model_inst.load_state_dict(state_dict, strict=True)
-                model_inst.to(device).eval()
-                bundle = {
-                    "type": "rmbg1_4_pth",
-                    "model": model_inst,
-                    "device": device,
-                    "preprocess_fn": bria_module.preprocess_image,
-                    "postprocess_fn": bria_module.postprocess_image,
-                }
+                bundle = cls._create_rmbg1_4_bundle(local_pth=local_pth, device=device)
                 cls.MODEL_CACHE[mode] = bundle
                 cls._log_model_ready(
                     model=mode,
-                    backend="rmbg1_4_pth",
+                    backend=f"rmbg1_4_pth_{bundle['device']}",
                     source="init",
                     model_path=local_pth,
                 )
@@ -245,8 +498,14 @@ class DetectRemoveBG(io.ComfyNode):
                 return None
 
         if mode == "RMBG-2.0":
-            local_onnx = os.path.join(rembg_dir, "RMBG-2.0.onnx")
-            if not os.path.isfile(local_onnx):
+            local_onnx = cls._resolve_model_file(
+                rembg_dir=rembg_dir,
+                preferred_name="RMBG-2.0.onnx",
+                candidate_names=["RMBG-2.0.onnx", "model.onnx", "model_fp16.onnx"],
+                required_tokens=["rmbg", "2.0"],
+            )
+            if local_onnx is None:
+                local_onnx = os.path.join(rembg_dir, "RMBG-2.0.onnx")
                 ok = cls._download_single_model_file(
                     dest_path=local_onnx,
                     urls=[
@@ -302,16 +561,22 @@ class DetectRemoveBG(io.ComfyNode):
             except Exception:
                 cls.log("Missing dependency 'transparent-background' for Inspyrenet.", "warning")
                 return None
+            remover_device = "cuda" if torch.cuda.is_available() else "cpu"
             try:
-                remover = Remover(jit=False)
+                remover = Remover(jit=False, device=remover_device)
             except Exception as e:
                 cls.log(f"Init Inspyrenet failed: {e}", "warning")
                 return None
-            bundle = {"type": "inspyrenet", "remover": remover}
+            bundle = {
+                "type": "inspyrenet",
+                "remover": remover,
+                "device": remover_device,
+                "remover_kwargs": {"jit": False, "device": remover_device},
+            }
             cls.MODEL_CACHE[mode] = bundle
             cls._log_model_ready(
                 model=mode,
-                backend="inspyrenet",
+                backend=f"inspyrenet_{remover_device}",
                 source="init",
                 model_path=os.path.join(rembg_dir, ".transparent-background"),
             )
@@ -325,16 +590,21 @@ class DetectRemoveBG(io.ComfyNode):
             return None
         try:
             if model_bundle.get("type") == "rmbg1_4_pth":
-                model_inst = model_bundle["model"]
-                device = model_bundle["device"]
-                preprocess_fn = model_bundle["preprocess_fn"]
-                postprocess_fn = model_bundle["postprocess_fn"]
                 img = Image.fromarray((np.clip(rgb, 0.0, 1.0) * 255.0).astype(np.uint8), mode="RGB")
-                x = preprocess_fn(img, [1024, 1024]).to(device)
-                with torch.no_grad():
-                    result = model_inst(x)
-                pred_u8 = postprocess_fn(result[0][0], (rgb.shape[0], rgb.shape[1]))
-                return np.clip(pred_u8.astype(np.float32) / 255.0, 0.0, 1.0).astype(np.float32)
+                try:
+                    return cls._run_rmbg1_4_inference(model_bundle, img, rgb.shape[0], rgb.shape[1])
+                except Exception as e:
+                    current_device = str(model_bundle.get("device", "cpu")).lower()
+                    if current_device != "cpu" and cls._is_cuda_oom_error(e):
+                        cls.log(
+                            "RMBG-1.4 hit CUDA allocation/OOM on the current visible GPU; retrying on CPU.",
+                            "warning",
+                        )
+                        model_bundle = cls._get_rmbg1_4_bundle(model_bundle, device="cpu")
+                        alpha = cls._run_rmbg1_4_inference(model_bundle, img, rgb.shape[0], rgb.shape[1])
+                        cls.log("RMBG-1.4 CPU fallback succeeded after CUDA allocation/OOM.", "info")
+                        return alpha
+                    raise
 
             if model_bundle.get("type") == "rmbg2_onnx":
                 session = model_bundle["session"]
@@ -378,7 +648,20 @@ class DetectRemoveBG(io.ComfyNode):
             if model_bundle.get("type") == "inspyrenet":
                 remover = model_bundle["remover"]
                 img = Image.fromarray((np.clip(rgb, 0.0, 1.0) * 255.0).astype(np.uint8), mode="RGB")
-                out = remover.process(img, type="map")
+                try:
+                    out = remover.process(img, type="map")
+                except Exception as e:
+                    current_device = str(model_bundle.get("device", "cpu")).lower()
+                    if current_device != "cpu" and cls._is_cuda_oom_error(e):
+                        cls.log(
+                            "Inspyrenet hit CUDA OOM on the current visible GPU; retrying on CPU.",
+                            "warning",
+                        )
+                        remover = cls._get_inspyrenet_remover(model_bundle, device="cpu")
+                        out = remover.process(img, type="map")
+                        cls.log("Inspyrenet CPU fallback succeeded after CUDA OOM.", "info")
+                    else:
+                        raise
                 out_np = np.array(out)
                 if out_np.ndim == 3:
                     out_np = out_np[..., 0]
@@ -471,37 +754,147 @@ class DetectRemoveBG(io.ComfyNode):
         os.makedirs(path, exist_ok=True)
         return path
 
-    @classmethod
-    def _load_bria_module_from_easyuse(cls):
-        global _BRIA_MODULE_CACHE
-        if _BRIA_MODULE_CACHE is not None:
-            return _BRIA_MODULE_CACHE
-        custom_nodes_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        candidates = [
-            os.path.join(custom_nodes_dir, "ComfyUI-Easy-Use", "py", "modules", "briaai", "rembg.py"),
-            os.path.join(custom_nodes_dir, "comfyui-easy-use", "py", "modules", "briaai", "rembg.py"),
-        ]
-        base_path = getattr(folder_paths, "base_path", None)
-        if base_path:
-            candidates.extend(
-                [
-                    os.path.join(base_path, "custom_nodes", "ComfyUI-Easy-Use", "py", "modules", "briaai", "rembg.py"),
-                    os.path.join(base_path, "custom_nodes", "comfyui-easy-use", "py", "modules", "briaai", "rembg.py"),
-                ]
+    @staticmethod
+    def _get_worker_device() -> str:
+        return "cuda:0" if torch.cuda.is_available() else "cpu"
+
+    @staticmethod
+    def _is_cuda_oom_error(error: Exception) -> bool:
+        message = str(error).lower()
+        return any(
+            token in message
+            for token in (
+                "cuda out of memory",
+                "out of memory",
+                "allocation on device",
+                "cuda error: out of memory",
             )
-        module_path = next((p for p in candidates if os.path.isfile(p)), None)
-        if not module_path:
-            raise FileNotFoundError("Cannot find ComfyUI-Easy-Use briaai/rembg.py")
-        spec = importlib.util.spec_from_file_location("detect_remove_bg_easyuse_bria", module_path)
-        if spec is None or spec.loader is None:
-            raise ImportError(f"Cannot create module spec for {module_path}")
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        for key in ("BriaRMBG", "preprocess_image", "postprocess_image"):
-            if not hasattr(module, key):
-                raise AttributeError(f"Missing '{key}' in {module_path}")
-        _BRIA_MODULE_CACHE = module
-        return _BRIA_MODULE_CACHE
+        )
+
+    @classmethod
+    def _normalize_rmbg_state_dict(cls, state_dict):
+        if isinstance(state_dict, dict) and isinstance(state_dict.get("state_dict"), dict):
+            state_dict = state_dict["state_dict"]
+        if isinstance(state_dict, dict):
+            if any(k.startswith("module.") for k in state_dict.keys()):
+                state_dict = {k.replace("module.", "", 1): v for k, v in state_dict.items()}
+            if any(k.startswith("_orig_mod.") for k in state_dict.keys()):
+                state_dict = {k.replace("_orig_mod.", "", 1): v for k, v in state_dict.items()}
+        return state_dict
+
+    @classmethod
+    def _create_rmbg1_4_bundle(cls, local_pth: str, device: str) -> dict:
+        model_inst = BriaRMBG()
+        state_dict = torch.load(local_pth, map_location=device)
+        state_dict = cls._normalize_rmbg_state_dict(state_dict)
+        model_inst.load_state_dict(state_dict, strict=True)
+        model_inst.to(device).eval()
+        return {
+            "type": "rmbg1_4_pth",
+            "model": model_inst,
+            "device": device,
+            "preprocess_fn": _bria_preprocess_image,
+            "postprocess_fn": _bria_postprocess_image,
+            "state_dict_path": local_pth,
+        }
+
+    @classmethod
+    def _get_rmbg1_4_bundle(cls, model_bundle: dict, device: str) -> dict:
+        current_device = str(model_bundle.get("device", "cpu")).lower()
+        target_device = str(device).lower()
+        if current_device == target_device and model_bundle.get("model") is not None:
+            return model_bundle
+
+        if current_device.startswith("cuda") and torch.cuda.is_available():
+            try:
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
+
+        bundle = cls._create_rmbg1_4_bundle(
+            local_pth=str(model_bundle["state_dict_path"]),
+            device=device,
+        )
+        model_bundle.update(bundle)
+        return model_bundle
+
+    @classmethod
+    def _run_rmbg1_4_inference(cls, model_bundle: dict, img: Image.Image, height: int, width: int) -> np.ndarray:
+        model_inst = model_bundle["model"]
+        device = model_bundle["device"]
+        preprocess_fn = model_bundle["preprocess_fn"]
+        postprocess_fn = model_bundle["postprocess_fn"]
+        x = preprocess_fn(img, [1024, 1024]).to(device)
+        with torch.no_grad():
+            result = model_inst(x)
+        pred_u8 = postprocess_fn(result[0][0], (height, width))
+        return np.clip(pred_u8.astype(np.float32) / 255.0, 0.0, 1.0).astype(np.float32)
+
+    @classmethod
+    def _get_inspyrenet_remover(cls, model_bundle: dict, device: str):
+        if model_bundle.get("device") == device and model_bundle.get("remover") is not None:
+            return model_bundle["remover"]
+
+        from transparent_background import Remover
+
+        remover_kwargs = dict(model_bundle.get("remover_kwargs") or {})
+        remover_kwargs["device"] = device
+        remover = Remover(**remover_kwargs)
+        model_bundle["remover"] = remover
+        model_bundle["device"] = device
+        model_bundle["remover_kwargs"] = remover_kwargs
+        return remover
+
+    @classmethod
+    def _resolve_model_file(
+        cls,
+        rembg_dir: str,
+        preferred_name: str,
+        candidate_names: list[str],
+        required_tokens: list[str] | None = None,
+    ) -> str | None:
+        preferred_lower = preferred_name.lower()
+        candidate_lowers = {name.lower() for name in candidate_names}
+        required_tokens = [token.lower() for token in (required_tokens or [])]
+
+        preferred_path = os.path.join(rembg_dir, preferred_name)
+        if os.path.isfile(preferred_path):
+            return preferred_path
+
+        matches: list[tuple[int, str]] = []
+        for root, _, files in os.walk(rembg_dir):
+            for file_name in files:
+                file_name_lower = file_name.lower()
+                if file_name_lower not in candidate_lowers:
+                    continue
+
+                full_path = os.path.join(root, file_name)
+                rel_path = os.path.relpath(full_path, rembg_dir).replace("\\", "/").lower()
+                is_root_file = os.path.normcase(root) == os.path.normcase(rembg_dir)
+                tokens_ok = all(token in rel_path for token in required_tokens) if required_tokens else True
+                if file_name_lower != preferred_lower and not (tokens_ok or is_root_file):
+                    continue
+
+                score = 0
+                if file_name_lower == preferred_lower:
+                    score += 100
+                if is_root_file:
+                    score += 50
+                if tokens_ok:
+                    score += 25
+
+                matches.append((score, full_path))
+
+        if not matches:
+            return None
+
+        matches.sort(key=lambda item: (-item[0], len(item[1]), item[1].lower()))
+        resolved_path = matches[0][1]
+        cls.log(
+            f"Resolved existing model file | preferred={preferred_name} | path={resolved_path}",
+            "info",
+        )
+        return resolved_path
 
     @staticmethod
     def log(message: str, level: str = "info"):
