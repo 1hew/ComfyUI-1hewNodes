@@ -1,9 +1,7 @@
 import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
-import { applyPreviewHiddenState } from "./core/preview_menu.js";
-import { collectDropPayload, installImagePreviewLayout } from "./core/media_utils.js";
+import { collectDropPayload } from "./core/media_utils.js";
 import { saveMaskFromClipspaceToSidecar } from "./core/image_mask_sidecar.js";
-import { createLoadImageDom } from "./core/load_image_dom.js";
 import { extendLoadImageMenu } from "./core/load_image_menu.js";
 import { createLoadImagePreviewController } from "./core/load_image_preview.js";
 import {
@@ -11,14 +9,8 @@ import {
     registerLoadImagePasteTarget,
 } from "./core/load_image_runtime.js";
 import { createLoadImageUploader } from "./core/load_image_upload.js";
-import {
-    installLoadImageSetSizeGuard,
-    scheduleLoadImagePreserveRefresh,
-    scheduleLoadImagePreviewStyleSync,
-} from "./core/load_image_node_runtime.js";
-import { createDomWidgetInteractionManager } from "./core/dom_widget_runtime.js";
 import { chainOnRemoved, createDisposer, registerExtensionOnce } from "./core/runtime.js";
-import { attachCanvasUploadHandlers, bindDomUploadDropTargets } from "./core/upload_drop_runtime.js";
+import { attachCanvasUploadHandlers } from "./core/upload_drop_runtime.js";
 
 registerExtensionOnce("__comfy1hewLoadImageExtensionRegistered", () => app.registerExtension({
     name: "ComfyUI-1hewNodes.load_image",
@@ -26,7 +18,6 @@ registerExtensionOnce("__comfy1hewLoadImageExtensionRegistered", () => app.regis
         if (nodeData.name !== "1hew_LoadImage") {
             return;
         }
-        installLoadImageSetSizeGuard(nodeType);
 
         const getExtraMenuOptions = nodeType.prototype.getExtraMenuOptions;
         nodeType.prototype.getExtraMenuOptions = function (_, options) {
@@ -37,12 +28,6 @@ registerExtensionOnce("__comfy1hewLoadImageExtensionRegistered", () => app.regis
 
         const onConfigure = nodeType.prototype.onConfigure;
         nodeType.prototype.onConfigure = function () {
-            const data = arguments[0];
-            const serializedSize =
-                data && Array.isArray(data.size) && data.size.length >= 2
-                    ? [data.size[0], data.size[1]]
-                    : null;
-
             const r = onConfigure ? onConfigure.apply(this, arguments) : undefined;
 
             if (this.widgets) {
@@ -50,15 +35,8 @@ registerExtensionOnce("__comfy1hewLoadImageExtensionRegistered", () => app.regis
                 if (fileWidget && fileWidget.value) {
                     this._comfy1hewLoadImagePendingPreview = true;
                     this._comfy1hewSchedulePreviewUpdate?.(0);
-                } else {
-                    scheduleLoadImagePreviewStyleSync(
-                        this,
-                        applyPreviewHiddenState,
-                        [0]
-                    );
                 }
             }
-            scheduleLoadImagePreserveRefresh(this, { serializedSize });
 
             return r;
         };
@@ -87,17 +65,6 @@ registerExtensionOnce("__comfy1hewLoadImageExtensionRegistered", () => app.regis
                         ? desiredSize[1]
                         : 0;
                 this._comfy1hewLoadImageBaseSize = [baseW, baseH];
-                const currentH = Array.isArray(this.size) ? this.size[1] : 0;
-                const hasPath =
-                    fileWidget && String(fileWidget.value || "").trim() !== "";
-                if (
-                    hasPath
-                    && Number.isFinite(currentH)
-                    && Number.isFinite(baseH)
-                    && currentH > baseH + 5
-                ) {
-                    this._comfy1hewPreserveFrameHeightUntilPreview = currentH;
-                }
             } catch {}
             this._comfy1hewLoadImageWasEmptyPath = true;
             this._comfy1hewLoadImageRedrawQueued = false;
@@ -131,6 +98,7 @@ registerExtensionOnce("__comfy1hewLoadImageExtensionRegistered", () => app.regis
                 }, delay);
             };
             this._comfy1hewSchedulePreviewUpdate = schedulePreviewUpdate;
+            const ensurePreviewPassthrough = () => {};
 
             const { uploadFilesAsFolder } = createLoadImageUploader({
                 app,
@@ -140,6 +108,7 @@ registerExtensionOnce("__comfy1hewLoadImageExtensionRegistered", () => app.regis
                 indexWidget,
                 includeSubdirWidget,
                 computeStateKey,
+                onSettled: () => ensurePreviewPassthrough?.(),
             });
             const unregisterPasteTarget = registerLoadImagePasteTarget({
                 app,
@@ -147,22 +116,27 @@ registerExtensionOnce("__comfy1hewLoadImageExtensionRegistered", () => app.regis
                 handlePasteFiles: (files) => uploadFilesAsFolder(files, false),
             });
 
+            const fileInputEl = document.createElement("input");
+            fileInputEl.type = "file";
+            fileInputEl.accept = "image/*";
+            fileInputEl.style.display = "none";
+
             const openFilePicker = () => {
                 try {
                     fileInputEl.value = "";
                 } catch {}
                 fileInputEl.click();
             };
-            const {
-                container,
-                imageEl,
-                infoEl,
-                fileInputEl,
-            } = createLoadImageDom({
-                app,
-                node: this,
-                openFilePicker,
-            });
+            const uploadWidget = this.addWidget(
+                "button",
+                "choose file to upload",
+                "image",
+                () => {
+                    app.canvas.node_widget = null;
+                    openFilePicker();
+                }
+            );
+            uploadWidget.serialize = false;
 
             fileInputEl.addEventListener("change", async () => {
                 const file = fileInputEl.files && fileInputEl.files[0];
@@ -175,161 +149,24 @@ registerExtensionOnce("__comfy1hewLoadImageExtensionRegistered", () => app.regis
                 } catch {}
             });
 
-            this.imageWidget = this.addDOMWidget(
-                "image_preview",
-                "div",
-                container,
-                {
-                    serialize: false,
-                    hideOnZoom: false,
-                }
-            );
-            if (this.imageWidget?.element?.style) {
-                this.imageWidget.element.style.pointerEvents = "none";
-            }
-
             const disposables = createDisposer();
-            const interaction = createDomWidgetInteractionManager({
-                getWidgetElement: () => this.imageWidget?.element,
-                container,
-                interactiveElements: [imageEl, infoEl],
-            });
-            const { setDragPassthrough, resetDragPassthrough } = interaction;
-            disposables.add(interaction.bindGlobalDragCleanup());
-
-            this.imageWidget.computeSize = function (width) {
-                if (this.aspectRatio) {
-                    const maxAspectRatio =
-                        typeof this._comfy1hew_maxAspectRatio === "number"
-                            ? this._comfy1hew_maxAspectRatio
-                            : null;
-                    const aspectRatio =
-                        maxAspectRatio && isFinite(maxAspectRatio)
-                            ? Math.min(this.aspectRatio, maxAspectRatio)
-                            : this.aspectRatio;
-                    let height = width * aspectRatio + 20;
-                    const maxPreviewHeight =
-                        typeof this._comfy1hew_maxPreviewHeight === "number"
-                            ? this._comfy1hew_maxPreviewHeight
-                            : null;
-                    if (maxPreviewHeight && isFinite(maxPreviewHeight)) {
-                        height = Math.min(height, maxPreviewHeight);
-                    }
-                    return [width, height];
-                }
-                return [width, 0];
-            };
 
             this._comfy1hewImageAutoSizeKey = "";
-            const { ensurePreviewLayout, updateLayout } = installImagePreviewLayout({
-                app,
-                node: this,
-                imageWidget: this.imageWidget,
-                container,
-                imageEl,
-                allWidget,
-                fileWidget,
-            });
-
-            const resetNodeHeightToBase = () => {
-                try {
-                    const baseH =
-                        Array.isArray(this._comfy1hewLoadImageBaseSize)
-                        && Number.isFinite(this._comfy1hewLoadImageBaseSize[1])
-                            ? this._comfy1hewLoadImageBaseSize[1]
-                            : null;
-                    if (typeof baseH === "number" && baseH > 0) {
-                        this.setSize([this.size[0], baseH]);
-                        return;
-                    }
-                } catch {}
-                // Fallback: avoid collapsing to zero-height which can make the DOM preview overflow the node frame
-                try {
-                    this.setSize([this.size[0], 130]);
-                } catch {}
-            };
-
-            const ensureProvisionalPreviewAspect = () => {
-                try {
-                    if (
-                        this.imageWidget?.aspectRatio
-                        || !Array.isArray(this.size)
-                        || !Number.isFinite(this.size[0])
-                        || !Number.isFinite(this.size[1])
-                        || this.size[0] <= 0
-                    ) {
-                        return false;
-                    }
-
-                    let availableHeight = null;
-                    if (Number.isFinite(this.imageWidget?.last_y)) {
-                        availableHeight = this.size[1] - this.imageWidget.last_y - 15;
-                    } else {
-                        const baseH =
-                            Array.isArray(this._comfy1hewLoadImageBaseSize)
-                            && Number.isFinite(this._comfy1hewLoadImageBaseSize[1])
-                                ? this._comfy1hewLoadImageBaseSize[1]
-                                : 130;
-                        availableHeight = this.size[1] - baseH;
-                    }
-
-                    if (!Number.isFinite(availableHeight) || availableHeight <= 20) {
-                        return false;
-                    }
-
-                    const provisionalAspect = Math.max(
-                        0.05,
-                        Math.min(8, (availableHeight - 20) / this.size[0])
-                    );
-                    this.imageWidget.aspectRatio = provisionalAspect;
-                    return true;
-                } catch {
-                    return false;
-                }
-            };
-
-            const dragTargets = [container, imageEl, infoEl];
-            bindDomUploadDropTargets({
-                disposables,
-                interaction,
-                dragTargets,
-                onDrop: async (event) => {
-                    try {
-                        const payload = await collectDropPayload(event);
-                        const pairs = (payload?.pairs || []).filter((pair) => pair?.file);
-                        const hasDirectory = Boolean(payload?.hasDirectory);
-                        await uploadFilesAsFolder(pairs, hasDirectory);
-                    } catch {}
-                },
-            });
+            this._comfy1hewPreviewImageEl = null;
 
             this.updatePreview = createLoadImagePreviewController({
                 app,
                 node: this,
-                imageEl,
-                infoEl,
-                container,
-                imageWidget: this.imageWidget,
                 fileWidget,
                 indexWidget,
                 includeSubdirWidget,
                 allWidget,
-                updateLayout,
-                ensurePreviewLayout,
-                resetNodeHeightToBase,
-                ensureProvisionalPreviewAspect,
-                schedulePreviewStyleSync: () =>
-                    scheduleLoadImagePreviewStyleSync(
-                        this,
-                        applyPreviewHiddenState,
-                        [0]
-                    ),
             });
 
             attachCanvasUploadHandlers({
                 node: this,
-                setDragPassthrough,
-                resetDragPassthrough,
+                setDragPassthrough: () => {},
+                resetDragPassthrough: () => {},
                 onFileDrop: (file) => {
                     void uploadFilesAsFolder([{ file, relativePath: file?.name }], false);
                 },
@@ -370,7 +207,6 @@ registerExtensionOnce("__comfy1hewLoadImageExtensionRegistered", () => app.regis
 
             chainOnRemoved(this, function () {
                 try {
-                    resetDragPassthrough();
                     disposables.dispose();
                 } catch {}
                 try {
@@ -389,20 +225,14 @@ registerExtensionOnce("__comfy1hewLoadImageExtensionRegistered", () => app.regis
                         }
                         this._comfy1hewPreviewStyleTimers = [];
                     }
+                    this._comfy1hewPreviewImageEl = null;
+                    this.imgs = null;
                 } catch {}
             });
 
             if (fileWidget && fileWidget.value || this._comfy1hewLoadImagePendingPreview) {
                 schedulePreviewUpdate(0);
-            } else {
-                scheduleLoadImagePreviewStyleSync(
-                    this,
-                    applyPreviewHiddenState,
-                    [0, 200]
-                );
             }
-
-            scheduleLoadImagePreserveRefresh(this);
 
             return r;
         };

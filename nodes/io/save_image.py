@@ -139,6 +139,15 @@ def _next_increment_path(directory: str, stem: str) -> str:
         counter += 1
 
 
+def _preview_filename_prefix(filename_prefix: str) -> str:
+    prefix = _sanitize_filename_prefix(filename_prefix)
+    dir_part, stem = _split_prefix_to_dir_and_stem(prefix)
+    preview_dir = "1hew_preview"
+    if dir_part:
+        preview_dir = f"{preview_dir}/{dir_part}"
+    return f"{preview_dir}/{stem}"
+
+
 class SaveImage(io.ComfyNode):
     @classmethod
     def define_schema(cls):
@@ -272,4 +281,15 @@ class SaveImage(io.ComfyNode):
                 pil_img.save(out_path, format="PNG", compress_level=4, pnginfo=pnginfo)
                 file_paths.append(os.path.abspath(out_path))
 
-        return io.NodeOutput("\n".join(file_paths))
+            preview_results = ui.ImageSaveHelper.save_images(
+                image,
+                filename_prefix=_preview_filename_prefix(safe_filename_prefix),
+                folder_type=io.FolderType.temp,
+                cls=effective_cls,
+                compress_level=4,
+            )
+
+        return io.NodeOutput(
+            "\n".join(file_paths),
+            ui=ui.SavedImages(preview_results),
+        )

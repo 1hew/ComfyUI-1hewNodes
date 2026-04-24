@@ -21,6 +21,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.13.0**
+- feat(text): Add `String Ratio Gpt20Image` with the GPT 2.0 image ratio set (`3:2`, `1:1`, `2:3`, `5:4`, `4:5`, `16:9`, `9:16`, `21:9`, `3:4`, `4:3`)
+
+**v3.12.0**
+- feat(text): Rename `String Image Ratio Gemini31FlashImage` to `String Ratio Gemini31FlashImage`, rename `String Image Resolution` to `String Resolution`, and align related file/node/doc names
+
 **v3.11.0**
 - feat(image): Add `Image Batch Interleave` for contiguous segment splitting followed by column-first interleaved batch reordering
 
@@ -543,6 +549,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Text Prefix Suffix | Text prefix suffix formatter with wildcard input support for flexible data formatting with custom prefix and suffix |
 | Text Custom Extract | Text custom extractor for extracting specified key values from JSON |
+| String Ratio Gpt20Image | Infer the nearest GPT 2.0 image supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
+| String Ratio Gemini31FlashImage | Infer the nearest Gemini 3.1 Flash supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
+| String Resolution | Infer the nearest resolution tier (`0.5k` / `1k` / `2k` / `4k`) from input images, or pass through the selected label when no image is connected |
 | String Filter | Text cleaner supporting `{input}` substitution, comment filtering (# and triple quotes), and optional empty-line removal |
 | String Join Multi | Join up to 5 text blocks with `{input}` substitution, comment/empty-line filtering, and composite separators|
 | List Custom Int | Custom integer list generator with dash separator and multiple delimiter support |

@@ -3,26 +3,14 @@ export function createLoadImageDom({ app, node, openFilePicker }) {
     Object.assign(imageEl.style, {
         width: "100%",
         maxWidth: "100%",
-        height: "100%",
-        maxHeight: "100%",
+        height: "auto",
+        maxHeight: "calc(100% - 20px)",
         display: "block",
+        flex: "0 0 auto",
         objectFit: "contain",
         minHeight: "0",
         pointerEvents: "none",
     });
-
-    const previewViewport = document.createElement("div");
-    Object.assign(previewViewport.style, {
-        width: "100%",
-        flex: "1 1 auto",
-        minHeight: "0",
-        overflow: "hidden",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        pointerEvents: "none",
-    });
-    previewViewport.appendChild(imageEl);
 
     const infoEl = document.createElement("div");
     Object.assign(infoEl.style, {
@@ -56,7 +44,7 @@ export function createLoadImageDom({ app, node, openFilePicker }) {
         pointerEvents: "none",
     });
 
-    container.appendChild(previewViewport);
+    container.appendChild(imageEl);
     container.appendChild(infoEl);
 
     const fileInputEl = document.createElement("input");

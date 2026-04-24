@@ -66,7 +66,15 @@ class ImageResizeGemini31FlashImage(ImageResizeGemini30ProImage):
         ("[4k] 5504x3072 (16:9)", 5504, 3072),
         ("[4k] 6336x2688 (21:9)", 6336, 2688),
     ]
-    PRESET_OPTIONS = ["auto", "auto (0.5k)", "auto (1k | 2k)", "auto (2k | 4k)"] + [name for name, _, _ in PRESET_RESOLUTIONS]
+    PRESET_OPTIONS = [
+        "auto",
+        "auto (0.5k)",
+        "auto (1k)",
+        "auto (2k)",
+        "auto (4k)",
+        "auto (1k | 2k)",
+        "auto (2k | 4k)",
+    ] + [name for name, _, _ in PRESET_RESOLUTIONS]
 
     @classmethod
     def define_schema(cls) -> io.Schema:
@@ -96,7 +104,7 @@ class ImageResizeGemini31FlashImage(ImageResizeGemini30ProImage):
         image=None,
         mask=None,
     ):
-        if preset_size == "auto (0.5k)":
+        if preset_size in ("auto (0.5k)", "auto (1k)", "auto (2k)", "auto (4k)"):
             if image is not None:
                 iw = max(int(image.shape[2]), 1)
                 ih = max(int(image.shape[1]), 1)
@@ -106,7 +114,13 @@ class ImageResizeGemini31FlashImage(ImageResizeGemini30ProImage):
             else:
                 iw, ih = 512, 512
 
-            candidates = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[0.5k]")]
+            prefix = {
+                "auto (0.5k)": "[0.5k]",
+                "auto (1k)": "[1k]",
+                "auto (2k)": "[2k]",
+                "auto (4k)": "[4k]",
+            }[preset_size]
+            candidates = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith(prefix)]
             width, height = cls._find_best_resolution(iw, ih, candidates)
             matched = [name for name, w, h in candidates if w == width and h == height]
             if matched:

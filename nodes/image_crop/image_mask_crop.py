@@ -78,20 +78,12 @@ class ImageMaskCrop(io.ComfyNode):
                     mask[mask_idx].detach().cpu().numpy() * 255
                 ).astype(np.uint8)
                 img_pil = Image.fromarray(img_np)
-                mask_pil = Image.fromarray(mask_np).convert("L")
+                mask_pil = cls._fit_mask_to_image(
+                    Image.fromarray(mask_np).convert("L"), img_pil.size
+                )
                 bbox = cls._get_bbox_from_mask(mask_pil)
                 if bbox is None:
                     full_mask = mask_pil
-                    if full_mask.size != img_pil.size:
-                        new_mask = Image.new("L", img_pil.size, 0)
-                        paste_x = max(
-                            0, (img_pil.width - full_mask.width) // 2
-                        )
-                        paste_y = max(
-                            0, (img_pil.height - full_mask.height) // 2
-                        )
-                        new_mask.paste(full_mask, (paste_x, paste_y))
-                        full_mask = new_mask
                     img_t = cls._compose_image_with_mask(
                         img_pil, full_mask, output_alpha
                     )
@@ -111,6 +103,16 @@ class ImageMaskCrop(io.ComfyNode):
                 y_min = max(0, y_min)
                 x_max = min(img_pil.width, x_max)
                 y_max = min(img_pil.height, y_max)
+                if output_crop and (x_max <= x_min or y_max <= y_min):
+                    full_mask = mask_pil
+                    full_mask_np = (
+                        np.array(full_mask).astype(np.float32) / 255.0
+                    )
+                    mk_t = torch.from_numpy(full_mask_np)
+                    img_t = cls._compose_image_with_mask(
+                        img_pil, full_mask, output_alpha
+                    )
+                    return img_t, mk_t
                 if output_crop:
                     cropped_img = img_pil.crop((x_min, y_min, x_max, y_max))
                     cropped_mask = mask_pil.crop((x_min, y_min, x_max, y_max))
@@ -123,12 +125,6 @@ class ImageMaskCrop(io.ComfyNode):
                     )
                 else:
                     full_mask = mask_pil
-                    if full_mask.size != img_pil.size:
-                        new_mask = Image.new("L", img_pil.size, 0)
-                        paste_x = max(0, (img_pil.width - full_mask.width) // 2)
-                        paste_y = max(0, (img_pil.height - full_mask.height) // 2)
-                        new_mask.paste(full_mask, (paste_x, paste_y))
-                        full_mask = new_mask
                     full_mask_np = (
                         np.array(full_mask).astype(np.float32) / 255.0
                     )
@@ -215,6 +211,25 @@ class ImageMaskCrop(io.ComfyNode):
         y_min, y_max = np.where(rows)[0][[0, -1]]
         x_min, x_max = np.where(cols)[0][[0, -1]]
         return (x_min, y_min, x_max + 1, y_max + 1)
+
+    @staticmethod
+    def _fit_mask_to_image(mask_pil: Image.Image, target_size) -> Image.Image:
+        if mask_pil.size == target_size:
+            return mask_pil
+
+        target_w, target_h = target_size
+        fitted_mask = Image.new("L", target_size, 0)
+
+        src_left = max(0, (mask_pil.width - target_w) // 2)
+        src_top = max(0, (mask_pil.height - target_h) // 2)
+        src_right = min(mask_pil.width, src_left + target_w)
+        src_bottom = min(mask_pil.height, src_top + target_h)
+
+        cropped_mask = mask_pil.crop((src_left, src_top, src_right, src_bottom))
+        paste_x = max(0, (target_w - cropped_mask.width) // 2)
+        paste_y = max(0, (target_h - cropped_mask.height) // 2)
+        fitted_mask.paste(cropped_mask, (paste_x, paste_y))
+        return fitted_mask
     
     @staticmethod
     def _pad_to_same_size(images):

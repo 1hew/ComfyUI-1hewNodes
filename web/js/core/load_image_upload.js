@@ -21,55 +21,62 @@ export function createLoadImageUploader({
     indexWidget,
     includeSubdirWidget,
     computeStateKey,
+    onSettled,
 }) {
     const uploadFilesAsFolder = async (pairs, hasDirectory) => {
-        const files = (pairs || []).filter((pair) => isValidImageFile(pair?.file));
-        if (files.length === 0) {
-            return;
-        }
+        try {
+            const files = (pairs || []).filter((pair) => isValidImageFile(pair?.file));
+            if (files.length === 0) {
+                return;
+            }
 
-        const form = new FormData();
-        for (const pair of files) {
-            const name = pair.relativePath || pair.file.name;
-            form.append("files", pair.file, name);
-        }
+            const form = new FormData();
+            for (const pair of files) {
+                const name = pair.relativePath || pair.file.name;
+                form.append("files", pair.file, name);
+            }
 
-        const response = await api.fetchApi("/1hew/upload_images", {
-            method: "POST",
-            body: form,
-        });
-        if (response.status !== 200) {
-            return;
-        }
+            const response = await api.fetchApi("/1hew/upload_images", {
+                method: "POST",
+                body: form,
+            });
+            if (response.status !== 200) {
+                return;
+            }
 
-        const data = await response.json();
-        const uploadedFolder = data?.folder;
-        const uploadedFiles = data?.files;
-        if (!uploadedFolder && (!uploadedFiles || uploadedFiles.length === 0)) {
-            return;
-        }
+            const data = await response.json();
+            const uploadedFolder = data?.folder;
+            const uploadedFiles = data?.files;
+            if (!uploadedFolder && (!uploadedFiles || uploadedFiles.length === 0)) {
+                return;
+            }
 
-        let finalPath = uploadedFolder;
-        if (Array.isArray(uploadedFiles) && uploadedFiles.length === 1) {
-            finalPath = uploadedFiles[0];
-        }
+            let finalPath = uploadedFolder;
+            if (Array.isArray(uploadedFiles) && uploadedFiles.length === 1) {
+                finalPath = uploadedFiles[0];
+            }
 
-        if (fileWidget) {
-            fileWidget.value = finalPath;
-        }
-        if (indexWidget) {
-            indexWidget.value = 0;
-        }
-        if (includeSubdirWidget && hasDirectory) {
-            includeSubdirWidget.value = true;
-        }
+            if (fileWidget) {
+                fileWidget.value = finalPath;
+            }
+            if (indexWidget) {
+                indexWidget.value = 0;
+            }
+            if (includeSubdirWidget && hasDirectory) {
+                includeSubdirWidget.value = true;
+            }
 
-        node._comfy1hewLoadImageStateKey = computeStateKey();
-        if (typeof node.updatePreview === "function") {
-            await node.updatePreview();
-        }
+            node._comfy1hewLoadImageStateKey = computeStateKey();
+            if (typeof node.updatePreview === "function") {
+                await node.updatePreview();
+            }
 
-        app.graph.setDirtyCanvas(true, true);
+            app.graph.setDirtyCanvas(true, true);
+        } finally {
+            try {
+                onSettled?.();
+            } catch {}
+        }
     };
 
     return {

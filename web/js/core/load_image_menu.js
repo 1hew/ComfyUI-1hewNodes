@@ -1,4 +1,3 @@
-import { addPreviewMenuOptions } from "./preview_menu.js";
 import {
     addCopyMediaFrameMenuOption,
     addSaveMediaMenuOption,
@@ -20,15 +19,12 @@ export function extendLoadImageMenu({ app, node, options }) {
         }
     }
 
-    addPreviewMenuOptions(options, { app, currentNode: node });
-
-    const imageEl = node?.imageWidget?.element?.querySelector("img") || null;
+    const imageEl = node?._comfy1hewPreviewImageEl || null;
     addSaveMediaMenuOption(options, {
         app,
         currentNode: node,
         content: "Save Image",
-        getMediaElFromNode: (currentNode) =>
-            currentNode?.imageWidget?.element?.querySelector("img"),
+        getMediaElFromNode: (currentNode) => currentNode?._comfy1hewPreviewImageEl,
         filenamePrefix: "image",
         filenameExt: "png",
     });

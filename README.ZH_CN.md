@@ -21,6 +21,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.13.0**
+- feat(text): 新增 `String Ratio Gpt20Image`，使用 GPT 2.0 图像模型比例集合（`3:2`、`1:1`、`2:3`、`5:4`、`4:5`、`16:9`、`9:16`、`21:9`、`3:4`、`4:3`）
+
+**v3.12.0**
+- feat(text): 将 `String Image Ratio Gemini31FlashImage` 重命名为 `String Ratio Gemini31FlashImage`，并将 `String Image Resolution` 重命名为 `String Resolution`，同步对齐文件名、节点名与文档命名
+
 **v3.11.0**
 - feat(image): 添加 `Image Batch Interleave` 节点，支持将图像批次按连续分段后做列优先交错重排
 
@@ -542,6 +548,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Text Prefix Suffix | 文本前缀后缀器，支持通配符输入的灵活数据格式化，可自定义前缀和后缀 |
 | Text Custom Extract | 文本自定义提取器，从JSON中提取指定键值 |
+| String Ratio Gpt20Image | 从输入图像推断最接近的 GPT 2.0 图像模型支持比例；未连接图像时透传所选比例 |
+| String Ratio Gemini31FlashImage | 从输入图像推断最接近的 Gemini 3.1 Flash 支持比例；未连接图像时透传所选比例 |
+| String Resolution | 从输入图像推断最接近的分辨率档位（`0.5k` / `1k` / `2k` / `4k`）；未连接图像时透传所选标签 |
 | String Filter | 文本过滤器，支持 `{input}` 替换、注释过滤（# 与三引号）、可选空行移除 |
 | String Join Multi | 多段文本拼接，支持 `{input}` 占位符、注释/空行过滤与复合分隔符 |
 | List Custom Int | 自定义整数列表生成器，支持连字符分割和多种分隔符 |

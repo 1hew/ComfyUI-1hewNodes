@@ -41,7 +41,14 @@ class ImageResizeGemini30ProImage(io.ComfyNode):
         ("[4k] 5504×3072 (16:9)", 5504, 3072),
         ("[4k] 6336×2688 (21:9)", 6336, 2688),
     ]
-    PRESET_OPTIONS = ["auto", "auto (1k | 2k)", "auto (2k | 4k)"] + [name for name, _, _ in PRESET_RESOLUTIONS]
+    PRESET_OPTIONS = [
+        "auto",
+        "auto (1k)",
+        "auto (2k)",
+        "auto (4k)",
+        "auto (1k | 2k)",
+        "auto (2k | 4k)",
+    ] + [name for name, _, _ in PRESET_RESOLUTIONS]
 
     @classmethod
     def define_schema(cls) -> io.Schema:
@@ -123,13 +130,26 @@ class ImageResizeGemini30ProImage(io.ComfyNode):
         image: torch.Tensor | None = None,
         mask: torch.Tensor | None = None,
     ) -> io.NodeOutput:
-        if preset_size in ("auto", "auto (1k | 2k)", "auto (2k | 4k)"):
+        if preset_size in (
+            "auto",
+            "auto (1k)",
+            "auto (2k)",
+            "auto (4k)",
+            "auto (1k | 2k)",
+            "auto (2k | 4k)",
+        ):
             if isinstance(image, torch.Tensor):
                 iw = max(int(image.shape[2]), 1)
                 ih = max(int(image.shape[1]), 1)
 
                 resolutions = cls.PRESET_RESOLUTIONS
-                if preset_size == "auto (1k | 2k)":
+                if preset_size == "auto (1k)":
+                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[1k]")]
+                elif preset_size == "auto (2k)":
+                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[2k]")]
+                elif preset_size == "auto (4k)":
+                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[4k]")]
+                elif preset_size == "auto (1k | 2k)":
                     resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[1k]") or r[0].startswith("[2k]")]
                 elif preset_size == "auto (2k | 4k)":
                     resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[2k]") or r[0].startswith("[4k]")]
@@ -141,7 +161,13 @@ class ImageResizeGemini30ProImage(io.ComfyNode):
                 ih = max(int(mask.shape[1]), 1)
 
                 resolutions = cls.PRESET_RESOLUTIONS
-                if preset_size == "auto (1k | 2k)":
+                if preset_size == "auto (1k)":
+                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[1k]")]
+                elif preset_size == "auto (2k)":
+                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[2k]")]
+                elif preset_size == "auto (4k)":
+                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[4k]")]
+                elif preset_size == "auto (1k | 2k)":
                     resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[1k]") or r[0].startswith("[2k]")]
                 elif preset_size == "auto (2k | 4k)":
                     resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[2k]") or r[0].startswith("[4k]")]
