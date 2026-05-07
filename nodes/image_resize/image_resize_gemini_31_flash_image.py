@@ -22,8 +22,8 @@ class ImageResizeGemini31FlashImage(ImageResizeGemini30ProImage):
         ("[0.5k] 792x168 (21:9)", 792, 168),
         # 1k_ratios
         ("[1k] 1024x1024 (1:1)", 1024, 1024),
-        ("[1k] 512x2048 (1:4)", 512, 2048),
-        ("[1k] 384x3072 (1:8)", 384, 3072),
+        ("[1k] 512x2064 (1:4)", 512, 2064),
+        ("[1k] 352x2928 (1:8)", 352, 2928),
         ("[1k] 848x1264 (2:3)", 848, 1264),
         ("[1k] 1264x848 (3:2)", 1264, 848),
         ("[1k] 896x1200 (3:4)", 896, 1200),
@@ -37,8 +37,8 @@ class ImageResizeGemini31FlashImage(ImageResizeGemini30ProImage):
         ("[1k] 1584x672 (21:9)", 1584, 672),
         # 2k_ratios
         ("[2k] 2048x2048 (1:1)", 2048, 2048),
-        ("[2k] 1024x4096 (1:4)", 1024, 4096),
-        ("[2k] 768x6144 (1:8)", 768, 6144),
+        ("[2k] 1024x4128 (1:4)", 1024, 4128),
+        ("[2k] 704x5856 (1:8)", 704, 5856),
         ("[2k] 1696x2528 (2:3)", 1696, 2528),
         ("[2k] 2528x1696 (3:2)", 2528, 1696),
         ("[2k] 1792x2400 (3:4)", 1792, 2400),
@@ -75,6 +75,12 @@ class ImageResizeGemini31FlashImage(ImageResizeGemini30ProImage):
         "auto (1k | 2k)",
         "auto (2k | 4k)",
     ] + [name for name, _, _ in PRESET_RESOLUTIONS]
+    PRESET_ALIASES = {
+        "[1k] 512x2048 (1:4)": "[1k] 512x2064 (1:4)",
+        "[1k] 384x3072 (1:8)": "[1k] 352x2928 (1:8)",
+        "[2k] 1024x4096 (1:4)": "[2k] 1024x4128 (1:4)",
+        "[2k] 768x6144 (1:8)": "[2k] 704x5856 (1:8)",
+    }
 
     @classmethod
     def define_schema(cls) -> io.Schema:
@@ -96,6 +102,25 @@ class ImageResizeGemini31FlashImage(ImageResizeGemini30ProImage):
         )
 
     @classmethod
+    def _normalize_preset_size(cls, preset_size: str) -> str:
+        if isinstance(preset_size, (list, tuple)):
+            preset_size = preset_size[0] if len(preset_size) > 0 else ""
+        normalized = "" if preset_size is None else str(preset_size).strip()
+        return cls.PRESET_ALIASES.get(normalized, normalized)
+
+    @classmethod
+    def validate_inputs(cls, preset_size, fit, pad_color, image=None, mask=None):
+        if cls._is_prompt_link(preset_size):
+            return super().validate_inputs(preset_size, fit, pad_color, image=image, mask=mask)
+        preset_size = cls._normalize_preset_size(preset_size)
+        return super().validate_inputs(preset_size, fit, pad_color, image=image, mask=mask)
+
+    @classmethod
+    def fingerprint_inputs(cls, preset_size, fit, pad_color, image=None, mask=None):
+        preset_size = cls._normalize_preset_size(preset_size)
+        return super().fingerprint_inputs(preset_size, fit, pad_color, image=image, mask=mask)
+
+    @classmethod
     async def execute(
         cls,
         preset_size,
@@ -104,6 +129,7 @@ class ImageResizeGemini31FlashImage(ImageResizeGemini30ProImage):
         image=None,
         mask=None,
     ):
+        preset_size = cls._normalize_preset_size(preset_size)
         if preset_size in ("auto (0.5k)", "auto (1k)", "auto (2k)", "auto (4k)"):
             if image is not None:
                 iw = max(int(image.shape[2]), 1)

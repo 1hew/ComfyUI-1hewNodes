@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.14.0**
+- feat: Add utility nodes for batch image lists, image counting, list interleaving, and mask bounding boxes
+- fix: Improve `Image Mask Crop` channel output and alpha handling
+
 **v3.13.0**
 - feat(text): Add `String Ratio Gpt20Image` with the GPT 2.0 image ratio set (`3:2`, `1:1`, `2:3`, `5:4`, `4:5`, `16:9`, `9:16`, `21:9`, `3:4`, `4:3`)
 
@@ -448,7 +452,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### ✂️ Image Cropping Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Image Mask Crop | Batch mask-based cropping with RGB/RGBA dual output modes and smart channel processing |
+| Image Mask Crop | Batch mask-based cropping with RGB/RGBA channel preservation and optional mask alpha output |
 | Image Crop Square | Square cropping with mask guidance and scaling support |
 | Image Crop with BBox Mask | Smart bounding box cropping with precise aspect ratio control and scale strength adjustment |
 | Image Paste by BBox Mask | Paste cropped images back with multiple blend modes |
@@ -474,6 +478,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Mask To Image | Convert a mask into RGB/RGBA image output with hole filling, configurable black/white color mapping, and optional transparent background |
 | Mask Math Ops | Mathematical operations for masks (union, intersection, difference, XOR) |
 | Mask Separate | Separate mask into individual connected regions with sorting and area filtering |
+| Mask To BBox Mask | Convert mask foregrounds into minimum bounding rectangle masks, with merged/separate output and outward `divisible_by` alignment |
 | Mask Fill Hole | Fill holes in enclosed areas of masks with batch processing support |
 | Mask Crop by BBox Mask | Mask bounding box cropping based on mask regions |
 | Mask Paste by BBox Mask | Simplified mask pasting with automatic base mask creation and bounding box detection |
@@ -523,6 +528,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🔢 Integer Nodes
 | Node Name | Description |
 |-----------|-------------|
+| Int Image Count | Count valid images from dynamic `image_X` inputs, ignoring empty inputs, empty tensors, and all-zero images |
 | Int Image Side Length | Output selected side length (longest/shortest/width/height) from image dimensions |
 | Int Image Size | Output width and height integers from image dimensions |
 | Int Mask Side Length | Output selected side length (longest/shortest/width/height) from mask dimensions |
@@ -537,6 +543,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Batch Group | Intelligent image batch grouper with configurable batch sizes, overlap handling, and flexible padding strategies |
 | Image Batch Range | Select a contiguous range from an image batch using start index and count; out-of-bounds safe |
 | Image Batch Interleave | Reorder an image batch by splitting it into contiguous segments and reading them back in column-first interleaved order |
+| Image List Interleave | Reorder an image list by contiguous segment interleaving while preserving each image's original size |
 | Image PingPong | Bidirectional frame repeat over batch, supports pre-reverse, link-frame removal, and frame truncation |
 | Image List Append | Image list appender for intelligently merging images into lists |
 | Mask Batch Math Ops | Batch mask mathematical operations |
@@ -564,6 +571,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Multi String Join | Concatenate dynamic `string_X` inputs with `{input}` variable support and comment/triple-quote filtering; customizable separator |
 | Multi Image Batch | Build image batches from dynamic `image_X` with crop/pad/stretch size unification and automatic RGBA preservation when any input has alpha |
+| Multi Image List | Build `image_list` from dynamic `image_X` batch or list inputs, splitting them into single-image list items |
 | Multi Image Overlay | Overlay multiple image layers sequentially with alpha compositing, fit modes, and automatic RGBA preservation when any input has alpha |
 | Multi Image Stitch | Dynamic multi-image stitcher with direction, size matching, spacing, padding color control, and automatic RGBA preservation when any input has alpha |
 | Multi Mask Batch | Build mask batch from dynamic `mask_X` with crop/pad/stretch size unification and configurable gray padding |

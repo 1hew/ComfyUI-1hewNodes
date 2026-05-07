@@ -21,7 +21,8 @@ class ImageMaskCrop(io.ComfyNode):
     批处理规则：图像与遮罩数量不一致时按最大批次循环使用。
     输出与公式：
     - 当 output_alpha=True：alpha = mask（0–255），图像输出为 RGBA；
-      当 output_alpha=False：输入为 RGBA 则保持 RGBA，输入为 RGB 则输出 RGB。
+      输入为 RGBA 时 alpha = 输入 alpha * mask。
+      当 output_alpha=False：只裁剪图像，输入为 RGBA 则保持 RGBA，输入为 RGB 则输出 RGB。
     - 当 output_crop=True：对图像与遮罩进行 bbox 裁剪后输出（可由 pad_crop 向外扩展）；
       当 output_crop=False：保持原尺寸，整幅图应用 alpha 或保持 RGB。
     """
@@ -84,9 +85,7 @@ class ImageMaskCrop(io.ComfyNode):
                 bbox = cls._get_bbox_from_mask(mask_pil)
                 if bbox is None:
                     full_mask = mask_pil
-                    img_t = cls._compose_image_with_mask(
-                        img_pil, full_mask, output_alpha
-                    )
+                    img_t = cls._compose_image(img_pil, full_mask, output_alpha)
                     mk_t = torch.from_numpy(
                         np.array(full_mask).astype(np.float32) / 255.0
                     )
@@ -109,9 +108,7 @@ class ImageMaskCrop(io.ComfyNode):
                         np.array(full_mask).astype(np.float32) / 255.0
                     )
                     mk_t = torch.from_numpy(full_mask_np)
-                    img_t = cls._compose_image_with_mask(
-                        img_pil, full_mask, output_alpha
-                    )
+                    img_t = cls._compose_image(img_pil, full_mask, output_alpha)
                     return img_t, mk_t
                 if output_crop:
                     cropped_img = img_pil.crop((x_min, y_min, x_max, y_max))
@@ -120,18 +117,14 @@ class ImageMaskCrop(io.ComfyNode):
                         np.array(cropped_mask).astype(np.float32) / 255.0
                     )
                     mk_t = torch.from_numpy(cropped_mask_np)
-                    img_t = cls._compose_image_with_mask(
-                        cropped_img, cropped_mask, output_alpha
-                    )
+                    img_t = cls._compose_image(cropped_img, cropped_mask, output_alpha)
                 else:
                     full_mask = mask_pil
                     full_mask_np = (
                         np.array(full_mask).astype(np.float32) / 255.0
                     )
                     mk_t = torch.from_numpy(full_mask_np)
-                    img_t = cls._compose_image_with_mask(
-                        img_pil, full_mask, output_alpha
-                    )
+                    img_t = cls._compose_image(img_pil, full_mask, output_alpha)
                 return img_t, mk_t
             return await asyncio.to_thread(_do)
 
@@ -165,25 +158,24 @@ class ImageMaskCrop(io.ComfyNode):
         return io.NodeOutput(image, mask)
 
     @staticmethod
-    def _compose_image_with_mask(
-        img_pil: Image.Image, mask_pil: Image.Image, output_alpha: bool
+    def _compose_image(
+        img_pil: Image.Image,
+        mask_pil: Image.Image,
+        output_alpha: bool,
     ) -> torch.Tensor:
         """
-        将 mask 作用到图像可见内容：
-        - RGB 通道始终乘以 mask，保证非白区域不可见（变黑）
-        - 若输入有 alpha，则输出 alpha = input_alpha * mask
-        - 若 output_alpha=True，则即使输入无 alpha 也输出 RGBA（alpha=mask）
+        根据 output_alpha 处理输出通道：
+        - output_alpha=False 时仅裁剪图像，保留输入 RGB/RGBA 通道数。
+        - output_alpha=True 时输出 RGBA，alpha 来自 mask；RGBA 输入会叠乘原 alpha。
         """
         img_np = np.array(img_pil)
         input_has_alpha = img_np.ndim == 3 and img_np.shape[2] == 4
+        if not output_alpha:
+            return torch.from_numpy(img_np.astype(np.float32) / 255.0)
 
         rgba_np = np.array(img_pil.convert("RGBA"), dtype=np.uint8)
         mask_l = np.array(mask_pil.convert("L"), dtype=np.uint8)
         mask_f = mask_l.astype(np.float32) / 255.0
-
-        rgb = rgba_np[:, :, :3].astype(np.float32)
-        rgb = np.clip(np.round(rgb * mask_f[:, :, None]), 0, 255).astype(np.uint8)
-        rgba_np[:, :, :3] = rgb
 
         if input_has_alpha:
             src_alpha = rgba_np[:, :, 3].astype(np.float32) / 255.0
@@ -193,12 +185,8 @@ class ImageMaskCrop(io.ComfyNode):
         else:
             alpha = mask_l
 
-        if output_alpha or input_has_alpha:
-            rgba_np[:, :, 3] = alpha
-            out_np = rgba_np.astype(np.float32) / 255.0
-        else:
-            out_np = rgba_np[:, :, :3].astype(np.float32) / 255.0
-
+        rgba_np[:, :, 3] = alpha
+        out_np = rgba_np.astype(np.float32) / 255.0
         return torch.from_numpy(out_np)
     
     @staticmethod

@@ -8,7 +8,7 @@
 | -------- | -------- | -------- | ------ | -------- | ---- |
 | `image` | - | IMAGE | - | - | 输入图像批次 |
 | `mask` | 可选 | MASK | - | - | 输入遮罩批次，若未提供则使用图像的 alpha 通道 |
-| `output_alpha` | - | BOOLEAN | false | - | 为 true 时输出 RGBA（alpha 来自遮罩）；否则输出 RGB |
+| `output_alpha` | - | BOOLEAN | false | - | 为 true 时输出 RGBA（alpha 来自遮罩）；否则保留输入图像的 RGB/RGBA 通道数 |
 | `output_crop` | - | BOOLEAN | true | - | 按遮罩边界框裁剪；为 false 时保持原图尺寸 |
 | `pad_crop` | - | INT | `0` | 0-4096 | 仅在 output_crop=true 时生效，向外扩展裁剪框的像素值 |
 
@@ -22,18 +22,21 @@
 ## 功能说明
 
 - 边界框裁剪：从遮罩计算 bbox 并同步裁剪图像/遮罩。
-- Alpha 通道：`output_alpha=true` 时将遮罩写入图像 alpha。
+- 裁剪框扩展：`pad_crop` 会在裁剪前向外扩展 bbox，扩展区域仍来自原图，不会额外补黑边。
+- Alpha 通道：`output_alpha=true` 时输出 RGBA，alpha 来自遮罩；如果输入本身为 RGBA，则输出 alpha 会叠乘输入 alpha 与遮罩。
+- 通道保持：`output_alpha=false` 时只裁剪图像，不用遮罩压黑 RGB；输入为 3 通道则输出 3 通道，输入为 4 通道则输出 4 通道。
 - 尺寸保持：`output_crop=false` 时保留原尺寸，并在需要时居中对齐并填充遮罩。
 - 批量稳健：图像与遮罩数量不一致时循环使用；输出在堆叠前做统一填充。
 
 ## 典型用法
 
 - 抠像剪切：设 `output_alpha=true` 生成带 alpha 的 RGBA；后续合成可直接利用透明度。
-- 紧凑裁剪：设 `output_crop=true` 聚焦遮罩区域；`output_alpha=false` 保持纯 RGB。
-- 全画布输出：设 `output_crop=false` 保持原始画布，同时应用遮罩 alpha。
+- 紧凑裁剪：设 `output_crop=true` 聚焦遮罩区域；`output_alpha=false` 时保留输入图像通道。
+- BBox 裁剪：使用矩形 bbox mask 并开启 `pad_crop` 时，扩展区域保留原图内容；若 `output_alpha=true`，扩展区域会按遮罩变透明。
+- 全画布输出：设 `output_crop=false` 保持原始画布，并按 `output_alpha` 决定是否输出遮罩 alpha。
 
 ## 注意与建议
 
 - 当遮罩全黑时，将回退为原尺寸输出；若启用 alpha，则仍会应用 alpha 通道。
-- 如输入为 RGBA，除非启用 `output_alpha`，裁剪流程会统一为 RGB。
+- 如输入为 RGBA 且 `output_alpha=false`，输出会保留原始 alpha 通道。
 - 输出在设备上做范围裁剪到 [0,1]。

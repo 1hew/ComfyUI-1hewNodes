@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.14.0**
+- feat: 添加批量图像列表、图像计数、列表交错与遮罩外接框等实用节点
+- fix: 优化 `Image Mask Crop` 输出通道与 alpha 处理
+
 **v3.13.0**
 - feat(text): 新增 `String Ratio Gpt20Image`，使用 GPT 2.0 图像模型比例集合（`3:2`、`1:1`、`2:3`、`5:4`、`4:5`、`16:9`、`9:16`、`21:9`、`3:4`、`4:3`）
 
@@ -447,7 +451,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### ✂️ 图像裁剪节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Image Mask Crop | 基于遮罩的批量裁剪，支持RGB/RGBA双输出模式和智能通道处理 |
+| Image Mask Crop | 基于遮罩的批量裁剪，支持 RGB/RGBA 通道保持与可选遮罩 alpha 输出 |
 | Image Crop Square | 方形裁剪，支持遮罩引导和缩放 |
 | Image Crop with BBox Mask| 智能边界框裁剪，支持精确比例控制和缩放强度调节 |
 | Image Paste by BBox Mask | 裁剪图像回贴，支持多种混合模式 |
@@ -473,6 +477,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Mask To Image | 将 mask 映射为 RGB/RGBA 图像，支持孔洞填充、黑白区域颜色映射和透明输出 |
 | Mask Math Ops | 遮罩数学运算（并集、交集、差集、异或） |
 | Mask Separate | 将遮罩分离为独立的连通区域，支持排序和面积过滤 |
+| Mask To BBox Mask | 将遮罩前景转换为最小外接矩形遮罩，支持合并/分离输出和 `divisible_by` 向外对齐 |
 | Mask Fill Hole | 填充遮罩中的封闭区域孔洞，支持批量处理 |
 | Mask Crop by BBox Mask | 基于蒙版区域的遮罩边界框裁剪 |
 | Mask Paste by BBox Mask | 简化遮罩粘贴，支持自动基础遮罩创建和边界框检测 |
@@ -522,6 +527,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🔢 整数节点
 | 节点名称 | 功能描述 |
 |---------|----------|
+| Int Image Count | 统计动态 `image_X` 输入中的有效图像数量，忽略空输入、空张量与全 0 图像 |
 | Int Image Side Length | 基于图像尺寸输出选定边长（最长/最短/宽/高） |
 | Int Image Size | 输出图像宽度与高度两个整数 |
 | Int Mask Side Length | 基于遮罩尺寸输出选定边长（最长/最短/宽/高） |
@@ -536,6 +542,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Batch Group | 智能图像批次分组器，支持可配置的批次大小、重叠处理和灵活的填充策略 |
 | Image Batch Range | 从图像批次选择连续范围，支持起始索引与数量，越界安全 |
 | Image Batch Interleave | 将图像批次按连续分段后做列优先交错重排，适合打散顺序为跨段轮询 |
+| Image List Interleave | 将图像列表按连续分段后做列优先交错重排，保持每张图片原尺寸 |
 | Image PingPong | 批量往返帧生成，支持预反转、拼接处去重与帧数截取 |
 | Image List Append | 图像列表追加器，智能合并图像到列表中 |
 | Mask Batch Math Ops | 批量遮罩数学运算 |
@@ -563,6 +570,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Multi String Join | 动态多输入字符串连接，支持 `{input}` 变量与注释/三引号过滤，可自定义分隔符 |
 | Multi Image Batch | 从动态 `image_X` 构建批次，支持 crop/pad/stretch 尺寸统一，并在任一输入带 alpha 时自动保留 RGBA |
+| Multi Image List | 从动态 `image_X` 批次或列表输入构建 `image_list`，并拆分为单张图像列表项 |
 | Multi Image Overlay | 按顺序叠加多个图像图层，支持 alpha 合成、尺寸适应，并在任一输入带 alpha 时自动保留 RGBA |
 | Multi Image Stitch | 动态多图像拼接，支持方向、尺寸匹配、间距与填充颜色，并在任一输入带 alpha 时自动保留 RGBA |
 | Multi Mask Batch | 从动态 `mask_X` 构建批次，支持 crop/pad/stretch 尺寸统一与灰度填充 |

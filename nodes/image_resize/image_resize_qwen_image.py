@@ -37,6 +37,26 @@ class ImageResizeQwenImage(io.ComfyNode):
         )
 
     @classmethod
+    def _normalize_preset_size(cls, preset_size) -> str:
+        if isinstance(preset_size, (list, tuple)):
+            preset_size = preset_size[0] if len(preset_size) > 0 else ""
+        return "" if preset_size is None else str(preset_size).strip()
+
+    @staticmethod
+    def _is_prompt_link(value) -> bool:
+        if value is None:
+            return True
+        if (
+            isinstance(value, (list, tuple))
+            and len(value) == 2
+            and isinstance(value[1], int)
+        ):
+            return True
+        if isinstance(value, str) and value.strip() in ("*", "STRING", "COMBO"):
+            return True
+        return False
+
+    @classmethod
     def validate_inputs(
         cls,
         preset_size: str,
@@ -45,8 +65,8 @@ class ImageResizeQwenImage(io.ComfyNode):
         image: torch.Tensor | None = None,
         mask: torch.Tensor | None = None,
     ):
-        if preset_size not in cls.PRESET_OPTIONS:
-            return "invalid preset_size"
+        if not cls._is_prompt_link(preset_size) and cls._normalize_preset_size(preset_size) not in cls.PRESET_OPTIONS:
+            return f"invalid preset_size: {preset_size!r}"
         if fit not in ("crop", "pad", "stretch"):
             return "invalid fit"
         return True
@@ -60,6 +80,7 @@ class ImageResizeQwenImage(io.ComfyNode):
         image: torch.Tensor | None = None,
         mask: torch.Tensor | None = None,
     ):
+        preset_size = cls._normalize_preset_size(preset_size)
         ib = int(image.shape[0]) if isinstance(image, torch.Tensor) else 0
         ih = int(image.shape[1]) if isinstance(image, torch.Tensor) else 0
         iw = int(image.shape[2]) if isinstance(image, torch.Tensor) else 0
@@ -77,6 +98,9 @@ class ImageResizeQwenImage(io.ComfyNode):
         image: torch.Tensor | None = None,
         mask: torch.Tensor | None = None,
     ) -> io.NodeOutput:
+        preset_size = cls._normalize_preset_size(preset_size)
+        if preset_size not in cls.PRESET_OPTIONS:
+            raise ValueError(f"invalid preset_size: {preset_size!r}")
         if preset_size == "auto":
             if isinstance(image, torch.Tensor):
                 iw = max(int(image.shape[2]), 1)
