@@ -4,6 +4,14 @@ import torch
 
 
 class MaskBatchRange(io.ComfyNode):
+    @staticmethod
+    def _empty_mask(mask: torch.Tensor) -> torch.Tensor:
+        return torch.empty(
+            (0,) + tuple(mask.shape[1:]),
+            dtype=mask.dtype,
+            device=mask.device,
+        )
+
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
@@ -13,47 +21,37 @@ class MaskBatchRange(io.ComfyNode):
             inputs=[
                 io.Mask.Input("mask"),
                 io.Int.Input("start_index", default=0, min=0, max=8192, step=1),
-                io.Int.Input("num_frame", default=1, min=1, max=8192, step=1),
+                io.Int.Input("step", default=1, min=1, max=8192, step=1),
+                io.Int.Input("num_frame", default=1, min=0, max=8192, step=1),
             ],
             outputs=[io.Mask.Output(display_name="mask")],
         )
 
     @classmethod
     async def execute(
-        cls, mask: torch.Tensor, start_index: int, num_frame: int
+        cls, mask: torch.Tensor, start_index: int, step: int, num_frame: int
     ) -> io.NodeOutput:
         try:
             total = int(mask.shape[0])
             start = max(0, int(start_index))
+            stride = max(1, int(step))
+            count = max(0, int(num_frame))
 
             if total <= 0 or start >= total:
-                empty_msk = torch.empty(
-                    (0,) + tuple(mask.shape[1:]),
-                    dtype=mask.dtype,
-                    device=mask.device,
-                )
-                return io.NodeOutput(empty_msk)
-
-            take = max(0, min(int(num_frame), total - start))
-
-            if take == 0:
-                empty_msk = torch.empty(
-                    (0,) + tuple(mask.shape[1:]),
-                    dtype=mask.dtype,
-                    device=mask.device,
-                )
-                return io.NodeOutput(empty_msk)
+                return io.NodeOutput(cls._empty_mask(mask))
 
             async def _slice():
                 def _do():
-                    return mask[start : start + take]
+                    if count == 0:
+                        return mask[start::stride]
+                    stop = start + (stride * count)
+                    return mask[start:stop:stride]
 
                 return await asyncio.to_thread(_do)
 
             selected_mask = await _slice()
+            if int(selected_mask.shape[0]) == 0:
+                return io.NodeOutput(cls._empty_mask(mask))
             return io.NodeOutput(selected_mask)
         except Exception:
-            empty_msk = torch.empty(
-                (0,) + tuple(mask.shape[1:]), dtype=mask.dtype, device=mask.device
-            )
-            return io.NodeOutput(empty_msk)
+            return io.NodeOutput(cls._empty_mask(mask))

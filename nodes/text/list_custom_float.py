@@ -6,6 +6,15 @@ from ...utils import make_ui_text
 
 
 class ListCustomFloat(io.ComfyNode):
+    _NUMBER_PATTERN = r"-?(?:\d+(?:\.\d*)?|\.\d+)"
+    _BRACKET_RANGE_RE = re.compile(
+        rf"(?P<open>[\[\(])\s*(?P<start>{_NUMBER_PATTERN})\s*,\s*(?P<end>{_NUMBER_PATTERN})\s*(?P<close>[\]\)])\s*(?:\:\s*(?P<step>{_NUMBER_PATTERN}))?"
+    )
+    _DASH_RANGE_RE = re.compile(
+        rf"(?P<start>{_NUMBER_PATTERN})\s*-\s*(?P<end>{_NUMBER_PATTERN})\s*(?:\:\s*(?P<step>{_NUMBER_PATTERN}))?"
+    )
+    _NUMBER_RE = re.compile(rf"(?P<value>{_NUMBER_PATTERN})")
+
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
@@ -24,83 +33,127 @@ class ListCustomFloat(io.ComfyNode):
     @classmethod
     async def execute(cls, custom_text: str) -> io.NodeOutput:
         text = custom_text or ""
-        items = cls._split_text(text)
+        items = cls._parse_values(text)
         if not items:
             items = [0.0]
         count = len(items)
         return io.NodeOutput(items, count, ui=make_ui_text(str(count)))
 
     @staticmethod
-    def _parse_section(text: str) -> list[float]:
-        if not text.strip():
-            return []
-        lines = text.split("\n")
-        float_list: list[float] = []
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            if "," in line or ";" in line or "，" in line or "；" in line:
-                line = (
-                    line.replace(";", ",")
-                    .replace("，", ",")
-                    .replace("；", ",")
-                )
-                items = line.split(",")
-                for item in items:
-                    item = item.strip()
-                    if (item.startswith('"') and item.endswith('"')) or (
-                        item.startswith("'") and item.endswith("'")
-                    ):
-                        item = item[1:-1]
-                    if item:
-                        try:
-                            float_list.append(float(item))
-                        except (ValueError, TypeError):
-                            continue
-            else:
-                if (line.startswith('"') and line.endswith('"')) or (
-                    line.startswith("'") and line.endswith("'")
-                ):
-                    line = line[1:-1]
-                if line:
-                    try:
-                        float_list.append(float(line))
-                    except (ValueError, TypeError):
-                        continue
-        return float_list if float_list else [0.0]
-
-    @staticmethod
-    def _strip_item(item: str) -> str:
-        s = item.strip()
-        if len(s) >= 2 and ((s[0] == s[-1]) and s[0] in ('"', "'")):
-            s = s[1:-1].strip()
-        return s
+    def _normalize_text(text: str) -> str:
+        return (
+            (text or "")
+            .replace("【", "[")
+            .replace("】", "]")
+            .replace("（", "(")
+            .replace("）", ")")
+            .replace("，", ",")
+            .replace("：", ":")
+            .replace("；", ",")
+            .replace(";", ",")
+        )
 
     @classmethod
-    def _split_text(cls, text: str) -> list[float]:
-        t = text or ""
-        if not t.strip():
+    def _parse_values(cls, text: str) -> list[float]:
+        normalized = cls._normalize_text(text)
+        if not normalized.strip():
             return []
 
-        dash_line_pattern = r"^\s*-+\s*$"
-        if re.search(dash_line_pattern, t, flags=re.MULTILINE):
-            parts = re.split(dash_line_pattern, t, flags=re.MULTILINE)
-        elif ("\n" in t) or ("\r" in t):
-            parts = re.split(r"\r?\n", t)
-        elif re.search(r"(。|(?<!\d)\.(?!\d))", t):
-            parts = re.split(r"(?:。|(?<!\d)\.(?!\d))+", t)
-        elif ("；" in t) or (";" in t):
-            parts = re.split(r"[；;]+", t)
-        else:
-            parts = re.split(r"[，,]+", t)
-
         out: list[float] = []
-        for p in parts:
-            s = cls._strip_item(p)
-            if s:
+        pos = 0
+        length = len(normalized)
+
+        while pos < length:
+            ch = normalized[pos]
+            if ch.isspace() or ch == ",":
+                pos += 1
+                continue
+
+            match = cls._BRACKET_RANGE_RE.match(normalized, pos)
+            if match:
+                out.extend(
+                    cls._expand_bracket_range(
+                        match.group("open"),
+                        float(match.group("start")),
+                        float(match.group("end")),
+                        match.group("close"),
+                        float(match.group("step")) if match.group("step") else 1.0,
+                    )
+                )
+                pos = match.end()
+                continue
+
+            match = cls._DASH_RANGE_RE.match(normalized, pos)
+            if match:
+                out.extend(
+                    cls._expand_dash_range(
+                        float(match.group("start")),
+                        float(match.group("end")),
+                        float(match.group("step")) if match.group("step") else 1.0,
+                    )
+                )
+                pos = match.end()
+                continue
+
+            match = cls._NUMBER_RE.match(normalized, pos)
+            if match:
                 try:
-                    out.append(float(s))
+                    out.append(cls._clean_float(float(match.group("value"))))
                 except (ValueError, TypeError):
-                    continue
+                    pass
+                pos = match.end()
+                continue
+
+            pos += 1
+
         return out
+
+    @classmethod
+    def _expand_bracket_range(
+        cls,
+        open_bracket: str,
+        start: float,
+        end: float,
+        close_bracket: str,
+        step: float,
+    ) -> list[float]:
+        direction = 1 if start <= end else -1
+        actual_step = abs(step)
+        if actual_step <= 0:
+            return []
+
+        first = start if open_bracket == "[" else start + (direction * actual_step)
+        last = end if close_bracket == "]" else end - (direction * actual_step)
+
+        return cls._build_range(first, last, actual_step, direction)
+
+    @classmethod
+    def _expand_dash_range(cls, start: float, end: float, step: float) -> list[float]:
+        actual_step = abs(step)
+        if actual_step <= 0:
+            return []
+        direction = 1 if start <= end else -1
+        return cls._build_range(start, end, actual_step, direction)
+
+    @classmethod
+    def _build_range(
+        cls, first: float, last: float, step: float, direction: int
+    ) -> list[float]:
+        values: list[float] = []
+        tolerance = max(1e-12, step * 1e-9)
+        current = first
+
+        if direction > 0:
+            while current <= last + tolerance:
+                values.append(cls._clean_float(current))
+                current += step
+            return values
+
+        while current >= last - tolerance:
+            values.append(cls._clean_float(current))
+            current -= step
+        return values
+
+    @staticmethod
+    def _clean_float(value: float) -> float:
+        return float(f"{value:.12f}")

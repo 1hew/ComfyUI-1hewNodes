@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import logging
 import threading
@@ -33,6 +34,17 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%H:%M:%S"
 )
+
+
+def _safe_log_text(value):
+    """Keep workflow paths intact, but make console logging encoding-safe."""
+    text = str(value)
+    encoding = getattr(getattr(sys, "stdout", None), "encoding", None) or "utf-8"
+    try:
+        text.encode(encoding)
+        return text
+    except UnicodeEncodeError:
+        return text.encode(encoding, errors="backslashreplace").decode(encoding, errors="replace")
 
 class WorkflowFileHandler(FileSystemEventHandler):
     def __init__(self):
@@ -85,7 +97,7 @@ class WorkflowFileHandler(FileSystemEventHandler):
             try:
                 with open(TEMP_FILE_PATH, "w", encoding="utf-8") as f:
                     f.write(relative_path)
-                logging.info(f"[{event_type}] 已更新工作流路径：{relative_path}")
+                logging.info(f"[{event_type}] 已更新工作流路径：{_safe_log_text(relative_path)}")
             except Exception as e:
                 logging.error(f"写入临时文件失败：{str(e)}")
 

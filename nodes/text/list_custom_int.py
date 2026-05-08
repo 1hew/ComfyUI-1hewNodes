@@ -6,6 +6,14 @@ from ...utils import make_ui_text
 
 
 class ListCustomInt(io.ComfyNode):
+    _BRACKET_RANGE_RE = re.compile(
+        r"(?P<open>[\[\(])\s*(?P<start>-?\d+)\s*,\s*(?P<end>-?\d+)\s*(?P<close>[\]\)])\s*(?:\:\s*(?P<step>\d+))?"
+    )
+    _DASH_RANGE_RE = re.compile(
+        r"(?P<start>-?\d+)\s*-\s*(?P<end>-?\d+)\s*(?:\:\s*(?P<step>\d+))?"
+    )
+    _NUMBER_RE = re.compile(r"(?P<value>-?(?:\d+(?:\.\d*)?|\.\d+))")
+
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
@@ -24,95 +32,105 @@ class ListCustomInt(io.ComfyNode):
     @classmethod
     async def execute(cls, custom_text: str) -> io.NodeOutput:
         text = custom_text or ""
-        items = cls._split_text(text)
+        items = cls._parse_values(text)
         if not items:
             items = [0]
         count = len(items)
         return io.NodeOutput(items, count, ui=make_ui_text(str(count)))
 
     @staticmethod
-    def _parse_section(text: str) -> list[int]:
-        if not text.strip():
-            return []
-        lines = text.split("\n")
-        int_list: list[int] = []
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            if "," in line or ";" in line or "，" in line or "；" in line:
-                line = (
-                    line.replace(";", ",")
-                    .replace("，", ",")
-                    .replace("；", ",")
-                )
-                items = line.split(",")
-                for item in items:
-                    item = item.strip()
-                    if (item.startswith('"') and item.endswith('"')) or (
-                        item.startswith("'") and item.endswith("'")
-                    ):
-                        item = item[1:-1]
-                    if item:
-                        try:
-                            if "." in item:
-                                int_val = int(float(item))
-                            else:
-                                int_val = int(item)
-                            int_list.append(int_val)
-                        except (ValueError, TypeError):
-                            continue
-            else:
-                if (line.startswith('"') and line.endswith('"')) or (
-                    line.startswith("'") and line.endswith("'")
-                ):
-                    line = line[1:-1]
-                if line:
-                    try:
-                        if "." in line:
-                            int_val = int(float(line))
-                        else:
-                            int_val = int(line)
-                        int_list.append(int_val)
-                    except (ValueError, TypeError):
-                        continue
-        return int_list if int_list else [0]
-
-    @staticmethod
-    def _strip_item(item: str) -> str:
-        s = item.strip()
-        if len(s) >= 2 and ((s[0] == s[-1]) and s[0] in ('"', "'")):
-            s = s[1:-1].strip()
-        return s
+    def _normalize_text(text: str) -> str:
+        return (
+            (text or "")
+            .replace("【", "[")
+            .replace("】", "]")
+            .replace("（", "(")
+            .replace("）", ")")
+            .replace("，", ",")
+            .replace("：", ":")
+            .replace("；", ",")
+            .replace(";", ",")
+        )
 
     @classmethod
-    def _split_text(cls, text: str) -> list[int]:
-        t = text or ""
-        if not t.strip():
+    def _parse_values(cls, text: str) -> list[int]:
+        normalized = cls._normalize_text(text)
+        if not normalized.strip():
             return []
 
-        dash_line_pattern = r"^\s*-+\s*$"
-        if re.search(dash_line_pattern, t, flags=re.MULTILINE):
-            parts = re.split(dash_line_pattern, t, flags=re.MULTILINE)
-        elif ("\n" in t) or ("\r" in t):
-            parts = re.split(r"\r?\n", t)
-        elif re.search(r"(。|(?<!\d)\.(?!\d))", t):
-            parts = re.split(r"(?:。|(?<!\d)\.(?!\d))+", t)
-        elif ("；" in t) or (";" in t):
-            parts = re.split(r"[；;]+", t)
-        else:
-            parts = re.split(r"[，,]+", t)
-
         out: list[int] = []
-        for p in parts:
-            s = cls._strip_item(p)
-            if s:
+        pos = 0
+        length = len(normalized)
+
+        while pos < length:
+            ch = normalized[pos]
+            if ch.isspace() or ch == ",":
+                pos += 1
+                continue
+
+            match = cls._BRACKET_RANGE_RE.match(normalized, pos)
+            if match:
+                out.extend(
+                    cls._expand_bracket_range(
+                        match.group("open"),
+                        int(match.group("start")),
+                        int(match.group("end")),
+                        match.group("close"),
+                        int(match.group("step")) if match.group("step") else 1,
+                    )
+                )
+                pos = match.end()
+                continue
+
+            match = cls._DASH_RANGE_RE.match(normalized, pos)
+            if match:
+                out.extend(
+                    cls._expand_dash_range(
+                        int(match.group("start")),
+                        int(match.group("end")),
+                        int(match.group("step")) if match.group("step") else 1,
+                    )
+                )
+                pos = match.end()
+                continue
+
+            match = cls._NUMBER_RE.match(normalized, pos)
+            if match:
                 try:
-                    if "." in s:
-                        v = int(float(s))
-                    else:
-                        v = int(s)
-                    out.append(v)
+                    out.append(int(float(match.group("value"))))
                 except (ValueError, TypeError):
-                    continue
+                    pass
+                pos = match.end()
+                continue
+
+            pos += 1
+
         return out
+
+    @classmethod
+    def _expand_bracket_range(
+        cls, open_bracket: str, start: int, end: int, close_bracket: str, step: int
+    ) -> list[int]:
+        direction = 1 if start <= end else -1
+        actual_step = max(1, step)
+
+        first = start if open_bracket == "[" else start + direction
+        last = end if close_bracket == "]" else end - direction
+
+        return cls._build_range(first, last, actual_step, direction)
+
+    @classmethod
+    def _expand_dash_range(cls, start: int, end: int, step: int) -> list[int]:
+        direction = 1 if start <= end else -1
+        return cls._build_range(start, end, max(1, step), direction)
+
+    @staticmethod
+    def _build_range(first: int, last: int, step: int, direction: int) -> list[int]:
+        if direction > 0:
+            if first > last:
+                return []
+            return list(range(first, last + 1, step))
+
+        if first < last:
+            return []
+        return list(range(first, last - 1, -step))

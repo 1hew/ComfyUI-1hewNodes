@@ -1,6 +1,6 @@
-# Image Batch Range - 连续区间帧切片
+# Image Batch Range - 按起点步长取图像批次
 
-**节点功能：** `Image Batch Range` 根据 `start_index` 与 `num_frame` 从图像批次中提取连续片段。当 `start_index ≥ 总帧数` 时输出为空批次；当 `num_frame` 超过从 `start_index` 开始的剩余数量时，仅返回剩余的帧数。
+**节点功能：** `Image Batch Range` 根据 `start_index`、`step` 与 `num_frame` 从图像批次中提取图像。`num_frame` 表示最终取出的张数；当 `num_frame = 0` 时，表示从 `start_index` 开始按 `step` 一直取到末尾。当 `start_index ≥ 总帧数` 时输出为空批次。
 
 ## 输入
 
@@ -8,27 +8,32 @@
 | -------- | -------- | -------- | ------ | -------- | ---- |
 | `image` | - | IMAGE | - | - | 输入图像批次 |
 | `start_index` | - | INT | 0 | 0-8192 | 起始帧索引；当 `start_index ≥ 总帧数` 时返回空批次。 |
-| `num_frame` | - | INT | 1 | 1-8192 | 取帧数量；按 `总帧数 - start_index` 进行裁剪。 |
+| `step` | - | INT | 1 | 1-8192 | 采样步长；`1` 表示连续取，`2` 表示每隔 1 张取 1 张。 |
+| `num_frame` | - | INT | 1 | 0-8192 | 最终取出的图像数量；`0` 表示从 `start_index` 开始按 `step` 一直取到末尾。 |
 
 ## 输出
 
 | 输出名称 | 数据类型 | 描述 |
 |---------|----------|------|
-| `image` | IMAGE | 提取的连续帧片段；越界或剩余为 0 时为空批次 |
+| `image` | IMAGE | 按起点与步长提取后的图像批次；越界时为空批次 |
 
 ## 功能说明
 
-- 边界安全：当 `start_index ≥ 总帧数` 时返回空批次；`num_frame` 按 `总帧数 - start_index` 裁剪。
+- 边界安全：当 `start_index ≥ 总帧数` 时返回空批次。
+- 步长采样：从 `start_index` 开始按 `step` 采样。
+- 到末尾模式：当 `num_frame = 0` 时，从起点按步长一直取到最后一张。
 - 异步切片：在工作线程执行切片避免阻塞。
-- 空输出处理：当可取帧为 0 时，返回与输入类型/设备匹配的空批次。
+- 空输出处理：返回与输入类型/设备匹配的空批次。
 
 ## 典型用法
 
-- 从序列中抽取场景片段：设置 `start_index=S`、`num_frame=N`。
-- 组合多个区间以构建子片段或训练窗口。
+- 连续取前几张：`start_index=0`、`step=1`、`num_frame=N`。
+- 间隔抽帧：`start_index=S`、`step=K`、`num_frame=N`。
+- 从某一帧开始抽到末尾：`start_index=S`、`step=K`、`num_frame=0`。
 
 ## 注意与建议
 
 - 当 `start_index ≥ 总帧数` 时，输出为空批次。
-- 当 `num_frame > 总帧数 - start_index` 时，仅返回剩余帧数。
+- 当 `num_frame > 0` 且剩余可取数量不足时，仅返回实际能取到的图像。
+- 当 `step = 1` 时，行为与旧版连续切片兼容。
 - 当 `总帧数 = 0` 时，输出为空批次。

@@ -1,12 +1,12 @@
-# List Custom Float - Custom Float List
+# List Custom Float - Flexible float list syntax
 
-**Node Purpose:** `List Custom Float` parses multi-line text into a list of floats and returns the list alongside its count. It supports dashed-section mode and CSV-style parsing with multiple separators and quote handling.
+**Node Purpose:** `List Custom Float` parses multiline text into a float list and returns the list alongside its count. It supports single values, lists, forward/reverse ranges, ranged strides, mixed Chinese/English punctuation, spaces, and mixed bracket styles. Float ranges are cleaned to avoid common accumulation noise.
 
 ## Inputs
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `custom_text` | - | STRING | `` | - | Multi-line text to parse into float values. |
+| `custom_text` | - | STRING | `` | multiline text | Text to parse using the flexible range/list syntax. |
 
 ## Outputs
 
@@ -17,17 +17,30 @@
 
 ## Features
 
-- Dashed-section parsing: lines consisting solely of `-` split sections; each section is stripped of quotes and parsed as a float.
-- CSV-style parsing: supports `,`, `;`, `，`, `；` separators; trims quotes per item.
-- Robust defaults: empty input yields `[0.0]`; invalid tokens are ignored.
-- Core logic: dashed detection; dashed parse; CSV parser.
+- Loose parsing: accepts `,`, `，`, `:`, `：`, `[]`, `【】`, `()`, `（）`, including mixed usage.
+- Single values and lists: supports `1.0`, `.5`, `1.0, 2.5, 3`.
+- Ranges and stride: supports `0-1`, `1-0`, `0-1:0.25`, `[0,1]`, `[0,1)`, `【1，0】：0.2`.
+- Reverse ranges: expressions like `1-0` and `[1,0]:0.2` expand in reverse order.
+- Precision cleanup: output values are normalized to avoid artifacts like `0.30000000000000004`.
+- Order and duplicates preserved: values are emitted in written order and duplicates are kept.
+- Robust defaults: empty input yields `[0.0]`; invalid fragments are ignored.
 
 ## Typical Usage
 
-- CSV input: `1.0, 0.5, 2.75` on one line or multiple lines.
-- Section mode: separate values using dashed lines to declare individual entries.
+- Single values and lists: `1.0, 0.5, 2.75`
+- Continuous range: `[0,1]`
+- Strided range: `[0,1):0.25`
+- Reverse range: `【1，0】：0.2`
+- Mixed input:
+  ```text
+  1.0，0.5，2.75
+  [0,1):0.25
+  【1，0】：0.2
+  .125
+  ```
 
 ## Notes & Tips
 
-- Quotes around numbers (e.g., `'0.5'`) are removed before parsing.
+- `:` / `：` means stride only in this node.
+- Both range endpoints and stride support floating-point values.
 - When no valid numbers are present, the node falls back to `[0.0]`.

@@ -21,6 +21,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.15.0**
+- feat(io): 添加 `Load PS` 节点，支持读取单个 PSD/PSB 的指定图层、全部图层批次或完整合成图，并提供拖拽上传与节点预览
+- refactor(batch): 重整批处理取样节点，为 `Image Batch Range` / `Mask Batch Range` 增加 `step` 与 `num_frame=0`，并用 `Image Batch Index`、`Image Batch Uniform` 替换 `Image Batch Extract`
+- refactor(text): 增强 `List Custom Int` 与 `List Custom Float`，支持更灵活的多行数值/区间/步长文本解析
+
 **v3.14.0**
 - feat: 添加批量图像列表、图像计数、列表交错与遮罩外接框等实用节点
 - fix: 优化 `Image Mask Crop` 输出通道与 alpha 处理
@@ -537,16 +542,17 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📦 批处理节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Image Batch Extract | 智能图像批次提取器，支持多种提取模式包括自定义索引、步长间隔和均匀分布 |
+| Image Batch Index | 使用多行索引文本从图像批次提取图像，支持灵活的列表/区间/步长语法与倒序 |
 | Image Batch Split | 智能图像批次拆分器，支持正向/反向拆分模式和增强的边界条件处理 |
 | Image Batch Group | 智能图像批次分组器，支持可配置的批次大小、重叠处理和灵活的填充策略 |
-| Image Batch Range | 从图像批次选择连续范围，支持起始索引与数量，越界安全 |
+| Image Batch Range | 按 `start_index`、`step` 与最终 `num_frame` 从图像批次取样；`num_frame=0` 时从起点一直取到末尾 |
+| Image Batch Uniform | 按最终 `num_frame` 对整个图像批次做均匀采样；`num_frame=0` 时返回全部 |
 | Image Batch Interleave | 将图像批次按连续分段后做列优先交错重排，适合打散顺序为跨段轮询 |
 | Image List Interleave | 将图像列表按连续分段后做列优先交错重排，保持每张图片原尺寸 |
 | Image PingPong | 批量往返帧生成，支持预反转、拼接处去重与帧数截取 |
 | Image List Append | 图像列表追加器，智能合并图像到列表中 |
 | Mask Batch Math Ops | 批量遮罩数学运算 |
-| Mask Batch Range | 从遮罩批次选择连续范围，支持起始索引与数量，越界安全 |
+| Mask Batch Range | 按 `start_index`、`step` 与最终 `num_frame` 从遮罩批次取样；`num_frame=0` 时从起点一直取到末尾 |
 | Mask Batch Split | 智能遮罩批次拆分器，支持正向/反向拆分模式和增强的边界条件处理 |
 | Video Cut Group | 视频硬切检测器，通过分析相邻帧相似度识别场景切换点，支持快速和精确模式 |
 
@@ -560,8 +566,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | String Resolution | 从输入图像推断最接近的分辨率档位（`0.5k` / `1k` / `2k` / `4k`）；未连接图像时透传所选标签 |
 | String Filter | 文本过滤器，支持 `{input}` 替换、注释过滤（# 与三引号）、可选空行移除 |
 | String Join Multi | 多段文本拼接，支持 `{input}` 占位符、注释/空行过滤与复合分隔符 |
-| List Custom Int | 自定义整数列表生成器，支持连字符分割和多种分隔符 |
-| List Custom Float | 自定义浮点数列表生成器，支持连字符分割和多种分隔符 |
+| List Custom Int | 使用灵活的多行数值/区间/步长文本构建整数列表，支持倒序与中英文符号混合输入 |
+| List Custom Float | 使用灵活的多行数值/区间/步长文本构建浮点列表，支持倒序与中英文符号混合输入 |
 | List Custom String | 自定义字符串列表生成器，支持连字符分割和多种分隔符 |
 | List Custom Seed | 自定义种子列表生成器，支持生成唯一随机种子列表和control after generate功能 |
 
@@ -582,6 +588,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Get File Count | 统计目录中图片/视频/文本文件数量，支持递归扫描 |
 | Load Image | 从文件/目录加载图片，支持批量加载、尺寸统一与遮罩输出 |
+| Load PS | 从 PSD/PSB 文件读取指定图层、全部图层批次或完整合成图，支持拖拽上传、可选节点预览、隐藏图层与组模式 |
 | Load Txt | 从文件或目录读取 `.txt` 文本，支持 `encode` 选择与按索引取文件 |
 | Load Video | 从文件/目录选择视频并输出 VIDEO 对象，解码阶段应用裁切与 FPS 设置 |
 | Load Video to Image | 将视频解码为图像帧批次、音频、fps 与帧数信息 |

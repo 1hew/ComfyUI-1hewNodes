@@ -1,6 +1,6 @@
-# Mask Batch Range - 遮罩连续区间切片
+# Mask Batch Range - 按起点步长取遮罩批次
 
-**节点功能：** `Mask Batch Range` 根据 `start_index` 与 `num_frame` 从遮罩批次中提取连续片段。当 `start_index ≥ 总帧数` 时输出为空批次；当 `num_frame` 超过剩余数量时，仅返回剩余的遮罩帧数。
+**节点功能：** `Mask Batch Range` 根据 `start_index`、`step` 与 `num_frame` 从遮罩批次中提取遮罩。`num_frame` 表示最终取出的张数；当 `num_frame = 0` 时，表示从 `start_index` 开始按 `step` 一直取到末尾。当 `start_index ≥ 总帧数` 时输出为空批次。
 
 ## 输入
 
@@ -8,25 +8,33 @@
 | -------- | -------- | -------- | ------ | -------- | ---- |
 | `mask` | - | MASK | - | - | 输入遮罩批次 |
 | `start_index` | - | INT | 0 | 0-8192 | 起始帧索引；当 `start_index ≥ 总帧数` 时返回空批次。 |
-| `num_frame` | - | INT | 1 | 1-8192 | 取帧数量；按 `总帧数 - start_index` 进行裁剪。 |
+| `step` | - | INT | 1 | 1-8192 | 采样步长；`1` 表示连续取，`2` 表示每隔 1 张取 1 张。 |
+| `num_frame` | - | INT | 1 | 0-8192 | 最终取出的遮罩数量；`0` 表示从 `start_index` 开始按 `step` 一直取到末尾。 |
 
 ## 输出
 
 | 输出名称 | 数据类型 | 描述 |
 |---------|----------|------|
-| `mask` | MASK | 提取的遮罩连续片段；越界或剩余为 0 时为空批次 |
+| `mask` | MASK | 按起点与步长提取后的遮罩批次；越界时为空批次 |
 
 ## 功能说明
 
-- 边界安全：当 `start_index ≥ 总帧数` 时返回空批次；`num_frame` 按 `总帧数 - start_index` 裁剪。
+- 边界安全：当 `start_index ≥ 总帧数` 时返回空批次。
+- 步长采样：从 `start_index` 开始按 `step` 采样。
+- 到末尾模式：当 `num_frame = 0` 时，从起点按步长一直取到最后一张。
 - 异步切片：在工作线程执行切片，避免阻塞。
 - 空输出处理：返回与输入类型/设备一致的空批次。
 
 ## 典型用法
 
-- 将遮罩区间与图像区间对齐输出。
+- 连续取前几张：`start_index=0`、`step=1`、`num_frame=N`。
+- 间隔抽取遮罩：`start_index=S`、`step=K`、`num_frame=N`。
+- 从某一帧开始抽到末尾：`start_index=S`、`step=K`、`num_frame=0`。
 
 ## 注意与建议
 
 - 行为与 `Image Batch Range` 在张量层面保持一致。
-- 当 `start_index ≥ 总帧数` 时为空；当 `num_frame > 总帧数 - start_index` 时仅返回剩余；当 `总帧数 = 0` 时为空。
+- 当 `start_index ≥ 总帧数` 时为空。
+- 当 `num_frame > 0` 且剩余可取数量不足时，仅返回实际能取到的遮罩。
+- 当 `step = 1` 时，行为与旧版连续切片兼容。
+- 当 `总帧数 = 0` 时为空。

@@ -1,12 +1,12 @@
-# List Custom Int - Custom Integer List
+# List Custom Int - Flexible integer list syntax
 
-**Node Purpose:** `List Custom Int` parses multi-line text into a list of integers and returns the list alongside its count. It supports dashed-section mode and CSV-style parsing with multi-language separators and quote handling, including decimal-to-integer coercion.
+**Node Purpose:** `List Custom Int` parses multiline text into an integer list and returns the list alongside its count. It supports single values, lists, forward/reverse ranges, ranged strides, mixed Chinese/English punctuation, spaces, and mixed bracket styles. Single float values are coerced with `int(float(...))`.
 
 ## Inputs
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `custom_text` | - | STRING | `` | - | Multi-line text to parse into integer values. |
+| `custom_text` | - | STRING | `` | multiline text | Text to parse using the flexible range/list syntax. |
 
 ## Outputs
 
@@ -17,19 +17,30 @@
 
 ## Features
 
-- Dashed-section parsing: each dashed block yields one integer value.
-- CSV-style parsing: supports `,`, `;`, `，`, `；`; trims quotes per item.
-- Decimal coercion: items like `"3.9"` are converted via `int(float(...))`.
-- Robust defaults: empty input yields `[0]`; invalid tokens are ignored.
-- Core logic: dashed detection; dashed parse; CSV parser; decimal coercion.
+- Loose parsing: accepts `,`, `，`, `:`, `：`, `[]`, `【】`, `()`, `（）`, including mixed usage.
+- Single values and lists: supports `1`, `2.9`, `1,2,3`, `1，2，3`.
+- Ranges and stride: supports `0-10`, `10-0`, `0-10:2`, `[0,10]`, `[0,10)`, `【10，0】：2`.
+- Reverse ranges: expressions like `10-0` and `[10,0]:2` expand in reverse order.
+- Order and duplicates preserved: values are emitted in written order and duplicates are kept.
+- Robust defaults: empty input yields `[0]`; invalid fragments are ignored.
 
 ## Typical Usage
 
-- CSV input: `1, 2, 3` on one line or multiple lines.
-- Mixed numeric strings: `"7"`, `"8.2"`, `"9"` become `7, 8, 9`.
-- Section mode: separate values using dashed lines.
+- Single values and lists: `1, 2, 3`
+- Continuous range: `[0,10]`
+- Strided range: `[0,20):2`
+- Reverse range: `【10，0】：2`
+- Mixed input:
+  ```text
+  1，2，3
+  [10,20)
+  【30，20】：2
+  7.9
+  ```
 
 ## Notes & Tips
 
-- Quotes around numbers are removed before parsing.
+- `:` / `：` means stride only in this node.
+- Single float values are coerced with `int(float(...))`, for example `7.9 -> 7`.
+- Range endpoints and stride are parsed with integer semantics.
 - When no valid integers are present, the node falls back to `[0]`.

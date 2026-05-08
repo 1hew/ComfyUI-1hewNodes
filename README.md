@@ -21,6 +21,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.15.0**
+- feat(io): Add `Load PS` for loading a single PSD/PSB as one indexed layer, all layer batches, or the merged document image, with drag-and-drop upload and node preview
+- refactor(batch): Reshape batch sampling nodes by adding `step` and `num_frame=0` support to `Image Batch Range` / `Mask Batch Range`, and replacing `Image Batch Extract` with `Image Batch Index` and `Image Batch Uniform`
+- refactor(text): Enhance `List Custom Int` and `List Custom Float` with more flexible multiline value/range/stride parsing
+
 **v3.14.0**
 - feat: Add utility nodes for batch image lists, image counting, list interleaving, and mask bounding boxes
 - fix: Improve `Image Mask Crop` channel output and alpha handling
@@ -538,16 +543,17 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📦 Batch Processing Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Image Batch Extract | Intelligent image batch extractor supporting multiple extraction modes including custom indices, step intervals, and uniform distribution |
+| Image Batch Index | Extract images from a batch using multiline index text with flexible list/range/stride syntax and reverse-order support |
 | Image Batch Split | Intelligent image batch splitter with forward/backward splitting modes and enhanced boundary condition handling |
 | Image Batch Group | Intelligent image batch grouper with configurable batch sizes, overlap handling, and flexible padding strategies |
-| Image Batch Range | Select a contiguous range from an image batch using start index and count; out-of-bounds safe |
+| Image Batch Range | Sample an image batch by `start_index`, `step`, and final `num_frame`; `num_frame=0` takes all remaining images |
+| Image Batch Uniform | Uniformly sample an image batch by final `num_frame`; `num_frame=0` returns all images |
 | Image Batch Interleave | Reorder an image batch by splitting it into contiguous segments and reading them back in column-first interleaved order |
 | Image List Interleave | Reorder an image list by contiguous segment interleaving while preserving each image's original size |
 | Image PingPong | Bidirectional frame repeat over batch, supports pre-reverse, link-frame removal, and frame truncation |
 | Image List Append | Image list appender for intelligently merging images into lists |
 | Mask Batch Math Ops | Batch mask mathematical operations |
-| Mask Batch Range | Select a contiguous range from a mask batch using start index and count; out-of-bounds safe |
+| Mask Batch Range | Sample a mask batch by `start_index`, `step`, and final `num_frame`; `num_frame=0` takes all remaining masks |
 | Mask Batch Split | Intelligent mask batch splitter with forward/backward splitting modes and enhanced boundary condition handling |
 | Video Cut Group | Video scene cut detector that identifies scene transitions by analyzing frame similarity, supporting both fast and precise modes |
 
@@ -561,8 +567,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | String Resolution | Infer the nearest resolution tier (`0.5k` / `1k` / `2k` / `4k`) from input images, or pass through the selected label when no image is connected |
 | String Filter | Text cleaner supporting `{input}` substitution, comment filtering (# and triple quotes), and optional empty-line removal |
 | String Join Multi | Join up to 5 text blocks with `{input}` substitution, comment/empty-line filtering, and composite separators|
-| List Custom Int | Custom integer list generator with dash separator and multiple delimiter support |
-| List Custom Float | Custom float list generator with dash separator and multiple delimiter support |
+| List Custom Int | Build integer lists from flexible multiline value/range/stride text with reverse-order and mixed punctuation support |
+| List Custom Float | Build float lists from flexible multiline value/range/stride text with reverse-order and mixed punctuation support |
 | List Custom String | Custom string list generator with dash separator and multiple delimiter support |
 | List Custom Seed | Custom seed list generator for creating unique random seed lists with control after generate functionality |
 
@@ -583,6 +589,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Get File Count | Count image/video/txt files in a folder with optional recursive scanning |
 | Load Image | Load images from a file or folder with batch mode, size unification, and derived masks |
+| Load PS | Load a PSD/PSB file as one indexed layer, all layer batches, or the merged document image, with drag-and-drop upload, optional node preview, hidden-layer, and group-mode controls |
 | Load Txt | Load `.txt` content from a file or folder with `encode` selection and indexed folder picking |
 | Load Video | Select a video from a file or folder and apply trimming/FPS settings during decoding |
 | Load Video to Image | Decode a video into an image batch, audio, fps, and frame count |
