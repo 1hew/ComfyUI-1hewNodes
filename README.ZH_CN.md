@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.15.1**
+- refactor(io): `Get File Count` 增加 `psd` 扫描、列表形式的 `filename` / `file_path` 输出与 `filename_suffix` 控制；`Load Image.filename` 与 `Load PS.layer_name` 改为字符串列表输出
+- refactor(logic): `text_match_value` 支持将简单数字与布尔文本自动输出为对应类型
+
 **v3.15.0**
 - feat(io): 添加 `Load PS` 节点，支持读取单个 PSD/PSB 的指定图层、全部图层批次或完整合成图，并提供拖拽上传与节点预览
 - refactor(batch): 重整批处理取样节点，为 `Image Batch Range` / `Mask Batch Range` 增加 `step` 与 `num_frame=0`，并用 `Image Batch Index`、`Image Batch Uniform` 替换 `Image Batch Extract`
@@ -527,7 +531,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Any Switch Select | 多路选择节点，支持多个输入选项的惰性切换，将选中的 `input_k` 路由到 `output`，并返回实际生效的 `select` 值 |
 | Multi Switch Select | 多输出选择节点，使用 1-based 的 `select` 在 `input_1..input_N` 中选中一路，并输出到对应的 `output_k` |
 | text_match_rownum | 多行文本行号匹配，返回首个匹配项的行号（1-based），未命中返回 0 |
-| text_match_value | 在多行键值对中匹配单行文本并返回对应值 |
+| text_match_value | 在多行键值对中匹配单行文本并返回对应值，支持简单数字与布尔文本自动转类型 |
 
 ### 🔢 整数节点
 | 节点名称 | 功能描述 |
@@ -586,9 +590,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📁 IO 节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Get File Count | 统计目录中图片/视频/文本文件数量，支持递归扫描 |
-| Load Image | 从文件/目录加载图片，支持批量加载、尺寸统一与遮罩输出 |
-| Load PS | 从 PSD/PSB 文件读取指定图层、全部图层批次或完整合成图，支持拖拽上传、可选节点预览、隐藏图层与组模式 |
+| Get File Count | 统计目录中图片/视频/psd/文本文件数量，支持递归扫描、列表形式的 `filename` / `file_path` 输出，以及 `filename` 后缀保留控制 |
+| Load Image | 从文件/目录加载图片，支持批量加载、尺寸统一、遮罩输出与列表形式 `filename` |
+| Load PS | 从 PSD/PSB 文件读取指定图层、全部图层批次或完整合成图，支持拖拽上传、可选节点预览、隐藏图层、组模式与列表形式 `layer_name` |
 | Load Txt | 从文件或目录读取 `.txt` 文本，支持 `encode` 选择与按索引取文件 |
 | Load Video | 从文件/目录选择视频并输出 VIDEO 对象，解码阶段应用裁切与 FPS 设置 |
 | Load Video to Image | 将视频解码为图像帧批次、音频、fps 与帧数信息 |

@@ -1,6 +1,6 @@
 # Load PS - Load PSD/PSB layers
 
-**Node Purpose:** `Load PS` loads one PSD/PSB file as a selected layer, an all-layer image batch, or the merged document image. It also outputs matching alpha masks, the source filename, and layer names. The node supports drag-and-drop/file-picker upload and shows a preview for the current mode.
+**Node Purpose:** `Load PS` loads one PSD/PSB file as a selected layer, an all-layer image batch, or the merged document image. It also outputs matching alpha masks, the source filename, and layer names. `layer_name` is returned as a string list aligned with the image batch order. The node supports drag-and-drop/file-picker upload and shows a preview for the current mode.
 
 ## Inputs
 
@@ -20,7 +20,7 @@
 | `image` | IMAGE | Loaded RGBA image. `all_layers` returns a batch; other modes return one image. |
 | `mask` | MASK | Alpha mask aligned to `image`; visible pixels are 1 and transparent pixels are 0. |
 | `filename` | STRING | PSD/PSB filename stem. |
-| `layer_name` | STRING | Current layer/group name. Batch mode returns newline-separated names matching the batch order. |
+| `layer_name` | STRING LIST | Current layer/group names. Single-layer mode returns a one-item list; batch mode matches the batch order. |
 
 ## Features
 
@@ -28,6 +28,7 @@
 - Drag-and-drop upload: drop `.psd` / `.psb` files onto the node, or use the `choose psd to upload` button.
 - Node preview: when `preview` is enabled, `merged` and `single_layer` show one preview image, while `all_layers` shows a layer grid preview.
 - Layer modes: `single_layer` selects one layer/group by `index`; `all_layers` outputs all valid layers/groups as a batch.
+- Layer-name output: `layer_name` stays aligned with the output images, so downstream nodes can consume names directly as a list.
 - Merged mode: `merged` outputs the full PSD composite and ignores `index` and `group_mode`.
 - Group handling: `group_mode=layer` expands group children; `group_mode=merged` outputs each group as one image.
 - Empty filtering: empty layers and empty group composites are skipped.

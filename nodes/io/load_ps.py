@@ -42,7 +42,7 @@ class LoadPS(io.ComfyNode):
                 io.Image.Output(display_name="image"),
                 io.Mask.Output(display_name="mask"),
                 io.String.Output(display_name="filename"),
-                io.String.Output(display_name="layer_name"),
+                io.String.Output(display_name="layer_name", is_output_list=True),
             ],
         )
 
@@ -408,7 +408,7 @@ class LoadPS(io.ComfyNode):
             torch.stack(image_tensors, dim=0),
             torch.stack(mask_tensors, dim=0),
             filename,
-            "\n".join(names),
+            list(names),
         )
 
     @staticmethod
@@ -421,7 +421,7 @@ class LoadPS(io.ComfyNode):
     def _empty_output(filename: str = "") -> io.NodeOutput:
         image = torch.zeros((0, 64, 64, 4), dtype=torch.float32)
         mask = torch.zeros((0, 64, 64), dtype=torch.float32)
-        return io.NodeOutput(image, mask, filename, "")
+        return io.NodeOutput(image, mask, filename, [])
 
 
 def _get_upload_base_dir() -> str:

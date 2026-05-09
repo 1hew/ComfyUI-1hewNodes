@@ -1,4 +1,12 @@
+import re
+
 from comfy_api.latest import io
+
+
+INT_PATTERN = re.compile(r"^[+-]?(0|[1-9]\d*)$")
+FLOAT_PATTERN = re.compile(
+    r"^[+-]?(?:((0|[1-9]\d*)\.\d+)|(\.\d+)|((0|[1-9]\d*)[eE][+-]?\d+)|(((0|[1-9]\d*)\.\d+|\.\d+)[eE][+-]?\d+))$"
+)
 
 
 class TextMatchValue(io.ComfyNode):
@@ -30,12 +38,12 @@ class TextMatchValue(io.ComfyNode):
 
             for key, value in entries:
                 if cls._normalize(key) == query:
-                    return io.NodeOutput(value)
+                    return io.NodeOutput(cls._coerce_value(value))
 
             for key, value in entries:
                 normalized_key = cls._normalize(key)
                 if normalized_key.startswith(query):
-                    return io.NodeOutput(value)
+                    return io.NodeOutput(cls._coerce_value(value))
 
             return io.NodeOutput("")
         except Exception as e:
@@ -88,6 +96,30 @@ class TextMatchValue(io.ComfyNode):
             if cls._is_balanced_braces(inner):
                 return inner
         return text
+
+    @staticmethod
+    def _coerce_value(value: str):
+        raw = str(value or "").strip()
+        lowered = raw.lower()
+
+        if lowered == "true":
+            return True
+        if lowered == "false":
+            return False
+
+        if INT_PATTERN.match(raw):
+            try:
+                return int(raw)
+            except ValueError:
+                pass
+
+        if FLOAT_PATTERN.match(raw):
+            try:
+                return float(raw)
+            except ValueError:
+                pass
+
+        return value
 
     @staticmethod
     def _is_balanced_braces(text: str) -> bool:

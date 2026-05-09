@@ -1,6 +1,6 @@
 # Load PS - 读取 PSD/PSB 图层
 
-**节点功能：** `Load PS` 用于从单个 PSD/PSB 文件读取指定图层、全部图层批次或完整合成图，并输出对应的 alpha 遮罩、文件名和图层名称。节点支持拖拽/选择上传 PSD 文件，并在节点上显示当前模式的预览。
+**节点功能：** `Load PS` 用于从单个 PSD/PSB 文件读取指定图层、全部图层批次或完整合成图，并输出对应的 alpha 遮罩、文件名和图层名称。`layer_name` 直接以字符串列表形式输出，顺序与图像批次一致。节点支持拖拽/选择上传 PSD 文件，并在节点上显示当前模式的预览。
 
 ## 输入
 
@@ -20,7 +20,7 @@
 | `image` | IMAGE | 读取得到的 RGBA 图像；`all_layers` 时为图层批次，其他模式为单张。 |
 | `mask` | MASK | 与 `image` 对齐的 alpha 遮罩，可见区域为 1，透明区域为 0。 |
 | `filename` | STRING | PSD/PSB 文件名（不含扩展名）。 |
-| `layer_name` | STRING | 当前图层/组名称；批次模式下按换行分隔，顺序与 batch 对应。 |
+| `layer_name` | STRING LIST | 当前图层/组名称列表；单层模式下为单项列表，批次模式下顺序与 batch 对应。 |
 
 ## 功能说明
 
@@ -28,6 +28,7 @@
 - 拖拽上传：可将 `.psd` / `.psb` 文件拖到节点上，或使用 `choose psd to upload` 按钮选择文件。
 - 节点预览：开启 `preview` 后，`merged` 和 `single_layer` 显示单张预览，`all_layers` 显示图层网格预览。
 - 图层模式：`single_layer` 按 `index` 选择一个图层/组，`all_layers` 输出全部有效图层/组为批次。
+- 图层名输出：`layer_name` 与输出图像保持一一对应，便于下游直接按列表处理，无需再手动拆行。
 - 合成模式：`merged` 输出整个 PSD 的合成图，忽略 `index` 和 `group_mode`。
 - 组处理：`group_mode=layer` 会展开组内图层；`group_mode=merged` 会把组作为一张图输出。
 - 空内容过滤：空图层和空组合成结果会被过滤，不进入输出。

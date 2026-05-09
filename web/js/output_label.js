@@ -99,7 +99,7 @@ const CONFIGS = {
         slots: [{ out: 0, value: 0, suffix: "int" }],
     },
     "1hew_GetFileCount": {
-        base: ["count", "folder", "include_subdir"],
+        base: ["count", "folder", "filename", "file_path", "include_subdir"],
         delimiter: null,
         slots: [{ out: 0, value: 0, suffix: "count" }],
     },

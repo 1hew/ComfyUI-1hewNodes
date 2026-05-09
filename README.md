@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.15.1**
+- refactor(io): Add `psd` scanning, list-form `filename` / `file_path` outputs, and `filename_suffix` control to `Get File Count`; align `Load Image.filename` and `Load PS.layer_name` to string-list outputs
+- refactor(logic): Add automatic typed output for simple numeric and boolean values in `text_match_value`
+
 **v3.15.0**
 - feat(io): Add `Load PS` for loading a single PSD/PSB as one indexed layer, all layer batches, or the merged document image, with drag-and-drop upload and node preview
 - refactor(batch): Reshape batch sampling nodes by adding `step` and `num_frame=0` support to `Image Batch Range` / `Mask Batch Range`, and replacing `Image Batch Extract` with `Image Batch Index` and `Image Batch Uniform`
@@ -528,7 +532,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Any Switch Select | Multi-way selector node supporting multiple input options, lazily routing the chosen `input_k` to `output` and returning the effective `select` value |
 | Multi Switch Select | Multi-output selector for `input_1..input_N`; uses 1-based `select` to route the chosen input to its matching `output_k` |
 | text_match_rownum | Match a single text against multi-line text and return first matched row number (1-based), or 0 when not found |
-| text_match_value | Match single-line text against multi-line key-value pairs and return corresponding value |
+| text_match_value | Match single-line text against multi-line key-value pairs and return corresponding value with simple numeric/boolean auto-typing |
 
 ### 🔢 Integer Nodes
 | Node Name | Description |
@@ -587,9 +591,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📁 IO Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Get File Count | Count image/video/txt files in a folder with optional recursive scanning |
-| Load Image | Load images from a file or folder with batch mode, size unification, and derived masks |
-| Load PS | Load a PSD/PSB file as one indexed layer, all layer batches, or the merged document image, with drag-and-drop upload, optional node preview, hidden-layer, and group-mode controls |
+| Get File Count | Count image/video/psd/txt files in a folder with optional recursive scanning, list-form `filename` / `file_path` outputs, and configurable filename extension retention |
+| Load Image | Load images from a file or folder with batch mode, size unification, derived masks, and list-form `filename` output |
+| Load PS | Load a PSD/PSB file as one indexed layer, all layer batches, or the merged document image, with drag-and-drop upload, optional node preview, hidden-layer, group-mode controls, and list-form `layer_name` output |
 | Load Txt | Load `.txt` content from a file or folder with `encode` selection and indexed folder picking |
 | Load Video | Select a video from a file or folder and apply trimming/FPS settings during decoding |
 | Load Video to Image | Decode a video into an image batch, audio, fps, and frame count |

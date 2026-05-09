@@ -1,6 +1,6 @@
 # Load Image - Load images from file or folder
 
-**Node Purpose:** `Load Image` loads images from a file path or a folder and outputs an image batch plus a matching mask batch. It supports recursive folder scan, indexed selection, batch loading, and size unification via center-crop + resize.
+**Node Purpose:** `Load Image` loads images from a file path or a folder and outputs an image batch plus a matching mask batch. `filename` is returned as a string list so it stays aligned with single or batch image outputs. It supports recursive folder scan, indexed selection, batch loading, and size unification via center-crop + resize.
 
 ## Inputs
 
@@ -18,12 +18,13 @@
 |------|------|-------------|
 | `image` | IMAGE | Loaded image (single) or image batch (when `all=true`). |
 | `mask` | MASK | Mask aligned to `image`; derived from alpha/transparency and optional sidecar masks. |
-| `filename` | STRING | The filename stem of the loaded image(s). |
+| `filename` | STRING LIST | Filename stems of the loaded image(s); single-image mode returns a one-item list and batch mode follows output order. |
 
 ## Features
 
 - File or folder input: accepts a single image file or a directory.
 - Batch mode: `all=true` loads all matched files as a batch.
+- Filename output: `filename` stays aligned with the single/batch image outputs and can be consumed directly as a list downstream.
 - Size unification: uses `get_image_size` or the first loaded image as the target size and applies center-crop + resize.
 - Mask extraction: builds masks from image alpha/transparency and merges with sidecar mask files when present.
 - Stable ordering: paths are sorted case-insensitively for consistent indexing across platforms.

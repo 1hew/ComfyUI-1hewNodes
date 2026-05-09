@@ -45,7 +45,7 @@ class LoadImage(io.ComfyNode):
             outputs=[
                 io.Image.Output(display_name="image"),
                 io.Mask.Output(display_name="mask"),
-                io.String.Output(display_name="filename"),
+                io.String.Output(display_name="filename", is_output_list=True),
             ],
         )
 
@@ -333,7 +333,7 @@ class LoadImage(io.ComfyNode):
         count = len(image_paths)
 
         if count == 0:
-            return io.NodeOutput(None, None, "")
+            return io.NodeOutput(None, None, [])
 
         target_h = 0
         target_w = 0
@@ -366,7 +366,7 @@ class LoadImage(io.ComfyNode):
                     start_idx = 1
                 except Exception as e:
                     print(f"Error loading first image {image_paths[0]}: {e}")
-                    return io.NodeOutput(None, None, "")
+                    return io.NodeOutput(None, None, [])
 
             for file_path in image_paths[start_idx:]:
                 try:
@@ -396,11 +396,11 @@ class LoadImage(io.ComfyNode):
                     print(f"Error loading image {file_path}: {e}")
 
             if not images_tensors:
-                return io.NodeOutput(None, None, "")
+                return io.NodeOutput(None, None, [])
 
             output_image = torch.cat(images_tensors, dim=0)
             output_mask = torch.cat(masks_tensors, dim=0).squeeze(-1)
-            output_filename = "\n".join(output_names)
+            output_filename = output_names
 
         else:
             idx = index % count
@@ -417,10 +417,10 @@ class LoadImage(io.ComfyNode):
 
                 output_image = tensor
                 output_mask = mask_tensor.squeeze(-1)
-                output_filename = cls.get_filename_stem(selected_path)
+                output_filename = [cls.get_filename_stem(selected_path)]
             except Exception as e:
                 print(f"Error loading image {selected_path}: {e}")
-                return io.NodeOutput(None, None, "")
+                return io.NodeOutput(None, None, [])
 
         return io.NodeOutput(
             output_image,

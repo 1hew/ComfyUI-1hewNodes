@@ -10,6 +10,7 @@ from ...utils import make_ui_text
 FILE_TYPE_EXTENSIONS = {
     "image": {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"},
     "video": {".webm", ".mp4", ".mkv", ".gif", ".mov", ".avi"},
+    "psd": {".psd"},
     "txt": {".txt"},
 }
 
@@ -23,12 +24,19 @@ class GetFileCount(io.ComfyNode):
             category="1hewNodes/io",
             inputs=[
                 io.String.Input("folder", default=""),
-                io.Combo.Input("type", default="image", options=["image", "video", "txt"]),
+                io.Combo.Input(
+                    "type",
+                    default="image",
+                    options=["image", "video", "psd", "txt"],
+                ),
+                io.Boolean.Input("filename_suffix", default=False),
                 io.Boolean.Input("include_subdir", default=True),
             ],
             outputs=[
                 io.Int.Output(display_name="count"),
                 io.String.Output(display_name="folder"),
+                io.String.Output(display_name="filename", is_output_list=True),
+                io.String.Output(display_name="file_path", is_output_list=True),
                 io.Boolean.Output(display_name="include_subdir"),
             ],
         )
@@ -57,8 +65,22 @@ class GetFileCount(io.ComfyNode):
         paths.sort(key=lambda x: x.lower())
         return paths
 
+    @staticmethod
+    def get_filename(path: str, filename_suffix: bool) -> str:
+        name = os.path.basename(path)
+        if filename_suffix:
+            return name
+        return os.path.splitext(name)[0]
+
     @classmethod
-    def IS_CHANGED(cls, folder: str, type: str, include_subdir: bool, **kwargs):
+    def IS_CHANGED(
+        cls,
+        folder: str,
+        type: str,
+        filename_suffix: bool,
+        include_subdir: bool,
+        **kwargs,
+    ):
         if not os.path.isdir(folder):
             return float("nan")
 
@@ -77,14 +99,24 @@ class GetFileCount(io.ComfyNode):
         return m.hexdigest()
 
     @classmethod
-    def execute(cls, folder: str, type: str, include_subdir: bool) -> io.NodeOutput:
+    def execute(
+        cls,
+        folder: str,
+        type: str,
+        filename_suffix: bool,
+        include_subdir: bool,
+    ) -> io.NodeOutput:
         extensions = FILE_TYPE_EXTENSIONS.get(str(type or "").strip().lower(), set())
 
         paths = cls.get_paths(folder, include_subdir, extensions)
         count = len(paths)
+        filename = [cls.get_filename(path, filename_suffix) for path in paths]
+        file_path = list(paths)
         return io.NodeOutput(
             count,
             folder,
+            filename,
+            file_path,
             include_subdir,
             ui=make_ui_text(str(count)),
         )
