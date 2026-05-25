@@ -21,38 +21,57 @@ function normalizePreviewEntry(entry) {
     return { filename, subfolder, type };
 }
 
-function extractPreviewEntry(message) {
+function normalizePreviewEntries(value) {
+    if (Array.isArray(value)) {
+        return value.map(normalizePreviewEntry).filter(Boolean);
+    }
+
+    const entry = normalizePreviewEntry(value);
+    return entry ? [entry] : [];
+}
+
+function extractPreviewEntries(message) {
     const visit = (value, depth) => {
         if (depth <= 0 || value == null) {
-            return null;
+            return [];
         }
 
         if (Array.isArray(value)) {
+            const directEntries = normalizePreviewEntries(value);
+            if (directEntries.length) {
+                return directEntries;
+            }
+
             for (const item of value) {
                 const result = visit(item, depth - 1);
-                if (result) {
+                if (result.length) {
                     return result;
                 }
             }
-            return null;
+            return [];
         }
 
         if (typeof value !== "object") {
-            return null;
+            return [];
+        }
+
+        const imageEntries = normalizePreviewEntries(value.images);
+        if (imageEntries.length) {
+            return imageEntries;
         }
 
         const directEntry = normalizePreviewEntry(value);
         if (directEntry) {
-            return directEntry;
+            return [directEntry];
         }
 
         for (const key of Object.keys(value)) {
             const result = visit(value[key], depth - 1);
-            if (result) {
+            if (result.length) {
                 return result;
             }
         }
-        return null;
+        return [];
     };
 
     return visit(message, 6);
@@ -74,6 +93,21 @@ function previewKey(entry) {
     return entry ? `${entry.type}::${entry.subfolder}::${entry.filename}` : "";
 }
 
+function previewEntriesKey(entries) {
+    return entries.map(previewKey).join("||");
+}
+
+function loadPreviewImage(entry) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.decoding = "async";
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = buildPreviewUrl(entry);
+    });
+}
+
 function clearPreview(node, { clearPersisted = false } = {}) {
     if (!node) {
         return;
@@ -93,22 +127,22 @@ function clearPreview(node, { clearPersisted = false } = {}) {
     app.graph?.setDirtyCanvas?.(true, true);
 }
 
-function applyPreview(node, entry) {
-    const normalizedEntry = normalizePreviewEntry(entry);
-    if (!normalizedEntry) {
+function applyPreview(node, entries) {
+    const normalizedEntries = normalizePreviewEntries(entries);
+    if (!normalizedEntries.length) {
         clearPreview(node, { clearPersisted: false });
         return;
     }
 
-    const nextPreviewKey = previewKey(normalizedEntry);
+    const nextPreviewKey = previewEntriesKey(normalizedEntries);
     if (
         node._comfy1hewSaveImagePreviewKey === nextPreviewKey
         && Array.isArray(node.imgs)
         && node.imgs[0]
     ) {
-        node._comfy1hewSaveImagePreview = normalizedEntry;
+        node._comfy1hewSaveImagePreview = normalizedEntries;
         node.properties = node.properties || {};
-        node.properties[PREVIEW_PROPERTY_KEY] = normalizedEntry;
+        node.properties[PREVIEW_PROPERTY_KEY] = normalizedEntries;
         node.setDirtyCanvas?.(true, true);
         app.graph?.setDirtyCanvas?.(true, true);
         return;
@@ -116,31 +150,27 @@ function applyPreview(node, entry) {
 
     node._comfy1hewSaveImageReqId = (node._comfy1hewSaveImageReqId || 0) + 1;
     const reqId = node._comfy1hewSaveImageReqId;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.decoding = "async";
-    img.onload = () => {
+
+    Promise.all(normalizedEntries.map(loadPreviewImage)).then((imgs) => {
         if (reqId !== node._comfy1hewSaveImageReqId) {
             return;
         }
 
-        node._comfy1hewSaveImagePreview = normalizedEntry;
+        node._comfy1hewSaveImagePreview = normalizedEntries;
         node._comfy1hewSaveImagePreviewKey = nextPreviewKey;
-        node._comfy1hewPreviewImageEl = img;
-        node.imgs = [img];
+        node._comfy1hewPreviewImageEl = imgs[0] || null;
+        node.imgs = imgs;
         node.properties = node.properties || {};
-        node.properties[PREVIEW_PROPERTY_KEY] = normalizedEntry;
+        node.properties[PREVIEW_PROPERTY_KEY] = normalizedEntries;
 
         node.setDirtyCanvas?.(true, true);
         app.graph?.setDirtyCanvas?.(true, true);
-    };
-    img.onerror = () => {
+    }).catch(() => {
         if (reqId !== node._comfy1hewSaveImageReqId) {
             return;
         }
         clearPreview(node, { clearPersisted: false });
-    };
-    img.src = buildPreviewUrl(normalizedEntry);
+    });
 }
 
 registerExtensionOnce("__comfy1hewSaveImageExtensionRegistered", () => app.registerExtension({
@@ -171,9 +201,9 @@ registerExtensionOnce("__comfy1hewSaveImageExtensionRegistered", () => app.regis
         const onExecuted = nodeType.prototype.onExecuted;
         nodeType.prototype.onExecuted = function (message) {
             const r = onExecuted?.apply(this, arguments);
-            const previewEntry = extractPreviewEntry(message);
-            if (previewEntry) {
-                applyPreview(this, previewEntry);
+            const previewEntries = extractPreviewEntries(message);
+            if (previewEntries.length) {
+                applyPreview(this, previewEntries);
             } else {
                 clearPreview(this, { clearPersisted: true });
             }
@@ -183,13 +213,13 @@ registerExtensionOnce("__comfy1hewSaveImageExtensionRegistered", () => app.regis
         const onConfigure = nodeType.prototype.onConfigure;
         nodeType.prototype.onConfigure = function () {
             const data = arguments[0];
-            const savedPreviewEntry = normalizePreviewEntry(
+            const savedPreviewEntries = normalizePreviewEntries(
                 data?.properties?.[PREVIEW_PROPERTY_KEY]
                 ?? this.properties?.[PREVIEW_PROPERTY_KEY],
             );
             const r = onConfigure?.apply(this, arguments);
-            if (savedPreviewEntry) {
-                applyPreview(this, savedPreviewEntry);
+            if (savedPreviewEntries.length) {
+                applyPreview(this, savedPreviewEntries);
             }
             return r;
         };
@@ -198,14 +228,14 @@ registerExtensionOnce("__comfy1hewSaveImageExtensionRegistered", () => app.regis
         nodeType.prototype.onSerialize = function () {
             const r = onSerialize?.apply(this, arguments);
             const serialized = arguments[0];
-            const previewEntry = normalizePreviewEntry(
+            const previewEntries = normalizePreviewEntries(
                 this._comfy1hewSaveImagePreview
                 ?? this.properties?.[PREVIEW_PROPERTY_KEY],
             );
             if (serialized) {
                 serialized.properties = {
                     ...(serialized.properties || {}),
-                    [PREVIEW_PROPERTY_KEY]: previewEntry,
+                    [PREVIEW_PROPERTY_KEY]: previewEntries.length ? previewEntries : null,
                 };
             }
             return r;

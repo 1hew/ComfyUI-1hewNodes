@@ -9,7 +9,7 @@
 | `mask` | - | MASK | - | - | Input mask batch. |
 | `threshold` | - | FLOAT | `0.5` | 0.0–1.0 | Binarization threshold. |
 | `min_area` | - | INT | `1` | 1-100000000 | Minimum connected region area. Regions smaller than this will be ignored. |
-| `sort_mode` | - | COMBO | `top_to_bottom` | `top_to_bottom` / `left_to_right` / `area_desc` | Sorting mode: top to bottom, left to right, or area descending. |
+| `sort_mode` | - | COMBO | `top_to_bottom` | `top_to_bottom` / `left_to_right` / `area_desc` | Sorting mode: row-major top to bottom, column-major left to right, or area descending. |
 | `connectivity` | - | COMBO | `8` | `8` / `4` | Connectivity: 8-connected or 4-connected. |
 
 ## Outputs
@@ -23,7 +23,7 @@
 
 - Connected component analysis: extracts independent connected regions from the binarized mask.
 - Area filtering: filters out small noise or fragments using `min_area`.
-- Sorted output: sorts the separated masks by spatial position (top-to-bottom/left-to-right) or area size (descending).
+- Sorted output: supports approximate grid ordering. `top_to_bottom` outputs the first row left-to-right, then the second row, and so on; `left_to_right` outputs the first column top-to-bottom, then the second column, and so on; `area_desc` sorts by area descending.
 - Batch processing: separates each frame in the input batch and concatenates all results into a single output batch.
 
 ## Typical Usage

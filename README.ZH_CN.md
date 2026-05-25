@@ -21,6 +21,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.17.0**
+- feat(image_crop): 添加 `Image Pad By BBox Mask`，支持按 bbox 遮罩将局部图像补回整张遮罩画布并使用可配置颜色填充空白区域
+
+**v3.16.0**
+- feat(image_resize): 添加 `Image Resize GPT Image 2.0`，支持与 Gemini 统一的 auto 预设匹配、dynamic 动态保比例档位与 1k/2k/4k 固定预设尺寸
+
 **v3.15.1**
 - refactor(io): `Get File Count` 增加 `psd` 扫描、列表形式的 `filename` / `file_path` 输出与 `filename_suffix` 控制；`Load Image.filename` 与 `Load PS.layer_name` 改为字符串列表输出
 - refactor(logic): `text_match_value` 支持将简单数字与布尔文本自动输出为对应类型
@@ -443,6 +449,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Resize Jimeng | 适配即梦常用分辨率的图像尺寸调整，支持自动尺寸匹配 |
 | Image Resize Gemini30ProImage | 适配 Gemini 3.0 Pro 预设分辨率，支持 auto 档位与 image/mask 同步变换 |
 | Image Resize Gemini31FlashImage | 适配 Gemini 3.1 Flash 预设分辨率，扩展 0.5k/1k/2k/4k 档位与超宽比例 |
+| Image Resize GPT Image 2.0 | 适配 GPT Image 2.0 尺寸，支持 auto 预设匹配、dynamic 动态保比例档位与 1k/2k/4k 固定预设 |
 | Image Resize Square | 通用方形尺寸适配节点，支持 256/512/1024/2048/4096 与 `auto`、`auto (0.5k \| 1k)` |
 
 ### 🌈 颜色节点
@@ -464,6 +471,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Crop Square | 方形裁剪，支持遮罩引导和缩放 |
 | Image Crop with BBox Mask| 智能边界框裁剪，支持精确比例控制和缩放强度调节 |
 | Image Paste by BBox Mask | 裁剪图像回贴，支持多种混合模式 |
+| Image Pad By BBox Mask | 按 bbox 遮罩将局部图像补回整张画布，并用指定颜色或策略填充空白区域 |
 | Image Edge Crop Pad | 智能边缘裁剪和填充，支持多种填充模式和遮罩输出 |
 | Image Grid Split | 将图像分割为网格布局，支持灵活的行列配置和选择性输出选项 |
 

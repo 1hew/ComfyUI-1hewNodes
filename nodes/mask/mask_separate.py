@@ -132,13 +132,10 @@ class MaskSeparate(io.ComfyNode):
     def _sort_regions(regions: list, sort_mode: str) -> list:
         mode = str(sort_mode).strip().lower()
         if mode == "left_to_right":
-            return sorted(
+            return MaskSeparate._sort_regions_by_grid(
                 regions,
-                key=lambda region: (
-                    float(region.centroid[1]),
-                    float(region.centroid[0]),
-                    -int(region.area),
-                ),
+                primary_axis=1,
+                secondary_axis=0,
             )
         if mode == "area_desc":
             return sorted(
@@ -149,11 +146,90 @@ class MaskSeparate(io.ComfyNode):
                     float(region.centroid[1]),
                 ),
             )
-        return sorted(
+        return MaskSeparate._sort_regions_by_grid(
+            regions,
+            primary_axis=0,
+            secondary_axis=1,
+        )
+
+    @staticmethod
+    def _sort_regions_by_grid(
+        regions: list,
+        *,
+        primary_axis: int,
+        secondary_axis: int,
+    ) -> list:
+        if not regions:
+            return []
+
+        ordered = sorted(
             regions,
             key=lambda region: (
-                float(region.centroid[0]),
-                float(region.centroid[1]),
+                float(region.centroid[primary_axis]),
+                float(region.centroid[secondary_axis]),
                 -int(region.area),
             ),
         )
+        tolerance = MaskSeparate._grid_group_tolerance(ordered, primary_axis)
+
+        groups: list[list] = []
+        group_centers: list[float] = []
+        for region in ordered:
+            center = float(region.centroid[primary_axis])
+            target_index = None
+            best_distance = None
+            for index, group_center in enumerate(group_centers):
+                distance = abs(center - group_center)
+                if distance <= tolerance and (
+                    best_distance is None or distance < best_distance
+                ):
+                    target_index = index
+                    best_distance = distance
+
+            if target_index is None:
+                groups.append([region])
+                group_centers.append(center)
+                continue
+
+            groups[target_index].append(region)
+            group_centers[target_index] = float(
+                np.mean(
+                    [
+                        float(item.centroid[primary_axis])
+                        for item in groups[target_index]
+                    ]
+                )
+            )
+
+        sorted_regions: list = []
+        for group in sorted(
+            groups,
+            key=lambda group_items: float(
+                np.mean([float(item.centroid[primary_axis]) for item in group_items])
+            ),
+        ):
+            sorted_regions.extend(
+                sorted(
+                    group,
+                    key=lambda region: (
+                        float(region.centroid[secondary_axis]),
+                        float(region.centroid[primary_axis]),
+                        -int(region.area),
+                    ),
+                )
+            )
+        return sorted_regions
+
+    @staticmethod
+    def _grid_group_tolerance(regions: list, primary_axis: int) -> float:
+        spans = []
+        for region in regions:
+            min_row, min_col, max_row, max_col = region.bbox
+            if primary_axis == 0:
+                spans.append(max(1, int(max_row) - int(min_row)))
+            else:
+                spans.append(max(1, int(max_col) - int(min_col)))
+
+        if not spans:
+            return 1.0
+        return max(1.0, float(np.median(spans)) * 0.65)

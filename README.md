@@ -21,6 +21,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.17.0**
+- feat(image_crop): Add `Image Pad By BBox Mask` for restoring a local image into a full mask canvas by bbox and filling uncovered areas with a configurable color strategy
+
+**v3.16.0**
+- feat(image_resize): Add `Image Resize GPT Image 2.0`, a GPT Image 2.0 size adapter with Gemini-style auto preset matching, dynamic aspect-preserving tiers, and 1k/2k/4k fixed presets
+
 **v3.15.1**
 - refactor(io): Add `psd` scanning, list-form `filename` / `file_path` outputs, and `filename_suffix` control to `Get File Count`; align `Load Image.filename` and `Load PS.layer_name` to string-list outputs
 - refactor(logic): Add automatic typed output for simple numeric and boolean values in `text_match_value`
@@ -444,6 +450,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Resize Jimeng | Resize for Jimeng-oriented presets with automatic nearest-size matching |
 | Image Resize Gemini30ProImage | Gemini 3.0 Pro preset size adapter with auto tiers and synchronized image/mask transforms |
 | Image Resize Gemini31FlashImage | Gemini 3.1 Flash preset size adapter with extended 0.5k/1k/2k/4k tiers and extreme aspect ratios |
+| Image Resize GPT Image 2.0 | GPT Image 2.0 size adapter with auto preset matching, dynamic aspect-preserving tiers, and 1k/2k/4k fixed presets |
 | Image Resize Square | General square size adapter with 256/512/1024/2048/4096 plus `auto` and `auto (0.5k \| 1k)` |
 
 ### 🌈 Color Nodes
@@ -465,6 +472,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Crop Square | Square cropping with mask guidance and scaling support |
 | Image Crop with BBox Mask | Smart bounding box cropping with precise aspect ratio control and scale strength adjustment |
 | Image Paste by BBox Mask | Paste cropped images back with multiple blend modes |
+| Image Pad By BBox Mask | Restore a local image into the full bbox mask canvas and fill uncovered areas with a configurable color or strategy |
 | Image Edge Crop Pad | Smart edge cropping and padding with multiple padding modes and mask output |
 | Image Grid Split | Split images into grid layouts with flexible row/column configuration and selective output options |
 
