@@ -111,16 +111,25 @@ class ImageMaskBlend(io.ComfyNode):
                     mask_pil = mask_pil.filter(ImageFilter.GaussianBlur(radius=feather))
                 if invert:
                     mask_pil = ImageOps.invert(mask_pil)
-                bg_rgb01 = cls._parse_color_advanced(background_color, img_pil, mask_pil)
-                bg_color = (
-                    int(round(max(0.0, min(1.0, bg_rgb01[0])) * 255.0)),
-                    int(round(max(0.0, min(1.0, bg_rgb01[1])) * 255.0)),
-                    int(round(max(0.0, min(1.0, bg_rgb01[2])) * 255.0)),
-                )
-                background = Image.new('RGB', img_pil.size, bg_color)
                 img_np_f = np.array(img_pil).astype(np.float32) / 255.0
-                bg_np_f = np.array(background).astype(np.float32) / 255.0
                 mask_f = np.array(mask_pil).astype(np.float32) / 255.0
+                bg_spec = cls._parse_color_advanced(background_color, img_pil, mask_pil)
+                if isinstance(bg_spec, str) and bg_spec == "extend":
+                    bg_np_f = cls._make_mask_extend_background(img_np_f, mask_f)
+                else:
+                    if isinstance(bg_spec, str) and bg_spec == "edge":
+                        bg_rgb01 = cls._get_mask_edge_color(img_np_f, mask_f)
+                    else:
+                        bg_rgb01 = bg_spec
+                    bg_color = np.array(
+                        [
+                            max(0.0, min(1.0, float(bg_rgb01[0]))),
+                            max(0.0, min(1.0, float(bg_rgb01[1]))),
+                            max(0.0, min(1.0, float(bg_rgb01[2]))),
+                        ],
+                        dtype=np.float32,
+                    )
+                    bg_np_f = np.broadcast_to(bg_color, img_np_f.shape).copy()
                 mask_f = np.clip(mask_f * float(opacity), 0.0, 1.0)
                 non_mask = 1.0 - mask_f
                 mask_3 = np.expand_dims(mask_f, axis=2)
@@ -170,6 +179,10 @@ class ImageMaskBlend(io.ComfyNode):
         if color_str is None:
             return (1.0, 1.0, 1.0)
         text = str(color_str).strip().lower()
+        if text in ("edge", "e"):
+            return "edge"
+        if text in ("extend", "ex"):
+            return "extend"
         if text in ("a", "average", "avg") and img_pil is not None:
             img_np = (
                 np.array(img_pil.convert("RGB")).astype(np.float32) / 255.0
@@ -256,6 +269,32 @@ class ImageMaskBlend(io.ComfyNode):
             return (rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0)
         except Exception:
             return (1.0, 1.0, 1.0)
+
+    @staticmethod
+    def _get_mask_edge_color(img_np_f, mask_f):
+        """获取遮罩内侧边缘的平均颜色，用于生成协调的纯色背景。"""
+        binary_mask = mask_f > 0.5
+        if not np.any(binary_mask):
+            return tuple(float(x) for x in img_np_f.mean(axis=(0, 1)))
+        structure = ndimage.generate_binary_structure(2, 2)
+        eroded = ndimage.binary_erosion(binary_mask, structure=structure, border_value=0)
+        edge = binary_mask & ~eroded
+        if not np.any(edge):
+            edge = binary_mask
+        avg = img_np_f[edge].mean(axis=0)
+        return (float(avg[0]), float(avg[1]), float(avg[2]))
+
+    @staticmethod
+    def _make_mask_extend_background(img_np_f, mask_f):
+        """将遮罩内侧颜色按最近邻扩展到背景区域。"""
+        binary_mask = mask_f > 0.5
+        if not np.any(binary_mask) or np.all(binary_mask):
+            return img_np_f.copy()
+        _, indices = ndimage.distance_transform_edt(
+            ~binary_mask,
+            return_indices=True,
+        )
+        return img_np_f[indices[0], indices[1]].astype(np.float32)
     
     @staticmethod
     def _get_average_color(img_pil, mask_pil):

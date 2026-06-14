@@ -21,6 +21,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.18.0**
+- feat(logic): 添加 `Int Number Compare` 与 `Float Number Compare`，支持两个数值按比较符输出布尔结果
+
+**v3.17.1**
+- feat(image_blend): `Image Mask Blend` 的 `background_color` 支持 `edge`/`e` 边缘平均色与 `extend`/`ex` 边缘扩展填充
+
 **v3.17.0**
 - feat(image_crop): 添加 `Image Pad By BBox Mask`，支持按 bbox 遮罩将局部图像补回整张遮罩画布并使用可配置颜色填充空白区域
 
@@ -460,7 +466,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎨 图像混合节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Image Mask Blend | 基于亮度的图像蒙版合成，支持羽化、透明度输出和多种颜色格式 |
+| Image Mask Blend | 基于亮度的图像蒙版合成，支持羽化、透明度输出和边缘扩展等多种背景策略 |
 | Image Blend Mode by Alpha | 基于透明度的图像混合，支持多种Photoshop风格混合模式 |
 | Image Blend Mode by CSS | CSS标准混合模式，基于Pilgram库实现 |
 
@@ -537,6 +543,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Any Empty Int | 通用空值检查节点（整数输出版本），检查任意类型输入是否为空，返回自定义的整数值 |
 | Any Switch Bool | 通用布尔切换节点，支持任意类型输入和惰性求值，根据布尔值条件选择输出 |
 | Any Switch Select | 多路选择节点，支持多个输入选项的惰性切换，将选中的 `input_k` 路由到 `output`，并返回实际生效的 `select` 值 |
+| Float Number Compare | 浮点数值比较节点，支持通过比较符判断两个 FLOAT 并输出布尔值 |
+| Int Number Compare | 整数数值比较节点，支持通过比较符判断两个 INT 并输出布尔值 |
 | Multi Switch Select | 多输出选择节点，使用 1-based 的 `select` 在 `input_1..input_N` 中选中一路，并输出到对应的 `output_k` |
 | text_match_rownum | 多行文本行号匹配，返回首个匹配项的行号（1-based），未命中返回 0 |
 | text_match_value | 在多行键值对中匹配单行文本并返回对应值，支持简单数字与布尔文本自动转类型 |
@@ -576,7 +584,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | String Ratio Gpt20Image | 从输入图像推断最接近的 GPT 2.0 图像模型支持比例；未连接图像时透传所选比例 |
 | String Ratio Gemini31FlashImage | 从输入图像推断最接近的 Gemini 3.1 Flash 支持比例；未连接图像时透传所选比例 |
 | String Resolution | 从输入图像推断最接近的分辨率档位（`0.5k` / `1k` / `2k` / `4k`）；未连接图像时透传所选标签 |
-| String Filter | 文本过滤器，支持 `{input}` 替换、注释过滤（# 与三引号）、可选空行移除 |
+| String Filter | 文本过滤器，支持用 `input` 值替换 `{input}` / `{n}`、注释过滤（# 与三引号）、可选空行移除 |
 | String Join Multi | 多段文本拼接，支持 `{input}` 占位符、注释/空行过滤与复合分隔符 |
 | List Custom Int | 使用灵活的多行数值/区间/步长文本构建整数列表，支持倒序与中英文符号混合输入 |
 | List Custom Float | 使用灵活的多行数值/区间/步长文本构建浮点列表，支持倒序与中英文符号混合输入 |

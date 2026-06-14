@@ -13,7 +13,7 @@
 | `feather` | - | INT | 0 | 0–50 | 对遮罩进行高斯羽化，平滑边缘 |
 | `opacity` | - | FLOAT | 1.0 | 0.0–1.0 | 缩放遮罩强度；0 禁用，1 保持原强度 |
 | `expansion` | - | INT | 0 | -100–100 | 正值膨胀、负值腐蚀（像素） |
-| `background_color` | - | STRING | 1.0 | 灰度/HEX/RGB/颜色名/`edge`/`average`/`mk`/`mask` | 非遮罩区域的底色来源 |
+| `background_color` | - | STRING | 1.0 | 灰度/HEX/RGB/颜色名/`edge`/`e`/`extend`/`ex`/`average`/`mk`/`mask` | 非遮罩区域的底色来源 |
 | `background_opacity` | - | FLOAT | 1.0 | 0.0–1.0 | 非遮罩区域中底色与原图的混合强度 |
 | `output_mask_invert` | - | BOOLEAN | false | - | 仅在输出端反转遮罩（不影响融合） |
 
@@ -29,14 +29,14 @@
 - 稳健批量：图像与遮罩数量不同时按最大批次循环对齐；必要时以 Lanczos 匹配尺寸。
 - 形态操作：支持填孔、膨胀（`expansion>0`）、腐蚀（`expansion<0`）与高斯羽化，提升选区质量。
 - 反转与强度：在形态与羽化后执行反转；通过 `opacity` 对选择强度进行统一缩放。
-- 背景策略：可从灰度/HEX/RGB、常用颜色名、整图 `average`、图像 `edge` 边缘色或遮罩区域平均色（`mk`/`mask`）解析底色。
+- 背景策略：可从灰度/HEX/RGB、常用颜色名、整图 `average`、遮罩区域平均色（`mk`/`mask`）、遮罩内侧边缘平均色（`edge`/`e`）或遮罩边缘扩展色（`extend`/`ex`）解析底色。
 - 复合公式：`mixed_bg = (1-background_opacity)*image + background_opacity*background`，确保非遮罩区域的可控融合。
 
 ## 典型用法
 
 - 清洁选区：开启 `fill_hole`，配合 `expansion` 与 `feather` 获得平滑边缘与完整形状。
 - 柔和过渡：适度 `feather` 与 `opacity<1` 形成自然的边缘衔接。
-- 色彩协调：`background_color=average` 或 `mk` 以本图或选区平均色作为底色，提升和谐度。
+- 色彩协调：`background_color=average` 或 `mk` 以本图或选区平均色作为底色；`edge`/`e` 使用选区边缘平均色，`extend`/`ex` 会将选区边缘颜色向背景区域延展。
 - 输出控制：下游需要反向遮罩时启用 `output_mask_invert`。
 
 ## 注意与建议

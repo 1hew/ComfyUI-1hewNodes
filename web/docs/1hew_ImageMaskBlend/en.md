@@ -13,7 +13,7 @@
 | `feather` | - | INT | 0 | 0–50 | Gaussian blur radius applied to the mask. |
 | `opacity` | - | FLOAT | 1.0 | 0.0–1.0 | Scales mask strength; 0 disables, 1 preserves full mask. |
 | `expansion` | - | INT | 0 | -100–100 | Positive dilates, negative erodes the mask (pixels). |
-| `background_color` | - | STRING | 1.0 | grayscale/HEX/RGB/name/`edge`/`average`/`mk`/`mask` | Background color source for non-mask areas. |
+| `background_color` | - | STRING | 1.0 | grayscale/HEX/RGB/name/`edge`/`e`/`extend`/`ex`/`average`/`mk`/`mask` | Background color source for non-mask areas. |
 | `background_opacity` | - | FLOAT | 1.0 | 0.0–1.0 | Mix strength between original image and background in non-mask areas. |
 | `output_mask_invert` | - | BOOLEAN | false | - | Invert only the output `mask` (does not affect blending). |
 
@@ -29,14 +29,14 @@
 - Robust batching: different image/mask counts are aligned by cycling the smaller batch; sizes are matched via Lanczos resizing.
 - Morphology: optional hole filling, dilation (`expansion>0`), erosion (`expansion<0`), and Gaussian feathering for soft edges.
 - Inversion and opacity: invert after morphology/feather; scale with `opacity` for graded selection.
-- Background strategies: parse color from grayscale/HEX/RGB, named colors, global `average`, image `edge` color, or average within the `mask` region (`mk`/`mask`).
+- Background strategies: parse color from grayscale/HEX/RGB, named colors, global `average`, average within the `mask` region (`mk`/`mask`), mask inner-edge average color (`edge`/`e`), or mask-edge color extension (`extend`/`ex`).
 - Deterministic compositing: `mixed_bg = (1-background_opacity)*image + background_opacity*background`.
 
 ## Typical Usage
 
 - Clean selections: enable `fill_hole`, then set `expansion` and `feather` to refine edges.
 - Soft composites: use moderate `feather` and `opacity<1` for smooth transitions.
-- Color-matched background: set `background_color=average` or `mk` to harmonize non-selected areas.
+- Color-matched background: set `background_color=average` or `mk` for global or selected-region averages; use `edge`/`e` for the selection edge average, or `extend`/`ex` to extend selection-edge colors into the background.
 - Output control: toggle `output_mask_invert` when a complementary mask is required downstream.
 
 ## Notes & Tips

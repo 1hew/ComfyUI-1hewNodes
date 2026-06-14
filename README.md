@@ -21,6 +21,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.18.0**
+- feat(logic): Add `Int Number Compare` and `Float Number Compare` for boolean results from two numeric inputs and a selected comparison operator
+
+**v3.17.1**
+- feat(image_blend): Add `edge`/`e` edge-average color and `extend`/`ex` edge-extension filling to `Image Mask Blend.background_color`
+
 **v3.17.0**
 - feat(image_crop): Add `Image Pad By BBox Mask` for restoring a local image into a full mask canvas by bbox and filling uncovered areas with a configurable color strategy
 
@@ -461,7 +467,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎨 Image Blending Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Image Mask Blend | Luminance-based image mask compositing with feathering, alpha output, and multiple color format support |
+| Image Mask Blend | Luminance-based image mask compositing with feathering, alpha output, and edge-extension background strategies |
 | Image Blend Mode by Alpha | Alpha-based image blending with multiple Photoshop-style blend modes |
 | Image Blend Mode by CSS | CSS standard blend modes based on Pilgram library |
 
@@ -538,6 +544,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Any Empty Int | Universal empty value checker (integer output version) that checks if any type of input is empty and returns custom integer values |
 | Any Switch Bool | Universal boolean switch node supporting any type input with lazy evaluation, selecting output based on boolean condition |
 | Any Switch Select | Multi-way selector node supporting multiple input options, lazily routing the chosen `input_k` to `output` and returning the effective `select` value |
+| Float Number Compare | Float comparison node that evaluates two FLOAT values with a selected operator and outputs a boolean |
+| Int Number Compare | Integer comparison node that evaluates two INT values with a selected operator and outputs a boolean |
 | Multi Switch Select | Multi-output selector for `input_1..input_N`; uses 1-based `select` to route the chosen input to its matching `output_k` |
 | text_match_rownum | Match a single text against multi-line text and return first matched row number (1-based), or 0 when not found |
 | text_match_value | Match single-line text against multi-line key-value pairs and return corresponding value with simple numeric/boolean auto-typing |
@@ -577,7 +585,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | String Ratio Gpt20Image | Infer the nearest GPT 2.0 image supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
 | String Ratio Gemini31FlashImage | Infer the nearest Gemini 3.1 Flash supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
 | String Resolution | Infer the nearest resolution tier (`0.5k` / `1k` / `2k` / `4k`) from input images, or pass through the selected label when no image is connected |
-| String Filter | Text cleaner supporting `{input}` substitution, comment filtering (# and triple quotes), and optional empty-line removal |
+| String Filter | Text cleaner supporting `{input}` / `{n}` substitution from the `input` value, comment filtering (# and triple quotes), and optional empty-line removal |
 | String Join Multi | Join up to 5 text blocks with `{input}` substitution, comment/empty-line filtering, and composite separators|
 | List Custom Int | Build integer lists from flexible multiline value/range/stride text with reverse-order and mixed punctuation support |
 | List Custom Float | Build float lists from flexible multiline value/range/stride text with reverse-order and mixed punctuation support |

@@ -9,7 +9,7 @@
 | `text` | - | STRING | `""` | - | Input text, multiline supported; literal `\n` is converted to newline. |
 | `filter_empty_line` | - | BOOLEAN | `false` | - | Remove empty lines. |
 | `filter_comment` | - | BOOLEAN | `false` | - | Filter comments (`#` and triple-quote blocks). |
-| `input` | - | STRING | `""` | - | Value to replace `{input}` placeholders. |
+| `input` | - | STRING | `""` | - | Value to replace `{input}` and `{n}` placeholders. |
 
 ## Outputs
 
@@ -19,7 +19,7 @@
 
 ## Features
 
-- Placeholder substitution: replaces `{input}` before processing.
+- Placeholder substitution: replaces both `{input}` and `{n}` with the `input` value before processing.
 - Comment filtering:
   - Single-line: `#` and trailing content are removed.
   - Multi-line: supports `""" ... """` and `''' ... '''` blocks; remains active until closed.
@@ -29,7 +29,7 @@
 ## Typical Usage
 
 - Clean text before joining; use with `String Join Multi` or `Text List to String`.
-- Inject external values using `{input}` in template text for unified substitution.
+- Inject external values using `{input}` or `{n}` in template text for unified substitution.
 
 ## Notes & Tips
 

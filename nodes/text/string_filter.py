@@ -28,6 +28,7 @@ class StringFilter(io.ComfyNode):
         text = (text or "").replace("\\n", "\n")
         in_val = "" if input is None else str(input)
         text = text.replace("{input}", in_val)
+        text = text.replace("{n}", in_val)
         filtered_text = cls._parse_text_and_filter_comments(
             text, filter_comment, filter_empty_line
         )
