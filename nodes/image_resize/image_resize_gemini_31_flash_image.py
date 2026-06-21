@@ -27,7 +27,7 @@ class ImageResizeGemini31FlashImage(ImageResizeGemini30ProImage):
         ("[1k] 848x1264 (2:3)", 848, 1264),
         ("[1k] 1264x848 (3:2)", 1264, 848),
         ("[1k] 896x1200 (3:4)", 896, 1200),
-        ("[1k] 2048x512 (4:1)", 2048, 512),
+        ("[1k] 2064x512 (4:1)", 2064, 512),
         ("[1k] 1200x896 (4:3)", 1200, 896),
         ("[1k] 928x1152 (4:5)", 928, 1152),
         ("[1k] 1152x928 (5:4)", 1152, 928),
@@ -76,7 +76,6 @@ class ImageResizeGemini31FlashImage(ImageResizeGemini30ProImage):
         "auto (2k | 4k)",
     ] + [name for name, _, _ in PRESET_RESOLUTIONS]
     PRESET_ALIASES = {
-        "[1k] 512x2048 (1:4)": "[1k] 512x2064 (1:4)",
         "[1k] 384x3072 (1:8)": "[1k] 352x2928 (1:8)",
         "[2k] 1024x4096 (1:4)": "[2k] 1024x4128 (1:4)",
         "[2k] 768x6144 (1:8)": "[2k] 704x5856 (1:8)",

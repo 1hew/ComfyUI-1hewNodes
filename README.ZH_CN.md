@@ -21,6 +21,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.19.0**
+- feat(conversion): 添加 `Image to Mask` 节点，支持可选图像按亮度转遮罩，未连接时输出 64x64 全黑遮罩
+- refactor(conversion): 将 `Mask to Image` 从遮罩操作分组移动到转换分组
+
+**v3.18.1**
+- fix(image_resize): 修正 `Image Resize Gemini31FlashImage` 的 `[1k] 4:1` 预设为 `2064x512`
+
 **v3.18.0**
 - feat(logic): 添加 `Int Number Compare` 与 `Float Number Compare`，支持两个数值按比较符输出布尔结果
 
@@ -71,7 +78,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(image_resize): 添加 `Image Resize Square` 节点，提供 256/512/1024/2048/4096 方形预设，并支持 `auto` 与 `auto (0.5k | 1k)` 自动匹配
 
 **v3.6.0**
-- feat(mask): 添加 `Mask To Image` 节点，支持黑白区域颜色映射、`fill_hole` 与可选 RGBA 输出
+- feat(mask): 添加 `Mask to Image` 节点，支持黑白区域颜色映射、`fill_hole` 与可选 RGBA 输出
 
 **v3.5.2**
 - refactor(io): 调整 `Save Txt` 节点命名设置与文件名生成逻辑
@@ -497,7 +504,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎭 遮罩操作节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Mask To Image | 将 mask 映射为 RGB/RGBA 图像，支持孔洞填充、黑白区域颜色映射和透明输出 |
 | Mask Math Ops | 遮罩数学运算（并集、交集、差集、异或） |
 | Mask Separate | 将遮罩分离为独立的连通区域，支持排序和面积过滤 |
 | Mask To BBox Mask | 将遮罩前景转换为最小外接矩形遮罩，支持合并/分离输出和 `divisible_by` 向外对齐 |
@@ -526,8 +532,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | URL to Video | 将视频URL转换为ComfyUI VIDEO对象，改进错误处理、超时控制，支持同步和异步下载方法 |
 | Image to URL | 将图像转换为 URL 字符串，支持 `auto`、`kefan`、`data` 三种模式 |
+| Image to Mask | 将可选图像按亮度转换为遮罩，未连接时输出 64x64 全黑遮罩 |
 | Image Batch to List | 将批量图像转换为图像列表，用于单独处理 |
 | Image List to Batch | 将图像列表转换为批量图像，自动进行尺寸标准化 |
+| Mask to Image | 将 mask 映射为 RGB/RGBA 图像，支持孔洞填充、黑白区域颜色映射和透明输出 |
 | Mask Batch to List | 将批量遮罩转换为遮罩列表，用于单独处理 |
 | Mask List to Batch | 将遮罩列表转换为批量遮罩，自动进行尺寸标准化 |
 | Mask to SAM3 Box | 将遮罩转换为 SAM3 框提示（归一化 cx,cy,bw,bh），支持正/负与合并/分离模式 |

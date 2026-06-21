@@ -21,6 +21,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.19.0**
+- feat(conversion): Add `Image to Mask` for optional image luminance-to-mask conversion with a 64x64 black fallback
+- refactor(conversion): Move `Mask to Image` from mask operations into the conversion group
+
+**v3.18.1**
+- fix(image_resize): Correct `Image Resize Gemini31FlashImage` `[1k] 4:1` preset to `2064x512`
+
 **v3.18.0**
 - feat(logic): Add `Int Number Compare` and `Float Number Compare` for boolean results from two numeric inputs and a selected comparison operator
 
@@ -71,7 +78,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(image_resize): Add `Image Resize Square` with square presets for 256/512/1024/2048/4096, plus `auto` and `auto (0.5k | 1k)` matching
 
 **v3.6.0**
-- feat(mask): Add `Mask To Image` with configurable black/white area colors, `fill_hole`, and optional RGBA output
+- feat(mask): Add `Mask to Image` with configurable black/white area colors, `fill_hole`, and optional RGBA output
 
 **v3.5.2**
 - refactor(io): Adjust `Save Txt` naming settings and filename generation logic
@@ -498,7 +505,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎭 Mask Operation Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Mask To Image | Convert a mask into RGB/RGBA image output with hole filling, configurable black/white color mapping, and optional transparent background |
 | Mask Math Ops | Mathematical operations for masks (union, intersection, difference, XOR) |
 | Mask Separate | Separate mask into individual connected regions with sorting and area filtering |
 | Mask To BBox Mask | Convert mask foregrounds into minimum bounding rectangle masks, with merged/separate output and outward `divisible_by` alignment |
@@ -527,8 +533,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | URL to Video | Convert video URLs to ComfyUI VIDEO objects with improved error handling, timeout control, and support for both synchronous and asynchronous download methods |
 | Image to URL | Convert image tensors into URL strings with `auto`, `kefan`, and `data` modes |
+| Image to Mask | Convert an optional image into a luminance mask, falling back to a 64x64 black mask when empty |
 | Image Batch to List | Convert batch images to image lists for individual processing |
 | Image List to Batch | Convert image lists to batch images with automatic size normalization |
+| Mask to Image | Convert a mask into RGB/RGBA image output with hole filling, configurable black/white color mapping, and optional transparent background |
 | Mask Batch to List | Convert batch masks to mask lists for individual processing |
 | Mask List to Batch | Convert mask lists to batch masks with automatic size normalization |
 | Mask to SAM3 Box | Convert masks to SAM3 box prompts (normalized cx, cy, bw, bh), supporting positive/negative and merge/separate modes |

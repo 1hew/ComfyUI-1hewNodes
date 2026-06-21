@@ -1,6 +1,6 @@
-# Mask To Image - 将遮罩映射为 RGB / RGBA 图像
+# Mask to Image - 将遮罩映射为 RGB / RGBA 图像
 
-**节点功能：** `Mask To Image` 将输入的 `MASK` 直接映射为图像输出。可分别设置 mask 白色区域和黑色区域对应的颜色，并支持输出带 alpha 的 RGBA 图像。
+**节点功能：** `Mask to Image` 将输入的 `MASK` 直接映射为图像输出。可分别设置 mask 白色区域和黑色区域对应的颜色，并支持输出带 alpha 的 RGBA 图像。
 
 ## 输入
 

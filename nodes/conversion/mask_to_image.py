@@ -15,8 +15,8 @@ class MaskToImage(io.ComfyNode):
     def define_schema(cls) -> io.Schema:
         return io.Schema(
             node_id="1hew_MaskToImage",
-            display_name="Mask To Image",
-            category="1hewNodes/mask",
+            display_name="Mask to Image",
+            category="1hewNodes/conversion",
             inputs=[
                 io.Mask.Input("mask"),
                 io.Boolean.Input(

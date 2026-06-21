@@ -1,6 +1,6 @@
-# Mask To Image - Convert Mask to RGB / RGBA Image
+# Mask to Image - Convert Mask to RGB / RGBA Image
 
-**Node Purpose:** `Mask To Image` converts an input `MASK` directly into an image output. You can choose the colors mapped from white and black mask regions, and optionally output RGBA with transparency.
+**Node Purpose:** `Mask to Image` converts an input `MASK` directly into an image output. You can choose the colors mapped from white and black mask regions, and optionally output RGBA with transparency.
 
 ## Inputs
 
