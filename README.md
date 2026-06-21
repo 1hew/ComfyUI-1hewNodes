@@ -21,7 +21,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
-**v3.19.0**
+**v3.19.1**
 - feat(conversion): Add `Image to Mask` for optional image luminance-to-mask conversion with a 64x64 black fallback
 - refactor(conversion): Move `Mask to Image` from mask operations into the conversion group
 

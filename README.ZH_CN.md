@@ -21,7 +21,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
-**v3.19.0**
+**v3.19.1**
 - feat(conversion): 添加 `Image to Mask` 节点，支持可选图像按亮度转遮罩，未连接时输出 64x64 全黑遮罩
 - refactor(conversion): 将 `Mask to Image` 从遮罩操作分组移动到转换分组
 
