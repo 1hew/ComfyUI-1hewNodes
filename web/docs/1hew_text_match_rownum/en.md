@@ -1,6 +1,6 @@
-# text_match_rownum - Multi-line Text Row Matching
+# Text Match Rownum - Multi-line Text Row Matching
 
-**Node Purpose:** `text_match_rownum` searches a target string within multi-line text and returns the first matched row number (1-based). It returns `0` when no match is found.
+**Node Purpose:** `Text Match Rownum` searches a target string within multi-line text and returns the first matched row number (1-based). It returns `0` when no match is found.
 
 ## Inputs
 

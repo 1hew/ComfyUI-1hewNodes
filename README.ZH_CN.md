@@ -21,6 +21,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.21.0**
+- feat(logic): 添加 `Text Compare` 节点，支持字符串相等、包含、前后缀与正则布尔比较
+- feat(text): 扩展 `String Ratio Gpt20Image` 与 `String Ratio Gemini31FlashImage` 的支持比例集合，使其与最新选择器预设一致
+- refactor(image_resize): 对齐 `Image Resize Gemini30ProImage` 与 `Image Resize Gemini31FlashImage` 的预设比例族与排序
+
 **v3.20.0**
 - feat(image): 添加精简版 `Image BW Matte`，固定使用 `auto + soft` 生成遮罩，仅保留 `gamma`、向内收边与羽化参数
 - feat(mask): 添加 `Mask Stroke` 节点，支持按百分比宽度生成遮罩外廓描边
@@ -450,7 +455,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Alpha Split | 提取 alpha 作为 `mask`，同时将 RGBA 或带 alpha 的图像铺到可配置底色上 |
 | Image Rotate with Mask | 高级图像旋转，支持遮罩集成、多种填充模式和遮罩中心旋转选项 |
 | Image Edit Stitch | 图像拼接与缝合，支持多种拼接模式 |
-| ImageMainStitch | 主画面拼接，支持动态 `image_2..image_N` 与方向/尺寸匹配/间距/填充 |
+| Image Main Stitch | 主画面拼接，支持动态 `image_2..image_N` 与方向/尺寸匹配/间距/填充 |
 | Image Add Label | 为图像添加文本标签，并在 RGBA 输入时自动保留 alpha |
 | Image Plot | 图像绘制和可视化工具，输入含 alpha 时自动保留 RGBA |
 | Image Stroke by Mask | 对遮罩区域应用描边效果，支持自定义宽度和颜色 |
@@ -487,10 +492,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Image Mask Crop | 基于遮罩的批量裁剪，支持 RGB/RGBA 通道保持与可选遮罩 alpha 输出 |
 | Image Crop Square | 方形裁剪，支持遮罩引导和缩放 |
-| Image Crop with BBox Mask| 智能边界框裁剪，支持精确比例控制和缩放强度调节 |
-| Image Paste by BBox Mask | 裁剪图像回贴，支持多种混合模式 |
+| Image Crop With BBox Mask | 智能边界框裁剪，支持精确比例控制和缩放强度调节 |
+| Image Paste By BBox Mask | 裁剪图像回贴，支持多种混合模式 |
 | Image Pad By BBox Mask | 按 bbox 遮罩将局部图像补回整张画布，并用指定颜色或策略填充空白区域 |
-| Image Edge Crop Pad | 智能边缘裁剪和填充，支持多种填充模式和遮罩输出 |
+| Image Edge Crop/Pad | 智能边缘裁剪和填充，支持多种填充模式和遮罩输出 |
 | Image Grid Split | 将图像分割为网格布局，支持灵活的行列配置和选择性输出选项 |
 
 ### 🧩 图像分块节点
@@ -502,14 +507,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🌊 高低频分离节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Image HLFreq Separate | 高级频率分离节点，支持RGB、HSV、IGBI三种分离方法，提供精确的高低频图像分离和自动重组功能 |
-| Image HLFreq Combine | 高级频率重组节点，支持RGB、HSV、IGBI三种重组模式，提供强度调整和批处理智能匹配 |
-| Image HLFreq Transform | 高级细节迁移节点，支持IGBI、RGB、HSV三种迁移方法，实现从细节图像向生成图像的精确纹理细节迁移 |
+| Image HL Freq Separate | 高级频率分离节点，支持RGB、HSV、IGBI三种分离方法，提供精确的高低频图像分离和自动重组功能 |
+| Image HL Freq Combine | 高级频率重组节点，支持RGB、HSV、IGBI三种重组模式，提供强度调整和批处理智能匹配 |
+| Image HL Freq Transform | 高级细节迁移节点，支持IGBI、RGB、HSV三种迁移方法，实现从细节图像向生成图像的精确纹理细节迁移 |
 
 ### 🎭 遮罩操作节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Mask Math Ops | 遮罩数学运算（并集、交集、差集、异或） |
 | Mask Separate | 将遮罩分离为独立的连通区域，支持排序和面积过滤 |
 | Mask To BBox Mask | 将遮罩前景转换为最小外接矩形遮罩，支持合并/分离输出和 `divisible_by` 向外对齐 |
 | Mask Fill Hole | 填充遮罩中的封闭区域孔洞，支持批量处理 |
@@ -532,6 +536,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Workflow Name | 自动获取当前工作流文件名，支持路径控制、自定义前缀后缀和日期格式化 |
 | Range Mapping | 数值范围映射工具，支持滑块值的线性变换和精度控制 |
+| Memory Cleanup | 请求 ComfyUI 在当前任务结束后释放执行缓存，并可选卸载已加载模型 |
 
 ### 🔄 转换节点
 | 节点名称 | 功能描述 |
@@ -560,8 +565,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Float Number Compare | 浮点数值比较节点，支持通过比较符判断两个 FLOAT 并输出布尔值 |
 | Int Number Compare | 整数数值比较节点，支持通过比较符判断两个 INT 并输出布尔值 |
 | Multi Switch Select | 多输出选择节点，使用 1-based 的 `select` 在 `input_1..input_N` 中选中一路，并输出到对应的 `output_k` |
-| text_match_rownum | 多行文本行号匹配，返回首个匹配项的行号（1-based），未命中返回 0 |
-| text_match_value | 在多行键值对中匹配单行文本并返回对应值，支持简单数字与布尔文本自动转类型 |
+| Text Compare | 比较两个字符串，支持相等、包含、前后缀和正则等运算符，并输出布尔值 |
+| Text Match Rownum | 多行文本行号匹配，返回首个匹配项的行号（1-based），未命中返回 0 |
+| Text Match Value | 在多行键值对中匹配单行文本并返回对应值，支持简单数字与布尔文本自动转类型 |
 
 ### 🔢 整数节点
 | 节点名称 | 功能描述 |

@@ -21,6 +21,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.21.0**
+- feat(logic): Add `Text Compare` for string equality, containment, prefix/suffix, and regex boolean matching
+- feat(text): Expand `String Ratio Gpt20Image` and `String Ratio Gemini31FlashImage` supported ratio sets to match the latest selector presets
+- refactor(image_resize): Align `Image Resize Gemini30ProImage` and `Image Resize Gemini31FlashImage` preset families with the updated ratio ordering
+
 **v3.20.0**
 - feat(image): Add a simplified `Image BW Matte` that fixes the pipeline to `auto + soft` and keeps only `gamma`, inward edge shrink, and blur controls
 - feat(mask): Add `Mask Stroke` for outer stroke mask with percentage width and union output
@@ -450,7 +455,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Alpha Split | Extract alpha as `mask` while flattening RGBA or alpha images onto a configurable solid background |
 | Image Rotate with Mask | Advanced image rotation with mask integration, multiple fill modes, and mask center rotation options |
 | Image Edit Stitch | Image stitching and merging with multiple stitching modes |
-| ImageMainStitch | Main-image stitcher supporting dynamic `image_2..image_N`, direction, size matching, spacing, and padding |
+| Image Main Stitch | Main-image stitcher supporting dynamic `image_2..image_N`, direction, size matching, spacing, and padding |
 | Image Add Label | Add text labels to images with automatic alpha preservation for RGBA inputs |
 | Image Plot | Image plotting and visualization tools with automatic RGBA preservation for alpha inputs |
 | Image Stroke by Mask | Apply stroke effects to mask regions with customizable width and color |
@@ -487,10 +492,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Image Mask Crop | Batch mask-based cropping with RGB/RGBA channel preservation and optional mask alpha output |
 | Image Crop Square | Square cropping with mask guidance and scaling support |
-| Image Crop with BBox Mask | Smart bounding box cropping with precise aspect ratio control and scale strength adjustment |
-| Image Paste by BBox Mask | Paste cropped images back with multiple blend modes |
+| Image Crop With BBox Mask | Smart bounding box cropping with precise aspect ratio control and scale strength adjustment |
+| Image Paste By BBox Mask | Paste cropped images back with multiple blend modes |
 | Image Pad By BBox Mask | Restore a local image into the full bbox mask canvas and fill uncovered areas with a configurable color or strategy |
-| Image Edge Crop Pad | Smart edge cropping and padding with multiple padding modes and mask output |
+| Image Edge Crop/Pad | Smart edge cropping and padding with multiple padding modes and mask output |
 | Image Grid Split | Split images into grid layouts with flexible row/column configuration and selective output options |
 
 ### 🧩 Image Tiling Nodes
@@ -502,14 +507,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🌊 High-Low Frequency Separation Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Image HLFreq Separate | Advanced frequency separation node supporting RGB, HSV, and IGBI separation methods with precise high-low frequency image separation and automatic recombination |
-| Image HLFreq Combine | Advanced frequency recombination node supporting RGB, HSV, and IGBI recombination modes with intensity adjustment and intelligent batch matching |
-| Image HLFreq Transform | Advanced detail transfer node supporting IGBI, RGB, and HSV transfer methods for precise texture detail migration from detail images to generated images |
+| Image HL Freq Separate | Advanced frequency separation node supporting RGB, HSV, and IGBI separation methods with precise high-low frequency image separation and automatic recombination |
+| Image HL Freq Combine | Advanced frequency recombination node supporting RGB, HSV, and IGBI recombination modes with intensity adjustment and intelligent batch matching |
+| Image HL Freq Transform | Advanced detail transfer node supporting IGBI, RGB, and HSV transfer methods for precise texture detail migration from detail images to generated images |
 
 ### 🎭 Mask Operation Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Mask Math Ops | Mathematical operations for masks (union, intersection, difference, XOR) |
 | Mask Separate | Separate mask into individual connected regions with sorting and area filtering |
 | Mask To BBox Mask | Convert mask foregrounds into minimum bounding rectangle masks, with merged/separate output and outward `divisible_by` alignment |
 | Mask Fill Hole | Fill holes in enclosed areas of masks with batch processing support |
@@ -532,6 +536,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Workflow Name | Automatically retrieves current workflow filename with path control, custom prefixes/suffixes, and date formatting |
 | Range Mapping | Value range mapping tool supporting linear transformation and precision control for slider values |
+| Memory Cleanup | Requests ComfyUI to release execution cache and optionally unload models after the current task completes |
 
 ### 🔄 Conversion Nodes
 | Node Name | Description |
@@ -560,8 +565,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Float Number Compare | Float comparison node that evaluates two FLOAT values with a selected operator and outputs a boolean |
 | Int Number Compare | Integer comparison node that evaluates two INT values with a selected operator and outputs a boolean |
 | Multi Switch Select | Multi-output selector for `input_1..input_N`; uses 1-based `select` to route the chosen input to its matching `output_k` |
-| text_match_rownum | Match a single text against multi-line text and return first matched row number (1-based), or 0 when not found |
-| text_match_value | Match single-line text against multi-line key-value pairs and return corresponding value with simple numeric/boolean auto-typing |
+| Text Compare | Compares two strings with equality, containment, prefix/suffix, or regex operators and outputs a boolean |
+| Text Match Rownum | Match a single text against multi-line text and return first matched row number (1-based), or 0 when not found |
+| Text Match Value | Match single-line text against multi-line key-value pairs and return corresponding value with simple numeric/boolean auto-typing |
 
 ### 🔢 Integer Nodes
 | Node Name | Description |
