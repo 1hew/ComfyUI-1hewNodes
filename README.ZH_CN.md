@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**Unreleased**
+- feat(image): 添加精简版 `Image BW Matte`，固定使用 `auto + soft` 生成遮罩，仅保留 `gamma`、向内收边与羽化参数
+
 **v3.19.1**
 - feat(conversion): 添加 `Image to Mask` 节点，支持可选图像按亮度转遮罩，未连接时输出 64x64 全黑遮罩
 - refactor(conversion): 将 `Mask to Image` 从遮罩操作分组移动到转换分组
@@ -452,6 +455,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Stroke by Mask | 对遮罩区域应用描边效果，支持自定义宽度和颜色 |
 | Image BBox Overlay by Mask | 基于遮罩的图像边界框叠加，支持独立和合并模式 |
 | Image Alpha Clean | 清理图像 alpha 透明边缘噪点，支持强度预设与仅检测模式 |
+| Image BW Matte | 从图像生成适合抠图的 `mask`，固定使用 `auto + soft` 流程，并提供 `gamma`、向内收边与羽化参数 |
 
 ### 📐 图像尺寸节点
 | 节点名称 | 功能描述 |
@@ -508,6 +512,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Mask Separate | 将遮罩分离为独立的连通区域，支持排序和面积过滤 |
 | Mask To BBox Mask | 将遮罩前景转换为最小外接矩形遮罩，支持合并/分离输出和 `divisible_by` 向外对齐 |
 | Mask Fill Hole | 填充遮罩中的封闭区域孔洞，支持批量处理 |
+| Mask Stroke | 对遮罩生成可选补洞的外描边，支持百分比宽度和并集输出 |
 | Mask Crop by BBox Mask | 基于蒙版区域的遮罩边界框裁剪 |
 | Mask Paste by BBox Mask | 简化遮罩粘贴，支持自动基础遮罩创建和边界框检测 |
 | Mask Repeat | 批量重复遮罩，支持反转功能 |

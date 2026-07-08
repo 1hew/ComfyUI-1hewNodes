@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**Unreleased**
+- feat(image): Add a simplified `Image BW Matte` that fixes the pipeline to `auto + soft` and keeps only `gamma`, inward edge shrink, and blur controls
+
 **v3.19.1**
 - feat(conversion): Add `Image to Mask` for optional image luminance-to-mask conversion with a 64x64 black fallback
 - refactor(conversion): Move `Mask to Image` from mask operations into the conversion group
@@ -444,7 +447,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Solid | Generate solid color images with enhanced color parameter supporting multiple input formats and dimension presets |
 | Image Alpha Join | Combine optional `image` and `mask` into a 4-channel image; supports empty output, transparent canvas, and full-alpha fallback |
 | Image Alpha Split | Extract alpha as `mask` while flattening RGBA or alpha images onto a configurable solid background |
-| Image Solid FluxKontext | Generate solid color images based on Flux Kontext dimension presets with flexible color input format support |
 | Image Rotate with Mask | Advanced image rotation with mask integration, multiple fill modes, and mask center rotation options |
 | Image Edit Stitch | Image stitching and merging with multiple stitching modes |
 | ImageMainStitch | Main-image stitcher supporting dynamic `image_2..image_N`, direction, size matching, spacing, and padding |
@@ -453,6 +455,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Stroke by Mask | Apply stroke effects to mask regions with customizable width and color |
 | Image BBox Overlay by Mask | Mask-based image bounding box overlay with independent and merge modes |
 | Image Alpha Clean | Clean image alpha edge noise with simple strength presets and optional detection-only output |
+| Image BW Matte | Generate a cutout-friendly `mask` with a fixed `auto + soft` pipeline, plus `gamma`, inward shrink, and blur controls |
 
 ### 📐 Image Resize Nodes
 | Node Name | Description |
@@ -509,6 +512,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Mask Separate | Separate mask into individual connected regions with sorting and area filtering |
 | Mask To BBox Mask | Convert mask foregrounds into minimum bounding rectangle masks, with merged/separate output and outward `divisible_by` alignment |
 | Mask Fill Hole | Fill holes in enclosed areas of masks with batch processing support |
+| Mask Stroke | Create an optional hole-filled outer stroke mask with percentage width support and union output |
 | Mask Crop by BBox Mask | Mask bounding box cropping based on mask regions |
 | Mask Paste by BBox Mask | Simplified mask pasting with automatic base mask creation and bounding box detection |
 | Mask Repeat | Batch repeat masks with optional inversion support |
