@@ -21,8 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
-**Unreleased**
+**v3.20.0**
 - feat(image): 添加精简版 `Image BW Matte`，固定使用 `auto + soft` 生成遮罩，仅保留 `gamma`、向内收边与羽化参数
+- feat(mask): 添加 `Mask Stroke` 节点，支持按百分比宽度生成遮罩外廓描边
 
 **v3.19.1**
 - feat(conversion): 添加 `Image to Mask` 节点，支持可选图像按亮度转遮罩，未连接时输出 64x64 全黑遮罩

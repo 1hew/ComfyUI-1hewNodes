@@ -21,8 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
-**Unreleased**
+**v3.20.0**
 - feat(image): Add a simplified `Image BW Matte` that fixes the pipeline to `auto + soft` and keeps only `gamma`, inward edge shrink, and blur controls
+- feat(mask): Add `Mask Stroke` for outer stroke mask with percentage width and union output
 
 **v3.19.1**
 - feat(conversion): Add `Image to Mask` for optional image luminance-to-mask conversion with a 64x64 black fallback
