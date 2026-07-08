@@ -6,7 +6,7 @@
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `selection` | - | COMBO | `3:2` | `3:2` / `1:1` / `2:3` / `5:4` / `4:5` / `16:9` / `9:16` / `21:9` / `3:4` / `4:3` | Manual GPT 2.0 image ratio preset used when `image` is not connected. |
+| `selection` | - | COMBO | `3:2` | `3:1` / `21:9` / `2:1` / `16:9` / `3:2` / `4:3` / `5:4` / `1:1` / `4:5` / `3:4` / `2:3` / `9:16` / `1:2` / `9:21` / `1:3` | Manual GPT 2.0 image ratio preset used when `image` is not connected. |
 | `image` | optional | IMAGE | - | - | Input image batch used to infer the nearest supported ratio per frame. |
 
 ## Outputs
