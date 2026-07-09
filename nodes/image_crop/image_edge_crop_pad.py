@@ -173,7 +173,7 @@ class ImageEdgeCropPad(io.ComfyNode):
             out_tensor = torch.zeros((B, new_height, new_width, C), dtype=img_tensor.dtype, device=img_tensor.device)
             out_mask = torch.ones((B, new_height, new_width), dtype=torch.float32, device=img_tensor.device)
             
-            fill_spec = ImageEdgeCropPad._parse_pad_color(pad_color)
+            fill_spec = ImageEdgeCropPad._parse_pad_color(pad_color, channels=C)
             if isinstance(fill_spec, str) and fill_spec in ('extend', 'mirror'):
                 nchw = img_tensor.permute(0, 3, 1, 2)
                 if fill_spec == 'extend':
@@ -241,10 +241,16 @@ class ImageEdgeCropPad(io.ComfyNode):
             return img_tensor, inv_mask
 
     @staticmethod
-    def _parse_pad_color(color_str):
+    def _parse_pad_color(color_str, channels=3):
+        """解析填充颜色，channels=4 时返回带 alpha 的四分量"""
+        default_rgba = (0.0, 0.0, 0.0, 0.0) if channels == 4 else (1.0, 1.0, 1.0)
+        default_rgb = (1.0, 1.0, 1.0)
+
         if color_str is None:
-            return (1.0, 1.0, 1.0)
+            return default_rgba if channels == 4 else default_rgb
         text = str(color_str).strip().lower()
+        if text in ('', 'transparent'):
+            return default_rgba if channels == 4 else default_rgb
         if text in ('edge', 'e'):
             return 'edge'
         if text in ('extend', 'ex'):
@@ -279,20 +285,34 @@ class ImageEdgeCropPad(io.ComfyNode):
         }
         if len(text) == 1 and text in single:
             text = single[text]
+
+        def _to_rgba(r, g, b, a=None):
+            if channels == 4:
+                if a is not None:
+                    return (r, g, b, a)
+                return (r, g, b, 1.0)
+            return (r, g, b)
+
         try:
             v = float(text)
             if 0.0 <= v <= 1.0:
-                return (v, v, v)
+                return _to_rgba(v, v, v)
         except Exception:
             pass
         if ',' in text:
             try:
                 parts = [p.strip() for p in text.split(',')]
-                if len(parts) >= 3:
+                if len(parts) >= 4 and channels == 4:
+                    r, g, b, a = [float(parts[i]) for i in range(4)]
+                    if max(r, g, b) <= 1.0:
+                        a = a if a <= 1.0 else a / 255.0
+                        return (r, g, b, a)
+                    return (r / 255.0, g / 255.0, b / 255.0, a / 255.0 if a > 1.0 else a)
+                elif len(parts) >= 3:
                     r, g, b = [float(parts[i]) for i in range(3)]
                     if max(r, g, b) <= 1.0:
-                        return (r, g, b)
-                    return (r / 255.0, g / 255.0, b / 255.0)
+                        return _to_rgba(r, g, b)
+                    return _to_rgba(r / 255.0, g / 255.0, b / 255.0)
             except Exception:
                 pass
         if text.startswith('#') and len(text) in (4, 7):
@@ -303,13 +323,13 @@ class ImageEdgeCropPad(io.ComfyNode):
                 r = int(hex_str[0:2], 16) / 255.0
                 g = int(hex_str[2:4], 16) / 255.0
                 b = int(hex_str[4:6], 16) / 255.0
-                return (r, g, b)
+                return _to_rgba(r, g, b)
             except Exception:
                 pass
         try:
             rgb = ImageColor.getrgb(text)
-            return (rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0)
+            return _to_rgba(rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0)
         except Exception:
-            return (1.0, 1.0, 1.0)
+            return default_rgba if channels == 4 else default_rgb
 
 

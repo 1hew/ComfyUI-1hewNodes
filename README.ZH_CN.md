@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.21.1**
+- feat(image_crop): `Image Edge Crop/Pad` 兼容 RGBA 透明通道输入，pad 默认透明、crop 保持 alpha，支持 `transparent` 关键字与 4 分量颜色字符串（如 `255,0,0,128`）
+
 **v3.21.0**
 - feat(logic): 添加 `Text Compare` 节点，支持字符串相等、包含、前后缀与正则布尔比较
 - feat(text): 扩展 `String Ratio Gpt20Image` 与 `String Ratio Gemini31FlashImage` 的支持比例集合，使其与最新选择器预设一致

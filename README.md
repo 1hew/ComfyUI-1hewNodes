@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.21.1**
+- feat(image_crop): `Image Edge Crop/Pad` now supports RGBA (transparent) input — pad defaults to transparency, crop preserves alpha; supports `transparent` keyword and 4-component color strings (e.g. `255,0,0,128`)
+
 **v3.21.0**
 - feat(logic): Add `Text Compare` for string equality, containment, prefix/suffix, and regex boolean matching
 - feat(text): Expand `String Ratio Gpt20Image` and `String Ratio Gemini31FlashImage` supported ratio sets to match the latest selector presets
