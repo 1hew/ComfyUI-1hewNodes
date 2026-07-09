@@ -1,3 +1,9 @@
+# 保存路径说明：
+# - 默认文件名 "image/ComfyUI"（相对路径）会将图片保存到 ComfyUI 配置的 output 目录下。
+# - output 目录由 folder_paths.get_output_directory() 决定：
+#   * 无 --output-directory 参数 → 默认 <comfyui_root>/output
+#   * 带 --output-directory <路径> 参数 → 自定义路径
+# - 输入绝对路径时会跳过 output 目录，直接保存到指定位置。
 from __future__ import annotations
 
 import asyncio
