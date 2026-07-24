@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.21.2**
+- feat(image_resize)：更新 `Image Resize GPT Image 2.0`，支持 1:3–3:1 比例预设，并按 GPT Image 2 尺寸限制调整 1k/2k/4k 分辨率
+
 **v3.21.1**
 - feat(image_crop): `Image Edge Crop/Pad` 兼容 RGBA 透明通道输入，pad 默认透明、crop 保持 alpha，支持 `transparent` 关键字与 4 分量颜色字符串（如 `255,0,0,128`）
 

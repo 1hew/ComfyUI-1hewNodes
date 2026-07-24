@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.21.2**
+- feat(image_resize): Update `Image Resize GPT Image 2.0` with 1:3–3:1 aspect-ratio presets and revised 1k/2k/4k resolutions aligned with GPT Image 2 size limits
+
 **v3.21.1**
 - feat(image_crop): `Image Edge Crop/Pad` now supports RGBA (transparent) input — pad defaults to transparency, crop preserves alpha; supports `transparent` keyword and 4-component color strings (e.g. `255,0,0,128`)
 
