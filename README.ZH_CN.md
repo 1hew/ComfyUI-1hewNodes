@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.22.0**
+- feat(conversion)：新增 `Video to Image`，从 ComfyUI VIDEO 对象中提取图像、音频、FPS 和帧数
+
 **v3.21.2**
 - feat(image_resize)：更新 `Image Resize GPT Image 2.0`，支持 1:3–3:1 比例预设，并按 GPT Image 2 尺寸限制调整 1k/2k/4k 分辨率
 
@@ -548,6 +551,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | 节点名称 | 功能描述 |
 |---------|----------|
 | URL to Video | 将视频URL转换为ComfyUI VIDEO对象，改进错误处理、超时控制，支持同步和异步下载方法 |
+| Video to Image | 从 ComfyUI VIDEO 对象中提取图像、音频、FPS 和帧数 |
 | Image to URL | 将图像转换为 URL 字符串，支持 `auto`、`kefan`、`data` 三种模式 |
 | Image to Mask | 将可选图像按亮度转换为遮罩，未连接时输出 64x64 全黑遮罩 |
 | Image Batch to List | 将批量图像转换为图像列表，用于单独处理 |

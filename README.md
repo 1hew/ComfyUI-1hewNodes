@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.22.0**
+- feat(conversion): Add `Video to Image` for extracting image, audio, FPS, and frame-count outputs from ComfyUI VIDEO objects
+
 **v3.21.2**
 - feat(image_resize): Update `Image Resize GPT Image 2.0` with 1:3–3:1 aspect-ratio presets and revised 1k/2k/4k resolutions aligned with GPT Image 2 size limits
 
@@ -548,6 +551,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|-------------|
 | URL to Video | Convert video URLs to ComfyUI VIDEO objects with improved error handling, timeout control, and support for both synchronous and asynchronous download methods |
+| Video to Image | Extract image frames, audio, FPS, and frame count from ComfyUI VIDEO objects |
 | Image to URL | Convert image tensors into URL strings with `auto`, `kefan`, and `data` modes |
 | Image to Mask | Convert an optional image into a luminance mask, falling back to a 64x64 black mask when empty |
 | Image Batch to List | Convert batch images to image lists for individual processing |
