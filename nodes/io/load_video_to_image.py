@@ -308,7 +308,10 @@ class VideoFromFile:
             probe = f"{fmt_name} {pix_fmt}".lower()
             return any(
                 token in probe
-                for token in ("yuva", "rgba", "bgra", "argb", "abgr")
+                for token in (
+                    "yuva", "rgba", "bgra", "argb", "abgr",
+                    "gbrap", "ya8", "ya16", "ayuv",
+                )
             )
         except Exception:
             return False

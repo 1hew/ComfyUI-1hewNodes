@@ -319,7 +319,10 @@ class VideoFromFile:
             probe = f"{fmt_name} {pix_fmt}".lower()
             return any(
                 token in probe
-                for token in ("yuva", "rgba", "bgra", "argb", "abgr")
+                for token in (
+                    "yuva", "rgba", "bgra", "argb", "abgr",
+                    "gbrap", "ya8", "ya16", "ayuv",
+                )
             )
         except Exception:
             return False
@@ -1402,7 +1405,13 @@ def _is_direct_preview_video(path: str) -> bool:
 
 def _has_alpha_pix_fmt(pix_fmt: str) -> bool:
     pix_fmt = (pix_fmt or "").lower()
-    return any(token in pix_fmt for token in ("yuva", "rgba", "bgra", "argb", "abgr"))
+    return any(
+        token in pix_fmt
+        for token in (
+            "yuva", "rgba", "bgra", "argb", "abgr",
+            "gbrap", "ya8", "ya16", "ayuv",
+        )
+    )
 
 
 def _ensure_preview_proxy_webm(source_path: str, include_audio: bool = True) -> str:
@@ -1412,7 +1421,7 @@ def _ensure_preview_proxy_webm(source_path: str, include_audio: bool = True) -> 
     except OSError:
         return ""
 
-    key = hashlib.sha256(f"{source_path}:{mtime}".encode()).hexdigest()
+    key = hashlib.sha256(f"{source_path}:{mtime}:pyav-vp9-v1".encode()).hexdigest()
     cache_dir = _preview_cache_dir()
     os.makedirs(cache_dir, exist_ok=True)
     out_path = os.path.join(cache_dir, f"{key}.webm")
@@ -1424,81 +1433,67 @@ def _ensure_preview_proxy_webm(source_path: str, include_audio: bool = True) -> 
         except OSError:
             pass
 
-    ffmpeg_exe = VideoFromFile._resolve_ffmpeg_exe()
-    info = VideoFromFile._probe_video_info_with_ffprobe(source_path)
-    pix_fmt = info.get("pix_fmt") or ""
-    output_pix_fmt = "yuva420p" if _has_alpha_pix_fmt(pix_fmt) else "yuv420p"
-
-    tmp_path = os.path.join(
-        cache_dir, f"{key}.{time.time_ns()}.tmp.webm"
-    )
-
-    command = [
-        ffmpeg_exe,
-        "-y",
-        "-v",
-        "error",
-        "-i",
-        source_path,
-        "-vf",
-        "scale=trunc(iw/2)*2:trunc(ih/2)*2",
-        "-c:v",
-        "libvpx-vp9",
-        "-pix_fmt",
-        output_pix_fmt,
-        "-auto-alt-ref",
-        "0",
-        "-b:v",
-        "0",
-        "-crf",
-        "33",
-        "-deadline",
-        "realtime",
-        "-cpu-used",
-        "5",
-    ]
-    if include_audio:
-        command.extend(
-            [
-                "-map",
-                "0:v:0",
-                "-map",
-                "0:a:0?",
-                "-c:a",
-                "libopus",
-                "-b:a",
-                "96k",
-                "-shortest",
-            ]
-        )
-    else:
-        command.append("-an")
-    command.append(tmp_path)
+    tmp_path = os.path.join(cache_dir, f"{key}.{time.time_ns()}.tmp.webm")
 
     try:
-        res = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except Exception:
-        return ""
+        with av.open(source_path) as inp:
+            in_video = inp.streams.video[0]
+            has_alpha = VideoFromFile._prefer_alpha_for_stream(in_video)
+            output_pix_fmt = "yuva420p" if has_alpha else "yuv420p"
+            width = int(in_video.width or 0) // 2 * 2
+            height = int(in_video.height or 0) // 2 * 2
 
-    if res.returncode != 0:
+            with av.open(tmp_path, "w") as out:
+                out_video = out.add_stream("libvpx-vp9")
+                out_video.width = width
+                out_video.height = height
+                out_video.pix_fmt = output_pix_fmt
+                out_video.rate = in_video.average_rate or 30
+                out_video.options = {
+                    "auto-alt-ref": "0",
+                    "b": "0",
+                    "crf": "33",
+                    "deadline": "realtime",
+                    "cpu-used": "5",
+                }
+
+                out_audio = None
+                if include_audio and inp.streams.audio:
+                    in_audio = inp.streams.audio[0]
+                    out_audio = out.add_stream("libopus", rate=in_audio.rate or 48000)
+
+                for packet in inp.demux():
+                    if packet.stream.type == "video":
+                        for frame in packet.decode():
+                            frame = frame.reformat(
+                                width=width,
+                                height=height,
+                                format=output_pix_fmt,
+                            )
+                            for out_packet in out_video.encode(frame):
+                                out.mux(out_packet)
+                    elif packet.stream.type == "audio" and out_audio is not None:
+                        for frame in packet.decode():
+                            frame.pts = None
+                            for out_packet in out_audio.encode(frame):
+                                out.mux(out_packet)
+
+                for out_packet in out_video.encode(None):
+                    out.mux(out_packet)
+                if out_audio is not None:
+                    for out_packet in out_audio.encode(None):
+                        out.mux(out_packet)
+
+        os.replace(tmp_path, out_path)
+        return out_path
+    except Exception as exc:
         try:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
         except OSError:
             pass
+        print(f"Info: PyAV WebM preview conversion failed: {exc}")
         return ""
-
-    try:
-        os.replace(tmp_path, out_path)
-    except OSError:
-        return ""
-
-    return out_path
 
 
 def _ensure_preview_proxy(
@@ -1516,9 +1511,12 @@ def _ensure_preview_proxy(
 
     if has_alpha:
         out_path = _ensure_preview_proxy_webm(source_path, include_audio=include_audio)
-        if not out_path:
-            return "", ""
-        return out_path, "video/webm"
+        if out_path:
+            return out_path, "video/webm"
+        print(
+            "Info: Falling back to an opaque MP4 preview for Alpha video: "
+            f"{source_path}"
+        )
 
     key = hashlib.sha256(f"{source_path}:{mtime}:mp4".encode()).hexdigest()
     cache_dir = _preview_cache_dir()
@@ -1819,7 +1817,7 @@ async def view_video_from_folder(request):
             preview = _ensure_preview_proxy_webm(path, include_audio=want_audio)
             if preview:
                 return web.FileResponse(preview, headers={"Content-Type": "video/webm"})
-            return web.FileResponse(path, headers={"Content-Type": "video/mp4"})
+            return web.Response(text="MOV preview conversion failed", status=415)
         return web.FileResponse(path)
 
     if not os.path.isdir(path):
@@ -1855,7 +1853,7 @@ async def view_video_from_folder(request):
         preview = _ensure_preview_proxy_webm(selected, include_audio=want_audio)
         if preview:
             return web.FileResponse(preview, headers={"Content-Type": "video/webm"})
-        return web.FileResponse(selected, headers={"Content-Type": "video/mp4"})
+        return web.Response(text="MOV preview conversion failed", status=415)
     return web.FileResponse(selected)
 
 
