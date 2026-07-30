@@ -87,6 +87,8 @@ def _split_prefix_to_dir_and_stem(prefix: str) -> tuple[str, str]:
         return "", _sanitize_filename_stem(stem)
 
     dir_part, stem_part = cleaned.rsplit("/", 1)
+    if len(dir_part) == 2 and dir_part[1] == ":":
+        dir_part += "/"
     stem = os.path.splitext(stem_part)[0]
     return dir_part, _sanitize_filename_stem(stem)
 
@@ -223,15 +225,33 @@ class SaveVideo(io.ComfyNode):
                     extension = source_ext.lstrip(".")
 
             if auto_increment:
-                (
-                    full_output_folder,
-                    filename,
-                    counter,
-                    subfolder,
-                    _resolved_prefix,
-                ) = folder_paths.get_save_image_path(
-                    safe_filename_prefix, output_dir, width, height
-                )
+                if _is_absolute_like(raw_prefix):
+                    target_dir_raw, filename = _split_prefix_to_dir_and_stem(raw_prefix)
+                    full_output_folder = (
+                        os.path.abspath(target_dir_raw)
+                        if target_dir_raw
+                        else os.path.abspath(output_dir)
+                    )
+                    os.makedirs(full_output_folder, exist_ok=True)
+                    subfolder = ""
+                    counter = 1
+                    while os.path.exists(
+                        os.path.join(
+                            full_output_folder,
+                            f"{filename}_{counter:05}_.{extension}",
+                        )
+                    ):
+                        counter += 1
+                else:
+                    (
+                        full_output_folder,
+                        filename,
+                        counter,
+                        subfolder,
+                        _resolved_prefix,
+                    ) = folder_paths.get_save_image_path(
+                        safe_filename_prefix, output_dir, width, height
+                    )
 
                 output_file = f"{filename}_{counter:05}_.{extension}"
                 path = os.path.join(full_output_folder, output_file)

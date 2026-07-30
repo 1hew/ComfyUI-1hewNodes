@@ -77,12 +77,16 @@ def _split_prefix_to_dir_and_stem(prefix: str) -> tuple[str, str]:
         return "", "ComfyUI"
 
     if is_trailing_sep:
+        if len(cleaned) == 2 and cleaned[1] == ":":
+            cleaned += "/"
         return cleaned, "ComfyUI"
     if "/" not in cleaned:
         stem = os.path.splitext(cleaned)[0]
         return "", _sanitize_filename_stem(stem)
 
     dir_part, stem_part = cleaned.rsplit("/", 1)
+    if len(dir_part) == 2 and dir_part[1] == ":":
+        dir_part += "/"
     stem = os.path.splitext(stem_part)[0]
     return dir_part, _sanitize_filename_stem(stem)
 
