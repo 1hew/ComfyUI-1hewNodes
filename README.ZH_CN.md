@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.23.0**
+- feat(int)：新增 `Int Video Count`，统计动态 `video_X` 输入中的已连接视频数量
+- docs：新增 `Int Video Count` 中英文文档并同步节点列表
+
 **v3.22.0**
 - feat(conversion)：新增 `Video to Image`，从 ComfyUI VIDEO 对象中提取图像、音频、FPS 和帧数
 
@@ -586,6 +590,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Int Image Side Length | 基于图像尺寸输出选定边长（最长/最短/宽/高） |
 | Int Image Size | 输出图像宽度与高度两个整数 |
 | Int Mask Side Length | 基于遮罩尺寸输出选定边长（最长/最短/宽/高） |
+| Int Video Count | 统计动态 `video_X` 输入中的已连接视频数量 |
 | Int Split | 将总数值分割为两部分，支持百分比与整数分割点 |
 | Int Wan | 生成 4n+1 等差数列，支持步长与范围校验 |
 

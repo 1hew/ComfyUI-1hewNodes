@@ -9,6 +9,7 @@ app.registerExtension({
             "1hew_MultiImageList": { base: "image_", addType: "IMAGE", select: null, initial: 1 },
             "1hew_MultiImageOverlay": { base: "image_", addType: "IMAGE", select: null, initial: 1 },
             "1hew_IntImageCount": { base: "image_", addType: "IMAGE", select: null, initial: 1 },
+            "1hew_IntVideoCount": { base: "video_", addType: "VIDEO", select: null, initial: 1 },
             "1hew_MultiMaskBatch": { base: "mask_", addType: "MASK", select: null, initial: 1 },
             "1hew_MultiImageStitch": { base: "image_", addType: "IMAGE", select: null, initial: 2 },
             "1hew_MultiSwitchSelect": { base: "input_", addType: "*", select: "select", initial: 1, max: 10, outputBase: "output_", outputType: "*" },

@@ -21,6 +21,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.23.0**
+- feat(int): Add `Int Video Count` to count connected videos from dynamic `video_X` inputs
+- docs: Add bilingual documentation for `Int Video Count` and synchronize the node list
+
 **v3.22.0**
 - feat(conversion): Add `Video to Image` for extracting image, audio, FPS, and frame-count outputs from ComfyUI VIDEO objects
 
@@ -586,6 +590,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Int Image Side Length | Output selected side length (longest/shortest/width/height) from image dimensions |
 | Int Image Size | Output width and height integers from image dimensions |
 | Int Mask Side Length | Output selected side length (longest/shortest/width/height) from mask dimensions |
+| Int Video Count | Count connected videos from dynamic `video_X` inputs |
 | Int Split | Split a total value into two parts, supporting percentage and integer split point |
 | Int Wan | Generate 4n+1 arithmetic sequences with step and range validation |
 
