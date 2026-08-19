@@ -24,6 +24,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 **v3.23.0**
 - feat(int): Add `Int Video Count` to count connected videos from dynamic `video_X` inputs
 - docs: Add bilingual documentation for `Int Video Count` and synchronize the node list
+- feat(conversion): Add `Video to URL` to upload ComfyUI VIDEO objects to a public URL with content-based caching
+- feat(conversion): Make `Image to URL`'s image input optional, returning an empty string when unconnected
 
 **v3.22.0**
 - feat(conversion): Add `Video to Image` for extracting image, audio, FPS, and frame-count outputs from ComfyUI VIDEO objects
@@ -557,6 +559,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | URL to Video | Convert video URLs to ComfyUI VIDEO objects with improved error handling, timeout control, and support for both synchronous and asynchronous download methods |
 | Video to Image | Extract image frames, audio, FPS, and frame count from ComfyUI VIDEO objects |
 | Image to URL | Convert image tensors into URL strings with `auto`, `kefan`, and `data` modes |
+| Video to URL | Upload ComfyUI VIDEO objects to a public URL with content-based caching |
 | Image to Mask | Convert an optional image into a luminance mask, falling back to a 64x64 black mask when empty |
 | Image Batch to List | Convert batch images to image lists for individual processing |
 | Image List to Batch | Convert image lists to batch images with automatic size normalization |

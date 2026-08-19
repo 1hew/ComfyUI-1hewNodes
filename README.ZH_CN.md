@@ -24,6 +24,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 **v3.23.0**
 - feat(int)：新增 `Int Video Count`，统计动态 `video_X` 输入中的已连接视频数量
 - docs：新增 `Int Video Count` 中英文文档并同步节点列表
+- feat(conversion)：新增 `Video to URL`，将 ComfyUI VIDEO 对象上传为公网 URL，并支持内容缓存复用
+- feat(conversion)：`Image to URL` 的 image 输入改为可选，未连接时输出空字符串
 
 **v3.22.0**
 - feat(conversion)：新增 `Video to Image`，从 ComfyUI VIDEO 对象中提取图像、音频、FPS 和帧数
@@ -557,6 +559,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | URL to Video | 将视频URL转换为ComfyUI VIDEO对象，改进错误处理、超时控制，支持同步和异步下载方法 |
 | Video to Image | 从 ComfyUI VIDEO 对象中提取图像、音频、FPS 和帧数 |
 | Image to URL | 将图像转换为 URL 字符串，支持 `auto`、`kefan`、`data` 三种模式 |
+| Video to URL | 将 ComfyUI VIDEO 对象上传为公网 URL，支持内容缓存复用 |
 | Image to Mask | 将可选图像按亮度转换为遮罩，未连接时输出 64x64 全黑遮罩 |
 | Image Batch to List | 将批量图像转换为图像列表，用于单独处理 |
 | Image List to Batch | 将图像列表转换为批量图像，自动进行尺寸标准化 |
