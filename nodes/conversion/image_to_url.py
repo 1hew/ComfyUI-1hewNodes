@@ -177,7 +177,7 @@ class ImageToURL(io.ComfyNode):
             display_name="Image to URL",
             category="1hewNodes/conversion",
             inputs=[
-                io.Image.Input("image"),
+                io.Image.Input("image", optional=True),
                 io.Combo.Input(
                     "mode",
                     options=cls.MODE_OPTIONS,
@@ -193,10 +193,13 @@ class ImageToURL(io.ComfyNode):
     @classmethod
     async def execute(
         cls,
-        image: torch.Tensor,
-        mode: str,
-        timeout: int,
+        image: Optional[torch.Tensor] = None,
+        mode: str = "auto",
+        timeout: int = 30,
     ) -> io.NodeOutput:
+        if image is None:
+            return io.NodeOutput("")
+
         image_batch = _to_batch(image)
         if image_batch.shape[0] == 0:
             return io.NodeOutput("")

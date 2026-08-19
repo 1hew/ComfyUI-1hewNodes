@@ -6,7 +6,7 @@
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `image` | - | IMAGE | - | - | Input image, supports single image or batch |
+| `image` | - | IMAGE | - | - | Input image, supports single image or batch; optional, output is an empty string when not connected |
 | `mode` | dropdown | COMBO | `auto` | `auto` / `kefan` / `data` | Conversion mode: automatic fallback, upload-only via `kefan.cn`, or direct data URL output |
 | `timeout` | - | INT | 30 | 5-300 | Upload timeout in seconds |
 
@@ -14,7 +14,7 @@
 
 | Name | Type | Description |
 |------|------|-------------|
-| `url` | STRING | URL output; returns a single URL for one image, or a multi-line string with one URL per line for batch input |
+| `url` | STRING | URL output; returns a single URL for one image, or a multi-line string with one URL per line for batch input; returns an empty string when no image is connected |
 
 ## Features
 
@@ -22,6 +22,7 @@
 - `kefan`: uploads only to `kefan.cn`; returns a public URL on success and raises an error on failure.
 - `data`: directly emits a `data:image/...;base64,...` string and does not depend on any external upload service.
 - Batch support: when the input is an image batch, each image is converted and the final output joins URLs as a multi-line string, one URL per line.
+- Optional input: when `image` is not connected, the node returns an empty string instead of raising an error.
 - Reuses upload cache: repeated uploads of the same image reuse the cached URL mapping when available.
 
 ## Typical Usage
