@@ -45,6 +45,35 @@ VALID_VIDEO_EXTENSIONS = {
 }
 
 
+def resolve_video_path(path: str) -> str:
+    """Resolve absolute and ComfyUI input-directory-relative video paths."""
+    raw = str(path or "").strip().strip('"').strip("'")
+    if not raw:
+        return ""
+
+    normalized = raw.replace("\\", os.sep).replace("/", os.sep)
+    if os.path.isabs(normalized) or os.path.splitdrive(normalized)[0]:
+        return os.path.abspath(normalized)
+
+    get_annotated = getattr(folder_paths, "get_annotated_filepath", None)
+    if callable(get_annotated):
+        try:
+            resolved = get_annotated(raw, accept_missing=True)
+        except TypeError:
+            try:
+                resolved = get_annotated(raw)
+            except Exception:
+                resolved = ""
+        except Exception:
+            resolved = ""
+        if resolved:
+            return os.path.abspath(str(resolved))
+
+    get_input_dir = getattr(folder_paths, "get_input_directory", None)
+    base_dir = get_input_dir() if callable(get_input_dir) else folder_paths.get_temp_directory()
+    return os.path.abspath(os.path.join(base_dir, normalized))
+
+
 def _get_filename_stem(path: str) -> str:
     base_name = os.path.basename(str(path or "").strip())
     stem, _ext = os.path.splitext(base_name)
@@ -310,19 +339,25 @@ class VideoFromFile:
         return {"waveform": waveform, "sample_rate": sample_rate}
 
     @staticmethod
-    def _prefer_alpha_for_stream(stream) -> bool:
+    def _pix_fmt_has_alpha(pix_fmt: str) -> bool:
+        probe = (pix_fmt or "").lower()
+        return any(
+            token in probe
+            for token in (
+                "yuva", "rgba", "bgra", "argb", "abgr",
+                "gbrap", "ya8", "ya16", "ayuv",
+            )
+        )
+
+    @classmethod
+    def _prefer_alpha_for_stream(cls, stream, probed_pix_fmt: str = "") -> bool:
         try:
             ctx = getattr(stream, "codec_context", None)
             fmt = getattr(ctx, "format", None)
             fmt_name = getattr(fmt, "name", "") or ""
             pix_fmt = getattr(ctx, "pix_fmt", "") or ""
-            probe = f"{fmt_name} {pix_fmt}".lower()
-            return any(
-                token in probe
-                for token in (
-                    "yuva", "rgba", "bgra", "argb", "abgr",
-                    "gbrap", "ya8", "ya16", "ayuv",
-                )
+            return cls._pix_fmt_has_alpha(
+                f"{fmt_name} {pix_fmt} {probed_pix_fmt}"
             )
         except Exception:
             return False
@@ -499,7 +534,11 @@ class VideoFromFile:
         if len(container.streams.video) > 0:
             stream = container.streams.video[0]
             stream.thread_type = "AUTO"
-            prefer_alpha = self._prefer_alpha_for_stream(stream)
+            probed = self._probe_video_info_with_ffprobe(path)
+            prefer_alpha = self._prefer_alpha_for_stream(
+                stream,
+                str(probed.get("pix_fmt") or ""),
+            )
 
             try:
                 fps = float(stream.average_rate)
@@ -783,14 +822,15 @@ class VideoFromFileWithSettings:
         input_fmt = "rgba" if has_alpha else "rgb24"
 
         _, path_ext = os.path.splitext(path)
-        use_alpha = has_alpha or path_ext.lower() == ".webm"
+        output_ext = path_ext.lower()
+        use_alpha = has_alpha or output_ext == ".webm"
 
         out_audio = None
         audio_np = None
         a_sr = 44100
         ch = 2
         layout = "stereo"
-        audio_codec_name = "libopus" if use_alpha else "aac"
+        audio_codec_name = "libopus" if output_ext == ".webm" else "aac"
 
         if audio is not None and audio.get("waveform") is not None:
             waveform = audio["waveform"]
@@ -808,7 +848,11 @@ class VideoFromFileWithSettings:
                 layout = "stereo" if ch >= 2 else "mono"
 
         with av.open(path, "w") as output:
-            if use_alpha:
+            if has_alpha and output_ext in {".mov", ".qt"}:
+                out_video = output.add_stream("prores_ks")
+                out_video.pix_fmt = "yuva444p10le"
+                out_video.options = {"profile": "4"}
+            elif use_alpha:
                 out_video = output.add_stream("libvpx-vp9")
                 out_video.pix_fmt = "yuva420p"
                 out_video.options = {"auto-alt-ref": "0", "b": "0", "crf": "23"}
@@ -1289,7 +1333,7 @@ class LoadVideo(io.ComfyNode):
 
     @staticmethod
     def get_video_paths(path: str, include_subdir: bool) -> list[str]:
-        path = (path or "").strip().strip('"').strip("'")
+        path = resolve_video_path(path)
         if os.path.isfile(path):
             ext = os.path.splitext(path)[1].lower()
             return [path] if ext in VALID_VIDEO_EXTENSIONS else []
@@ -1318,7 +1362,7 @@ class LoadVideo(io.ComfyNode):
 
     @classmethod
     def IS_CHANGED(cls, file, include_subdir, **kwargs):
-        file = (file or "").strip().strip('"').strip("'")
+        file = resolve_video_path(file)
         start_skip = int(kwargs.get("start_skip") or 0)
         end_skip = int(kwargs.get("end_skip") or 0)
         fps = float(kwargs.get("fps") or 0.0)

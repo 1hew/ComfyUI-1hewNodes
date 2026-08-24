@@ -6,7 +6,7 @@
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `file` | - | STRING | `""` | - | Video file path or folder path. |
+| `file` | - | STRING | `""` | - | Video file or folder path. Supports absolute paths and paths relative to the ComfyUI input directory. |
 | `frame_limit` | - | INT | `0` | 0-100000 | Maximum output frame count; `0` keeps all frames after other settings. |
 | `fps` | - | FLOAT | `0.0` | 0-120 | Target FPS used for resampling; `0` keeps source FPS. |
 | `start_skip` | - | INT | `0` | 0-100000 | Number of frames to skip from the start. |

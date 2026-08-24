@@ -333,13 +333,17 @@ class SaveVideo(io.ComfyNode):
             progress_steps += 1
         progress_bar = _new_progress_bar(progress_steps)
 
-        if isinstance(path_attr, str) and os.path.isfile(path_attr):
+        # ComfyUI video implementations may expose the original file as
+        # either ``path`` or ``source_path``. Prefer the original stream when
+        # available so alpha-capable MOV/ProRes files are not unnecessarily
+        # decoded and re-encoded as yuv420p.
+        if isinstance(source_path, str) and os.path.isfile(source_path):
             has_audio = await cls._has_audio_stream(source_path)
             if has_audio:
-                await asyncio.to_thread(shutil.copy2, path_attr, path)
+                await asyncio.to_thread(shutil.copy2, source_path, path)
             else:
                 await cls._write_silent_audio_video(
-                    input_path=path_attr,
+                    input_path=source_path,
                     output_path=path,
                 )
         else:
@@ -442,12 +446,18 @@ class SaveVideo(io.ComfyNode):
                 with av.open(path) as container:
                     if not container.streams.video:
                         return False
-                    pix_fmt = container.streams.video[0].codec_context.pix_fmt or ""
+                    stream = container.streams.video[0]
+                    codec_context = stream.codec_context
+                    pix_fmt = getattr(codec_context, "pix_fmt", "") or ""
+                    context_format = getattr(codec_context, "format", None)
+                    context_format_name = getattr(context_format, "name", "") or ""
+                    stream_format = getattr(getattr(stream, "format", None), "name", "") or ""
+                    probe = f"{pix_fmt} {context_format_name} {stream_format}".lower()
                     alpha_formats = [
                         "yuva", "rgba", "argb", "abgr", "bgra",
                         "gbrap", "ya8", "ya16", "ayuv",
                     ]
-                    return any(fmt in pix_fmt for fmt in alpha_formats)
+                    return any(fmt in probe for fmt in alpha_formats)
             return await asyncio.to_thread(_check)
         except Exception:
             return False

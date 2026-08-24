@@ -34,6 +34,35 @@ VALID_VIDEO_EXTENSIONS = {
 }
 
 
+def resolve_video_path(path: str) -> str:
+    """Resolve absolute and ComfyUI input-directory-relative video paths."""
+    raw = str(path or "").strip().strip('"').strip("'")
+    if not raw:
+        return ""
+
+    normalized = raw.replace("\\", os.sep).replace("/", os.sep)
+    if os.path.isabs(normalized) or os.path.splitdrive(normalized)[0]:
+        return os.path.abspath(normalized)
+
+    get_annotated = getattr(folder_paths, "get_annotated_filepath", None)
+    if callable(get_annotated):
+        try:
+            resolved = get_annotated(raw, accept_missing=True)
+        except TypeError:
+            try:
+                resolved = get_annotated(raw)
+            except Exception:
+                resolved = ""
+        except Exception:
+            resolved = ""
+        if resolved:
+            return os.path.abspath(str(resolved))
+
+    get_input_dir = getattr(folder_paths, "get_input_directory", None)
+    base_dir = get_input_dir() if callable(get_input_dir) else folder_paths.get_temp_directory()
+    return os.path.abspath(os.path.join(base_dir, normalized))
+
+
 def _get_filename_stem(path: str) -> str:
     base_name = os.path.basename(str(path or "").strip())
     stem, _ext = os.path.splitext(base_name)
@@ -142,7 +171,7 @@ class VideoFromFile:
             "-select_streams",
             "v:0",
             "-show_entries",
-            "stream=width,height,avg_frame_rate,pix_fmt,nb_frames,duration",
+            "stream=width,height,avg_frame_rate,pix_fmt,nb_frames,duration:stream_tags=rotate:stream_side_data=rotation",
             "-of",
             "json",
             path,
@@ -182,6 +211,18 @@ class VideoFromFile:
             duration = float(stream.get("duration") or 0.0)
         except Exception:
             duration = 0.0
+        rotation = 0.0
+        try:
+            rotation = float((stream.get("tags") or {}).get("rotate") or 0.0)
+        except Exception:
+            rotation = 0.0
+        for side_data in stream.get("side_data_list") or []:
+            try:
+                if "rotation" in side_data:
+                    rotation = float(side_data["rotation"])
+                    break
+            except Exception:
+                pass
         return {
             "width": width,
             "height": height,
@@ -189,7 +230,15 @@ class VideoFromFile:
             "pix_fmt": pix_fmt,
             "nb_frames": nb_frames,
             "duration": duration,
+            "rotation": rotation,
         }
+
+    @staticmethod
+    def _apply_video_rotation(image: np.ndarray, rotation: float) -> np.ndarray:
+        quadrant = int(round(float(rotation or 0.0) / 90.0)) % 4
+        if quadrant == 0:
+            return image
+        return np.rot90(image, k=(-quadrant) % 4).copy()
 
     @classmethod
     def _probe_audio_info_with_ffprobe(cls, path: str) -> dict:
@@ -299,19 +348,25 @@ class VideoFromFile:
         return {"waveform": waveform, "sample_rate": sample_rate}
 
     @staticmethod
-    def _prefer_alpha_for_stream(stream) -> bool:
+    def _pix_fmt_has_alpha(pix_fmt: str) -> bool:
+        probe = (pix_fmt or "").lower()
+        return any(
+            token in probe
+            for token in (
+                "yuva", "rgba", "bgra", "argb", "abgr",
+                "gbrap", "ya8", "ya16", "ayuv",
+            )
+        )
+
+    @classmethod
+    def _prefer_alpha_for_stream(cls, stream, probed_pix_fmt: str = "") -> bool:
         try:
             ctx = getattr(stream, "codec_context", None)
             fmt = getattr(ctx, "format", None)
             fmt_name = getattr(fmt, "name", "") or ""
             pix_fmt = getattr(ctx, "pix_fmt", "") or ""
-            probe = f"{fmt_name} {pix_fmt}".lower()
-            return any(
-                token in probe
-                for token in (
-                    "yuva", "rgba", "bgra", "argb", "abgr",
-                    "gbrap", "ya8", "ya16", "ayuv",
-                )
+            return cls._pix_fmt_has_alpha(
+                f"{fmt_name} {pix_fmt} {probed_pix_fmt}"
             )
         except Exception:
             return False
@@ -478,6 +533,10 @@ class VideoFromFile:
                 raise RuntimeError(f"Error opening video {path}: {exc}") from exc
 
             video_tensor = torch.from_numpy(np.stack(frames)).float() / 255.0
+            rotation = float(info.get("rotation") or 0.0)
+            if rotation:
+                frames = [self._apply_video_rotation(frame, rotation) for frame in frames]
+                video_tensor = torch.from_numpy(np.stack(frames)).float() / 255.0
             return VideoComponents(images=video_tensor, audio=None, frame_rate=fps)
 
         frames: list[np.ndarray] = []
@@ -488,7 +547,12 @@ class VideoFromFile:
         if len(container.streams.video) > 0:
             stream = container.streams.video[0]
             stream.thread_type = "AUTO"
-            prefer_alpha = self._prefer_alpha_for_stream(stream)
+            probed = self._probe_video_info_with_ffprobe(path)
+            prefer_alpha = self._prefer_alpha_for_stream(
+                stream,
+                str(probed.get("pix_fmt") or ""),
+            )
+            rotation = float(probed.get("rotation") or 0.0)
 
             try:
                 fps = float(stream.average_rate)
@@ -594,6 +658,8 @@ class VideoFromFile:
                             dtype=img_np.dtype,
                         )
                         img_np = np.concatenate([rgb, alpha], axis=-1)
+
+                    img_np = self._apply_video_rotation(img_np, rotation)
 
                     frames.append(img_np)
                     if progress_bar is not None:
@@ -999,7 +1065,7 @@ class LoadVideoToImage(io.ComfyNode):
 
     @staticmethod
     def get_video_paths(path: str, include_subdir: bool) -> list[str]:
-        path = (path or "").strip().strip('"').strip("'")
+        path = resolve_video_path(path)
         if os.path.isfile(path):
             ext = os.path.splitext(path)[1].lower()
             return [path] if ext in VALID_VIDEO_EXTENSIONS else []
@@ -1028,7 +1094,7 @@ class LoadVideoToImage(io.ComfyNode):
 
     @classmethod
     def IS_CHANGED(cls, file, include_subdir, **kwargs):
-        file = (file or "").strip().strip('"').strip("'")
+        file = resolve_video_path(file)
         if os.path.isfile(file):
             try:
                 mtime = os.path.getmtime(file)

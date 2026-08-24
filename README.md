@@ -21,6 +21,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.23.1**
+- fix(io): Make `Load Video` and `Load Video to Image` resolve absolute paths and paths relative to the ComfyUI input directory, including directory scans and cache invalidation
+- fix(io): Preserve alpha-capable MOV/video streams when loading and saving, including ProRes 4444 output for processed transparent MOV files
+- fix(io): Keep source video streams when `Save Video` receives a `source_path`, avoiding unnecessary re-encoding that can drop transparency
+
 **v3.23.0**
 - feat(int): Add `Int Video Count` to count connected videos from dynamic `video_X` inputs
 - docs: Add bilingual documentation for `Int Video Count` and synchronize the node list

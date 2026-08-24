@@ -21,6 +21,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.23.1**
+- fix(io)：`Load Video` 与 `Load Video to Image` 支持绝对路径和相对于 ComfyUI 输入目录的路径，并统一应用于目录扫描与缓存变化判断
+- fix(io)：加载和保存支持透明通道的视频流；处理透明 MOV 时使用 ProRes 4444 输出
+- fix(io)：`Save Video` 收到 `source_path` 时优先保留原始视频流，避免不必要的重新编码导致透明通道丢失
+
 **v3.23.0**
 - feat(int)：新增 `Int Video Count`，统计动态 `video_X` 输入中的已连接视频数量
 - docs：新增 `Int Video Count` 中英文文档并同步节点列表
