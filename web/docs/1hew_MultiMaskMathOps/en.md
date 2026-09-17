@@ -1,25 +1,26 @@
 # Multi Mask Math Ops - Binary Mask Operations
 
-**Node Purpose:** `Mask Math Ops` performs per-pixel binary-like operations between two masks: `or`, `and`, `subtract (a-b)`, `subtract (b-a)`, and `xor`. Handles batch cycling and resizes masks to match when sizes differ.
+**Node Purpose:** `Mask Math Ops` performs per-pixel binary-like operations across multiple masks: `or`, `and`, `subtract (a-b)`, `subtract (b-a)`, and `xor`. Supports dynamic `mask_1..mask_N` inputs, batch cycling, and size alignment.
 
 ## Inputs
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | `mask_1` | - | MASK | - | - | First mask batch. |
-| `mask_2` | - | MASK | - | - | Second mask batch; resized to `mask_1` size when needed. |
-| `operation` | - | COMBO | `or` | `or` / `and` / `subtract (a-b)` / `subtract (b-a)` / `xor` | Operation type.
+| `mask_2..mask_N` | optional (dynamic) | MASK | - | - | Additional mask batches; resized to `mask_1` size when needed. |
+| `operation` | - | COMBO | `or` | `or` / `and` / `subtract (a-b)` / `subtract (b-a)` / `xor` | Operation type. |
 
 ## Outputs
 
 | Name | Type | Description |
 |------|------|-------------|
-| `mask` | MASK | Resulting mask batch.
+| `mask` | MASK | Resulting mask batch. |
 
 ## Features
 
+- Dynamic ports: connecting the last `mask_X` port automatically appends the next mask port.
 - Batch cycling: aligns differing batch sizes by indexing modulo per item.
-- Size alignment: resizes `mask_2` to `mask_1` with Lanczos when shapes differ.
+- Size alignment: resizes additional masks to `mask_1` with Lanczos when shapes differ.
 - Operations:
 - `and`: min of arrays.
 - `or`: max of arrays.

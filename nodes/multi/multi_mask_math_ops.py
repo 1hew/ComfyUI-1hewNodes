@@ -10,7 +10,7 @@ class MultiMaskMathOps(io.ComfyNode):
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
-            node_id="1hew_MaskMathOps",
+            node_id="1hew_MultiMaskMathOps",
             display_name="Multi Mask Math Ops",
             category="1hewNodes/multi",
             inputs=[
