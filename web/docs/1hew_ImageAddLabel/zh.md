@@ -2,7 +2,7 @@
 
 **节点功能**：`Image Add Label` 为图像添加文字标签，标签随图像尺寸与放置方向自适应缩放。支持批量图像与批量文本、动态变量引用、`--` 段落分隔以及按可用宽度自动换行。任一输入批次为 RGBA 时，节点会保留 alpha 并输出 RGBA。
 
-## Inputs | 输入
+## 输入
 
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
@@ -10,13 +10,13 @@
 | `height_pad` | - | INT | 24 | 1–1024 | 文本周围的最小留白，随尺寸比例缩放 |
 | `font_size` | - | INT | 36 | 1–256 | 以 1024 为参考分辨率的基础字号，自动缩放 |
 | `invert_color` | - | BOOLEAN | True | - | `True` 输出白色标签+黑字；`False` 输出黑色标签+白字 |
-| `font` | - | COMBO | 自动 | fonts 目录 | 从 `fonts/` 目录选择字体（如 `Alibaba-PuHuiTi-Regular.otf`） |
+| `font` | - | COMBO | `Alibaba-PuHuiTi-Regular.otf` | `fonts/` 目录下的字体（Light/Regular/Medium/Bold/Heavy） | 从 `fonts/` 目录选择的字体 |
 | `text` | - | STRING(多行) | "" | - | 标签文本。存在仅由连字符组成的行时，按 `--` 严格分段；否则按换行分割 |
 | `direction` | - | COMBO | `top` | `top`/`bottom`/`left`/`right` | 标签放置方向 |
 | `input1` | - | STRING | "" | - | 可在 `text` 中引用的变量 |
 | `input2` | - | STRING | "" | - | 可在 `text` 中引用的变量 |
 
-## Outputs | 输出
+## 输出
 
 | 输出名称 | 数据类型 | 描述 |
 |---------|----------|------|

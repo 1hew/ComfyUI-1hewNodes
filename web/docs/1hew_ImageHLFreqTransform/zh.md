@@ -1,4 +1,4 @@
-﻿# Image HL Freq Transform - 遮罩细节迁移
+# Image HL Freq Transform - 遮罩细节迁移
 
 **节点功能：** `Image HL Freq Transform` 将 `detail_image` 的细节迁移到 `generate_image` 上，支持 `rgb`、`hsv`、`igbi` 分离方法，并可选用 `detail_mask` 控制细节应用区域。输出结果图及中间高/低频层。
 
@@ -17,7 +17,8 @@
 | 输出名称 | 数据类型 | 描述 |
 |---------|----------|------|
 | `image` | IMAGE | 迁移细节后的结果图 |
-| `high_freq` | IMAGE | 中间高频层。
+| `high_freq` | IMAGE | 中间高频层 |
+| `low_freq` | IMAGE | 中间低频层 |
 
 ## 典型用法
 

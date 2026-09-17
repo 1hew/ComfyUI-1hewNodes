@@ -10,7 +10,7 @@
 | `rows` | - | INT | 2 | 1–10 | Number of rows to split. |
 | `columns` | - | INT | 2 | 1–10 | Number of columns to split. |
 | `index` | - | INT | 0 | -100–100 | Python-style index to select a specific tile per image (e.g., 0 for first, -1 for last). Ignored if `all` is True. |
-| `all` | - | BOOL | False | - | If True, outputs all tiles from the split. If False, outputs only the tile selected by `index`. |
+| `all` | - | BOOL | True | - | If True, outputs all tiles from the split. If False, outputs only the tile selected by `index`. |
 
 ## Outputs
 
@@ -33,4 +33,4 @@
 ## Notes & Tips
 
 - Ensure image dimensions are divisible by `rows` and `columns` for exact tiling; otherwise the last pixels in each axis are dropped due to integer division.
-- RGBA inputs are converted to RGB tiles internally to ensure consistent shape.
+- Tiles preserve the input channel count (e.g., RGBA inputs yield RGBA tiles); no channel conversion is applied.

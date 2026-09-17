@@ -51,21 +51,6 @@
 | Is aspect ratio | `^\d+:\d+$` | `16:9` | `n:n` format |
 | Has lora trigger | `:\d+(\.\d+)?>` | `<lora:name:0.8>` | Detect lora weight syntax |
 
-## Regex Quick Reference
-
-| Scenario | `b` Pattern | `a` Example | Note |
-|----------|-------------|-------------|------|
-| Is numeric | `^\d+$` | `12345` | At least one digit |
-| Is alphabetic | `^[A-Za-z]+$` | `Hello` | Letters only |
-| Contains Chinese | `[\u4e00-\u9fff]` | `你好世界` | Any CJK character |
-| Is image file | `(?i)\.(png\|jpe?g\|gif\|webp)$` | `photo.jpg` | Case-insensitive image extension |
-| Is video file | `(?i)\.(mp4\|webm\|mov\|avi)$` | `movie.mp4` | Common video extensions |
-| Strip version suffix | `^(.+?)(?:_v\d+)?$` | `image_v3.jpg` | Capture text before optional `_vN` |
-| Is seed value | `^\d{1,10}$` | `4294967295` | 1 to 10 digits |
-| NSFW keyword check | `NSFW\|nude\|naked` | `photo of people` | Multi-keyword with `\|` |
-| Is aspect ratio | `^\d+:\d+$` | `16:9` | `n:n` format |
-| Has lora trigger | `:\d+(\.\d+)?>` | `<lora:name:0.8>` | Detect lora weight syntax |
-
 ## Notes & Tips
 
 - For `startswith` / `endswith`, `a` is the match fragment and `b` is the string being checked.

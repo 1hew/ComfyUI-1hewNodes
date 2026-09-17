@@ -8,7 +8,7 @@
 | -------- | -------- | -------- | ------ | -------- | ---- |
 | `image` | 必需 | IMAGE | - | - | 待裁切的原图像 |
 | `mask` | 必需 | MASK | - | - | 定义裁切主体的遮罩 |
-| `preset_ratio` | - | COMBO | `mask` | `mask` / `image` / `auto` / `9:16` ... | 目标纵横比预设。`mask`跟随遮罩; `image`跟随原图; `auto`自动匹配常见比例 |
+| `preset_ratio` | - | COMBO | `mask` | `mask` / `image` / `auto` / `9:16` / `2:3` / `3:4` / `4:5` / `1:1` / `5:4` / `4:3` / `3:2` / `16:9` / `21:9` | 目标纵横比预设。`mask`跟随遮罩; `image`跟随原图; `auto`自动匹配常见比例 |
 | `get_crop_ratio` | 可选 | IMAGE | - | - | 可选参考图像。若连接，将自动匹配该图像的宽高比，覆盖 `preset_ratio` |
 | `scale_strength` | - | FLOAT | 0.0 | 0.0-1.0 | 缩放强度。在满足比例的前提下，向外扩展裁切框的程度 |
 | `crop_to_side` | - | COMBO | `None` | `None` / `longest` / `shortest` / `width` / `height` | 目标边长控制模式 |

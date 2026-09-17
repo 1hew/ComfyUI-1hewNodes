@@ -6,7 +6,7 @@
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `image_1` | - | IMAGE | - | - | First image input; the frontend dynamically appends `image_2..image_N` as connections are made. |
+| `image_1` | optional | IMAGE | - | - | First image input; the frontend dynamically appends `image_2..image_N` as connections are made. |
 
 ## Outputs
 

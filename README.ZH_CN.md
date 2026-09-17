@@ -21,6 +21,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.24.0**
+- feat(image_resize)：统一 `auto`（先按面积定档→档内选比例）到 GPT Image 2.0 / Gemini30Pro / Gemini31Flash / Jimeng 四个 resize 节点
+- feat(image_resize)：Jimeng `auto` 排除 `[2.0_pro]` 预设
+- docs：同步四个 resize 节点的中英文文档与节点列表
+
 **v3.23.1**
 - fix(io)：`Load Video` 与 `Load Video to Image` 支持绝对路径和相对于 ComfyUI 输入目录的路径，并统一应用于目录扫描与缓存变化判断
 - fix(io)：加载和保存支持透明通道的视频流；处理透明 MOV 时使用 ProRes 4444 输出
@@ -482,6 +487,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image BBox Overlay by Mask | 基于遮罩的图像边界框叠加，支持独立和合并模式 |
 | Image Alpha Clean | 清理图像 alpha 透明边缘噪点，支持强度预设与仅检测模式 |
 | Image BW Matte | 从图像生成适合抠图的 `mask`，固定使用 `auto + soft` 流程，并提供 `gamma`、向内收边与羽化参数 |
+| Image Align Change Mask | 将 AI 编辑图与原图对齐，输出 clean/raw 变化遮罩、变化评分与叠加图，抑制小幅全局色彩漂移 |
+| Image Blur | 整图高斯模糊，支持小数半径、逐帧批量处理，blur 为 0 时原图透传 |
 
 ### 📐 图像尺寸节点
 | 节点名称 | 功能描述 |
@@ -489,23 +496,24 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Resize FluxKontext | 图像尺寸调整为 FluxKontext 预设尺寸，支持图像和遮罩的自动/手动尺寸选择 |
 | Image Resize QwenImage | 专为 Qwen 视觉模型优化的图像尺寸调整，支持预设分辨率与自动匹配 |
 | Image Resize Universal | 通用图像尺寸调整，支持多种比例来源、fit 策略与遮罩同步输出 |
-| Image Resize Jimeng | 适配即梦常用分辨率的图像尺寸调整，支持自动尺寸匹配 |
-| Image Resize Gemini30ProImage | 适配 Gemini 3.0 Pro 预设分辨率，支持 auto 档位与 image/mask 同步变换 |
-| Image Resize Gemini31FlashImage | 适配 Gemini 3.1 Flash 预设分辨率，扩展 0.5k/1k/2k/4k 档位与超宽比例 |
-| Image Resize GPT Image 2.0 | 适配 GPT Image 2.0 尺寸，支持 auto 预设匹配、dynamic 动态保比例档位与 1k/2k/4k 固定预设 |
+| Image Resize Jimeng | 适配即梦常用分辨率的图像尺寸调整，支持按面积定档的 auto 匹配 |
+| Image Resize Gemini30ProImage | 适配 Gemini 3.0 Pro 预设分辨率，支持按面积定档的 auto 匹配与 image/mask 同步变换 |
+| Image Resize Gemini31FlashImage | 适配 Gemini 3.1 Flash 预设分辨率，支持按面积定档的 auto 匹配与 0.5k/1k/2k/4k 档位 |
+| Image Resize GPT Image 2.0 | 适配 GPT Image 2.0 尺寸，支持按面积定档的 auto 预设匹配、dynamic 动态保比例档位与 1k/2k/4k 固定预设 |
 | Image Resize Square | 通用方形尺寸适配节点，支持 256/512/1024/2048/4096 与 `auto`、`auto (0.5k \| 1k)` |
 
 ### 🌈 颜色节点
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Match Brightness Contrast | 调整源图像的亮度和对比度以匹配参考图像 |
+| Image Color Match | 将参考图像的颜色迁移到源图像，支持 wavelet/adain（原生）与 mkl/hm/reinhard/mvgd 及其组合（color-matcher），并支持批量循环匹配 |
 
 ### 🎨 图像混合节点
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Image Mask Blend | 基于亮度的图像蒙版合成，支持羽化、透明度输出和边缘扩展等多种背景策略 |
 | Image Blend Mode by Alpha | 基于透明度的图像混合，支持多种Photoshop风格混合模式 |
-| Image Blend Mode by CSS | CSS标准混合模式，基于Pilgram库实现 |
+| Image Blend Mode by CSS | CSS标准混合模式，基于 PyTorch 原生实现 |
 
 ### ✂️ 图像裁剪节点
 | 节点名称 | 功能描述 |
@@ -546,7 +554,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🔍 检测节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Detect Remove BG | 多后端抠图节点，支持 RMBG/BiRefNet/Inspyrenet，输出前景图与 alpha 遮罩 |
+| Detect Remove BG | 多后端抠图节点，支持 RMBG/BiRefNet/InSPyReNet，输出前景图与 alpha 遮罩 |
 | Detect Remove BG Refine | RMBG 掩码后处理细化，输入原图+mask，输出 refined RGBA 与 alpha |
 | Detect Guide Line | 引导线检测，融合 Canny、HoughLinesP 与 DBSCAN 消失点聚类 |
 | Detect Yolo | YOLO模型目标检测，支持子文件夹模型、可自定义置信度阈值和可选标签显示控制 |
@@ -590,6 +598,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Text Compare | 比较两个字符串，支持相等、包含、前后缀和正则等运算符，并输出布尔值 |
 | Text Match Rownum | 多行文本行号匹配，返回首个匹配项的行号（1-based），未命中返回 0 |
 | Text Match Value | 在多行键值对中匹配单行文本并返回对应值，支持简单数字与布尔文本自动转类型 |
+| Image Minimum Area | 将图像放大至面积达到最小正方形参考面积（N²），支持 crop/pad/stretch、divisible_by 取整、遮罩输出与 resize_bool 标志 |
+| String Random | 按固定种子从多行自定义文本中随机抽取一项（支持虚线/换行/标点分隔） |
 
 ### 🔢 整数节点
 | 节点名称 | 功能描述 |
@@ -626,6 +636,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Text Custom Extract | 文本自定义提取器，从JSON中提取指定键值 |
 | String Ratio Gpt20Image | 从输入图像推断最接近的 GPT 2.0 图像模型支持比例；未连接图像时透传所选比例 |
 | String Ratio Gemini31FlashImage | 从输入图像推断最接近的 Gemini 3.1 Flash 支持比例；未连接图像时透传所选比例 |
+| String Ratio Jimeng | 从输入图像推断最接近的 Jimeng 支持比例；未连接图像时透传所选比例 |
 | String Resolution | 从输入图像推断最接近的分辨率档位（`0.5k` / `1k` / `2k` / `4k`）；未连接图像时透传所选标签 |
 | String Filter | 文本过滤器，支持用 `input` 值替换 `{input}` / `{n}`、注释过滤（# 与三引号）、可选空行移除 |
 | String Join Multi | 多段文本拼接，支持 `{input}` 占位符、注释/空行过滤与复合分隔符 |

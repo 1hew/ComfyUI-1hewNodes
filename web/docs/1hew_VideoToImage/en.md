@@ -6,7 +6,7 @@
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `video` | - | VIDEO | - | - | Input ComfyUI video object. |
+| `video` | optional | VIDEO | - | - | Input ComfyUI video object. |
 
 ## Outputs
 

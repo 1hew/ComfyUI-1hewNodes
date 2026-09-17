@@ -10,7 +10,7 @@
 | `height_pad` | - | INT | 24 | 1–1024 | Minimum padding in pixels around text. Scales with image size. |
 | `font_size` | - | INT | 36 | 1–256 | Base font size at 1024 reference resolution. Scales automatically. |
 | `invert_color` | - | BOOLEAN | True | - | White label with black text when True; inverted when False. |
-| `font` | - | COMBO | auto | fonts dir | Font file from `fonts/` directory (e.g., `Alibaba-PuHuiTi-Regular.otf`). |
+| `font` | - | COMBO | `Alibaba-PuHuiTi-Regular.otf` | fonts in `fonts/` (Light/Regular/Medium/Bold/Heavy) | Font file selected from the `fonts/` directory. |
 | `text` | - | STRING(multiline) | "" | - | Label text. Supports `--` separator lines to split sections, otherwise uses newline. |
 | `direction` | - | COMBO | `top` | `top`/`bottom`/`left`/`right` | Placement side of the label. |
 | `input1` | - | STRING | "" | - | Optional variable available to template in `text`. |

@@ -6,7 +6,7 @@
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `any` | - | ANY (`*`) | - | - | Input content to save; automatically converted to string. Dict/list values are formatted as JSON text. |
+| `any` | optional | ANY (`*`) | - | - | Input content to save; automatically converted to string. Dict/list values are formatted as JSON text. |
 | `filename` | - | STRING | `txt/ComfyUI` | - | Save prefix or absolute path. Relative paths are written under the ComfyUI output directory. |
 | `auto_increment` | - | BOOLEAN | `true` | - | When `true`, creates a new numbered file; when `false`, uses a fixed filename and overwrites it. |
 | `save_output` | - | BOOLEAN | `true` | - | When `true`, writes to disk; when `false`, only previews the text in UI without saving. |

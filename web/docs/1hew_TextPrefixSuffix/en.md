@@ -6,7 +6,7 @@
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `text` | optional | ANY | - | - | Any text or iterable; non-string iterables are converted to a list for per-item processing |
+| `text` | - | ANY | - | - | Any text or iterable; non-string iterables are converted to a list for per-item processing |
 | `prefix` | - | STRING | `""` | - | Per-item prefix (e.g., `[` or `Scene: `) |
 | `suffix` | - | STRING | `""` | - | Per-item suffix (e.g., `]` or `;`) |
 

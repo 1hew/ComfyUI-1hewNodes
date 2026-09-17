@@ -14,8 +14,8 @@
 | `min_frame_count` | - | INT | 10 | 1-1000 | Minimum segment length; merges cuts that are too close. |
 | `max_frame_count` | - | INT | 0 | 0-10000 | Maximum segment length; `0` disables splitting of long segments. |
 | `fast` | - | BOOLEAN | `False` | - | Enable simplified SSIM detection for speed. |
-| `add_frame` | - | STRING | `` | comma list | Manually add cut frames; accepts English/Chinese commas. |
-| `delete_frame` | - | STRING | `` | comma list | Remove cut frames (except `0`); accepts English/Chinese commas. |
+| `add_frame` | optional | STRING | `` | comma list | Manually add cut frames; accepts English/Chinese commas. |
+| `delete_frame` | optional | STRING | `` | comma list | Remove cut frames (except `0`); accepts English/Chinese commas. |
 
 ## Outputs
 
@@ -24,7 +24,7 @@
 | `image` | IMAGE | Frames at each group start index (keyframes). |
 | `group_total` | INT | Number of groups (segments). |
 | `start_index` | LIST(INT) | Start frame indices for each segment (always includes `0`). |
-| `batch_count` | LIST(INT) | Frame counts per segment.
+| `batch_count` | LIST(INT) | Frame counts per segment. |
 
 ## Features
 

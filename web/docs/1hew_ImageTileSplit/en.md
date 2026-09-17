@@ -9,7 +9,7 @@
 | `image` | required | IMAGE | - | - | Input image to be split. |
 | `get_tile_size` | optional | IMAGE | - | - | Reference image; if connected, its dimensions are used as the tile size (overrides `mode`). |
 | `mode` | - | COMBO | `auto` | `auto` / `grid` / Presets... | Split mode. `auto` calculates optimal grid; `grid` uses manual rows/cols; Presets use fixed resolutions. |
-| `overlap_amount` | - | FLOAT | 0.05 | 0.0-512.0 | Overlap between tiles. <=1.0 is ratio, >1.0 is pixels. |
+| `overlap_amount` | - | FLOAT | 0.05 | 0.0-1024.0 | Overlap between tiles. <=1.0 is ratio, >1.0 is pixels. |
 | `grid_row` | - | INT | 2 | 1-10 | Number of rows in `grid` mode. |
 | `grid_col` | - | INT | 2 | 1-10 | Number of columns in `grid` mode. |
 | `divisible_by` | - | INT | 8 | 1-1024 | Ensures tile dimensions are multiples of this value (ignored in Preset/Reference modes). |

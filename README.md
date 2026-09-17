@@ -21,6 +21,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.24.0**
+- feat(image_resize): Unify `auto` (tier by input area → closest aspect within tier) across GPT Image 2.0 / Gemini30Pro / Gemini31Flash / Jimeng resize nodes
+- feat(image_resize): Jimeng `auto` excludes `[2.0_pro]` presets
+- docs: Sync bilingual docs and node list for the four resize nodes
+
 **v3.23.1**
 - fix(io): Make `Load Video` and `Load Video to Image` resolve absolute paths and paths relative to the ComfyUI input directory, including directory scans and cache invalidation
 - fix(io): Preserve alpha-capable MOV/video streams when loading and saving, including ProRes 4444 output for processed transparent MOV files
@@ -482,6 +487,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image BBox Overlay by Mask | Mask-based image bounding box overlay with independent and merge modes |
 | Image Alpha Clean | Clean image alpha edge noise with simple strength presets and optional detection-only output |
 | Image BW Matte | Generate a cutout-friendly `mask` with a fixed `auto + soft` pipeline, plus `gamma`, inward shrink, and blur controls |
+| Image Align Change Mask | Align an AI-edited image to its original and extract clean/raw change masks, a change score, and an overlay while rejecting small global color drift |
+| Image Blur | Whole-image Gaussian blur with fractional radius, per-frame batch processing, and pass-through when blur is 0 |
 
 ### 📐 Image Resize Nodes
 | Node Name | Description |
@@ -489,23 +496,24 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Resize FluxKontext | Resize images/masks to FluxKontext preset sizes with auto/manual target selection |
 | Image Resize QwenImage | Qwen-oriented image resizing with preset resolutions and auto matching |
 | Image Resize Universal | Universal image resizing with ratio inference, fit strategies, and synchronized mask output |
-| Image Resize Jimeng | Resize for Jimeng-oriented presets with automatic nearest-size matching |
-| Image Resize Gemini30ProImage | Gemini 3.0 Pro preset size adapter with auto tiers and synchronized image/mask transforms |
-| Image Resize Gemini31FlashImage | Gemini 3.1 Flash preset size adapter with extended 0.5k/1k/2k/4k tiers and extreme aspect ratios |
-| Image Resize GPT Image 2.0 | GPT Image 2.0 size adapter with auto preset matching, dynamic aspect-preserving tiers, and 1k/2k/4k fixed presets |
+| Image Resize Jimeng | Resize for Jimeng-oriented presets with area-tiered auto matching and 1k/2k/4k fixed presets |
+| Image Resize Gemini30ProImage | Gemini 3.0 Pro preset size adapter with area-tiered auto matching and synchronized image/mask transforms |
+| Image Resize Gemini31FlashImage | Gemini 3.1 Flash preset size adapter with area-tiered auto matching across 0.5k/1k/2k/4k tiers and extreme aspect ratios |
+| Image Resize GPT Image 2.0 | GPT Image 2.0 size adapter with area-tiered auto preset matching, dynamic aspect-preserving tiers, and 1k/2k/4k fixed presets |
 | Image Resize Square | General square size adapter with 256/512/1024/2048/4096 plus `auto` and `auto (0.5k \| 1k)` |
 
 ### 🌈 Color Nodes
 | Node Name | Description |
 |-----------|-------------|
 | Match Brightness Contrast | Adjusts the brightness and contrast of the source image to match the reference image |
+| Image Color Match | Transfer the color of a reference image onto a source image with wavelet/adain (native) or mkl/hm/reinhard/mvgd plus hybrids (color-matcher), supporting batch cycling |
 
 ### 🎨 Image Blending Nodes
 | Node Name | Description |
 |-----------|-------------|
 | Image Mask Blend | Luminance-based image mask compositing with feathering, alpha output, and edge-extension background strategies |
 | Image Blend Mode by Alpha | Alpha-based image blending with multiple Photoshop-style blend modes |
-| Image Blend Mode by CSS | CSS standard blend modes based on Pilgram library |
+| Image Blend Mode by CSS | CSS standard blend modes implemented natively in PyTorch |
 
 ### ✂️ Image Cropping Nodes
 | Node Name | Description |
@@ -546,7 +554,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🔍 Detection Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Detect Remove BG | Multi-backend background removal (RMBG/BiRefNet/Inspyrenet) with image + alpha mask outputs |
+| Detect Remove BG | Multi-backend background removal (RMBG/BiRefNet/InSPyReNet) with image + alpha mask outputs |
 | Detect Remove BG Refine | RMBG mask post-refinement using original image + mask, outputs refined RGBA and alpha |
 | Detect Yolo | YOLO model object detection with subfolder model support, customizable confidence thresholds, and optional label display control |
 | Detect Guide Line | Guide line detection combining Canny, HoughLinesP, and DBSCAN vanishing-point clustering |
@@ -590,6 +598,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Text Compare | Compares two strings with equality, containment, prefix/suffix, or regex operators and outputs a boolean |
 | Text Match Rownum | Match a single text against multi-line text and return first matched row number (1-based), or 0 when not found |
 | Text Match Value | Match single-line text against multi-line key-value pairs and return corresponding value with simple numeric/boolean auto-typing |
+| Image Minimum Area | Upscale an image until its area reaches a minimum square reference area (N²), with crop/pad/stretch fit, divisible_by rounding, mask output, and a resize_bool flag |
+| String Random | Randomly pick one item from multiline custom text (split by dash lines, newlines, or punctuation) using a fixed seed |
 
 ### 🔢 Integer Nodes
 | Node Name | Description |
@@ -626,6 +636,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Text Custom Extract | Text custom extractor for extracting specified key values from JSON |
 | String Ratio Gpt20Image | Infer the nearest GPT 2.0 image supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
 | String Ratio Gemini31FlashImage | Infer the nearest Gemini 3.1 Flash supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
+| String Ratio Jimeng | Infer the nearest Jimeng supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
 | String Resolution | Infer the nearest resolution tier (`0.5k` / `1k` / `2k` / `4k`) from input images, or pass through the selected label when no image is connected |
 | String Filter | Text cleaner supporting `{input}` / `{n}` substitution from the `input` value, comment filtering (# and triple quotes), and optional empty-line removal |
 | String Join Multi | Join up to 5 text blocks with `{input}` substitution, comment/empty-line filtering, and composite separators|

@@ -8,7 +8,7 @@
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | `image` | Required | IMAGE | - | - | Original image to be cropped |
 | `mask` | Required | MASK | - | - | Mask defining the subject to crop |
-| `preset_ratio` | - | COMBO | `mask` | `mask` / `image` / `auto` / `9:16` ... | Target aspect ratio preset. `mask` follows mask; `image` follows original; `auto` matches common ratios |
+| `preset_ratio` | - | COMBO | `mask` | `mask` / `image` / `auto` / `9:16` / `2:3` / `3:4` / `4:5` / `1:1` / `5:4` / `4:3` / `3:2` / `16:9` / `21:9` | Target aspect ratio preset. `mask` follows mask; `image` follows original; `auto` matches common ratios |
 | `get_crop_ratio` | Optional | IMAGE | - | - | Optional reference image. If connected, auto-matches its aspect ratio, overriding `preset_ratio` |
 | `scale_strength` | - | FLOAT | 0.0 | 0.0-1.0 | Scale strength. Extends the crop box outwards while maintaining aspect ratio |
 | `crop_to_side` | - | COMBO | `None` | `None` / `longest` / `shortest` / `width` / `height` | Target side control mode |

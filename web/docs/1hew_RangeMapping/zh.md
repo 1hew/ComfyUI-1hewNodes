@@ -1,4 +1,4 @@
-﻿# Range Mapping - 范围映射（0–1 到 [min, max]）
+# Range Mapping - 范围映射（0–1 到 [min, max]）
 
 **节点功能：** `Range Mapping` 将归一化输入 `value∈[0,1]` 映射到目标范围 `[min, max]`，并支持按位小数四舍五入或整数化输出。
 
@@ -20,7 +20,7 @@
 
 ## 功能说明
 
-- 线性映射：`actual = min + value × (max − max)`。
+- 线性映射：`actual = min + value × (max − min)`。
 - 边界宽泛：`min`/`max` 支持很大的正负范围。 
 
 ## 典型用法

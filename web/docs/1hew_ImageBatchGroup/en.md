@@ -10,7 +10,7 @@
 | `batch_size` | - | INT | 81 | 1-1024 | Window size per group. |
 | `overlap` | - | INT | 0 | 0-1024 | Overlap frames between consecutive windows. |
 | `last_batch_mode` | - | COMBO | `backtrack_last` | `drop_incomplete` / `keep_remaining` / `backtrack_last` / `fill_color` | Strategy for the final window. |
-| `color` | - | STRING | `1.0` | grayscale/HEX/RGB/name/single-letter | Background color when `fill_color` is used; supports `0.0-1.0`, `R,G,B`, HEX, named colors, and single-letter aliases. |
+| `color` | optional | STRING | `1.0` | grayscale/HEX/RGB/name/single-letter | Background color when `fill_color` is used; supports `0.0-1.0`, `R,G,B`, HEX, named colors, and single-letter aliases. |
 
 ## Outputs
 

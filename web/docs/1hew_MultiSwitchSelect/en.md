@@ -7,7 +7,7 @@
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | `select` | - | INT | 1 | 1-10 | Input number to route; `1` maps to `input_1`. |
-| `input_1` | - | ANY (`*`) | - | - | First candidate input. |
+| `input_1` | optional | ANY (`*`) | - | - | First candidate input. |
 | `input_2…input_10` | optional (dynamic) | ANY (`*`) | - | - | Additional candidate inputs. |
 
 ## Outputs

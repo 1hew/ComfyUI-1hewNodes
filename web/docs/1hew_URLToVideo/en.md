@@ -6,7 +6,7 @@
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `video_url` | - | STRING | - | http(s) | Direct URL to a video resource (must start with `http://` or `https://`). |
+| `video_url` | - | STRING | `` | http(s) | Direct URL to a video resource (must start with `http://` or `https://`). |
 | `timeout` | - | INT | 30 | 5-300 | Download timeout in seconds. |
 
 ## Outputs

@@ -13,7 +13,7 @@
 
 | Name | Type | Description |
 |------|------|-------------|
-| `rownum` | INT | First matched row index (1-based); returns `0` if not found. |
+| `int` | INT | First matched row index (1-based); returns `0` if not found. |
 
 ## Features
 
@@ -23,7 +23,7 @@
 
 ## Typical Usage
 
-- Text routing: match one keyword against candidate lines and feed `rownum` into switch-like logic nodes.
+- Text routing: match one keyword against candidate lines and feed `int` into switch-like logic nodes.
 - Config selection: map row index to different parameter groups or processing branches.
 
 ## Notes & Tips

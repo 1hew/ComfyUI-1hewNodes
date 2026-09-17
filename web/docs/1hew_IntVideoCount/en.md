@@ -6,7 +6,7 @@
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `video_1` | - | VIDEO | - | - | First video input; the frontend dynamically appends `video_2..video_N` as connections are made. |
+| `video_1` | optional | VIDEO | - | - | First video input; the frontend dynamically appends `video_2..video_N` as connections are made. |
 
 ## Outputs
 
