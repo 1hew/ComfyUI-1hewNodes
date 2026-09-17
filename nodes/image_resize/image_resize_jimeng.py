@@ -52,6 +52,13 @@ class ImageResizeJimeng(io.ComfyNode):
         "auto (1k | 2k)",
         "auto (2k | 4k)",
     ] + [name for name, _, _ in PRESET_RESOLUTIONS]
+    MAX_EDGE = 3840
+    NATIVE_OUTPUTS = True
+    TARGET_PIXELS = {
+        "1k": 1328 * 1328,
+        "2k": 2048 * 2048,
+        "4k": 4096 * 4096,
+    }
 
     @classmethod
     def define_schema(cls) -> io.Schema:
@@ -69,6 +76,8 @@ class ImageResizeJimeng(io.ComfyNode):
             outputs=[
                 io.Image.Output(display_name="image"),
                 io.Mask.Output(display_name="mask"),
+                io.Image.Output(display_name="native_image"),
+                io.Mask.Output(display_name="native_mask"),
             ],
         )
 
@@ -146,6 +155,32 @@ class ImageResizeJimeng(io.ComfyNode):
         return best_match[1], best_match[2]
 
     @classmethod
+    def _auto_tier(cls, iw: int, ih: int) -> str:
+        area = max(int(iw), 1) * max(int(ih), 1)
+        return min(
+            cls.TARGET_PIXELS.keys(),
+            key=lambda key: abs(math.log(max(area, 1)) - math.log(cls.TARGET_PIXELS[key])),
+        )
+
+    @classmethod
+    def _auto_candidates(cls, iw: int, ih: int, preset_size: str) -> list:
+        # bare auto 只在 1k/2k/4k 三档内定档，不涉及 [2.0_pro]。
+        if preset_size == "auto":
+            prefix = f"[{cls._auto_tier(iw, ih)}]"
+            return [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith(prefix)]
+        prefixes = {
+            "auto (1k)": ("[1k]",),
+            "auto (2k)": ("[2k]",),
+            "auto (4k)": ("[4k]",),
+            "auto (1k | 2k)": ("[1k]", "[2k]"),
+            "auto (2k | 4k)": ("[2k]", "[4k]"),
+        }
+        p = prefixes.get(preset_size)
+        if p is not None:
+            return [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith(p)]
+        return list(cls.PRESET_RESOLUTIONS)
+
+    @classmethod
     async def execute(
         cls,
         preset_size: str,
@@ -168,37 +203,13 @@ class ImageResizeJimeng(io.ComfyNode):
             if isinstance(image, torch.Tensor):
                 iw = max(int(image.shape[2]), 1)
                 ih = max(int(image.shape[1]), 1)
-                
-                resolutions = cls.PRESET_RESOLUTIONS
-                if preset_size == "auto (1k)":
-                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[1k]")]
-                elif preset_size == "auto (2k)":
-                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[2k]")]
-                elif preset_size == "auto (4k)":
-                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[4k]")]
-                elif preset_size == "auto (1k | 2k)":
-                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[1k]") or r[0].startswith("[2k]")]
-                elif preset_size == "auto (2k | 4k)":
-                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[2k]") or r[0].startswith("[4k]")]
-                
+                resolutions = cls._auto_candidates(iw, ih, preset_size)
                 width, height = cls._find_best_resolution(iw, ih, resolutions)
 
             elif isinstance(mask, torch.Tensor):
                 iw = max(int(mask.shape[2]), 1)
                 ih = max(int(mask.shape[1]), 1)
-                
-                resolutions = cls.PRESET_RESOLUTIONS
-                if preset_size == "auto (1k)":
-                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[1k]")]
-                elif preset_size == "auto (2k)":
-                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[2k]")]
-                elif preset_size == "auto (4k)":
-                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[4k]")]
-                elif preset_size == "auto (1k | 2k)":
-                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[1k]") or r[0].startswith("[2k]")]
-                elif preset_size == "auto (2k | 4k)":
-                    resolutions = [r for r in cls.PRESET_RESOLUTIONS if r[0].startswith("[2k]") or r[0].startswith("[4k]")]
-                
+                resolutions = cls._auto_candidates(iw, ih, preset_size)
                 width, height = cls._find_best_resolution(iw, ih, resolutions)
             else:
                 width, height = 1328, 1328
@@ -227,7 +238,25 @@ class ImageResizeJimeng(io.ComfyNode):
             if device is not None:
                 out_img = out_img.to(device)
                 out_msk = out_msk.to(device)
-            return io.NodeOutput(out_img, out_msk)
+            return cls._output(out_img, out_msk, out_img, out_msk)
+
+        # native source (image + mask at their original resolution)
+        if isinstance(image, torch.Tensor):
+            nat_img_src = image
+            nb = int(image.shape[0])
+            nh = int(image.shape[1])
+            nw = int(image.shape[2])
+            if isinstance(mask, torch.Tensor):
+                nat_msk_src = cls._ensure_mask_3d(mask)
+            else:
+                nat_msk_src = torch.ones((nb, nh, nw), dtype=torch.float32, device=image.device)
+        else:
+            nat_msk_src = cls._ensure_mask_3d(mask)
+            nb = int(nat_msk_src.shape[0])
+            nh = int(nat_msk_src.shape[1])
+            nw = int(nat_msk_src.shape[2])
+            nat_img_src = cls._blank_image(nb, nh, nw, pc, device)
+        native_img, native_msk = cls._native_pair(nat_img_src, nat_msk_src, tw, th, fit, pc)
 
         if isinstance(image, torch.Tensor) and (not isinstance(mask, torch.Tensor)):
             b, h, w, _ = image.shape
@@ -236,7 +265,7 @@ class ImageResizeJimeng(io.ComfyNode):
                 resized = F.interpolate(img_nchw, size=(th, tw), mode="bicubic", align_corners=False).permute(0, 2, 3, 1)
                 out_img = torch.clamp(resized, 0.0, 1.0).to(torch.float32)
                 out_msk = torch.ones((b, th, tw), dtype=torch.float32, device=image.device)
-                return io.NodeOutput(out_img, out_msk)
+                return cls._output(out_img, out_msk, native_img, native_msk)
             if fit == "pad":
                 sw = tw / max(w, 1)
                 sh = th / max(h, 1)
@@ -250,7 +279,7 @@ class ImageResizeJimeng(io.ComfyNode):
                 left = max((tw - new_w) // 2, 0)
                 out_msk = torch.zeros((b, th, tw), dtype=torch.float32, device=out_img.device)
                 out_msk[:, top : top + new_h, left : left + new_w] = 1.0
-                return io.NodeOutput(out_img, out_msk)
+                return cls._output(out_img, out_msk, native_img, native_msk)
             ta = tw / max(th, 1)
             oa = w / max(h, 1)
             if oa > ta:
@@ -267,7 +296,7 @@ class ImageResizeJimeng(io.ComfyNode):
             out_img = torch.clamp(resized, 0.0, 1.0).to(torch.float32)
             out_msk = torch.zeros((b, h, w), dtype=torch.float32, device=image.device)
             out_msk[:, top : top + ch, left : left + cw] = 1.0
-            return io.NodeOutput(out_img, out_msk)
+            return cls._output(out_img, out_msk, native_img, native_msk)
 
         if (not isinstance(image, torch.Tensor)) and isinstance(mask, torch.Tensor):
             mb, mh, mw = int(mask.shape[0]), int(mask.shape[1]), int(mask.shape[2])
@@ -282,7 +311,7 @@ class ImageResizeJimeng(io.ComfyNode):
                 if device is not None:
                     out_img = out_img.to(device)
                     out_msk = out_msk.to(device)
-                return io.NodeOutput(out_img, out_msk)
+                return cls._output(out_img, out_msk, native_img, native_msk)
             if fit == "pad":
                 sw = tw / max(mw, 1)
                 sh = th / max(mh, 1)
@@ -302,7 +331,7 @@ class ImageResizeJimeng(io.ComfyNode):
                 if device is not None:
                     out_img = out_img.to(device)
                     out_msk = out_msk.to(device)
-                return io.NodeOutput(out_img, out_msk)
+                return cls._output(out_img, out_msk, native_img, native_msk)
             ta = tw / max(th, 1)
             oa = mw / max(mh, 1)
             if oa > ta:
@@ -324,7 +353,7 @@ class ImageResizeJimeng(io.ComfyNode):
             if device is not None:
                 out_img = out_img.to(device)
                 out_msk = out_msk.to(device)
-            return io.NodeOutput(out_img, out_msk)
+            return cls._output(out_img, out_msk, native_img, native_msk)
 
         b, h, w, _ = image.shape
         m = cls._ensure_mask_3d(mask)
@@ -338,7 +367,7 @@ class ImageResizeJimeng(io.ComfyNode):
                 out_msk = torch.clamp(out_msk, 0.0, 1.0).to(torch.float32)
             else:
                 out_msk = torch.ones((b, th, tw), dtype=torch.float32, device=image.device)
-            return io.NodeOutput(out_img, out_msk)
+            return cls._output(out_img, out_msk, native_img, native_msk)
         if fit == "pad":
             sw = tw / max(w, 1)
             sh = th / max(h, 1)
@@ -357,7 +386,7 @@ class ImageResizeJimeng(io.ComfyNode):
                 out_msk[:, top : top + new_h, left : left + new_w] = torch.clamp(m_res, 0.0, 1.0)
             else:
                 out_msk[:, top : top + new_h, left : left + new_w] = 1.0
-            return io.NodeOutput(out_img, out_msk)
+            return cls._output(out_img, out_msk, native_img, native_msk)
         ta = tw / max(th, 1)
         oa = w / max(h, 1)
         if oa > ta:
@@ -379,7 +408,7 @@ class ImageResizeJimeng(io.ComfyNode):
             out_msk = torch.clamp(out_msk, 0.0, 1.0).to(torch.float32)
         else:
             out_msk = torch.ones((b, th, tw), dtype=torch.float32, device=image.device)
-        return io.NodeOutput(out_img, out_msk)
+        return cls._output(out_img, out_msk, native_img, native_msk)
 
     @staticmethod
     def _ensure_mask_3d(mask):
@@ -529,3 +558,95 @@ class ImageResizeJimeng(io.ComfyNode):
             out[:] = fill_t
         out[:, top:h_end, left:w_end, :] = img[:, : h_end - top, : w_end - left, :]
         return out
+
+    @classmethod
+    def _blank_image(cls, batch, height, width, pad_color, device):
+        rgb = (1.0, 1.0, 1.0) if isinstance(pad_color, str) else pad_color
+        base = torch.ones((int(batch), int(height), int(width), 3), dtype=torch.float32, device=device)
+        color_t = torch.tensor(rgb, dtype=torch.float32, device=device)
+        return base * color_t.view(1, 1, 1, 3)
+
+    @staticmethod
+    def _round_to_multiple_of_16(value: int) -> int:
+        return max(16, int(round(float(value) / 16.0)) * 16)
+
+    @staticmethod
+    def _ceil_to_multiple_of_16(value: int) -> int:
+        return max(16, ((int(value) + 15) // 16) * 16)
+
+    @staticmethod
+    def _resize_image(image: torch.Tensor, target_h: int, target_w: int) -> torch.Tensor:
+        img_nchw = image.permute(0, 3, 1, 2)
+        resized = F.interpolate(img_nchw, size=(int(target_h), int(target_w)), mode="bicubic", align_corners=False)
+        return torch.clamp(resized.permute(0, 2, 3, 1), 0.0, 1.0).to(torch.float32)
+
+    @staticmethod
+    def _resize_mask(mask: torch.Tensor, target_h: int, target_w: int) -> torch.Tensor:
+        m4 = mask.unsqueeze(1)
+        resized = F.interpolate(m4, size=(int(target_h), int(target_w)), mode="nearest").squeeze(1)
+        return torch.clamp(resized, 0.0, 1.0).to(torch.float32)
+
+    @classmethod
+    def _native_pair(cls, image, mask, target_w, target_h, fit, pad_color):
+        """Second output: same aspect ratio as the main output, anchored to the source scale."""
+        b, h, w, _ = image.shape
+        ratio = float(target_w) / float(max(target_h, 1))
+        source_aspect = float(w) / float(max(h, 1))
+
+        if fit == "pad":
+            if source_aspect > ratio:
+                cw, ch = w, max(h, int(math.ceil(w / ratio)))
+            else:
+                cw, ch = max(w, int(math.ceil(h * ratio))), h
+            native_img = cls._pad_to_rgb(image, ch, cw, pad_color)
+            top = max((ch - h) // 2, 0)
+            left = max((cw - w) // 2, 0)
+            native_msk = torch.zeros((b, ch, cw), dtype=torch.float32, device=mask.device)
+            native_msk[:, top : top + h, left : left + w] = mask
+            return cls._cap_native(native_img, native_msk)
+
+        if fit == "crop":
+            if source_aspect > ratio:
+                cw, ch = max(1, int(math.floor(h * ratio))), h
+            else:
+                cw, ch = w, max(1, int(math.floor(w / ratio)))
+            cw = max(1, min(int(cw), w))
+            ch = max(1, min(int(ch), h))
+            left = max((w - cw) // 2, 0)
+            top = max((h - ch) // 2, 0)
+            native_img = image[:, top : top + ch, left : left + cw, :].contiguous()
+            native_msk = mask[:, top : top + ch, left : left + cw].contiguous()
+            return cls._cap_native(native_img, native_msk)
+
+        area = float(w * h)
+        cw = max(int(round((area * ratio) ** 0.5)), 1)
+        ch = max(int(round((area / ratio) ** 0.5)), 1)
+        native_img = cls._resize_image(image, ch, cw)
+        native_msk = cls._resize_mask(mask, ch, cw)
+        return cls._cap_native(native_img, native_msk)
+
+    @classmethod
+    def _output(cls, out_img, out_msk, native_img=None, native_msk=None):
+        # Native is a proportional copy of the final main output, so its
+        # content/crop/padding are identical and only the resolution differs.
+        main_h, main_w = int(out_img.shape[1]), int(out_img.shape[2])
+        hint_h = int(native_img.shape[1]) if native_img is not None else main_h
+        hint_w = int(native_img.shape[2]) if native_img is not None else main_w
+        gcd = math.gcd(main_w, main_h)
+        ratio_w, ratio_h = main_w // gcd, main_h // gcd
+        scale = max(1, int(round(math.sqrt((hint_w * hint_h) / float(ratio_w * ratio_h)))))
+        native_w, native_h = ratio_w * scale, ratio_h * scale
+        native_img = cls._resize_image(out_img, native_h, native_w)
+        native_msk = cls._resize_mask(out_msk, native_h, native_w)
+        return io.NodeOutput(out_img, out_msk, native_img, native_msk)
+
+    @classmethod
+    def _cap_native(cls, native_img, native_msk):
+        hh, ww = int(native_img.shape[1]), int(native_img.shape[2])
+        longest = max(hh, ww)
+        if longest <= cls.MAX_EDGE:
+            return native_img, native_msk
+        scale = float(cls.MAX_EDGE) / float(longest)
+        nw = max(1, int(round(ww * scale)))
+        nh = max(1, int(round(hh * scale)))
+        return cls._resize_image(native_img, nh, nw), cls._resize_mask(native_msk, nh, nw)

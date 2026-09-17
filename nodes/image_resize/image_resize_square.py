@@ -12,6 +12,7 @@ class ImageResizeSquare(ImageResizeGemini30ProImage):
         ("[4k] 4096x4096 (1:1)", 4096, 4096),
     ]
     PRESET_OPTIONS = ["auto", "auto (0.5k | 1k)"] + [name for name, _, _ in PRESET_RESOLUTIONS]
+    NATIVE_OUTPUTS = False
 
     @classmethod
     def define_schema(cls) -> io.Schema:

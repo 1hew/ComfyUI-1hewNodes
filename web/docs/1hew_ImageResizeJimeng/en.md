@@ -6,9 +6,9 @@
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `preset_size` | - | COMBO | `auto (2k \| 4k)` | `auto` / `1k` / `2k` / `4k` / `2.0_pro` presets | Target resolution preset. `auto` modes match input aspect ratio to the closest standard resolution. |
+| `preset_size` | - | COMBO | `auto (2k \| 4k)` | `auto` / `auto (1k)` / `auto (2k)` / `auto (4k)` / `auto (1k \| 2k)` / `auto (2k \| 4k)` / `[1k]` / `[2k]` / `[4k]` / `[2.0_pro]` presets | Target resolution preset. `auto` picks the `1k`/`2k`/`4k` tier by input area, then matches the closest aspect ratio within it (excluding `[2.0_pro]`); `auto (1k)` etc. fix the tier. |
 | `fit` | - | COMBO | `crop` | `crop` / `pad` / `stretch` | Fit mode: determines how the image adapts to the target resolution. |
-| `pad_color` | - | STRING | `1.0` | float / hex / rgb | Padding background color used when `fit` is set to `pad`. |
+| `pad_color` | - | STRING | `1.0` | color name / HEX / RGB / `edge` / `extend` / `mirror` / `average` | Padding background color or strategy used when `fit` is set to `pad`. |
 | `image` | optional | IMAGE | - | - | Input image batch to be resized. |
 | `mask` | optional | MASK | - | - | Input mask batch to be resized. |
 
@@ -18,12 +18,15 @@
 |------|------|-------------|
 | `image` | IMAGE | Resized image batch. |
 | `mask` | MASK | Resized mask batch. |
+| `native_image` | IMAGE | Native-resolution copy of the main output; identical content/crop/padding, different resolution. |
+| `native_mask` | MASK | Mask aligned with `native_image`. |
 
 ## Features
 
 - **Standard Presets**: Built-in support for 1k, 2k, 4k, and 2.0 pro resolution standards, covering common aspect ratios (21:9, 16:9, 3:2, 4:3, 1:1, etc.).
 - **Auto Matching**: 
-  - `auto`: Matches input to the closest resolution across all presets.
+  - `auto`: Picks the `1k`/`2k`/`4k` tier by input area, then matches the closest aspect ratio within it (excluding `[2.0_pro]`).
+  - `auto (1k)` / `auto (2k)` / `auto (4k)`: Restrict matching to the selected tier.
   - `auto (1k | 2k)`: Restricts matching to 1k and 2k presets.
   - `auto (2k | 4k)`: Restricts matching to 2k and 4k presets.
 - **Fit Modes**:

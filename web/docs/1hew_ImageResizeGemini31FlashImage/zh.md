@@ -6,7 +6,7 @@
 
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
-| `preset_size` | - | COMBO | `auto (2k \| 4k)` | `auto` / `auto (0.5k)` / `auto (1k \| 2k)` / `auto (2k \| 4k)` / 各预设分辨率项 | 目标尺寸选择；`auto (0.5k)` 会优先在 `[512]` 预设中自动匹配 |
+| `preset_size` | - | COMBO | `auto (2k \| 4k)` | `auto` / `auto (0.5k)` / `auto (1k)` / `auto (2k)` / `auto (4k)` / `auto (1k \| 2k)` / `auto (2k \| 4k)` / 各预设分辨率项 | 目标尺寸选择；`auto` 先按输入面积确定 `0.5k`/`1k`/`2k`/`4k` 档位、再在该档内选最接近比例，`auto (0.5k)` 等固定档位 |
 | `fit` | - | COMBO | `crop` | `crop` / `pad` / `stretch` | 适应模式：裁剪、填充、拉伸 |
 | `pad_color` | - | STRING | `1.0` | 灰度/HEX/RGB/颜色名/`edge`/`average`/`extend`/`mirror` | `pad` 模式背景填充策略 |
 | `image` | 可选 | IMAGE | - | - | 输入图像批次 |
@@ -18,11 +18,13 @@
 |---------|----------|------|
 | `image` | IMAGE | 调整后的图像批次 |
 | `mask` | MASK | 与输出尺寸匹配的遮罩批次 |
+| `native_image` | IMAGE | 主输出的原生分辨率副本；内容、裁剪与填充一致，仅分辨率不同 |
+| `native_mask` | MASK | 与 `native_image` 对齐的遮罩 |
 
 ## 功能说明
 
 - 扩展预设集：比 Gemini30 版本新增更多超宽/超高比例组合与 `0.5k` 自动档位。
-- 自动匹配逻辑：`auto*` 模式下按输入宽高比和面积匹配最近预设。
+- 自动匹配逻辑：`auto` 先按输入面积确定 `0.5k` / `1k` / `2k` / `4k` 档位，再在该档内按宽高比匹配最近预设；`auto (0.5k)` 等固定档位。
 - 适配策略一致：`crop` / `pad` / `stretch` 与 Gemini30 版本行为一致，遮罩同步输出。
 - 输入弹性：支持 image-only、mask-only、无输入三种场景。
 

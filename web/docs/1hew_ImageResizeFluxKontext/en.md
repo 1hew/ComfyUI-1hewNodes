@@ -17,7 +17,7 @@
 | Name | Type | Description |
 |------|------|-------------|
 | `image` | IMAGE | Resized image batch at preset size. |
-| `mask` | MASK | Resized mask aligned to output geometry.
+| `mask` | MASK | Resized mask aligned to output geometry. |
 
 ## Features
 

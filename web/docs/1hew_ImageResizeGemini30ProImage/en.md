@@ -6,7 +6,7 @@
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `preset_size` | - | COMBO | `auto (2k \| 4k)` | `auto` / `auto (1k \| 2k)` / `auto (2k \| 4k)` / preset resolution entries | Target size selector; `auto*` picks the closest preset by aspect ratio first, then area. |
+| `preset_size` | - | COMBO | `auto (2k \| 4k)` | `auto` / `auto (1k)` / `auto (2k)` / `auto (4k)` / `auto (1k \| 2k)` / `auto (2k \| 4k)` / preset resolution entries | Target size selector; `auto` picks the `1k`/`2k`/`4k` tier by input area, then the closest-aspect preset within it; `auto (1k)` etc. fix the tier. |
 | `fit` | - | COMBO | `crop` | `crop` / `pad` / `stretch` | Fit mode: crop, pad, or stretch. |
 | `pad_color` | - | STRING | `1.0` | grayscale/HEX/RGB/color name/`edge`/`average`/`extend`/`mirror` | Background fill strategy for `pad` mode. |
 | `image` | optional | IMAGE | - | - | Input image batch. |
@@ -18,10 +18,12 @@
 |------|------|-------------|
 | `image` | IMAGE | Resized image batch. |
 | `mask` | MASK | Output mask batch aligned to output size. |
+| `native_image` | IMAGE | Native-resolution copy of the main output; identical content/crop/padding, different resolution. |
+| `native_mask` | MASK | Mask aligned with `native_image`. |
 
 ## Features
 
-- Auto preset matching: chooses the closest preset using aspect ratio priority with area as tie-breaker.
+- Auto preset matching: `auto` picks the `1k`/`2k`/`4k` tier by input area, then matches the closest-aspect preset within it; `auto (1k)` etc. fix the tier.
 - Works with partial inputs: accepts image-only or mask-only; when both are absent, outputs a target-sized background image and full-white mask.
 - Three fit modes:
   - `crop`: center-crop with aspect preservation, then resize.

@@ -1,4 +1,4 @@
-﻿from comfy_api.latest import io
+from comfy_api.latest import io
 import math
 
 import torch
@@ -7,21 +7,21 @@ import torch.nn.functional as F
 
 class ImageResizeGPTImage20(io.ComfyNode):
     PRESET_RESOLUTIONS = [
-        ("[1k] 1728x576 (3:1)", 1728, 576),
-        ("[1k] 1344x576 (21:9)", 1344, 576),
-        ("[1k] 1440x720 (2:1)", 1440, 720),
-        ("[1k] 1280x720 (16:9)", 1280, 720),
-        ("[1k] 1248x832 (3:2)", 1248, 832),
-        ("[1k] 1152x864 (4:3)", 1152, 864),
-        ("[1k] 1120x896 (5:4)", 1120, 896),
+        ("[1k] 1760x592 (3:1)", 1760, 592),
+        ("[1k] 1552x672 (21:9)", 1552, 672),
+        ("[1k] 1424x736 (2:1)", 1424, 736),
+        ("[1k] 1328x784 (16:9)", 1328, 784),
+        ("[1k] 1232x848 (3:2)", 1232, 848),
+        ("[1k] 1168x896 (4:3)", 1168, 896),
+        ("[1k] 1136x912 (5:4)", 1136, 912),
         ("[1k] 1024x1024 (1:1)", 1024, 1024),
-        ("[1k] 896x1120 (4:5)", 896, 1120),
-        ("[1k] 864x1152 (3:4)", 864, 1152),
-        ("[1k] 832x1248 (2:3)", 832, 1248),
-        ("[1k] 720x1280 (9:16)", 720, 1280),
-        ("[1k] 720x1440 (1:2)", 720, 1440),
-        ("[1k] 576x1344 (9:21)", 576, 1344),
-        ("[1k] 576x1728 (1:3)", 576, 1728),
+        ("[1k] 912x1136 (4:5)", 912, 1136),
+        ("[1k] 896x1168 (3:4)", 896, 1168),
+        ("[1k] 848x1232 (2:3)", 848, 1232),
+        ("[1k] 784x1328 (9:16)", 784, 1328),
+        ("[1k] 736x1424 (1:2)", 736, 1424),
+        ("[1k] 672x1552 (9:21)", 672, 1552),
+        ("[1k] 592x1760 (1:3)", 592, 1760),
         ("[2k] 3456x1152 (3:1)", 3456, 1152),
         ("[2k] 2688x1152 (21:9)", 2688, 1152),
         ("[2k] 2880x1440 (2:1)", 2880, 1440),
@@ -35,7 +35,7 @@ class ImageResizeGPTImage20(io.ComfyNode):
         ("[2k] 1664x2496 (2:3)", 1664, 2496),
         ("[2k] 1440x2560 (9:16)", 1440, 2560),
         ("[2k] 1440x2880 (1:2)", 1440, 2880),
-        ("[2k] 1152x2880 (9:21)", 1152, 2880),
+        ("[2k] 1152x2688 (9:21)", 1152, 2688),
         ("[2k] 1152x3456 (1:3)", 1152, 3456),
         ("[4k] 3840x1280 (3:1)", 3840, 1280),
         ("[4k] 3840x1648 (21:9)", 3840, 1648),
@@ -88,6 +88,8 @@ class ImageResizeGPTImage20(io.ComfyNode):
             outputs=[
                 io.Image.Output(display_name="image"),
                 io.Mask.Output(display_name="mask"),
+                io.Image.Output(display_name="native_image"),
+                io.Mask.Output(display_name="native_mask"),
             ],
         )
 
@@ -132,7 +134,7 @@ class ImageResizeGPTImage20(io.ComfyNode):
         if not isinstance(image, torch.Tensor) and not isinstance(mask, torch.Tensor):
             out_img = cls._blank_image(1, th, tw, pc, device)
             out_msk = torch.ones((1, th, tw), dtype=torch.float32, device=device)
-            return io.NodeOutput(out_img, out_msk)
+            return io.NodeOutput(out_img, out_msk, out_img, out_msk)
 
         if not isinstance(image, torch.Tensor):
             m = cls._ensure_mask_3d(mask)
@@ -140,15 +142,33 @@ class ImageResizeGPTImage20(io.ComfyNode):
             image_device = m.device
             image = cls._blank_image(b, h, w, pc, image_device)
             m = cls._ensure_mask_3d(mask)
-            out_img, out_msk = cls._resize_pair(image, m, tw, th, fit, pc)
-            return io.NodeOutput(out_img, out_msk)
+            out_img, out_msk, native_img, native_msk = cls._resize_pair(image, m, tw, th, fit, pc)
+            return cls._output(out_img, out_msk, native_img, native_msk)
 
         b, h, w, _ = image.shape
         m = cls._ensure_mask_3d(mask)
-        if not isinstance(m, torch.Tensor):
+        has_mask = isinstance(m, torch.Tensor)
+        if not has_mask:
             m = torch.ones((b, h, w), dtype=torch.float32, device=image.device)
-        out_img, out_msk = cls._resize_pair(image, m, tw, th, fit, pc)
-        return io.NodeOutput(out_img, out_msk)
+        out_img, out_msk, native_img, native_msk = cls._resize_pair(image, m, tw, th, fit, pc)
+
+        if fit == "crop" and not has_mask:
+            # Match the other resize nodes: with crop and no mask input, the
+            # default mask marks the kept region at the SOURCE resolution.
+            target_aspect = tw / max(th, 1)
+            source_aspect = w / max(h, 1)
+            if source_aspect > target_aspect:
+                crop_w = max(int(round(h * target_aspect)), 1)
+                crop_h = h
+            else:
+                crop_h = max(int(round(w / target_aspect)), 1)
+                crop_w = w
+            left = max((w - crop_w) // 2, 0)
+            top = max((h - crop_h) // 2, 0)
+            out_msk = torch.zeros((b, h, w), dtype=torch.float32, device=image.device)
+            out_msk[:, top : top + crop_h, left : left + crop_w] = 1.0
+
+        return cls._output(out_img, out_msk, native_img, native_msk)
 
     @classmethod
     def fingerprint_inputs(
@@ -206,7 +226,13 @@ class ImageResizeGPTImage20(io.ComfyNode):
             return preset
 
         if cls._is_auto_preset(preset_size):
-            candidates = cls._preset_candidates(preset_size)
+            # auto（不带档位）：先按输入面积定档（1k/2k/4k），再在该档内选最接近比例的预设。
+            # auto (1k)/(2k)/(4k)：直接限定在对应档内选比例。
+            if cls._normalize_preset_size(preset_size) == "auto":
+                target_key = cls._resolve_target_key(source_w, source_h, preset_size)
+                candidates = cls._preset_candidates(f"auto ({target_key})")
+            else:
+                candidates = cls._preset_candidates(preset_size)
             return cls._find_best_resolution(source_w, source_h, candidates)
 
         target_key = cls._resolve_target_key(source_w, source_h, preset_size)
@@ -343,16 +369,12 @@ class ImageResizeGPTImage20(io.ComfyNode):
         target_h: int,
         fit: str,
         pad_color,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         b, h, w, _ = image.shape
         if fit == "stretch":
             out_img = cls._resize_image(image, target_h, target_w)
             out_msk = cls._resize_mask(mask, target_h, target_w)
-            return out_img, out_msk
-
-        target_aspect = target_w / max(target_h, 1)
-        source_aspect = w / max(h, 1)
-        if fit == "pad":
+        elif fit == "pad":
             scale = min(target_w / max(w, 1), target_h / max(h, 1))
             new_w = max(int(round(w * scale)), 1)
             new_h = max(int(round(h * scale)), 1)
@@ -363,19 +385,97 @@ class ImageResizeGPTImage20(io.ComfyNode):
             left = max((target_w - new_w) // 2, 0)
             out_msk = torch.zeros((b, target_h, target_w), dtype=torch.float32, device=resized_msk.device)
             out_msk[:, top : top + new_h, left : left + new_w] = resized_msk
-            return out_img, out_msk
-
-        if source_aspect > target_aspect:
-            crop_w = max(int(round(h * target_aspect)), 1)
-            crop_h = h
         else:
-            crop_h = max(int(round(w / target_aspect)), 1)
-            crop_w = w
-        left = max((w - crop_w) // 2, 0)
-        top = max((h - crop_h) // 2, 0)
-        cropped_img = image[:, top : top + crop_h, left : left + crop_w, :]
-        cropped_msk = mask[:, top : top + crop_h, left : left + crop_w]
-        return cls._resize_image(cropped_img, target_h, target_w), cls._resize_mask(cropped_msk, target_h, target_w)
+            target_aspect = target_w / max(target_h, 1)
+            source_aspect = w / max(h, 1)
+            if source_aspect > target_aspect:
+                crop_w = max(int(round(h * target_aspect)), 1)
+                crop_h = h
+            else:
+                crop_h = max(int(round(w / target_aspect)), 1)
+                crop_w = w
+            left = max((w - crop_w) // 2, 0)
+            top = max((h - crop_h) // 2, 0)
+            cropped_img = image[:, top : top + crop_h, left : left + crop_w, :]
+            cropped_msk = mask[:, top : top + crop_h, left : left + crop_w]
+            out_img = cls._resize_image(cropped_img, target_h, target_w)
+            out_msk = cls._resize_mask(cropped_msk, target_h, target_w)
+
+        native_img, native_msk = cls._native_pair(image, mask, target_w, target_h, fit, pad_color)
+        return out_img, out_msk, native_img, native_msk
+
+    @classmethod
+    def _native_pair(
+        cls,
+        image: torch.Tensor,
+        mask: torch.Tensor,
+        target_w: int,
+        target_h: int,
+        fit: str,
+        pad_color,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Second output: same aspect ratio as the main output, anchored to the source scale.
+
+        pad     -> native content + pad to target ratio (area grows)
+        crop    -> native center-crop to target ratio (area shrinks)
+        stretch -> non-uniform stretch to target ratio, area preserved (W*H == w*h, approx)
+        """
+        b, h, w, _ = image.shape
+        ratio = float(target_w) / float(max(target_h, 1))
+        source_aspect = float(w) / float(max(h, 1))
+
+        if fit == "pad":
+            # Keep the source pixels at native scale; no implicit 16 alignment.
+            if source_aspect > ratio:
+                cw, ch = w, max(h, int(math.ceil(w / ratio)))
+            else:
+                cw, ch = max(w, int(math.ceil(h * ratio))), h
+            native_img = cls._pad_to_rgb(image, ch, cw, pad_color)
+            top = max((ch - h) // 2, 0)
+            left = max((cw - w) // 2, 0)
+            native_msk = torch.zeros((b, ch, cw), dtype=torch.float32, device=mask.device)
+            native_msk[:, top : top + h, left : left + w] = mask
+            return cls._cap_native(native_img, native_msk)
+
+        if fit == "crop":
+            if source_aspect > ratio:
+                cw, ch = max(int(round(h * ratio)), 1), h
+            else:
+                cw, ch = w, max(int(round(w / ratio)), 1)
+            cw = max(1, min(int(cw), w))
+            ch = max(1, min(int(ch), h))
+            left = max((w - cw) // 2, 0)
+            top = max((h - ch) // 2, 0)
+            native_img = image[:, top : top + ch, left : left + cw, :].contiguous()
+            native_msk = mask[:, top : top + ch, left : left + cw].contiguous()
+            return cls._cap_native(native_img, native_msk)
+
+        # stretch: preserve area, target ratio
+        area = float(w * h)
+        cw = max(int(round((area * ratio) ** 0.5)), 1)
+        ch = max(int(round((area / ratio) ** 0.5)), 1)
+        native_img = cls._resize_image(image, ch, cw)
+        native_msk = cls._resize_mask(mask, ch, cw)
+        return cls._cap_native(native_img, native_msk)
+
+    @staticmethod
+    def _ceil_to_multiple_of_16(value: int) -> int:
+        return max(16, ((int(value) + 15) // 16) * 16)
+
+    @classmethod
+    def _cap_native(
+        cls,
+        native_img: torch.Tensor,
+        native_msk: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        hh, ww = int(native_img.shape[1]), int(native_img.shape[2])
+        longest = max(hh, ww)
+        if longest <= cls.MAX_EDGE:
+            return native_img, native_msk
+        scale = float(cls.MAX_EDGE) / float(longest)
+        nw = max(1, int(round(ww * scale)))
+        nh = max(1, int(round(hh * scale)))
+        return cls._resize_image(native_img, nh, nw), cls._resize_mask(native_msk, nh, nw)
 
     @staticmethod
     def _resize_image(image: torch.Tensor, target_h: int, target_w: int) -> torch.Tensor:
@@ -388,3 +488,18 @@ class ImageResizeGPTImage20(io.ComfyNode):
         m4 = mask.unsqueeze(1)
         resized = F.interpolate(m4, size=(int(target_h), int(target_w)), mode="nearest").squeeze(1)
         return torch.clamp(resized, 0.0, 1.0).to(torch.float32)
+
+    @classmethod
+    def _output(cls, out_img, out_msk, native_img=None, native_msk=None):
+        # Native is a proportional copy of the final main output. This keeps
+        # crop/padding/content identical; only the resolution is different.
+        main_h, main_w = int(out_img.shape[1]), int(out_img.shape[2])
+        hint_h = int(native_img.shape[1]) if native_img is not None else main_h
+        hint_w = int(native_img.shape[2]) if native_img is not None else main_w
+        gcd = math.gcd(main_w, main_h)
+        ratio_w, ratio_h = main_w // gcd, main_h // gcd
+        scale = max(1, int(round(math.sqrt((hint_w * hint_h) / float(ratio_w * ratio_h)))))
+        native_w, native_h = ratio_w * scale, ratio_h * scale
+        native_img = cls._resize_image(out_img, native_h, native_w)
+        native_msk = cls._resize_mask(out_msk, native_h, native_w)
+        return io.NodeOutput(out_img, out_msk, native_img, native_msk)

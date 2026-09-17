@@ -1,4 +1,6 @@
 from comfy_api.latest import io
+import math
+import torch
 
 from .image_resize_gemini_30_pro_image import ImageResizeGemini30ProImage
 
@@ -80,6 +82,12 @@ class ImageResizeGemini31FlashImage(ImageResizeGemini30ProImage):
         "[2k] 1024x4096 (1:4)": "[2k] 1024x4128 (1:4)",
         "[2k] 768x6144 (1:8)": "[2k] 704x5856 (1:8)",
     }
+    TARGET_PIXELS = {
+        "0.5k": 512 * 512,
+        "1k": 1024 * 1024,
+        "2k": 2048 * 2048,
+        "4k": 4096 * 4096,
+    }
 
     @classmethod
     def define_schema(cls) -> io.Schema:
@@ -97,6 +105,8 @@ class ImageResizeGemini31FlashImage(ImageResizeGemini30ProImage):
             outputs=[
                 io.Image.Output(display_name="image"),
                 io.Mask.Output(display_name="mask"),
+                io.Image.Output(display_name="native_image"),
+                io.Mask.Output(display_name="native_mask"),
             ],
         )
 
@@ -152,3 +162,59 @@ class ImageResizeGemini31FlashImage(ImageResizeGemini30ProImage):
                 preset_size = matched[0]
 
         return await super().execute(preset_size, fit, pad_color, image=image, mask=mask)
+
+    @classmethod
+    def _native_pair(cls, image, mask, target_w, target_h, fit, pad_color):
+        """Gemini31 native canvas: source-scale dimensions, no 16 alignment."""
+        b, h, w, _ = image.shape
+        ratio = float(target_w) / float(max(target_h, 1))
+        source_aspect = float(w) / float(max(h, 1))
+        if fit == "pad":
+            if source_aspect > ratio:
+                cw, ch = w, max(h, int(math.ceil(w / ratio)))
+            else:
+                cw, ch = max(w, int(math.ceil(h * ratio))), h
+            native_img = cls._pad_to_rgb(image, ch, cw, pad_color)
+            top = max((ch - h) // 2, 0)
+            left = max((cw - w) // 2, 0)
+            native_msk = torch.zeros((b, ch, cw), dtype=torch.float32, device=mask.device)
+            native_msk[:, top : top + h, left : left + w] = mask
+            return native_img, native_msk
+        if fit == "crop":
+            if source_aspect > ratio:
+                cw, ch = max(1, int(math.floor(h * ratio))), h
+            else:
+                cw, ch = w, max(1, int(math.floor(w / ratio)))
+            left = max((w - cw) // 2, 0)
+            top = max((h - ch) // 2, 0)
+            return (
+                image[:, top : top + ch, left : left + cw, :].contiguous(),
+                mask[:, top : top + ch, left : left + cw].contiguous(),
+            )
+        area = float(w * h)
+        cw = max(1, int(round(math.sqrt(area * ratio))))
+        ch = max(1, int(round(math.sqrt(area / ratio))))
+        return cls._resize_image(image, ch, cw), cls._resize_mask(mask, ch, cw)
+
+    @classmethod
+    def _output(cls, out_img, out_msk, native_img=None, native_msk=None):
+        """Return native as an exact-ratio copy of the final main output.
+
+        Gemini31 has no implicit 16-pixel alignment: native dimensions are
+        chosen from the source-scale hint, then the finished main output is
+        resized proportionally so crop and padding are identical.
+        """
+        main_h, main_w = int(out_img.shape[1]), int(out_img.shape[2])
+        hint_h = int(native_img.shape[1]) if native_img is not None else main_h
+        hint_w = int(native_img.shape[2]) if native_img is not None else main_w
+        hint_area = max(hint_h * hint_w, 1)
+        # Preserve the main output ratio exactly as an integer ratio. There is
+        # intentionally no 16-pixel alignment here.
+        gcd = math.gcd(main_w, main_h)
+        ratio_w, ratio_h = main_w // gcd, main_h // gcd
+        scale = max(1, int(round(math.sqrt(hint_area / float(ratio_w * ratio_h)))))
+        native_w = ratio_w * scale
+        native_h = ratio_h * scale
+        native_img = cls._resize_image(out_img, native_h, native_w)
+        native_msk = cls._resize_mask(out_msk, native_h, native_w)
+        return io.NodeOutput(out_img, out_msk, native_img, native_msk)
