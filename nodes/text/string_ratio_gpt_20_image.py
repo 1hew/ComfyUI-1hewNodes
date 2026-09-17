@@ -31,7 +31,7 @@ class StringRatioGpt20Image(io.ComfyNode):
             display_name="String Ratio Gpt20Image",
             category="1hewNodes/text",
             inputs=[
-                io.Combo.Input("selection", options=cls.RATIO_LABELS, default="3:2"),
+                io.Combo.Input("selection", options=cls.RATIO_LABELS, default="1:1"),
                 io.Image.Input("image", optional=True),
             ],
             outputs=[
@@ -46,7 +46,7 @@ class StringRatioGpt20Image(io.ComfyNode):
         image: torch.Tensor | None = None,
     ) -> io.NodeOutput:
         if not isinstance(image, torch.Tensor) or image.ndim != 4:
-            return io.NodeOutput(selection if selection in cls.RATIO_LABELS else "3:2")
+            return io.NodeOutput(selection if selection in cls.RATIO_LABELS else "1:1")
 
         ratios = []
         batch = int(image.shape[0])

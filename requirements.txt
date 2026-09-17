@@ -10,10 +10,14 @@ psd-tools
 # Additional dependencies for specific features
 scipy>=1.7.0
 requests>=2.25.0
-pilgram>=1.1.0
+color-matcher>=0.6.0
 watchdog>=3.0.0
 ultralytics>=8.3.0
-transformers
-huggingface-hub
 rembg
 transparent-background
+# RMBG-2.0 single-file mode (GPU users may prefer onnxruntime-gpu)
+onnxruntime
+
+# Video processing
+av
+torchaudio

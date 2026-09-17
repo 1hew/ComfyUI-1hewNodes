@@ -9,7 +9,8 @@ from comfy_api.latest import io
 class MultiImageOverlay(io.ComfyNode):
     """
     多图层叠加：
-    - image_1 为最上层，数字越大越靠底层
+    - 默认模式下 image_1 为最上层，数字越大越靠底层，并行处理 batch
+    - stack 模式下，image_1 及其 batch 项在最上方，后续输入及 batch 项依次位于下方，输出单张预览
     - RGBA 输入使用 alpha 做正常图层合成
     - RGB 输入视为不透明图层
     """
@@ -27,6 +28,11 @@ class MultiImageOverlay(io.ComfyNode):
                     default="center",
                 ),
                 io.String.Input("color", default="1.0"),
+                io.Combo.Input(
+                    "batch_mode",
+                    options=["parallel", "stack"],
+                    default="parallel",
+                ),
                 io.Image.Input("image_1"),
             ],
             outputs=[io.Image.Output(display_name="image")],
@@ -37,6 +43,7 @@ class MultiImageOverlay(io.ComfyNode):
         cls,
         fit_mode: str,
         color: str = "1.0",
+        batch_mode: str = "parallel",
         **kwargs,
     ) -> io.NodeOutput:
         ordered = []
@@ -58,9 +65,26 @@ class MultiImageOverlay(io.ComfyNode):
             return io.NodeOutput(empty)
 
         preserve_alpha = any(int(image.shape[3]) == 4 for image in images)
-        batch_size = max(int(image.shape[0]) for image in images)
-        images = [cls._broadcast_image(image, batch_size) for image in images]
-        stack_images = list(reversed(images))
+        if batch_mode == "stack":
+            # Treat every item in every input batch as one layer. This produces
+            # one preview image instead of compositing corresponding batch
+            # indices in parallel. image_1 is the top input layer, followed by
+            # image_2 and later inputs underneath it. Within each batch, the
+            # first item is also the top item and later items are underneath.
+            flattened = []
+            for image in images:
+                flattened.extend(
+                    image[index : index + 1]
+                    for index in range(int(image.shape[0]))
+                )
+            # Composite from bottom to top: later inputs are below earlier
+            # inputs, and later batch items are below earlier batch items.
+            stack_images = list(reversed(flattened))
+        else:
+            batch_size = max(int(image.shape[0]) for image in images)
+            images = [cls._broadcast_image(image, batch_size) for image in images]
+            # Existing behavior: image_1 is the top layer and image_N the bottom.
+            stack_images = list(reversed(images))
 
         canvas = cls._ensure_rgba(stack_images[0])
         target_h = int(canvas.shape[1])
