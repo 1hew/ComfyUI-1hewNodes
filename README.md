@@ -21,6 +21,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.25.0**
+- feat(color): Add `Image Color Restore` to restore an aligned AI edit's colors to the reference while smoothing removal/occlusion seams
+- feat(mask): Add `Mask Levels` for grayscale levels (black/white point) adjustment with inversion and binary fallback
+- refactor(image): Adjust `Image Align Change Mask` `expand`/`feather` defaults to 16/8
+- docs: Add bilingual docs for the two new nodes and sync the node list
+
 **v3.24.0**
 - feat(image_resize): Unify `auto` (tier by input area → closest aspect within tier) across GPT Image 2.0 / Gemini30Pro / Gemini31Flash / Jimeng resize nodes
 - feat(image_resize): Jimeng `auto` excludes `[2.0_pro]` presets
@@ -507,6 +513,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Match Brightness Contrast | Adjusts the brightness and contrast of the source image to match the reference image |
 | Image Color Match | Transfer the color of a reference image onto a source image with wavelet/adain (native) or mkl/hm/reinhard/mvgd plus hybrids (color-matcher), supporting batch cycling |
+| Image Color Restore | Restore an aligned AI edit's colors to its original reference with local occlusion-seam smoothing; outputs the corrected image and a trusted unchanged mask |
 
 ### 🎨 Image Blending Nodes
 | Node Name | Description |
@@ -550,6 +557,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Mask Paste by BBox Mask | Simplified mask pasting with automatic base mask creation and bounding box detection |
 | Mask Repeat | Batch repeat masks with optional inversion support |
 | Mask Alpha Clean | Clean mask alpha noise and tiny islands with strength presets and optional detection-only output |
+| Mask Levels | Apply a levels adjustment to a grayscale mask, remapping the range via black/white points with inversion and binary fallback |
 
 ### 🔍 Detection Nodes
 | Node Name | Description |

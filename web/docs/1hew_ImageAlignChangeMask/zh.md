@@ -73,8 +73,8 @@ min_align_score: 0.80
 color_compensation: true
 sensitivity: 8.0
 min_component_area: 32
-expand: 8
-feather: 4
+expand: 16
+feather: 8
 ```
 
 ### 预设 B：检测小文字/五官/饰品

@@ -21,6 +21,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.25.0**
+- feat(color)：新增 `Image Color Restore`，将已对齐的 AI 编辑图颜色还原到参考图，并平滑物体移除/遮挡产生的接缝
+- feat(mask)：新增 `Mask Levels`，对灰度遮罩做色阶（black_point/white_point）调整，支持反相与二值退化
+- refactor(image)：`Image Align Change Mask` 的 `expand`/`feather` 默认值调整为 16/8
+- docs：新增上述两节点的中英文文档并同步节点列表
+
 **v3.24.0**
 - feat(image_resize)：统一 `auto`（先按面积定档→档内选比例）到 GPT Image 2.0 / Gemini30Pro / Gemini31Flash / Jimeng 四个 resize 节点
 - feat(image_resize)：Jimeng `auto` 排除 `[2.0_pro]` 预设
@@ -507,6 +513,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Match Brightness Contrast | 调整源图像的亮度和对比度以匹配参考图像 |
 | Image Color Match | 将参考图像的颜色迁移到源图像，支持 wavelet/adain（原生）与 mkl/hm/reinhard/mvgd 及其组合（color-matcher），并支持批量循环匹配 |
+| Image Color Restore | 将已对齐的 AI 编辑图颜色还原到原始参考图，并在物体移除/遮挡接缝处做局部平滑；输出校正图与可信未变化遮罩 |
 
 ### 🎨 图像混合节点
 | 节点名称 | 功能描述 |
@@ -550,6 +557,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Mask Paste by BBox Mask | 简化遮罩粘贴，支持自动基础遮罩创建和边界框检测 |
 | Mask Repeat | 批量重复遮罩，支持反转功能 |
 | Mask Alpha Clean | 清理遮罩 alpha 噪点与小孤岛，支持强度预设与仅检测模式 |
+| Mask Levels | 对灰度遮罩做色阶（Levels）调整，按 black_point/white_point 重映射灰度区间，支持反相与二值退化 |
 
 ### 🔍 检测节点
 | 节点名称 | 功能描述 |

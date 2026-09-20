@@ -40,8 +40,8 @@ class ImageAlignChangeMask(io.ComfyNode):
                 io.Boolean.Input("color_compensation", default=True),
                 io.Float.Input("sensitivity", default=8.0, min=0.5, max=20.0, step=0.1),
                 io.Int.Input("min_component_area", default=32, min=0, max=100000, step=1),
-                io.Int.Input("expand", default=8, min=0, max=128, step=1),
-                io.Int.Input("feather", default=4, min=0, max=128, step=1),
+                io.Int.Input("expand", default=16, min=0, max=128, step=1),
+                io.Int.Input("feather", default=8, min=0, max=128, step=1),
             ],
             outputs=[
                 io.Image.Output(display_name="align_image"),
