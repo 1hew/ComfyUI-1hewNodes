@@ -21,6 +21,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.26.0**
+- feat(image)：新增 `Image Alpha Edge`，对带 alpha 图像的边缘做向内收边/向外扩边与羽化，内置 RGB 外扩，用于清理抠图毛边（填孔仍由遮罩节点负责）
+- feat(image_resize)：新增 `Image Resize Doubao Seedream 5.0 Pro`（官方 1k/1.5k/2k 精确预设）与 `Image Resize Qwen Image 3.0`、`Image Resize Qwen Image 3.0 Pro`（1k/2k 预设与动态尺寸）
+- refactor(image_resize)：重建 `Image Resize GPT Image 2.0` 的 `1k`/`2k` 预设为 16 的精确倍数，并让 `4k` 档在官方限制与 `3840` 最长边上限内严格等比
+- refactor(color)：`Image Color Restore` 输出改名为 `image` / `unchanged_mask`，`unchanged_threshold` 默认值改为 0（自动）
+- docs：新增上述图像与尺寸节点的中英文文档并同步节点列表
+
 **v3.25.0**
 - feat(color)：新增 `Image Color Restore`，将已对齐的 AI 编辑图颜色还原到参考图，并平滑物体移除/遮挡产生的接缝
 - feat(mask)：新增 `Mask Levels`，对灰度遮罩做色阶（black_point/white_point）调整，支持反相与二值退化
@@ -492,6 +499,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Stroke by Mask | 对遮罩区域应用描边效果，支持自定义宽度和颜色 |
 | Image BBox Overlay by Mask | 基于遮罩的图像边界框叠加，支持独立和合并模式 |
 | Image Alpha Clean | 清理图像 alpha 透明边缘噪点，支持强度预设与仅检测模式 |
+| Image Alpha Edge | 对带 alpha 图像的边缘做向内收边/向外扩边并羽化，内置 RGB 外扩以去除抠图毛边；填孔由遮罩节点负责 |
 | Image BW Matte | 从图像生成适合抠图的 `mask`，固定使用 `auto + soft` 流程，并提供 `gamma`、向内收边与羽化参数 |
 | Image Align Change Mask | 将 AI 编辑图与原图对齐，输出 clean/raw 变化遮罩、变化评分与叠加图，抑制小幅全局色彩漂移 |
 | Image Blur | 整图高斯模糊，支持小数半径、逐帧批量处理，blur 为 0 时原图透传 |
@@ -506,6 +514,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Resize Gemini30ProImage | 适配 Gemini 3.0 Pro 预设分辨率，支持按面积定档的 auto 匹配与 image/mask 同步变换 |
 | Image Resize Gemini31FlashImage | 适配 Gemini 3.1 Flash 预设分辨率，支持按面积定档的 auto 匹配与 0.5k/1k/2k/4k 档位 |
 | Image Resize GPT Image 2.0 | 适配 GPT Image 2.0 尺寸，支持按面积定档的 auto 预设匹配、dynamic 动态保比例档位与 1k/2k/4k 固定预设 |
+| Image Resize Doubao Seedream 5.0 Pro | 适配豆包 Seedream 5.0 Pro 官方 1k/1.5k/2k 精确预设，支持按档位自动匹配、动态尺寸与 image/mask 同步变换 |
+| Image Resize Qwen Image 3.0 | 适配 Qwen Image 3.0 的 1k/2k 预设，支持按档位自动匹配、动态尺寸与 image/mask 同步变换 |
+| Image Resize Qwen Image 3.0 Pro | 适配 Qwen Image 3.0 Pro 的 1k/2k 预设，支持按档位自动匹配、动态尺寸与 image/mask 同步变换 |
 | Image Resize Square | 通用方形尺寸适配节点，支持 256/512/1024/2048/4096 与 `auto`、`auto (0.5k \| 1k)` |
 
 ### 🌈 颜色节点

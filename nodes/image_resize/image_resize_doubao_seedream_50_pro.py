@@ -1,82 +1,74 @@
+"""Doubao Seedream 5.0 Pro 专用尺寸适配节点。
+
+与 1hewOffice 的 1hewOffice_doubao_Seedream50Pro 成对使用：
+本节点把输入图/遮罩裁或缩到官方尺寸表里的精确像素，接到 API 节点的 image_1 后，
+aspect_ratio=auto 会推断出同一比例，从而让出图尺寸与本节点完全一致。
+
+固定预设表与 1hewOffice 的 doubao_seedream_50_pro.py 中 SIZE_MAP 逐项一致（1k / 1.5k / 2k × 8 个比例；该文件属于 1hewOffice，不在本仓库内）。
+"""
+
 from comfy_api.latest import io
 import math
 
 import torch
 import torch.nn.functional as F
 
+from .image_resize_gemini_30_pro_image import ImageResizeGemini30ProImage
 
-class ImageResizeGPTImage20(io.ComfyNode):
+
+class ImageResizeDoubaoSeedream50Pro(io.ComfyNode):
     PRESET_RESOLUTIONS = [
-        ("[1k] 1728x576 (3:1)", 1728, 576),
-        ("[1k] 1344x576 (21:9)", 1344, 576),
-        ("[1k] 1440x720 (2:1)", 1440, 720),
-        ("[1k] 1280x720 (16:9)", 1280, 720),
-        ("[1k] 1248x832 (3:2)", 1248, 832),
-        ("[1k] 1152x864 (4:3)", 1152, 864),
-        ("[1k] 1120x896 (5:4)", 1120, 896),
         ("[1k] 1024x1024 (1:1)", 1024, 1024),
-        ("[1k] 896x1120 (4:5)", 896, 1120),
+        ("[1k] 1152x864 (4:3)", 1152, 864),
         ("[1k] 864x1152 (3:4)", 864, 1152),
+        ("[1k] 1424x800 (16:9)", 1424, 800),
+        ("[1k] 800x1424 (9:16)", 800, 1424),
+        ("[1k] 1248x832 (3:2)", 1248, 832),
         ("[1k] 832x1248 (2:3)", 832, 1248),
-        ("[1k] 720x1280 (9:16)", 720, 1280),
-        ("[1k] 720x1440 (1:2)", 720, 1440),
-        ("[1k] 576x1344 (9:21)", 576, 1344),
-        ("[1k] 576x1728 (1:3)", 576, 1728),
-        ("[2k] 3456x1152 (3:1)", 3456, 1152),
-        ("[2k] 2688x1152 (21:9)", 2688, 1152),
-        ("[2k] 2880x1440 (2:1)", 2880, 1440),
-        ("[2k] 2560x1440 (16:9)", 2560, 1440),
-        ("[2k] 2496x1664 (3:2)", 2496, 1664),
-        ("[2k] 2304x1728 (4:3)", 2304, 1728),
-        ("[2k] 2240x1792 (5:4)", 2240, 1792),
+        ("[1k] 1568x672 (21:9)", 1568, 672),
+        ("[1.5k] 1536x1536 (1:1)", 1536, 1536),
+        ("[1.5k] 1792x1344 (4:3)", 1792, 1344),
+        ("[1.5k] 1344x1792 (3:4)", 1344, 1792),
+        ("[1.5k] 2048x1152 (16:9)", 2048, 1152),
+        ("[1.5k] 1152x2048 (9:16)", 1152, 2048),
+        ("[1.5k] 1872x1248 (3:2)", 1872, 1248),
+        ("[1.5k] 1248x1872 (2:3)", 1248, 1872),
+        ("[1.5k] 2352x1008 (21:9)", 2352, 1008),
         ("[2k] 2048x2048 (1:1)", 2048, 2048),
-        ("[2k] 1792x2240 (4:5)", 1792, 2240),
-        ("[2k] 1728x2304 (3:4)", 1728, 2304),
+        ("[2k] 2368x1776 (4:3)", 2368, 1776),
+        ("[2k] 1776x2368 (3:4)", 1776, 2368),
+        ("[2k] 2816x1584 (16:9)", 2816, 1584),
+        ("[2k] 1584x2816 (9:16)", 1584, 2816),
+        ("[2k] 2496x1664 (3:2)", 2496, 1664),
         ("[2k] 1664x2496 (2:3)", 1664, 2496),
-        ("[2k] 1440x2560 (9:16)", 1440, 2560),
-        ("[2k] 1440x2880 (1:2)", 1440, 2880),
-        ("[2k] 1152x2688 (9:21)", 1152, 2688),
-        ("[2k] 1152x3456 (1:3)", 1152, 3456),
-        ("[4k] 3840x1280 (3:1)", 3840, 1280),
-        ("[4k] 3808x1632 (21:9)", 3808, 1632),
-        ("[4k] 3840x1920 (2:1)", 3840, 1920),
-        ("[4k] 3840x2160 (16:9)", 3840, 2160),
-        ("[4k] 3504x2336 (3:2)", 3504, 2336),
-        ("[4k] 3264x2448 (4:3)", 3264, 2448),
-        ("[4k] 3200x2560 (5:4)", 3200, 2560),
-        ("[4k] 2880x2880 (1:1)", 2880, 2880),
-        ("[4k] 2560x3200 (4:5)", 2560, 3200),
-        ("[4k] 2448x3264 (3:4)", 2448, 3264),
-        ("[4k] 2336x3504 (2:3)", 2336, 3504),
-        ("[4k] 2160x3840 (9:16)", 2160, 3840),
-        ("[4k] 1920x3840 (1:2)", 1920, 3840),
-        ("[4k] 1632x3808 (9:21)", 1632, 3808),
-        ("[4k] 1280x3840 (1:3)", 1280, 3840),
+        ("[2k] 3136x1344 (21:9)", 3136, 1344),
     ]
     PRESET_OPTIONS = [
         "auto",
         "auto (1k)",
+        "auto (1.5k)",
         "auto (2k)",
-        "auto (4k)",
         "dynamic",
         "dynamic (1k)",
+        "dynamic (1.5k)",
         "dynamic (2k)",
-        "dynamic (4k)",
     ] + [name for name, _, _ in PRESET_RESOLUTIONS]
     TARGET_PIXELS = {
         "1k": 1024 * 1024,
+        "1.5k": 1536 * 1536,
         "2k": 2048 * 2048,
-        "4k": 3840 * 2160,
     }
-    MIN_SAFE_ASPECT_RATIO = 1.0 / 3.0
-    MAX_SAFE_ASPECT_RATIO = 3.0
-    MAX_EDGE = 3840
+    # 官方 Seedream 5.0 Pro 宽高比范围 1:16 ~ 16:1。
+    MIN_SAFE_ASPECT_RATIO = 1.0 / 16.0
+    MAX_SAFE_ASPECT_RATIO = 16.0
+    # 官方固定表最大边为 3136（2k 21:9）；动态档留到 4096。
+    MAX_EDGE = 4096
 
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
-            node_id="1hew_ImageResizeGPTImage20",
-            display_name="Image Resize GPT Image 2.0",
+            node_id="1hew_ImageResizeDoubaoSeedream50Pro",
+            display_name="Image Resize Doubao Seedream 5.0 Pro",
             category="1hewNodes/image/resize",
             inputs=[
                 io.Combo.Input("preset_size", options=cls.PRESET_OPTIONS, default="auto (2k)"),
@@ -141,7 +133,6 @@ class ImageResizeGPTImage20(io.ComfyNode):
             b, h, w = int(m.shape[0]), int(m.shape[1]), int(m.shape[2])
             image_device = m.device
             image = cls._blank_image(b, h, w, pc, image_device)
-            m = cls._ensure_mask_3d(mask)
             out_img, out_msk, native_img, native_msk = cls._resize_pair(image, m, tw, th, fit, pc)
             return cls._output(out_img, out_msk, native_img, native_msk)
 
@@ -153,8 +144,7 @@ class ImageResizeGPTImage20(io.ComfyNode):
         out_img, out_msk, native_img, native_msk = cls._resize_pair(image, m, tw, th, fit, pc)
 
         if fit == "crop" and not has_mask:
-            # Match the other resize nodes: with crop and no mask input, the
-            # default mask marks the kept region at the SOURCE resolution.
+            # 与其他 resize 节点一致：crop 且未接 mask 时，默认遮罩标记保留区域（源分辨率）。
             target_aspect = tw / max(th, 1)
             source_aspect = w / max(h, 1)
             if source_aspect > target_aspect:
@@ -226,8 +216,8 @@ class ImageResizeGPTImage20(io.ComfyNode):
             return preset
 
         if cls._is_auto_preset(preset_size):
-            # auto（不带档位）：先按输入面积定档（1k/2k/4k），再在该档内选最接近比例的预设。
-            # auto (1k)/(2k)/(4k)：直接限定在对应档内选比例。
+            # auto（不带档位）：先按输入面积定档，再在该档内选最接近比例的预设。
+            # auto (1k)/(1.5k)/(2k)：直接限定在对应档内选比例。
             if cls._normalize_preset_size(preset_size) == "auto":
                 target_key = cls._resolve_target_key(source_w, source_h, preset_size)
                 candidates = cls._preset_candidates(f"auto ({target_key})")
@@ -248,25 +238,28 @@ class ImageResizeGPTImage20(io.ComfyNode):
         return str(preset_size or "").strip().lower() in {
             "auto",
             "auto (1k)",
+            "auto (1.5k)",
             "auto (2k)",
-            "auto (4k)",
         }
 
     @classmethod
     def _preset_candidates(cls, preset_size: str) -> list[tuple[str, int, int]]:
         normalized = str(preset_size or "").strip().lower()
-        if normalized == "auto (1k)":
-            prefixes = ("[1k]",)
-        elif normalized == "auto (2k)":
-            prefixes = ("[2k]",)
-        elif normalized == "auto (4k)":
-            prefixes = ("[4k]",)
-        else:
-            prefixes = ("[1k]", "[2k]", "[4k]")
+        prefix_map = {
+            "auto (1k)": ("[1k]",),
+            "auto (1.5k)": ("[1.5k]",),
+            "auto (2k)": ("[2k]",),
+        }
+        prefixes = prefix_map.get(normalized, ("[1k]", "[1.5k]", "[2k]"))
         return [item for item in cls.PRESET_RESOLUTIONS if item[0].startswith(prefixes)]
 
     @classmethod
-    def _find_best_resolution(cls, source_w: int, source_h: int, candidates: list[tuple[str, int, int]]) -> tuple[int, int]:
+    def _find_best_resolution(
+        cls,
+        source_w: int,
+        source_h: int,
+        candidates: list[tuple[str, int, int]],
+    ) -> tuple[int, int]:
         source_ratio = float(max(int(source_w), 1)) / float(max(int(source_h), 1))
         ratio_candidates = []
         for _, width, height in candidates:
@@ -293,12 +286,16 @@ class ImageResizeGPTImage20(io.ComfyNode):
     @classmethod
     def _resolve_target_key(cls, source_w: int, source_h: int, preset_size: str) -> str:
         normalized = str(preset_size or "").strip().lower()
-        if normalized in ("auto (1k)", "dynamic (1k)"):
-            return "1k"
-        if normalized in ("auto (2k)", "dynamic (2k)"):
-            return "2k"
-        if normalized in ("auto (4k)", "dynamic (4k)"):
-            return "4k"
+        fixed = {
+            "auto (1k)": "1k",
+            "auto (1.5k)": "1.5k",
+            "auto (2k)": "2k",
+            "dynamic (1k)": "1k",
+            "dynamic (1.5k)": "1.5k",
+            "dynamic (2k)": "2k",
+        }
+        if normalized in fixed:
+            return fixed[normalized]
 
         area = max(int(source_w), 1) * max(int(source_h), 1)
         return min(
@@ -350,14 +347,10 @@ class ImageResizeGPTImage20(io.ComfyNode):
 
     @staticmethod
     def _parse_pad_color(color_str):
-        from .image_resize_gemini_30_pro_image import ImageResizeGemini30ProImage
-
         return ImageResizeGemini30ProImage._parse_pad_color(color_str)
 
     @staticmethod
     def _pad_to_rgb(img, target_h, target_w, fill_rgb):
-        from .image_resize_gemini_30_pro_image import ImageResizeGemini30ProImage
-
         return ImageResizeGemini30ProImage._pad_to_rgb(img, target_h, target_w, fill_rgb)
 
     @classmethod
@@ -414,18 +407,17 @@ class ImageResizeGPTImage20(io.ComfyNode):
         fit: str,
         pad_color,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Second output: same aspect ratio as the main output, anchored to the source scale.
+        """第二个输出：与主输出同比例、锚定源尺寸的副本。
 
-        pad     -> native content + pad to target ratio (area grows)
-        crop    -> native center-crop to target ratio (area shrinks)
-        stretch -> non-uniform stretch to target ratio, area preserved (W*H == w*h, approx)
+        pad     -> 原生内容 + 填充到目标比例（面积变大）
+        crop    -> 按目标比例中心裁剪（面积变小）
+        stretch -> 非等比拉伸到目标比例，面积基本不变
         """
         b, h, w, _ = image.shape
         ratio = float(target_w) / float(max(target_h, 1))
         source_aspect = float(w) / float(max(h, 1))
 
         if fit == "pad":
-            # Keep the source pixels at native scale; no implicit 16 alignment.
             if source_aspect > ratio:
                 cw, ch = w, max(h, int(math.ceil(w / ratio)))
             else:
@@ -450,17 +442,12 @@ class ImageResizeGPTImage20(io.ComfyNode):
             native_msk = mask[:, top : top + ch, left : left + cw].contiguous()
             return cls._cap_native(native_img, native_msk)
 
-        # stretch: preserve area, target ratio
         area = float(w * h)
         cw = max(int(round((area * ratio) ** 0.5)), 1)
         ch = max(int(round((area / ratio) ** 0.5)), 1)
         native_img = cls._resize_image(image, ch, cw)
         native_msk = cls._resize_mask(mask, ch, cw)
         return cls._cap_native(native_img, native_msk)
-
-    @staticmethod
-    def _ceil_to_multiple_of_16(value: int) -> int:
-        return max(16, ((int(value) + 15) // 16) * 16)
 
     @classmethod
     def _cap_native(
@@ -491,8 +478,7 @@ class ImageResizeGPTImage20(io.ComfyNode):
 
     @classmethod
     def _output(cls, out_img, out_msk, native_img=None, native_msk=None):
-        # Native is a proportional copy of the final main output. This keeps
-        # crop/padding/content identical; only the resolution is different.
+        # native 是主输出的同比例副本：裁剪与填充完全一致，只有分辨率不同。
         main_h, main_w = int(out_img.shape[1]), int(out_img.shape[2])
         hint_h = int(native_img.shape[1]) if native_img is not None else main_h
         hint_w = int(native_img.shape[2]) if native_img is not None else main_w

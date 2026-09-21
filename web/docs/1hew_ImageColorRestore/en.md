@@ -9,7 +9,7 @@
 | `edit_image` | - | IMAGE | - | - | AI-edited image on an approximately solid background; must be pixel-aligned with `org_image` (resized to the reference size when dimensions differ). |
 | `org_image` | - | IMAGE | - | - | Aligned original/reference image used as the color source (no solid-background requirement). |
 | `background_threshold` | - | FLOAT | 0.0 | 0–80 (step 0.1) | LAB distance threshold for foreground/background split; `0` = auto. Foreground must land in 0.5%–80% or the node errors. |
-| `unchanged_threshold` | - | FLOAT | 10.0 | 0–80 (step 0.1) | Max RGB residual (0–255) for a pixel to count as unchanged; `0` = auto. Higher restores the reference more aggressively. |
+| `unchanged_threshold` | - | FLOAT | 0.0 | 0–80 (step 0.1) | Max RGB residual (0–255) for a pixel to count as unchanged; `0` = auto. Higher restores the reference more aggressively. |
 | `seam_max_distance` | - | FLOAT | 96.0 | 1–1024 (step 1) | Max propagation distance (px) from the trusted unchanged region. |
 | `seam_decay` | - | FLOAT | 64.0 | 1–1024 (step 1) | Distance falloff `exp(-d/decay)`; larger reaches farther. |
 | `seam_residual_blur` | - | FLOAT | 24.0 | 0.1–128 (step 0.5) | Gaussian sigma for smoothing the residual field. |
@@ -21,14 +21,15 @@
 
 | Name | Type | Description |
 |------|------|-------------|
-| `corrected_image` | IMAGE | Color-restored image; preserves `edit_image`'s alpha channel when present. |
-| `safe_unchanged_mask` | MASK | Mask of confidently unchanged pixels, useful for diagnostics or downstream compositing. |
+| `image` | IMAGE | Color-restored image; preserves `edit_image`'s alpha channel when present. |
+| `unchanged_mask` | MASK | Pixels the edit left unchanged — the areas where the output takes its content from `org_image` (the reference). |
 
 ## Features
 
 - Trusted fit: an affine (quadratic) color fit is solved only on confidently unchanged pixels, keeping real edits from contaminating the model.
 - Occlusion seams: a continuous seam field locally smooths seams left by removed/occluded objects.
 - Alpha preservation: restoration operates on RGB only; the `edit_image` alpha channel is kept intact.
+- `unchanged_mask` semantics: it marks the confidently unchanged foreground pixels, i.e. where the output is filled with `org_image` (reference) content; outside the mask the output keeps the globally color-mapped `edit_image` content.
 - Batch support: batches are supported; a single-image side is broadcast across all frames.
 - Safe failure: errors are raised when foreground segmentation or the unchanged ratio is implausible, avoiding silently corrupted output.
 
@@ -42,4 +43,4 @@
 
 - `edit_image` must place the subject on an approximately solid background, otherwise foreground segmentation (and the whole fit) fails.
 - The two images must be essentially pixel-aligned; on size mismatch `edit_image` is resized to `org_image`.
-- Defaults suit most cases; if restoration is too aggressive, lower `unchanged_threshold` (`0` = auto).
+- `unchanged_threshold` defaults to `0` (auto); set a positive value to take manual control — higher restores the reference more aggressively.

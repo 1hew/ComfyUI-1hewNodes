@@ -21,6 +21,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.26.0**
+- feat(image): Add `Image Alpha Edge` to shrink/expand an alpha image's edge and feather it, with built-in RGB bleed for cleaning matte fringe (hole filling stays in the mask nodes)
+- feat(image_resize): Add `Image Resize Doubao Seedream 5.0 Pro` with exact official 1k/1.5k/2k presets, plus `Image Resize Qwen Image 3.0` and `Image Resize Qwen Image 3.0 Pro` with 1k/2k presets and dynamic sizing
+- refactor(image_resize): Rebuild `Image Resize GPT Image 2.0` `1k`/`2k` presets as exact multiples of 16 and make the `4k` tier exactly proportional within the official limits and the `3840` longest-edge cap
+- refactor(color): Rename `Image Color Restore` outputs to `image` / `unchanged_mask` and default `unchanged_threshold` to 0 (auto)
+- docs: Add bilingual docs for the new image and resize nodes, and sync the node list
+
 **v3.25.0**
 - feat(color): Add `Image Color Restore` to restore an aligned AI edit's colors to the reference while smoothing removal/occlusion seams
 - feat(mask): Add `Mask Levels` for grayscale levels (black/white point) adjustment with inversion and binary fallback
@@ -492,6 +499,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Stroke by Mask | Apply stroke effects to mask regions with customizable width and color |
 | Image BBox Overlay by Mask | Mask-based image bounding box overlay with independent and merge modes |
 | Image Alpha Clean | Clean image alpha edge noise with simple strength presets and optional detection-only output |
+| Image Alpha Edge | Shrink or expand an alpha image's edge and feather it, with built-in RGB bleed to remove matte fringe; hole filling is left to the mask nodes |
 | Image BW Matte | Generate a cutout-friendly `mask` with a fixed `auto + soft` pipeline, plus `gamma`, inward shrink, and blur controls |
 | Image Align Change Mask | Align an AI-edited image to its original and extract clean/raw change masks, a change score, and an overlay while rejecting small global color drift |
 | Image Blur | Whole-image Gaussian blur with fractional radius, per-frame batch processing, and pass-through when blur is 0 |
@@ -506,6 +514,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Resize Gemini30ProImage | Gemini 3.0 Pro preset size adapter with area-tiered auto matching and synchronized image/mask transforms |
 | Image Resize Gemini31FlashImage | Gemini 3.1 Flash preset size adapter with area-tiered auto matching across 0.5k/1k/2k/4k tiers and extreme aspect ratios |
 | Image Resize GPT Image 2.0 | GPT Image 2.0 size adapter with area-tiered auto preset matching, dynamic aspect-preserving tiers, and 1k/2k/4k fixed presets |
+| Image Resize Doubao Seedream 5.0 Pro | Doubao Seedream 5.0 Pro size adapter with official 1k/1.5k/2k presets, tiered auto matching, dynamic sizing, and synchronized image/mask transforms |
+| Image Resize Qwen Image 3.0 | Qwen Image 3.0 size adapter with 1k/2k presets, tiered auto matching, dynamic sizing, and synchronized image/mask transforms |
+| Image Resize Qwen Image 3.0 Pro | Qwen Image 3.0 Pro size adapter with 1k/2k presets, tiered auto matching, dynamic sizing, and synchronized image/mask transforms |
 | Image Resize Square | General square size adapter with 256/512/1024/2048/4096 plus `auto` and `auto (0.5k \| 1k)` |
 
 ### 🌈 Color Nodes

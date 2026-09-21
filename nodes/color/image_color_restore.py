@@ -1510,7 +1510,7 @@ class ImageColorRestore(io.ComfyNode):
                 ),
                 io.Float.Input(
                     "unchanged_threshold",
-                    default=10.0,
+                    default=0.0,
                     min=0.0,
                     max=80.0,
                     step=0.1,
@@ -1567,8 +1567,8 @@ class ImageColorRestore(io.ComfyNode):
                 ),
             ],
             outputs=[
-                io.Image.Output(display_name="corrected_image"),
-                io.Mask.Output(display_name="safe_unchanged_mask"),
+                io.Image.Output(display_name="image"),
+                io.Mask.Output(display_name="unchanged_mask"),
             ],
         )
 

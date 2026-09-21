@@ -45,24 +45,26 @@
 
 | Ratio | 1k Size | 2k Size | 4k Size |
 | ----- | ------- | ------- | ------- |
-| `3:1` | `1760x592` | `3456x1152` | `3840x1280` |
-| `21:9` | `1552x672` | `2688x1152` | `3840x1648` |
-| `2:1` | `1424x736` | `2880x1440` | `3840x1920` |
-| `16:9` | `1328x784` | `2560x1440` | `3840x2160` |
-| `3:2` | `1232x848` | `2496x1664` | `3520x2352` |
-| `4:3` | `1168x896` | `2304x1728` | `3312x2496` |
-| `5:4` | `1136x912` | `2240x1792` | `3216x2576` |
+| `3:1` | `1728x576` | `3456x1152` | `3840x1280` |
+| `21:9` | `1344x576` | `2688x1152` | `3808x1632` |
+| `2:1` | `1440x720` | `2880x1440` | `3840x1920` |
+| `16:9` | `1280x720` | `2560x1440` | `3840x2160` |
+| `3:2` | `1248x832` | `2496x1664` | `3504x2336` |
+| `4:3` | `1152x864` | `2304x1728` | `3264x2448` |
+| `5:4` | `1120x896` | `2240x1792` | `3200x2560` |
 | `1:1` | `1024x1024` | `2048x2048` | `2880x2880` |
-| `4:5` | `912x1136` | `1792x2240` | `2576x3216` |
-| `3:4` | `896x1168` | `1728x2304` | `2496x3312` |
-| `2:3` | `848x1232` | `1664x2496` | `2352x3520` |
-| `9:16` | `784x1328` | `1440x2560` | `2160x3840` |
-| `1:2` | `736x1424` | `1440x2880` | `1920x3840` |
-| `9:21` | `672x1552` | `1152x2688` | `1648x3840` |
-| `1:3` | `592x1760` | `1152x3456` | `1280x3840` |
+| `4:5` | `896x1120` | `1792x2240` | `2560x3200` |
+| `3:4` | `864x1152` | `1728x2304` | `2448x3264` |
+| `2:3` | `832x1248` | `1664x2496` | `2336x3504` |
+| `9:16` | `720x1280` | `1440x2560` | `2160x3840` |
+| `1:2` | `720x1440` | `1440x2880` | `1920x3840` |
+| `9:21` | `576x1344` | `1152x2688` | `1632x3808` |
+| `1:3` | `576x1728` | `1152x3456` | `1280x3840` |
 
 ## Notes & Tips
 
 - This table is a node preset list derived from GPT Image 2.0 sizing rules, not an official fixed enumeration.
+- All three tiers are **exactly proportional**: `1k` / `2k` are built as `(a×k, b×k)` with `k` a multiple of 16; `4k` takes the **largest exact value** within the official constraints **and** this node's own `3840` longest-edge cap.
+- The three official custom-size rules (`GPT Image 2`): both sides a **multiple of 16**, aspect ratio **≤ 3:1**, total pixels **655,360 – 8,294,400**. Every entry in this table satisfies them; the `3840` longest-edge cap is an additional node-level limit (not one of the three official rules), which is what stops a `4k` entry such as `2:1` from growing past `3840x1920`.
 - `auto` picks a tier by input area and the nearest size within it; `auto (1k)` etc. fix the tier; `dynamic*` computes sizes dynamically from the input aspect ratio.
 - `4k` outputs may take longer in downstream API nodes; consider increasing `timeout_sec`.

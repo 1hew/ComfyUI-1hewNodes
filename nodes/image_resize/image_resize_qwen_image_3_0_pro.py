@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 
 
-class ImageResizeGPTImage20(io.ComfyNode):
+class ImageResizeQwenImage30Pro(io.ComfyNode):
     PRESET_RESOLUTIONS = [
         ("[1k] 1728x576 (3:1)", 1728, 576),
         ("[1k] 1344x576 (21:9)", 1344, 576),
@@ -37,46 +37,30 @@ class ImageResizeGPTImage20(io.ComfyNode):
         ("[2k] 1440x2880 (1:2)", 1440, 2880),
         ("[2k] 1152x2688 (9:21)", 1152, 2688),
         ("[2k] 1152x3456 (1:3)", 1152, 3456),
-        ("[4k] 3840x1280 (3:1)", 3840, 1280),
-        ("[4k] 3808x1632 (21:9)", 3808, 1632),
-        ("[4k] 3840x1920 (2:1)", 3840, 1920),
-        ("[4k] 3840x2160 (16:9)", 3840, 2160),
-        ("[4k] 3504x2336 (3:2)", 3504, 2336),
-        ("[4k] 3264x2448 (4:3)", 3264, 2448),
-        ("[4k] 3200x2560 (5:4)", 3200, 2560),
-        ("[4k] 2880x2880 (1:1)", 2880, 2880),
-        ("[4k] 2560x3200 (4:5)", 2560, 3200),
-        ("[4k] 2448x3264 (3:4)", 2448, 3264),
-        ("[4k] 2336x3504 (2:3)", 2336, 3504),
-        ("[4k] 2160x3840 (9:16)", 2160, 3840),
-        ("[4k] 1920x3840 (1:2)", 1920, 3840),
-        ("[4k] 1632x3808 (9:21)", 1632, 3808),
-        ("[4k] 1280x3840 (1:3)", 1280, 3840),
     ]
     PRESET_OPTIONS = [
         "auto",
         "auto (1k)",
         "auto (2k)",
-        "auto (4k)",
         "dynamic",
         "dynamic (1k)",
         "dynamic (2k)",
-        "dynamic (4k)",
     ] + [name for name, _, _ in PRESET_RESOLUTIONS]
     TARGET_PIXELS = {
         "1k": 1024 * 1024,
         "2k": 2048 * 2048,
-        "4k": 3840 * 2160,
     }
-    MIN_SAFE_ASPECT_RATIO = 1.0 / 3.0
-    MAX_SAFE_ASPECT_RATIO = 3.0
-    MAX_EDGE = 3840
+    # Qwen-Image 官方宽高比范围 1:8 ~ 8:1（比 GPT 的 1:3 ~ 3:1 更宽）。
+    MIN_SAFE_ASPECT_RATIO = 1.0 / 8.0
+    MAX_SAFE_ASPECT_RATIO = 8.0
+    # 上游实测长边 4096 可用；qwen 官方面积上限 2048x2048，故无 4k 档。
+    MAX_EDGE = 4096
 
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
-            node_id="1hew_ImageResizeGPTImage20",
-            display_name="Image Resize GPT Image 2.0",
+            node_id="1hew_ImageResizeQwenImage30Pro",
+            display_name="Image Resize Qwen Image 3.0 Pro",
             category="1hewNodes/image/resize",
             inputs=[
                 io.Combo.Input("preset_size", options=cls.PRESET_OPTIONS, default="auto (2k)"),
@@ -226,8 +210,8 @@ class ImageResizeGPTImage20(io.ComfyNode):
             return preset
 
         if cls._is_auto_preset(preset_size):
-            # auto（不带档位）：先按输入面积定档（1k/2k/4k），再在该档内选最接近比例的预设。
-            # auto (1k)/(2k)/(4k)：直接限定在对应档内选比例。
+            # auto（不带档位）：先按输入面积定档（1k/2k），再在该档内选最接近比例的预设。
+            # auto (1k)/(2k)：直接限定在对应档内选比例。
             if cls._normalize_preset_size(preset_size) == "auto":
                 target_key = cls._resolve_target_key(source_w, source_h, preset_size)
                 candidates = cls._preset_candidates(f"auto ({target_key})")
@@ -249,7 +233,6 @@ class ImageResizeGPTImage20(io.ComfyNode):
             "auto",
             "auto (1k)",
             "auto (2k)",
-            "auto (4k)",
         }
 
     @classmethod
@@ -259,10 +242,8 @@ class ImageResizeGPTImage20(io.ComfyNode):
             prefixes = ("[1k]",)
         elif normalized == "auto (2k)":
             prefixes = ("[2k]",)
-        elif normalized == "auto (4k)":
-            prefixes = ("[4k]",)
         else:
-            prefixes = ("[1k]", "[2k]", "[4k]")
+            prefixes = ("[1k]", "[2k]")
         return [item for item in cls.PRESET_RESOLUTIONS if item[0].startswith(prefixes)]
 
     @classmethod
@@ -297,8 +278,6 @@ class ImageResizeGPTImage20(io.ComfyNode):
             return "1k"
         if normalized in ("auto (2k)", "dynamic (2k)"):
             return "2k"
-        if normalized in ("auto (4k)", "dynamic (4k)"):
-            return "4k"
 
         area = max(int(source_w), 1) * max(int(source_h), 1)
         return min(
