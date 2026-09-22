@@ -21,6 +21,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.27.0**
+- feat(logic): Add `Image Area Compare` to compare the pixel area (width × height) of two IMAGE inputs with a selected operator and output a boolean
+- fix(image_resize): Remove the duplicate `Image Resize Qwen Image 3.0` node, which was identical to `Image Resize Qwen Image 3.0 Pro`; switch existing workflows to the Pro node
+- refactor(image): Rework `Image Alpha Edge` so edge/feather modify the alpha channel only and never blur or recolour the subject's RGB; only newly visible pixels receive an alpha-aware colour extension instead of the old solid-region RGB bleed
+- docs: Add bilingual docs for `Image Area Compare`, update the `Image Alpha Edge` docs, and sync the node list
+
 **v3.26.0**
 - feat(image): Add `Image Alpha Edge` to shrink/expand an alpha image's edge and feather it, with built-in RGB bleed for cleaning matte fringe (hole filling stays in the mask nodes)
 - feat(image_resize): Add `Image Resize Doubao Seedream 5.0 Pro` with exact official 1k/1.5k/2k presets, plus `Image Resize Qwen Image 3.0` and `Image Resize Qwen Image 3.0 Pro` with 1k/2k presets and dynamic sizing
@@ -515,7 +521,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Resize Gemini31FlashImage | Gemini 3.1 Flash preset size adapter with area-tiered auto matching across 0.5k/1k/2k/4k tiers and extreme aspect ratios |
 | Image Resize GPT Image 2.0 | GPT Image 2.0 size adapter with area-tiered auto preset matching, dynamic aspect-preserving tiers, and 1k/2k/4k fixed presets |
 | Image Resize Doubao Seedream 5.0 Pro | Doubao Seedream 5.0 Pro size adapter with official 1k/1.5k/2k presets, tiered auto matching, dynamic sizing, and synchronized image/mask transforms |
-| Image Resize Qwen Image 3.0 | Qwen Image 3.0 size adapter with 1k/2k presets, tiered auto matching, dynamic sizing, and synchronized image/mask transforms |
 | Image Resize Qwen Image 3.0 Pro | Qwen Image 3.0 Pro size adapter with 1k/2k presets, tiered auto matching, dynamic sizing, and synchronized image/mask transforms |
 | Image Resize Square | General square size adapter with 256/512/1024/2048/4096 plus `auto` and `auto (0.5k \| 1k)` |
 
@@ -617,6 +622,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Text Compare | Compares two strings with equality, containment, prefix/suffix, or regex operators and outputs a boolean |
 | Text Match Rownum | Match a single text against multi-line text and return first matched row number (1-based), or 0 when not found |
 | Text Match Value | Match single-line text against multi-line key-value pairs and return corresponding value with simple numeric/boolean auto-typing |
+| Image Area Compare | Compare the pixel area (width × height) of two IMAGE inputs with a selected operator and output a boolean |
 | Image Minimum Area | Upscale an image until its area reaches a minimum square reference area (N²), with crop/pad/stretch fit, divisible_by rounding, mask output, and a resize_bool flag |
 | String Random | Randomly pick one item from multiline custom text (split by dash lines, newlines, or punctuation) using a fixed seed |
 

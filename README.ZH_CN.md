@@ -21,6 +21,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.27.0**
+- feat(logic)：新增 `Image Area Compare`，比较两个 IMAGE 输入的像素面积（宽 × 高）大小，按比较符输出布尔值
+- fix(image_resize)：移除与 `Image Resize Qwen Image 3.0 Pro` 完全重复的 `Image Resize Qwen Image 3.0` 节点，旧工作流请改用 Pro 节点
+- refactor(image)：重构 `Image Alpha Edge`，收边/扩边与羽化只修改 alpha 通道，不再模糊或重染主体 RGB；仅对新出现的可见像素做 alpha 感知的颜色延展，替代旧的实心区 RGB 外扩
+- docs：新增 `Image Area Compare` 中英文文档，更新 `Image Alpha Edge` 文档并同步节点列表
+
 **v3.26.0**
 - feat(image)：新增 `Image Alpha Edge`，对带 alpha 图像的边缘做向内收边/向外扩边与羽化，内置 RGB 外扩，用于清理抠图毛边（填孔仍由遮罩节点负责）
 - feat(image_resize)：新增 `Image Resize Doubao Seedream 5.0 Pro`（官方 1k/1.5k/2k 精确预设）与 `Image Resize Qwen Image 3.0`、`Image Resize Qwen Image 3.0 Pro`（1k/2k 预设与动态尺寸）
@@ -515,7 +521,6 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Resize Gemini31FlashImage | 适配 Gemini 3.1 Flash 预设分辨率，支持按面积定档的 auto 匹配与 0.5k/1k/2k/4k 档位 |
 | Image Resize GPT Image 2.0 | 适配 GPT Image 2.0 尺寸，支持按面积定档的 auto 预设匹配、dynamic 动态保比例档位与 1k/2k/4k 固定预设 |
 | Image Resize Doubao Seedream 5.0 Pro | 适配豆包 Seedream 5.0 Pro 官方 1k/1.5k/2k 精确预设，支持按档位自动匹配、动态尺寸与 image/mask 同步变换 |
-| Image Resize Qwen Image 3.0 | 适配 Qwen Image 3.0 的 1k/2k 预设，支持按档位自动匹配、动态尺寸与 image/mask 同步变换 |
 | Image Resize Qwen Image 3.0 Pro | 适配 Qwen Image 3.0 Pro 的 1k/2k 预设，支持按档位自动匹配、动态尺寸与 image/mask 同步变换 |
 | Image Resize Square | 通用方形尺寸适配节点，支持 256/512/1024/2048/4096 与 `auto`、`auto (0.5k \| 1k)` |
 
@@ -617,6 +622,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Text Compare | 比较两个字符串，支持相等、包含、前后缀和正则等运算符，并输出布尔值 |
 | Text Match Rownum | 多行文本行号匹配，返回首个匹配项的行号（1-based），未命中返回 0 |
 | Text Match Value | 在多行键值对中匹配单行文本并返回对应值，支持简单数字与布尔文本自动转类型 |
+| Image Area Compare | 比较两个 IMAGE 输入的像素面积（宽 × 高）大小，按比较符输出布尔值 |
 | Image Minimum Area | 将图像放大至面积达到最小正方形参考面积（N²），支持 crop/pad/stretch、divisible_by 取整、遮罩输出与 resize_bool 标志 |
 | String Random | 按固定种子从多行自定义文本中随机抽取一项（支持虚线/换行/标点分隔） |
 

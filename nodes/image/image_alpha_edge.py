@@ -7,7 +7,6 @@ import cv2
 import numpy as np
 import torch
 from comfy_api.latest import io
-from scipy import ndimage
 
 
 class ImageAlphaEdge(io.ComfyNode):
@@ -15,10 +14,13 @@ class ImageAlphaEdge(io.ComfyNode):
 
     典型场景：抠图（去背景）后元素边缘仍残留一圈被背景色污染的
     半透明“毛边 / 彩边”。本节点先用形态学向内收边，把被污染的
-    边缘像素直接裁掉，再做高斯羽化得到干净的过渡；羽化前会固定把
-    不透明区域的颜色向过渡带扩散（bleed），避免羽化后出现暗边 / 彩边。
+    边缘像素直接裁掉，再做高斯羽化得到干净的过渡。
 
-    处理顺序：收边 / 扩边 → 颜色外扩 → 羽化。
+    采用设计软件（如 Photoshop 层遮罩）的模型：收边 / 扩边与羽化
+    只修改 alpha 通道，主体的 RGB 颜色不会被模糊或重染，从而在
+    烟花、发丝等细小多彩细节上不会产生多边色块或条状色带；只有
+    原本完全透明、本次新出现覆盖的像素，才会得到平滑的 alpha 感知
+    颜色延展，保证羽化过渡带合成时不带暗边 / 彩边。
     输出带 alpha 的 4 通道图像，并同时给出处理后的 alpha 遮罩。
 
     收边 / 扩边是灰度形态学（min / max 滤波），直接作用在 alpha 上：
@@ -28,7 +30,6 @@ class ImageAlphaEdge(io.ComfyNode):
     """
 
     MAX_RADIUS = 256
-    SOLID_ALPHA = 0.9
 
     @classmethod
     def define_schema(cls) -> io.Schema:
@@ -134,16 +135,36 @@ class ImageAlphaEdge(io.ComfyNode):
         if current.ndim != 3:
             raise ValueError("image frame must be [H,W,C]")
 
+        # Preserve the exact sample values for the documented pass-through case.
+        if edge == 0 and feather <= 0.0:
+            alpha = cls._to_alpha(current)
+            return current.copy(), alpha.copy()
+
         rgb = cls._to_rgb(current)
         alpha = cls._to_alpha(current)
 
+        # Design-software model: the edge adjustment and feather modify the alpha
+        # channel only.  RGB is the subject's own colour and is never bent,
+        # blurred or recoloured - blurring or recolouring straight RGB is what
+        # produced the Voronoi facets and the opaque tube-like bands on fine,
+        # multi-coloured detail.  Only pixels that become newly visible (their
+        # source alpha was zero) receive a colour, extended smoothly from nearby
+        # covered pixels so the feathered band stays clean when composited.
+        source_alpha = alpha
+        source_visible = source_alpha > 1.0e-6
+
         if edge != 0:
             alpha = cls._morph(alpha, edge)
+        # The post-edge matte is the only colour donor: if a negative edge
+        # removes a contaminated fringe, that fringe must not be sampled again
+        # while reconstructing the feather band.
+        donor_alpha = alpha.copy()
         if feather > 0.0:
-            # Colour extension only matters for the band the blur will spread
-            # the alpha into; the kernel radius of a float Gaussian is ~4*sigma.
-            rgb = cls._bleed_rgb(rgb, alpha, int(np.ceil(4.0 * feather)) + 1)
             alpha = cls._feather(alpha, feather)
+
+        newly_visible = (alpha > 1.0e-6) & ~(source_visible)
+        if np.any(newly_visible):
+            rgb = cls._extend_rgb(rgb, donor_alpha, newly_visible, feather)
 
         alpha = np.clip(alpha, 0.0, 1.0).astype(np.float32)
         rgb = np.clip(rgb, 0.0, 1.0).astype(np.float32)
@@ -189,40 +210,33 @@ class ImageAlphaEdge(io.ComfyNode):
             return cv2.dilate(source, kernel, iterations=1)
         return cv2.erode(source, kernel, iterations=1)
 
-    @classmethod
-    def _bleed_rgb(
-        cls, rgb: np.ndarray, alpha: np.ndarray, radius: int
+    @staticmethod
+    def _extend_rgb(
+        rgb: np.ndarray,
+        donor_alpha: np.ndarray,
+        targets: np.ndarray,
+        feather: float,
     ) -> np.ndarray:
-        """Push the nearest *clean* colour outward, but only where it matters.
+        """Fill newly visible pixels with smooth colour from the retained matte.
 
-        The colour source is the solidly opaque region (alpha >= SOLID_ALPHA).
-        On a soft matte the semi-transparent ramp is itself blended with the
-        old background, so copying from the nearest alpha > 0 pixel would just
-        spread that contamination outward and leave a halo. Targets are
-        limited to the band the feather blur can actually reach; everything
-        else keeps its own RGB. rgb is a private copy and is filled in place.
+        A normalized convolution of RGB weighted by the post-edge alpha makes a
+        continuous colour field without hard nearest-source Voronoi cells. Only
+        targets that were fully transparent in the input are written, so existing
+        translucent detail keeps its exact RGB. The colour-field blur matches the
+        alpha feather; otherwise a large feather can reveal arbitrary RGB stored
+        in transparent input pixels.
         """
-        if radius <= 0:
+        weight = donor_alpha.astype(np.float32)
+        sigma = max(1.0, float(feather))
+        weights = cv2.GaussianBlur(weight, (0, 0), sigmaX=sigma, sigmaY=sigma)
+        usable = targets & (weights > 1.0e-6)
+        if not np.any(usable):
             return rgb
-
-        solid = alpha >= cls.SOLID_ALPHA
-        if not np.any(solid) or np.all(solid):
-            return rgb
-
-        kernel = cv2.getStructuringElement(
-            cv2.MORPH_ELLIPSE,
-            (radius * 2 + 1, radius * 2 + 1),
-        )
-        reach = (
-            cv2.dilate((alpha > 0.0).astype(np.uint8), kernel, iterations=1) > 0
-        )
-        targets = reach & ~solid
-        if not np.any(targets):
-            return rgb
-
-        _, indices = ndimage.distance_transform_edt(~solid, return_indices=True)
-        ys, xs = np.nonzero(targets)
-        rgb[ys, xs] = rgb[indices[0][ys, xs], indices[1][ys, xs]]
+        for channel in range(3):
+            weighted = cv2.GaussianBlur(
+                rgb[:, :, channel] * weight, (0, 0), sigmaX=sigma, sigmaY=sigma
+            )
+            rgb[:, :, channel][usable] = weighted[usable] / weights[usable]
         return rgb
 
     @staticmethod

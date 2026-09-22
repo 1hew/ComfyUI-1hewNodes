@@ -41,8 +41,8 @@ If the input really is a hard-edged matte the result stays hard-edged; use `feat
 - Anti-aliased: `edge` is grayscale morphology, so the matte's sub-pixel transition survives (the old binarization turned soft edges into a 1 px staircase).
 - Signed edge control: one parameter covers both inward shrink (negative) and outward expand (positive).
 - Fringe removal: with `edge < 0` the contaminated boundary band is discarded rather than blended, which is the reliable way to kill matte fringe.
-- Built-in decontamination: before feathering, the colour of the nearest **solidly opaque** pixel is pushed into the transition band (fixed behaviour, no toggle). The source requires `alpha >= 0.9`, so a soft matte's own contaminated ramp does not keep spreading the old background colour outward.
-- Fixed pipeline order: shrink/expand → RGB bleed → feather.
+- Design-software feathering (Photoshop-style): `edge` and `feather` modify the alpha channel only. The subject's RGB is never blurred, dilated or recoloured, so fine multi-colour details (fireworks, hair, smoke) keep their exact colours instead of turning into Voronoi facets or opaque bands. Only pixels that were fully transparent and become newly visible get a smooth, alpha-aware colour extension so the feathered band stays clean when composited.
+- Fixed pipeline order: shrink/expand → feather (alpha only) → colour extension into newly visible pixels.
 - Soft matte friendly: with `edge = 0` the original soft alpha is kept (no binarization at all).
 - Single responsibility: edges only — hole filling is matte repair and belongs to a dedicated mask node.
 - Batch support: image batches are processed frame by frame with synchronized `image` and `mask` outputs.
@@ -59,9 +59,8 @@ If the input really is a hard-edged matte the result stays hard-edged; use `feat
 ## Notes & Tips
 
 - `edge` does not harden a soft matte: grayscale morphology keeps the transition band, so hair, smoke and motion blur can be shrunk directly. A hard matte stays hard after the offset — use `feather` to build a transition band.
-- The colour extension is a fixed pipeline step with no toggle: it runs only when `feather > 0`, takes its colours from the solid region (`alpha >= 0.9`) after the edge adjustment, and fills only the band the feather blur can reach (about `4 x feather` pixels) - transparent pixels further away keep their original RGB. If the matte never reaches 0.9 the extension is skipped rather than spreading contaminated colour.
-- It rewrites RGB data: inside the transition band, transparent pixels that held the old background colour are replaced by the nearest subject colour. If you must keep the original RGB there, composite the original image back afterwards.
-- Turning it off would not be "cleaner": the feathered band would simply show the old background colour as a halo. Measured on a red subject over a blue background, the blue leak with no extension peaked at +0.23. With the corrected colour source the leak measures 0.0000 for soft edges from 1 px to 10 px wide.
+- The colour extension is a fixed pipeline step with no toggle: it runs only when `feather > 0`. The post-edge alpha is the colour donor, so a fringe removed by a negative `edge` cannot be sampled again. Only pixels that were fully transparent in the input but become visible through edge adjustment or feathering receive colour; existing translucent detail keeps its RGB unchanged.
+- The colour field uses the same Gaussian scale as `feather`, so a large feather does not expose old-background RGB stored in transparent input pixels. It rewrites RGB only in that new transition band; composite the original back afterwards if those original transparent-pixel RGB values must be retained.
 - Hole filling is out of scope: this node only moves the alpha level sets, it never repairs interior holes. Run a mask node first if you need holes filled, then feed the result here.
 - Large `feather` values cost more time; on a 2048×2048 image a radius up to 256 still completes in well under a second.
 - Inputs without an alpha channel return a fully opaque `mask` and an RGBA image, so the node is safe to insert anywhere.
