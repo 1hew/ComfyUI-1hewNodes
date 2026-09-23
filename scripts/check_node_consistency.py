@@ -16,6 +16,8 @@ derived views, so this script fails whenever those views drift apart:
 * every web/js/dynamic_port.js entry must name a current node_id whose
   declared ports match the configured base / addType / select / output,
   so the front-end dynamic-port table cannot drift from the schemas;
+* every quoted 1hew_* literal in web/**/*.js must be a current node_id,
+  so a renamed or removed node cannot leave a stale front-end reference;
 * display_name should follow the spaced model/version convention
   (reported as a warning only, never fatal).
 
@@ -34,7 +36,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 NODES_DIR = ROOT / "nodes"
-DOCS_DIR = ROOT / "web" / "docs"
+WEB_DIR = ROOT / "web"
+DOCS_DIR = WEB_DIR / "docs"
 
 # README node-list section heading -> file
 READMES = {
@@ -62,6 +65,11 @@ DYNAMIC_CONFIG_ENTRY_RE = re.compile(r'"(1hew_[A-Za-z0-9_]+)"\s*:\s*\{([^}]*)\}'
 DYNAMIC_CONFIG_FIELD_RE = re.compile(r'(\w+)\s*:\s*(?:"([^"]*)"|(\d+)|(null))')
 SCHEMA_INPUT_RE = re.compile(r'io\.(?:Custom\("([^"]+)"\)|([A-Za-z]+))\.Input\(\s*(f?)"([^"]*)"')
 SCHEMA_OUTPUT_RE = re.compile(r'io\.(?:Custom\("([^"]+)"\)|([A-Za-z]+))\.Output\(\s*display_name=(f?)"([^"]*)"')
+
+# Any quoted 1hew_* literal in the front-end must be a current node_id.
+# Internal property names (e.g. node.1hew_step_config) are unquoted, so a
+# quoted literal is always a node reference.
+JS_NODE_ID_RE = re.compile(r"""["'](1hew_[A-Za-z0-9_]+)["']""")
 
 # io.<Builtin>.Input -> the LiteGraph port type dynamic_port.js adds at runtime
 PORT_TYPE_MAP = {
@@ -258,6 +266,20 @@ def check_dynamic_ports(nodes_by_id, errors, warnings):
             )
 
 
+def check_js_node_ids(known_ids, errors):
+    """Fail when web/js references a node_id that no node defines."""
+    for path in sorted(WEB_DIR.rglob("*.js")):
+        text = path.read_text(encoding="utf-8")
+        for match in JS_NODE_ID_RE.finditer(text):
+            token = match.group(1)
+            if token not in known_ids:
+                line = text.count("\n", 0, match.start()) + 1
+                errors.append(
+                    "%s:%d references unknown node_id: %s"
+                    % (path.relative_to(ROOT), line, token)
+                )
+
+
 def main():
     errors = []
     warnings = []
@@ -332,6 +354,7 @@ def main():
 
     nodes_by_id = {node_id: path for node_id, _, path in nodes}
     check_dynamic_ports(nodes_by_id, errors, warnings)
+    check_js_node_ids(known_ids, errors)
 
     for _, display_name, _ in nodes:
         if display_name in COMPACT_NAME_ALLOWLIST:

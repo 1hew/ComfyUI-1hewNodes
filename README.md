@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.28.2**
+- chore(tooling): Extend `scripts/check_node_consistency.py` to fail on any quoted `1hew_*` literal in `web/**/*.js` that is not a current node_id, so a renamed or removed node cannot leave a stale front-end reference
+
 **v3.28.1**
 - chore(tooling): Extend `scripts/check_node_consistency.py` to validate the `web/js/dynamic_port.js` port table against the node schemas — stale node_ids, duplicate keys, `base` / `addType` / `select` / `outputBase` / `outputType` mismatches, and invalid `initial` / `max` now fail
 

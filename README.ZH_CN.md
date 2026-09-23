@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.28.2**
+- chore(tooling)：`scripts/check_node_consistency.py` 新增规则——`web/**/*.js` 中任何带引号的 `1hew_*` 字面量都必须是当前存在的 node_id，节点改名或删除后不会残留失效的前端引用
+
 **v3.28.1**
 - chore(tooling)：`scripts/check_node_consistency.py` 新增 `web/js/dynamic_port.js` 端口表校验——失效的 node_id、重复 key、`base` / `addType` / `select` / `outputBase` / `outputType` 不匹配、`initial` / `max` 非法都会直接报错
 
