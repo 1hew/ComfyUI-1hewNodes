@@ -13,6 +13,9 @@ derived views, so this script fails whenever those views drift apart:
   with no duplicate rows;
 * the pyproject version must equal the newest changelog entry in both
   READMEs, so a release has exactly one version authority;
+* every web/js/dynamic_port.js entry must name a current node_id whose
+  declared ports match the configured base / addType / select / output,
+  so the front-end dynamic-port table cannot drift from the schemas;
 * display_name should follow the spaced model/version convention
   (reported as a warning only, never fatal).
 
@@ -52,6 +55,26 @@ DISPLAY_NAME_RE = re.compile(r'display_name="([^"]+)"')
 SEPARATOR_RE = re.compile(r":?-{2,}:?")
 VERSION_RE = re.compile(r'^version\s*=\s*"([^"]+)"', re.MULTILINE)
 CHANGELOG_VERSION_RE = re.compile(r"^\*\*v([0-9][0-9A-Za-z.\-]*)\*\*$")
+
+# Front-end dynamic-port table: node_id -> {base, addType, select, initial, ...}
+DYNAMIC_PORTS_FILE = ROOT / "web" / "js" / "dynamic_port.js"
+DYNAMIC_CONFIG_ENTRY_RE = re.compile(r'"(1hew_[A-Za-z0-9_]+)"\s*:\s*\{([^}]*)\}')
+DYNAMIC_CONFIG_FIELD_RE = re.compile(r'(\w+)\s*:\s*(?:"([^"]*)"|(\d+)|(null))')
+SCHEMA_INPUT_RE = re.compile(r'io\.(?:Custom\("([^"]+)"\)|([A-Za-z]+))\.Input\(\s*(f?)"([^"]*)"')
+SCHEMA_OUTPUT_RE = re.compile(r'io\.(?:Custom\("([^"]+)"\)|([A-Za-z]+))\.Output\(\s*display_name=(f?)"([^"]*)"')
+
+# io.<Builtin>.Input -> the LiteGraph port type dynamic_port.js adds at runtime
+PORT_TYPE_MAP = {
+    "Image": "IMAGE",
+    "Mask": "MASK",
+    "Video": "VIDEO",
+    "Audio": "AUDIO",
+    "String": "STRING",
+    "Int": "INT",
+    "Float": "FLOAT",
+    "Boolean": "BOOLEAN",
+    "Combo": "COMBO",
+}
 
 # display_name patterns that violate the spaced naming convention
 CAMEL_RE = re.compile(r"[a-z][A-Z]")
@@ -119,6 +142,120 @@ def top_changelog_version(readme, heading):
         if match:
             return match.group(1)
     return None
+
+
+def port_type(custom, builtin):
+    """Resolve an io.Custom(X) or io.X input type to its LiteGraph port name."""
+    return custom if custom else PORT_TYPE_MAP.get(builtin, builtin)
+
+
+def schema_ports(text, pattern):
+    """Return (type, is_fstring, name) for every matching IO declaration."""
+    return [
+        (port_type(match.group(1), match.group(2)), match.group(3) == "f", match.group(4))
+        for match in pattern.finditer(text)
+    ]
+
+
+def dynamic_configs():
+    """Parse web/js/dynamic_port.js into ({node_id: fields}, [duplicate ids])."""
+    configs = {}
+    duplicates = []
+    text = DYNAMIC_PORTS_FILE.read_text(encoding="utf-8")
+    for match in DYNAMIC_CONFIG_ENTRY_RE.finditer(text):
+        node_id, body = match.group(1), match.group(2)
+        if node_id in configs:
+            duplicates.append(node_id)
+        fields = {}
+        for field in DYNAMIC_CONFIG_FIELD_RE.finditer(body):
+            if field.group(2) is not None:
+                value = field.group(2)
+            elif field.group(3) is not None:
+                value = int(field.group(3))
+            else:
+                value = None
+            fields[field.group(1)] = value
+        configs[node_id] = fields
+    return configs, duplicates
+
+
+def check_dynamic_ports(nodes_by_id, errors, warnings):
+    """Fail when the front-end dynamic-port table drifts from the node schemas."""
+    configs, duplicates = dynamic_configs()
+    for node_id in duplicates:
+        errors.append("dynamic_port.js has duplicate config key: %s" % node_id)
+
+    for node_id, cfg in sorted(configs.items()):
+        if node_id not in nodes_by_id:
+            errors.append("dynamic_port.js references unknown node_id: %s" % node_id)
+            continue
+        text = nodes_by_id[node_id].read_text(encoding="utf-8")
+        inputs = schema_ports(text, SCHEMA_INPUT_RE)
+        outputs = schema_ports(text, SCHEMA_OUTPUT_RE)
+
+        base = cfg.get("base")
+        add_type = cfg.get("addType")
+        if not isinstance(base, str) or not base:
+            errors.append("%s: dynamic_port.js base must be a non-empty string" % node_id)
+            continue
+        if not isinstance(add_type, str) or not add_type:
+            errors.append("%s: dynamic_port.js addType must be a non-empty string" % node_id)
+
+        base_inputs = [port for port in inputs if port[2].startswith(base)]
+        if not base_inputs:
+            declared = ", ".join(sorted({port[2] for port in inputs})) or "none"
+            errors.append(
+                "%s: dynamic_port.js base %r matches no declared input (declared: %s)"
+                % (node_id, base, declared)
+            )
+        for ptype, _is_fstring, pname in base_inputs:
+            if add_type and ptype != add_type:
+                errors.append(
+                    "%s: dynamic_port.js addType %r != declared type %r of input %r"
+                    % (node_id, add_type, ptype, pname)
+                )
+
+        select = cfg.get("select")
+        if select and select not in {port[2] for port in inputs}:
+            errors.append(
+                "%s: dynamic_port.js select %r matches no declared input" % (node_id, select)
+            )
+
+        output_base = cfg.get("outputBase")
+        output_type = cfg.get("outputType")
+        if output_base:
+            base_outputs = [port for port in outputs if port[2].startswith(output_base)]
+            if not base_outputs:
+                errors.append(
+                    "%s: dynamic_port.js outputBase %r matches no declared output"
+                    % (node_id, output_base)
+                )
+            for ptype, _is_fstring, pname in base_outputs:
+                if output_type and ptype != output_type:
+                    errors.append(
+                        "%s: dynamic_port.js outputType %r != declared type %r of output %r"
+                        % (node_id, output_type, ptype, pname)
+                    )
+
+        initial = cfg.get("initial")
+        cap = cfg.get("max")
+        if not isinstance(initial, int) or initial < 1:
+            errors.append("%s: dynamic_port.js initial must be a positive integer" % node_id)
+        if cap is not None:
+            if not isinstance(cap, int) or cap < 1:
+                errors.append("%s: dynamic_port.js max must be a positive integer" % node_id)
+            elif isinstance(initial, int) and initial > cap:
+                errors.append(
+                    "%s: dynamic_port.js initial (%s) exceeds max (%s)"
+                    % (node_id, initial, cap)
+                )
+
+        explicit = [port for port in base_inputs if not port[1]]
+        if isinstance(initial, int) and initial != len(explicit):
+            warnings.append(
+                "%s: dynamic_port.js initial=%s but the node declares %d explicit %r input(s)"
+                % (node_id, initial, len(explicit), base)
+            )
 
 
 def main():
@@ -192,6 +329,9 @@ def main():
                     "%s newest changelog v%s != pyproject version %s"
                     % (readme_name, top, version)
                 )
+
+    nodes_by_id = {node_id: path for node_id, _, path in nodes}
+    check_dynamic_ports(nodes_by_id, errors, warnings)
 
     for _, display_name, _ in nodes:
         if display_name in COMPACT_NAME_ALLOWLIST:

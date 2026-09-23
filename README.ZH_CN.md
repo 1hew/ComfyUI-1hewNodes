@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.28.1**
+- chore(tooling)：`scripts/check_node_consistency.py` 新增 `web/js/dynamic_port.js` 端口表校验——失效的 node_id、重复 key、`base` / `addType` / `select` / `outputBase` / `outputType` 不匹配、`initial` / `max` 非法都会直接报错
+
 **v3.28.0**
 - feat(text)：新增按模型区分的 `String Resolution` 选择器——`String Resolution GPT Image 2.0`（`1k` / `2k` / `4k`）、`String Resolution Gemini 3.1 Flash Image`（`0.5k` / `1k` / `2k` / `4k`）、`String Resolution Jimeng`（`1k` / `2k` / `4k`）、`String Resolution Doubao Seedream 5.0 Pro`（`1k` / `1.5k` / `2k`）与 `String Resolution Qwen Image 3.0 Pro`（`1k` / `2k`），替代通用 `String Resolution` 节点；旧工作流请改用对应模型节点
 - feat(text)：新增 `String Ratio Doubao Seedream 5.0 Pro`（8 个比例）与 `String Ratio Qwen Image 3.0 Pro`（15 个比例），从输入图像推断最接近的支持比例

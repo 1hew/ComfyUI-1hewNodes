@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.28.1**
+- chore(tooling): Extend `scripts/check_node_consistency.py` to validate the `web/js/dynamic_port.js` port table against the node schemas — stale node_ids, duplicate keys, `base` / `addType` / `select` / `outputBase` / `outputType` mismatches, and invalid `initial` / `max` now fail
+
 **v3.28.0**
 - feat(text): Add model-specific `String Resolution` selectors — `String Resolution GPT Image 2.0` (`1k` / `2k` / `4k`), `String Resolution Gemini 3.1 Flash Image` (`0.5k` / `1k` / `2k` / `4k`), `String Resolution Jimeng` (`1k` / `2k` / `4k`), `String Resolution Doubao Seedream 5.0 Pro` (`1k` / `1.5k` / `2k`) and `String Resolution Qwen Image 3.0 Pro` (`1k` / `2k`) — replacing the generic `String Resolution` node; switch existing workflows to the matching model node
 - feat(text): Add `String Ratio Doubao Seedream 5.0 Pro` (8 ratios) and `String Ratio Qwen Image 3.0 Pro` (15 ratios) to infer the nearest supported aspect ratio from input images
