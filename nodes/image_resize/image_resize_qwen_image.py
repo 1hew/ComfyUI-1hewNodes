@@ -21,7 +21,7 @@ class ImageResizeQwenImage(io.ComfyNode):
     def define_schema(cls) -> io.Schema:
         return io.Schema(
             node_id="1hew_ImageResizeQwenImage",
-            display_name="Image Resize QwenImage",
+            display_name="Image Resize Qwen Image",
             category="1hewNodes/image/resize",
             inputs=[
                 io.Combo.Input("preset_size", options=cls.PRESET_OPTIONS, default="auto"),

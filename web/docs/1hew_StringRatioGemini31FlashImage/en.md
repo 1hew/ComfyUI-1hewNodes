@@ -1,6 +1,6 @@
-# String Ratio Gemini31FlashImage - Gemini 3.1 Flash Ratio Selector
+# String Ratio Gemini 3.1 Flash Image - Gemini 3.1 Flash Ratio Selector
 
-**Node Purpose:** `String Ratio Gemini31FlashImage` outputs the nearest Gemini 3.1 Flash supported aspect ratio string for each input image. If no image is connected, it passes through the manually selected ratio.
+**Node Purpose:** `String Ratio Gemini 3.1 Flash Image` outputs the nearest Gemini 3.1 Flash supported aspect ratio string for each input image. If no image is connected, it passes through the manually selected ratio.
 
 ## Inputs
 
@@ -17,7 +17,7 @@
 
 ## Features
 
-- Gemini 3.1 Flash ratio set: uses the same supported ratio family as `Image Resize Gemini31FlashImage`.
+- Gemini 3.1 Flash ratio set: uses the same supported ratio family as `Image Resize Gemini 3.1 Flash Image`.
 - Image-driven inference: matches each input image to the nearest preset ratio in log-ratio space.
 - Manual fallback: when no image is connected, returns the selected ratio directly.
 - Batch-friendly: supports multi-image batches and returns one ratio per image line.
@@ -25,7 +25,7 @@
 ## Typical Usage
 
 - Use before Gemini 3.1 Flash image nodes that require an aspect-ratio string.
-- Pair with `Image Resize Gemini31FlashImage` to keep resize presets and ratio strings aligned.
+- Pair with `Image Resize Gemini 3.1 Flash Image` to keep resize presets and ratio strings aligned.
 - Leave `image` empty when you want to force a fixed ratio string downstream.
 
 ## Notes & Tips

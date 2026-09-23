@@ -1,6 +1,6 @@
-# String Ratio Gemini31FlashImage - Gemini 3.1 Flash 比例选择器
+# String Ratio Gemini 3.1 Flash Image - Gemini 3.1 Flash 比例选择器
 
-**节点功能：** `String Ratio Gemini31FlashImage` 为每张输入图像输出最接近的 Gemini 3.1 Flash 支持比例字符串；如果未连接图像，则直接输出手动选择的比例。
+**节点功能：** `String Ratio Gemini 3.1 Flash Image` 为每张输入图像输出最接近的 Gemini 3.1 Flash 支持比例字符串；如果未连接图像，则直接输出手动选择的比例。
 
 ## 输入
 
@@ -17,7 +17,7 @@
 
 ## 功能说明
 
-- Gemini 3.1 Flash 预设集：与 `Image Resize Gemini31FlashImage` 使用同一组支持比例。
+- Gemini 3.1 Flash 预设集：与 `Image Resize Gemini 3.1 Flash Image` 使用同一组支持比例。
 - 图像驱动推断：基于对数比例差匹配最接近的预设宽高比。
 - 手动回退：未连接图像时直接透传手动选择的比例。
 - 批处理友好：支持图像批次输入，每张图输出一行比例字符串。
@@ -25,7 +25,7 @@
 ## 典型用法
 
 - 用在需要比例字符串输入的 Gemini 3.1 Flash 图像节点前。
-- 与 `Image Resize Gemini31FlashImage` 搭配，保持尺寸预设与比例字符串一致。
+- 与 `Image Resize Gemini 3.1 Flash Image` 搭配，保持尺寸预设与比例字符串一致。
 - 当你希望下游固定使用某个比例时，可以不连接 `image`，直接输出选定值。
 
 ## 注意与建议

@@ -1,6 +1,6 @@
-# Image Resize Gemini30ProImage - Gemini 3.0 Pro 图像尺寸适配
+# Image Resize Gemini 3.0 Pro Image - Gemini 3.0 Pro 图像尺寸适配
 
-**节点功能：** `Image Resize Gemini30ProImage` 用于将输入图像/遮罩适配到 Gemini 3.0 Pro 常用预设分辨率，支持自动匹配最接近分辨率，并在 `crop` / `pad` / `stretch` 三种模式下同步输出图像与遮罩。
+**节点功能：** `Image Resize Gemini 3.0 Pro Image` 用于将输入图像/遮罩适配到 Gemini 3.0 Pro 常用预设分辨率，支持自动匹配最接近分辨率，并在 `crop` / `pad` / `stretch` 三种模式下同步输出图像与遮罩。
 
 ## 输入
 

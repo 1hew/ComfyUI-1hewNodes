@@ -1,24 +1,35 @@
+"""Qwen Image 3.0 Pro 专用分辨率标签节点。
+
+与 1hewOffice 的 1hewOffice_QwenImage30Pro 成对使用：按图像面积推断出 API 节点
+resolution 支持的档位之一（1k / 2k），未连接图像时直接透传手动选择的标签。
+
+目标面积取自 QwenImage30Pro.MAX_PIXELS_BY_RESOLUTION（该文件属于 1hewOffice，不在本仓库内）：
+1k = 1024x1024，2k = 2048x2048。
+"""
+
 import math
 
 import torch
 from comfy_api.latest import io
 
 
-class StringResolution(io.ComfyNode):
+class StringResolutionQwenImage30Pro(io.ComfyNode):
+    # 各档位目标面积取该模型 1:1 官方尺寸的面积，与 API 节点的分辨率档位一一对应。
     RESOLUTION_OPTIONS = [
-        ("0.5k", 512 * 512),
         ("1k", 1024 * 1024),
         ("2k", 2048 * 2048),
-        ("4k", 4096 * 4096),
     ]
     RESOLUTION_LABELS = [label for label, _ in RESOLUTION_OPTIONS]
 
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
-            node_id="1hew_StringResolution",
-            display_name="String Resolution",
+            node_id="1hew_StringResolutionQwenImage30Pro",
+            display_name="String Resolution Qwen Image 3.0 Pro",
             category="1hewNodes/text",
+            description=(
+                "从输入图像推断最接近的 Qwen Image 3.0 Pro 分辨率档位（1k / 2k）；未连接图像时透传所选标签。与 1hewOffice 的 Qwen Image 3.0 Pro 节点成对使用。"
+            ),
             inputs=[
                 io.Combo.Input("selection", options=cls.RESOLUTION_LABELS, default="1k"),
                 io.Image.Input("image", optional=True),
@@ -35,9 +46,7 @@ class StringResolution(io.ComfyNode):
         image: torch.Tensor | None = None,
     ) -> io.NodeOutput:
         if not isinstance(image, torch.Tensor) or image.ndim != 4:
-            return io.NodeOutput(
-                selection if selection in cls.RESOLUTION_LABELS else "1k"
-            )
+            return io.NodeOutput(selection if selection in cls.RESOLUTION_LABELS else "1k")
 
         labels = []
         batch = int(image.shape[0])

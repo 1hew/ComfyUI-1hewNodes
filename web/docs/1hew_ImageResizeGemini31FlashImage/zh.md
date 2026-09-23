@@ -1,6 +1,6 @@
-# Image Resize Gemini31FlashImage - Gemini 3.1 Flash 图像尺寸适配
+# Image Resize Gemini 3.1 Flash Image - Gemini 3.1 Flash 图像尺寸适配
 
-**节点功能：** `Image Resize Gemini31FlashImage` 继承 Gemini 3.0 Pro 版本的缩放逻辑，并扩展了更宽比例范围（包含 `0.5k` / `1k` / `2k` / `4k` 档位）。适用于 Gemini 3.1 Flash 任务前的图像与遮罩尺寸标准化。
+**节点功能：** `Image Resize Gemini 3.1 Flash Image` 继承 Gemini 3.0 Pro 版本的缩放逻辑，并扩展了更宽比例范围（包含 `0.5k` / `1k` / `2k` / `4k` 档位）。适用于 Gemini 3.1 Flash 任务前的图像与遮罩尺寸标准化。
 
 ## 输入
 
@@ -23,9 +23,9 @@
 
 ## 功能说明
 
-- 扩展预设集：比 Gemini30 版本新增更多超宽/超高比例组合与 `0.5k` 自动档位。
+- 扩展预设集：比 Gemini 3.0 版本新增更多超宽/超高比例组合与 `0.5k` 自动档位。
 - 自动匹配逻辑：`auto` 先按输入面积确定 `0.5k` / `1k` / `2k` / `4k` 档位，再在该档内按宽高比匹配最近预设；`auto (0.5k)` 等固定档位。
-- 适配策略一致：`crop` / `pad` / `stretch` 与 Gemini30 版本行为一致，遮罩同步输出。
+- 适配策略一致：`crop` / `pad` / `stretch` 与 Gemini 3.0 版本行为一致，遮罩同步输出。
 - 输入弹性：支持 image-only、mask-only、无输入三种场景。
 
 ## 典型用法

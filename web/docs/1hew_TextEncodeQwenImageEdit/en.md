@@ -1,12 +1,12 @@
-# Text Encode QwenImageEdit - Qwen image-edit prompt encoder
+# Text Encode Qwen Image Edit - Qwen image-edit prompt encoder
 
-**Node Purpose:** `Text Encode QwenImageEdit` builds a QwenImageEdit-compatible prompt with one or more image placeholders, resizes images for the vision encoder, and outputs a `CONDITIONING`. With an optional `VAE`, it also attaches `reference_latents` for image-reference guidance.
+**Node Purpose:** `Text Encode Qwen Image Edit` builds a Qwen Image Edit-compatible prompt with one or more image placeholders, resizes images for the vision encoder, and outputs a `CONDITIONING`. With an optional `VAE`, it also attaches `reference_latents` for image-reference guidance.
 
 ## Inputs
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `clip` | - | CLIP | - | - | QwenImageEdit-compatible CLIP model used for tokenize and encode. |
+| `clip` | - | CLIP | - | - | Qwen Image Edit-compatible CLIP model used for tokenize and encode. |
 | `vae` | optional | VAE | - | - | When connected, the node generates `reference_latents` for each provided image. |
 | `image_1` | optional | IMAGE | - | - | First input image. The UI supports dynamic `image_2..image_10` ports. |
 | `prompt` | - | STRING(multiline) | `""` | - | User instruction appended after the image placeholders. |

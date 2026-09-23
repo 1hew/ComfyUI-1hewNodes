@@ -28,7 +28,7 @@ class StringRatioGpt20Image(io.ComfyNode):
     def define_schema(cls) -> io.Schema:
         return io.Schema(
             node_id="1hew_StringRatioGpt20Image",
-            display_name="String Ratio Gpt20Image",
+            display_name="String Ratio GPT Image 2.0",
             category="1hewNodes/text",
             inputs=[
                 io.Combo.Input("selection", options=cls.RATIO_LABELS, default="1:1"),

@@ -21,6 +21,15 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.28.0**
+- feat(text): Add model-specific `String Resolution` selectors — `String Resolution GPT Image 2.0` (`1k` / `2k` / `4k`), `String Resolution Gemini 3.1 Flash Image` (`0.5k` / `1k` / `2k` / `4k`), `String Resolution Jimeng` (`1k` / `2k` / `4k`), `String Resolution Doubao Seedream 5.0 Pro` (`1k` / `1.5k` / `2k`) and `String Resolution Qwen Image 3.0 Pro` (`1k` / `2k`) — replacing the generic `String Resolution` node; switch existing workflows to the matching model node
+- feat(text): Add `String Ratio Doubao Seedream 5.0 Pro` (8 ratios) and `String Ratio Qwen Image 3.0 Pro` (15 ratios) to infer the nearest supported aspect ratio from input images
+- refactor(image_resize): Reorder `Image Resize Doubao Seedream 5.0 Pro` presets widest → square → tallest to match the API node's `aspect_ratio` option order
+- docs: Add bilingual docs for the 7 new text nodes, remove the generic `String Resolution` docs, and document the per-node/per-model Jimeng resolution tiers for `String Resolution Jimeng` / `Image Resize Jimeng` in the node docs
+- refactor(naming): Unify model node display names to the spaced form (`Image Resize Gemini 3.1 Flash Image`, `String Ratio GPT Image 2.0`, `Text Encode Qwen Image Edit`, …); `node_id`s are unchanged, so existing workflows keep working
+- feat(image): Give `Image Align Change Mask` an optional `mask` input — alignment, color compensation, and noise fitting then use only the redrawn region's background, and only change islands overlapping that region are kept, whole (the mask is used exactly as drawn)
+- chore(tooling): Add `scripts/check_node_consistency.py` and document the naming rule in `nodes/__init__.py`; `nodes/**/*.py` is the single source of truth, and the checker fails on duplicate node_id/display_name, missing or orphan `web/docs` entries, README node-list drift, and a `pyproject.toml` / changelog version mismatch
+
 **v3.27.0**
 - feat(logic): Add `Image Area Compare` to compare the pixel area (width × height) of two IMAGE inputs with a selected operator and output a boolean
 - fix(image_resize): Remove the duplicate `Image Resize Qwen Image 3.0` node, which was identical to `Image Resize Qwen Image 3.0 Pro`; switch existing workflows to the Pro node
@@ -513,12 +522,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📐 Image Resize Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Image Resize FluxKontext | Resize images/masks to FluxKontext preset sizes with auto/manual target selection |
-| Image Resize QwenImage | Qwen-oriented image resizing with preset resolutions and auto matching |
+| Image Resize Flux Kontext | Resize images/masks to Flux Kontext preset sizes with auto/manual target selection |
+| Image Resize Qwen Image | Qwen-oriented image resizing with preset resolutions and auto matching |
 | Image Resize Universal | Universal image resizing with ratio inference, fit strategies, and synchronized mask output |
 | Image Resize Jimeng | Resize for Jimeng-oriented presets with area-tiered auto matching and 1k/2k/4k fixed presets |
-| Image Resize Gemini30ProImage | Gemini 3.0 Pro preset size adapter with area-tiered auto matching and synchronized image/mask transforms |
-| Image Resize Gemini31FlashImage | Gemini 3.1 Flash preset size adapter with area-tiered auto matching across 0.5k/1k/2k/4k tiers and extreme aspect ratios |
+| Image Resize Gemini 3.0 Pro Image | Gemini 3.0 Pro preset size adapter with area-tiered auto matching and synchronized image/mask transforms |
+| Image Resize Gemini 3.1 Flash Image | Gemini 3.1 Flash preset size adapter with area-tiered auto matching across 0.5k/1k/2k/4k tiers and extreme aspect ratios |
 | Image Resize GPT Image 2.0 | GPT Image 2.0 size adapter with area-tiered auto preset matching, dynamic aspect-preserving tiers, and 1k/2k/4k fixed presets |
 | Image Resize Doubao Seedream 5.0 Pro | Doubao Seedream 5.0 Pro size adapter with official 1k/1.5k/2k presets, tiered auto matching, dynamic sizing, and synchronized image/mask transforms |
 | Image Resize Qwen Image 3.0 Pro | Qwen Image 3.0 Pro size adapter with 1k/2k presets, tiered auto matching, dynamic sizing, and synchronized image/mask transforms |
@@ -659,12 +668,18 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Text Prefix Suffix | Text prefix suffix formatter with wildcard input support for flexible data formatting with custom prefix and suffix |
 | Text Custom Extract | Text custom extractor for extracting specified key values from JSON |
-| String Ratio Gpt20Image | Infer the nearest GPT 2.0 image supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
-| String Ratio Gemini31FlashImage | Infer the nearest Gemini 3.1 Flash supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
+| String Ratio GPT Image 2.0 | Infer the nearest GPT 2.0 image supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
+| String Ratio Gemini 3.1 Flash Image | Infer the nearest Gemini 3.1 Flash supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
 | String Ratio Jimeng | Infer the nearest Jimeng supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
-| String Resolution | Infer the nearest resolution tier (`0.5k` / `1k` / `2k` / `4k`) from input images, or pass through the selected label when no image is connected |
+| String Ratio Doubao Seedream 5.0 Pro | Infer the nearest Doubao Seedream 5.0 Pro supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
+| String Ratio Qwen Image 3.0 Pro | Infer the nearest Qwen Image 3.0 Pro supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
+| String Resolution GPT Image 2.0 | Infer the nearest GPT Image 2.0 resolution tier (`1k` / `2k` / `4k`) from input images, or pass through the selected label when no image is connected |
+| String Resolution Gemini 3.1 Flash Image | Infer the nearest Gemini 3.1 Flash Image resolution tier (`0.5k` / `1k` / `2k` / `4k`) from input images, or pass through the selected label when no image is connected |
+| String Resolution Jimeng | Infer the nearest Jimeng resolution tier (`1k` / `2k` / `4k`) from input images, or pass through the selected label when no image is connected |
+| String Resolution Doubao Seedream 5.0 Pro | Infer the nearest Doubao Seedream 5.0 Pro resolution tier (`1k` / `1.5k` / `2k`) from input images, or pass through the selected label when no image is connected |
+| String Resolution Qwen Image 3.0 Pro | Infer the nearest Qwen Image 3.0 Pro resolution tier (`1k` / `2k`) from input images, or pass through the selected label when no image is connected |
 | String Filter | Text cleaner supporting `{input}` / `{n}` substitution from the `input` value, comment filtering (# and triple quotes), and optional empty-line removal |
-| String Join Multi | Join up to 5 text blocks with `{input}` substitution, comment/empty-line filtering, and composite separators|
+| String Join Multi | Join up to 5 text blocks with `{input}` substitution, comment/empty-line filtering, and composite separators |
 | List Custom Int | Build integer lists from flexible multiline value/range/stride text with reverse-order and mixed punctuation support |
 | List Custom Float | Build float lists from flexible multiline value/range/stride text with reverse-order and mixed punctuation support |
 | List Custom String | Custom string list generator with dash separator and multiple delimiter support |
@@ -700,7 +715,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎛️ Conditioning Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Text Encode QwenImageEdit | Qwen image-edit conditioning encoder combining vision inputs and text, supports size preservation modes and reference latents |
+| Text Encode Qwen Image Edit | Qwen image-edit conditioning encoder combining vision inputs and text, supports size preservation modes and reference latents |
 
 
 ### 🔊 Audio Nodes

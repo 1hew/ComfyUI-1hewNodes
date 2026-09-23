@@ -1,12 +1,12 @@
-# Text Encode QwenImageEdit - Qwen 图生编辑提示词编码器
+# Text Encode Qwen Image Edit - Qwen 图生编辑提示词编码器
 
-**节点功能：** `Text Encode QwenImageEdit` 将多张图像占位符与文本指令组合为 QwenImageEdit 兼容的输入，并对视觉输入执行尺寸适配，输出 `CONDITIONING`。当连接 `VAE` 时，节点同时写入 `reference_latents` 用于参考图引导。
+**节点功能：** `Text Encode Qwen Image Edit` 将多张图像占位符与文本指令组合为 Qwen Image Edit 兼容的输入，并对视觉输入执行尺寸适配，输出 `CONDITIONING`。当连接 `VAE` 时，节点同时写入 `reference_latents` 用于参考图引导。
 
 ## 输入
 
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
-| `clip` | - | CLIP | - | - | QwenImageEdit 兼容的 CLIP，用于 tokenize 与 encode。 |
+| `clip` | - | CLIP | - | - | Qwen Image Edit 兼容的 CLIP，用于 tokenize 与 encode。 |
 | `vae` | 可选 | VAE | - | - | 连接后为每张输入图生成 `reference_latents`。 |
 | `image_1` | 可选 | IMAGE | - | - | 第一张输入图像；前端支持动态扩展 `image_2..image_10`。 |
 | `prompt` | - | STRING(多行) | `""` | - | 用户文本指令，将追加在图像占位符之后。 |

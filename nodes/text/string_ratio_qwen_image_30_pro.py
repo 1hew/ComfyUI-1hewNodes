@@ -1,14 +1,26 @@
+"""Qwen Image 3.0 Pro 专用比例字符串节点。
+
+与 1hewOffice 的 1hewOffice_QwenImage30Pro 成对使用：为每张输入图像推断出
+API 节点 aspect_ratio 支持的 15 个比例之一（3:1 / 21:9 / 2:1 / 16:9 / 3:2 / 4:3 / 5:4 /
+1:1 / 4:5 / 3:4 / 2:3 / 9:16 / 1:2 / 9:21 / 1:3），未连接图像时直接透传手动选择的比例。
+
+比例集合与 1hewOffice 的 qwen_image_30_pro.py 中 QwenImage30Pro.ASPECT_RATIO_OPTIONS
+逐项一致（去掉 auto / dynamic；该文件属于 1hewOffice，不在本仓库内），
+也与本仓库的 Image Resize Qwen Image 3.0 Pro 预设表比例一致。
+"""
+
 import math
 
 import torch
 from comfy_api.latest import io
 
 
-class StringRatioGemini31FlashImage(io.ComfyNode):
+class StringRatioQwenImage30Pro(io.ComfyNode):
+    # 顺序：最宽 -> 正方形 -> 最高，与 API 节点 aspect_ratio 的选项顺序一致。
     RATIO_OPTIONS = [
-        ("8:1", 8, 1),
-        ("4:1", 4, 1),
+        ("3:1", 3, 1),
         ("21:9", 21, 9),
+        ("2:1", 2, 1),
         ("16:9", 16, 9),
         ("3:2", 3, 2),
         ("4:3", 4, 3),
@@ -18,17 +30,22 @@ class StringRatioGemini31FlashImage(io.ComfyNode):
         ("3:4", 3, 4),
         ("2:3", 2, 3),
         ("9:16", 9, 16),
-        ("1:4", 1, 4),
-        ("1:8", 1, 8),
+        ("1:2", 1, 2),
+        ("9:21", 9, 21),
+        ("1:3", 1, 3),
     ]
     RATIO_LABELS = [label for label, _, _ in RATIO_OPTIONS]
 
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
-            node_id="1hew_StringRatioGemini31FlashImage",
-            display_name="String Ratio Gemini 3.1 Flash Image",
+            node_id="1hew_StringRatioQwenImage30Pro",
+            display_name="String Ratio Qwen Image 3.0 Pro",
             category="1hewNodes/text",
+            description=(
+                "从输入图像推断最接近的 Qwen Image 3.0 Pro 支持比例；"
+                "未连接图像时透传所选比例。与 1hewOffice 的 Qwen Image 3.0 Pro 节点成对使用。"
+            ),
             inputs=[
                 io.Combo.Input("selection", options=cls.RATIO_LABELS, default="1:1"),
                 io.Image.Input("image", optional=True),

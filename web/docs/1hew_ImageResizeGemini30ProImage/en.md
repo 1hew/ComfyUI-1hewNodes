@@ -1,6 +1,6 @@
-# Image Resize Gemini30ProImage - Gemini 3.0 Pro Size Adapter
+# Image Resize Gemini 3.0 Pro Image - Gemini 3.0 Pro Size Adapter
 
-**Node Purpose:** `Image Resize Gemini30ProImage` adapts image/mask inputs to Gemini 3.0 Pro preset resolutions. It supports nearest preset auto-selection and synchronized image/mask outputs under `crop` / `pad` / `stretch` fit modes.
+**Node Purpose:** `Image Resize Gemini 3.0 Pro Image` adapts image/mask inputs to Gemini 3.0 Pro preset resolutions. It supports nearest preset auto-selection and synchronized image/mask outputs under `crop` / `pad` / `stretch` fit modes.
 
 ## Inputs
 

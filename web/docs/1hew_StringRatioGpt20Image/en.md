@@ -1,6 +1,6 @@
-# String Ratio Gpt20Image - GPT 2.0 Image Ratio Selector
+# String Ratio GPT Image 2.0 - GPT 2.0 Image Ratio Selector
 
-**Node Purpose:** `String Ratio Gpt20Image` outputs the nearest GPT 2.0 image supported aspect ratio string for each input image. If no image is connected, it passes through the manually selected ratio.
+**Node Purpose:** `String Ratio GPT Image 2.0` outputs the nearest GPT 2.0 image supported aspect ratio string for each input image. If no image is connected, it passes through the manually selected ratio.
 
 ## Inputs
 

@@ -31,7 +31,7 @@ class ImageResizeFluxKontext(io.ComfyNode):
     def define_schema(cls) -> io.Schema:
         return io.Schema(
             node_id="1hew_ImageResizeFluxKontext",
-            display_name="Image Resize FluxKontext",
+            display_name="Image Resize Flux Kontext",
             category="1hewNodes/image/resize",
             inputs=[
                 io.Combo.Input("preset_size", options=cls.PRESET_OPTIONS, default="auto"),

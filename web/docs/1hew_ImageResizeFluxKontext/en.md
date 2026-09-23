@@ -1,6 +1,6 @@
-# Image Resize FluxKontext - Preset model resolutions
+# Image Resize Flux Kontext - Preset model resolutions
 
-**Node Purpose:** `Image Resize FluxKontext` resizes images and masks to model-aligned preset resolutions used by FluxKontext. Supports `auto` closest aspect selection, fit modes (`crop`, `pad`, `stretch`), and rich `pad_color` strategies.
+**Node Purpose:** `Image Resize Flux Kontext` resizes images and masks to model-aligned preset resolutions used by Flux Kontext. Supports `auto` closest aspect selection, fit modes (`crop`, `pad`, `stretch`), and rich `pad_color` strategies.
 
 ## Inputs
 
@@ -31,7 +31,7 @@
 
 ## Typical Usage
 
-- Align to model: set `preset_size` to a FluxKontext preset or leave `auto`.
+- Align to model: set `preset_size` to a Flux Kontext preset or leave `auto`.
 - Preserve content: use `fit=pad` and `pad_color=edge`/`average` for natural-looking borders.
 - Strict content region: use `fit=crop` to remove excess content cleanly.
 

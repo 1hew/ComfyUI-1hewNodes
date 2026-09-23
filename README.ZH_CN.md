@@ -21,6 +21,15 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.28.0**
+- feat(text)：新增按模型区分的 `String Resolution` 选择器——`String Resolution GPT Image 2.0`（`1k` / `2k` / `4k`）、`String Resolution Gemini 3.1 Flash Image`（`0.5k` / `1k` / `2k` / `4k`）、`String Resolution Jimeng`（`1k` / `2k` / `4k`）、`String Resolution Doubao Seedream 5.0 Pro`（`1k` / `1.5k` / `2k`）与 `String Resolution Qwen Image 3.0 Pro`（`1k` / `2k`），替代通用 `String Resolution` 节点；旧工作流请改用对应模型节点
+- feat(text)：新增 `String Ratio Doubao Seedream 5.0 Pro`（8 个比例）与 `String Ratio Qwen Image 3.0 Pro`（15 个比例），从输入图像推断最接近的支持比例
+- refactor(image_resize)：`Image Resize Doubao Seedream 5.0 Pro` 预设改为按「最宽 → 正方形 → 最高」排列，与 API 节点 `aspect_ratio` 选项顺序一致
+- docs：新增上述 7 个文本节点的中英文文档，移除通用 `String Resolution` 文档并同步节点列表；在节点文档中补充即梦 `String Resolution Jimeng` / `Image Resize Jimeng` 的按节点/模型可用档位表
+- refactor(naming)：统一模型类节点的 display_name 为分词写法（`Image Resize Gemini 3.1 Flash Image`、`String Ratio GPT Image 2.0`、`Text Encode Qwen Image Edit` 等）；`node_id` 未变，旧工作流不受影响
+- feat(image)：`Image Align Change Mask` 新增可选 `mask` 输入——对齐、颜色补偿与噪声估计只使用重绘区域以外的背景，只保留与该区域重叠的整块变化岛（mask 按画到的像素原样使用）
+- chore(tooling)：新增 `scripts/check_node_consistency.py`，并在 `nodes/__init__.py` 写明命名规范；以 `nodes/**/*.py` 为唯一真源，重复的 node_id/display_name、缺失或多余的 `web/docs`、README 节点列表漂移、`pyproject.toml` 与更新日志版本不一致都会直接报错
+
 **v3.27.0**
 - feat(logic)：新增 `Image Area Compare`，比较两个 IMAGE 输入的像素面积（宽 × 高）大小，按比较符输出布尔值
 - fix(image_resize)：移除与 `Image Resize Qwen Image 3.0 Pro` 完全重复的 `Image Resize Qwen Image 3.0` 节点，旧工作流请改用 Pro 节点
@@ -513,12 +522,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📐 图像尺寸节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Image Resize FluxKontext | 图像尺寸调整为 FluxKontext 预设尺寸，支持图像和遮罩的自动/手动尺寸选择 |
-| Image Resize QwenImage | 专为 Qwen 视觉模型优化的图像尺寸调整，支持预设分辨率与自动匹配 |
+| Image Resize Flux Kontext | 图像尺寸调整为 Flux Kontext 预设尺寸，支持图像和遮罩的自动/手动尺寸选择 |
+| Image Resize Qwen Image | 专为 Qwen 视觉模型优化的图像尺寸调整，支持预设分辨率与自动匹配 |
 | Image Resize Universal | 通用图像尺寸调整，支持多种比例来源、fit 策略与遮罩同步输出 |
 | Image Resize Jimeng | 适配即梦常用分辨率的图像尺寸调整，支持按面积定档的 auto 匹配 |
-| Image Resize Gemini30ProImage | 适配 Gemini 3.0 Pro 预设分辨率，支持按面积定档的 auto 匹配与 image/mask 同步变换 |
-| Image Resize Gemini31FlashImage | 适配 Gemini 3.1 Flash 预设分辨率，支持按面积定档的 auto 匹配与 0.5k/1k/2k/4k 档位 |
+| Image Resize Gemini 3.0 Pro Image | 适配 Gemini 3.0 Pro 预设分辨率，支持按面积定档的 auto 匹配与 image/mask 同步变换 |
+| Image Resize Gemini 3.1 Flash Image | 适配 Gemini 3.1 Flash 预设分辨率，支持按面积定档的 auto 匹配与 0.5k/1k/2k/4k 档位 |
 | Image Resize GPT Image 2.0 | 适配 GPT Image 2.0 尺寸，支持按面积定档的 auto 预设匹配、dynamic 动态保比例档位与 1k/2k/4k 固定预设 |
 | Image Resize Doubao Seedream 5.0 Pro | 适配豆包 Seedream 5.0 Pro 官方 1k/1.5k/2k 精确预设，支持按档位自动匹配、动态尺寸与 image/mask 同步变换 |
 | Image Resize Qwen Image 3.0 Pro | 适配 Qwen Image 3.0 Pro 的 1k/2k 预设，支持按档位自动匹配、动态尺寸与 image/mask 同步变换 |
@@ -659,10 +668,16 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Text Prefix Suffix | 文本前缀后缀器，支持通配符输入的灵活数据格式化，可自定义前缀和后缀 |
 | Text Custom Extract | 文本自定义提取器，从JSON中提取指定键值 |
-| String Ratio Gpt20Image | 从输入图像推断最接近的 GPT 2.0 图像模型支持比例；未连接图像时透传所选比例 |
-| String Ratio Gemini31FlashImage | 从输入图像推断最接近的 Gemini 3.1 Flash 支持比例；未连接图像时透传所选比例 |
+| String Ratio GPT Image 2.0 | 从输入图像推断最接近的 GPT 2.0 图像模型支持比例；未连接图像时透传所选比例 |
+| String Ratio Gemini 3.1 Flash Image | 从输入图像推断最接近的 Gemini 3.1 Flash 支持比例；未连接图像时透传所选比例 |
 | String Ratio Jimeng | 从输入图像推断最接近的 Jimeng 支持比例；未连接图像时透传所选比例 |
-| String Resolution | 从输入图像推断最接近的分辨率档位（`0.5k` / `1k` / `2k` / `4k`）；未连接图像时透传所选标签 |
+| String Ratio Doubao Seedream 5.0 Pro | 从输入图像推断最接近的 Doubao Seedream 5.0 Pro 支持比例；未连接图像时透传所选比例 |
+| String Ratio Qwen Image 3.0 Pro | 从输入图像推断最接近的 Qwen Image 3.0 Pro 支持比例；未连接图像时透传所选比例 |
+| String Resolution GPT Image 2.0 | 从输入图像推断最接近的 GPT Image 2.0 分辨率档位（`1k` / `2k` / `4k`）；未连接图像时透传所选标签 |
+| String Resolution Gemini 3.1 Flash Image | 从输入图像推断最接近的 Gemini 3.1 Flash Image 分辨率档位（`0.5k` / `1k` / `2k` / `4k`）；未连接图像时透传所选标签 |
+| String Resolution Jimeng | 从输入图像推断最接近的即梦分辨率档位（`1k` / `2k` / `4k`）；未连接图像时透传所选标签 |
+| String Resolution Doubao Seedream 5.0 Pro | 从输入图像推断最接近的 Doubao Seedream 5.0 Pro 分辨率档位（`1k` / `1.5k` / `2k`）；未连接图像时透传所选标签 |
+| String Resolution Qwen Image 3.0 Pro | 从输入图像推断最接近的 Qwen Image 3.0 Pro 分辨率档位（`1k` / `2k`）；未连接图像时透传所选标签 |
 | String Filter | 文本过滤器，支持用 `input` 值替换 `{input}` / `{n}`、注释过滤（# 与三引号）、可选空行移除 |
 | String Join Multi | 多段文本拼接，支持 `{input}` 占位符、注释/空行过滤与复合分隔符 |
 | List Custom Int | 使用灵活的多行数值/区间/步长文本构建整数列表，支持倒序与中英文符号混合输入 |
@@ -700,7 +715,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🎛️ 条件编码节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Text Encode QwenImageEdit | Qwen 图文编辑条件编码，支持多图视觉编码、尺寸保持策略与参考潜空间 |
+| Text Encode Qwen Image Edit | Qwen 图文编辑条件编码，支持多图视觉编码、尺寸保持策略与参考潜空间 |
 
 
 ### 🔊 音频节点

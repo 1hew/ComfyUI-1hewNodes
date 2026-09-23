@@ -1,6 +1,6 @@
-# Image Resize FluxKontext - 预设模型分辨率
+# Image Resize Flux Kontext - 预设模型分辨率
 
-**节点功能**：`Image Resize FluxKontext` 将图像/遮罩缩放到 FluxKontext 预设分辨率。支持 `auto` 最近纵横比匹配、`crop`/`pad`/`stretch` 三种适配模式，以及多种 `pad_color` 填充策略。
+**节点功能**：`Image Resize Flux Kontext` 将图像/遮罩缩放到 Flux Kontext 预设分辨率。支持 `auto` 最近纵横比匹配、`crop`/`pad`/`stretch` 三种适配模式，以及多种 `pad_color` 填充策略。
 
 ## 输入
 
@@ -31,7 +31,7 @@
 
 ## 典型用法
 
-- 模型对齐：将 `preset_size` 选择为 FluxKontext 预设，或使用 `auto`。
+- 模型对齐：将 `preset_size` 选择为 Flux Kontext 预设，或使用 `auto`。
 - 保留内容：设置 `fit=pad` 并选用 `edge`/`average` 以获得自然边界。
 - 严格内容区域：设置 `fit=crop` 清晰地去除多余区域。
 

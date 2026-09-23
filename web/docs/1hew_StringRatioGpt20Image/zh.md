@@ -1,6 +1,6 @@
-# String Ratio Gpt20Image - GPT 2.0 图像比例选择器
+# String Ratio GPT Image 2.0 - GPT 2.0 图像比例选择器
 
-**节点功能：** `String Ratio Gpt20Image` 为每张输入图像输出最接近的 GPT 2.0 图像模型支持比例字符串；如果未连接图像，则直接输出手动选择的比例。
+**节点功能：** `String Ratio GPT Image 2.0` 为每张输入图像输出最接近的 GPT 2.0 图像模型支持比例字符串；如果未连接图像，则直接输出手动选择的比例。
 
 ## 输入
 

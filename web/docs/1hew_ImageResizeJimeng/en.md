@@ -39,3 +39,18 @@
 
 - **Preparing for Generation**: Select a specific preset like `[2k] 2048x2048 (1:1)` to ensure your input image strictly matches the model's preferred training resolution.
 - **Batch Processing**: Use `auto` mode to process a batch of images with varying aspect ratios, automatically resizing each to its nearest standard equivalent.
+
+## Tiers available per node / model
+
+This node ships every tier preset, but the Jimeng `resolution` options are not uniform across nodes, so pick a tier the paired node actually supports:
+
+| Jimeng node | Available tiers |
+| ----------- | --------------- |
+| `Jimeng Image T2I` | `1k` / `2k` / `4k` |
+| `Jimeng Image Multi Edit` | `2k` / `4k` |
+| `Jimeng Image 4.0` / `4.1` / `4.5` / `4.6` / `4.7` / `5.0 Lite` | `2k` / `4k` |
+| `Jimeng Image 3.0` / `ControlNet` / `IP` | `1k` / `2k` |
+| `Jimeng Image Single Edit` / `Style` / `Subject` | `1k` / `2k` |
+
+- Model `2.0_pro` uses a separate 1024-base size table (`2.0_pro_ratios`), which maps to this node's `[2.0_pro]` presets and is not part of the `1k`/`2k`/`4k` tiers; that is why `auto` never selects `[2.0_pro]`.
+- When paired with `String Resolution Jimeng`, keep the label it outputs within the tiers listed above.

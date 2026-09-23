@@ -1,6 +1,6 @@
-﻿# Image Resize QwenImage - Preset-Driven Resize with Fit Modes
+# Image Resize Qwen Image - Preset-Driven Resize with Fit Modes
 
-**Node Purpose:** `Image Resize QwenImage` resizes images and/or masks to predefined resolutions optimized for QwenImage workflows. Supports `auto` preset selection based on aspect ratio, three fit modes (`crop`, `pad`, `stretch`), advanced `pad_color` strategies, and synchronized mask output.
+**Node Purpose:** `Image Resize Qwen Image` resizes images and/or masks to predefined resolutions optimized for Qwen Image workflows. Supports `auto` preset selection based on aspect ratio, three fit modes (`crop`, `pad`, `stretch`), advanced `pad_color` strategies, and synchronized mask output.
 
 ## Inputs
 

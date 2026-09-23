@@ -20,7 +20,7 @@ class TextEncodeQwenImageEdit(io.ComfyNode):
         ]
         return io.Schema(
             node_id="1hew_TextEncodeQwenImageEdit",
-            display_name="Text Encode QwenImageEdit",
+            display_name="Text Encode Qwen Image Edit",
             category="1hewNodes/condition",
             inputs=inputs,
             outputs=[io.Custom("CONDITIONING").Output(display_name="conditioning")],

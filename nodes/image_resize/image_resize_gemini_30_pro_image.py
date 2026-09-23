@@ -62,7 +62,7 @@ class ImageResizeGemini30ProImage(io.ComfyNode):
     def define_schema(cls) -> io.Schema:
         return io.Schema(
             node_id="1hew_ImageResizeGemini30ProImage",
-            display_name="Image Resize Gemini30ProImage",
+            display_name="Image Resize Gemini 3.0 Pro Image",
             category="1hewNodes/image/resize",
             inputs=[
                 io.Combo.Input("preset_size", options=cls.PRESET_OPTIONS, default="auto (2k | 4k)"),

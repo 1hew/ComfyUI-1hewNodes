@@ -1,6 +1,6 @@
-﻿# Image Resize QwenImage - 预设驱动的尺寸调整与适配模式
+# Image Resize Qwen Image - 预设驱动的尺寸调整与适配模式
 
-**节点功能：** `Image Resize QwenImage` 将图像与/或遮罩调整到为 QwenImage 工作流优化的预设分辨率。支持按输入长宽比自动选择预设（`auto`），三种适配模式（`crop`/`pad`/`stretch`），高级 `pad_color` 背景策略，并输出同步的遮罩。
+**节点功能：** `Image Resize Qwen Image` 将图像与/或遮罩调整到为 Qwen Image 工作流优化的预设分辨率。支持按输入长宽比自动选择预设（`auto`），三种适配模式（`crop`/`pad`/`stretch`），高级 `pad_color` 背景策略，并输出同步的遮罩。
 
 ## 输入
 

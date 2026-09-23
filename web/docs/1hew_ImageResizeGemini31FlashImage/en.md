@@ -1,6 +1,6 @@
-# Image Resize Gemini31FlashImage - Gemini 3.1 Flash Size Adapter
+# Image Resize Gemini 3.1 Flash Image - Gemini 3.1 Flash Size Adapter
 
-**Node Purpose:** `Image Resize Gemini31FlashImage` reuses the Gemini30 resizing behavior while extending preset coverage (including `0.5k` / `1k` / `2k` / `4k` tiers). It is intended for image/mask size normalization before Gemini 3.1 Flash workflows.
+**Node Purpose:** `Image Resize Gemini 3.1 Flash Image` reuses the Gemini 3.0 resizing behavior while extending preset coverage (including `0.5k` / `1k` / `2k` / `4k` tiers). It is intended for image/mask size normalization before Gemini 3.1 Flash workflows.
 
 ## Inputs
 
@@ -23,7 +23,7 @@
 
 ## Features
 
-- Extended presets: adds more extreme aspect ratios and `0.5k` auto tier compared with Gemini30 version.
+- Extended presets: adds more extreme aspect ratios and `0.5k` auto tier compared with the Gemini 3.0 version.
 - Auto selection: `auto` picks a tier by input area, then the nearest-aspect preset within it; `auto (0.5k)` etc. fix the tier.
 - Same fit behavior: `crop` / `pad` / `stretch` remain consistent, including synchronized mask transforms.
 - Flexible inputs: supports image-only, mask-only, and no-input fallback.
