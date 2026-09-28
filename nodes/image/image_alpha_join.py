@@ -30,24 +30,24 @@ class ImageAlphaJoin(io.ComfyNode):
         images = cls._normalize_images(image) if isinstance(image, torch.Tensor) else None
         masks = cls._normalize_masks(mask) if isinstance(mask, torch.Tensor) else None
 
+        # An empty image input (unconnected or a zero-length batch) yields an
+        # empty output, regardless of whether a mask was provided.
+        if images is None or int(images.shape[0]) <= 0:
+            return io.NodeOutput(None)
+
+        # A zero-length mask batch is treated as "no mask".
+        if masks is not None and int(masks.shape[0]) <= 0:
+            masks = None
+
         if masks is not None and bool(invert_mask):
             masks = 1.0 - masks
 
-        if images is None and masks is None:
-            return io.NodeOutput(None)
-
-        batch_size = max(
-            int(images.shape[0]) if images is not None else 0,
-            int(masks.shape[0]) if masks is not None else 0,
-        )
-        if batch_size <= 0:
-            return io.NodeOutput(None)
-
+        batch_size = int(images.shape[0])
         output_images: list[torch.Tensor] = []
-        output_device = image.device if isinstance(image, torch.Tensor) else mask.device
+        output_device = image.device
 
         for index in range(batch_size):
-            frame = images[index % int(images.shape[0])] if images is not None else None
+            frame = images[index]
             alpha = masks[index % int(masks.shape[0])] if masks is not None else None
             output_images.append(cls._join_single(frame=frame, alpha=alpha))
 
@@ -58,15 +58,9 @@ class ImageAlphaJoin(io.ComfyNode):
     def _join_single(
         cls,
         *,
-        frame: torch.Tensor | None,
+        frame: torch.Tensor,
         alpha: torch.Tensor | None,
     ) -> torch.Tensor:
-        if frame is None:
-            if alpha is None:
-                raise ValueError("image and mask cannot both be empty")
-            height, width = int(alpha.shape[0]), int(alpha.shape[1])
-            return torch.zeros((height, width, 4), dtype=torch.float32, device=alpha.device)
-
         rgb = cls._to_rgb(frame)
         height, width = int(rgb.shape[0]), int(rgb.shape[1])
 

@@ -6,7 +6,7 @@
 
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
-| `image` | - | IMAGE | - | - | 输入图像，支持单图或批量；RGBA 会提取 alpha 并与底色合成 |
+| `image` | - | IMAGE | - | - | 输入图像，支持单图或批量；RGBA 会提取 alpha 并与底色合成；为空时两个输出都为空 |
 | `background_color` | - | STRING | `1.0` | 与 `Image Solid` 的 `color` 相同：颜色名 / `#RRGGBB` / `r,g,b` / `0~1` 灰度 / 单字母颜色简写 | 透明区域要铺上的底色 |
 
 ## 输出
@@ -18,6 +18,7 @@
 
 ## 功能说明
 
+- `image` 为空（未连接或空批次）：输出空，`image` 与 `mask` 两个输出都为空。
 - RGBA 输入：输出 `mask` 为原始 alpha，同时使用 `background_color` 对透明区域做标准合成。
 - RGB 输入：`image` 原样输出，`mask` 返回全白。
 - 批量支持：输入是 image batch 时，会逐张处理并同步输出 image 与 mask。
@@ -33,3 +34,4 @@
 
 - 本节点的 `image` 输出固定为 RGB，不保留 alpha 通道。
 - 如果输入本身没有 alpha，`mask` 会是全白，`background_color` 不会影响图像结果。
+- `image` 为空时不会构造占位图，`image` 与 `mask` 均直接输出空，方便下游短路。

@@ -21,6 +21,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.29.0**
+- feat(image_resize)：新增 `Image Resize Area`，按面积保持原比例缩放：将 `√(宽 × 高)` 夹到可配置区间并对齐倍数，同步处理可选遮罩，兼容 `Image Resize Universal` 的 `fit` / `pad_color` 行为，并且只在小图时懒加载可选 `upscale_model`
+- fix(image)：`Image Alpha Join` 在 `image` 输入为空（未连接或空批次）时改为输出空，不再输出透明画布；空批次的 `mask` 按未输入处理
+- fix(image)：`Image Alpha Split` 在 `image` 输入为空（未连接或空批次）时，`image` / `mask` 两个输出都返回空
+- docs：新增 `Image Resize Area` 中英文文档并同步 README 节点列表
+
+
 **v3.28.2**
 - chore(tooling)：`scripts/check_node_consistency.py` 新增规则——`web/**/*.js` 中任何带引号的 `1hew_*` 字面量都必须是当前存在的 node_id，节点改名或删除后不会残留失效的前端引用
 
@@ -510,8 +517,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Image Solid | 生成纯色图像，增强颜色参数支持多种输入格式和多种尺寸预设 |
-| Image Alpha Join | 将可选 `image` 与 `mask` 合并为 4 通道图像，支持空输出、透明画布与全 alpha 兜底 |
-| Image Alpha Split | 提取 alpha 作为 `mask`，同时将 RGBA 或带 alpha 的图像铺到可配置底色上 |
+| Image Alpha Join | 将可选 `image` 与 `mask` 合并为 4 通道图像；`image` 为空时输出为空，`mask` 缺失时用全 alpha 兜底 |
+| Image Alpha Split | 提取 alpha 作为 `mask`，同时将 RGBA 或带 alpha 的图像铺到可配置底色上；`image` 为空时输出为空 |
 | Image Rotate with Mask | 高级图像旋转，支持遮罩集成、多种填充模式和遮罩中心旋转选项 |
 | Image Edit Stitch | 图像拼接与缝合，支持多种拼接模式 |
 | Image Main Stitch | 主画面拼接，支持动态 `image_2..image_N` 与方向/尺寸匹配/间距/填充 |
@@ -538,6 +545,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Resize Doubao Seedream 5.0 Pro | 适配豆包 Seedream 5.0 Pro 官方 1k/1.5k/2k 精确预设，支持按档位自动匹配、动态尺寸与 image/mask 同步变换 |
 | Image Resize Qwen Image 3.0 Pro | 适配 Qwen Image 3.0 Pro 的 1k/2k 预设，支持按档位自动匹配、动态尺寸与 image/mask 同步变换 |
 | Image Resize Square | 通用方形尺寸适配节点，支持 256/512/1024/2048/4096 与 `auto`、`auto (0.5k \| 1k)` |
+| Image Resize Area | 按面积自动缩放并保持原图比例（N = √面积，夹到 min/max 并对齐倍数；输出面积约 N²、宽高对齐倍数）；复用 Image Resize Universal 的 `fit` / `pad_color` / 遮罩行为，并支持可选懒加载 `upscale_model` |
 
 ### 🌈 颜色节点
 | 节点名称 | 功能描述 |

@@ -21,6 +21,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.29.0**
+- feat(image_resize): Add `Image Resize Area`, an aspect-preserving area normalizer: clamp and align `sqrt(width × height)` to configurable bounds, synchronize optional masks, provide Image Resize Universal-compatible `fit` / `pad_color` handling, and lazily use an optional `upscale_model` only for undersized inputs
+- fix(image): Make `Image Alpha Join` return an empty output whenever the `image` input is empty (unconnected or a zero-length batch) instead of a transparent canvas, and treat a zero-length `mask` batch as no mask
+- fix(image): Make `Image Alpha Split` return empty `image` / `mask` outputs when the `image` input is empty (unconnected or a zero-length batch)
+- docs: Add bilingual `Image Resize Area` documentation and synchronize the README node list
+
+
 **v3.28.2**
 - chore(tooling): Extend `scripts/check_node_consistency.py` to fail on any quoted `1hew_*` literal in `web/**/*.js` that is not a current node_id, so a renamed or removed node cannot leave a stale front-end reference
 
@@ -510,8 +517,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|--------------|
 | Image Solid | Generate solid color images with enhanced color parameter supporting multiple input formats and dimension presets |
-| Image Alpha Join | Combine optional `image` and `mask` into a 4-channel image; supports empty output, transparent canvas, and full-alpha fallback |
-| Image Alpha Split | Extract alpha as `mask` while flattening RGBA or alpha images onto a configurable solid background |
+| Image Alpha Join | Combine optional `image` and `mask` into a 4-channel image; an empty `image` yields an empty output, and a missing `mask` falls back to full alpha |
+| Image Alpha Split | Extract alpha as `mask` while flattening RGBA or alpha images onto a configurable solid background; an empty `image` yields empty outputs |
 | Image Rotate with Mask | Advanced image rotation with mask integration, multiple fill modes, and mask center rotation options |
 | Image Edit Stitch | Image stitching and merging with multiple stitching modes |
 | Image Main Stitch | Main-image stitcher supporting dynamic `image_2..image_N`, direction, size matching, spacing, and padding |
@@ -538,6 +545,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image Resize Doubao Seedream 5.0 Pro | Doubao Seedream 5.0 Pro size adapter with official 1k/1.5k/2k presets, tiered auto matching, dynamic sizing, and synchronized image/mask transforms |
 | Image Resize Qwen Image 3.0 Pro | Qwen Image 3.0 Pro size adapter with 1k/2k presets, tiered auto matching, dynamic sizing, and synchronized image/mask transforms |
 | Image Resize Square | General square size adapter with 256/512/1024/2048/4096 plus `auto` and `auto (0.5k \| 1k)` |
+| Image Resize Area | Area-based automatic resize that keeps the source aspect ratio: `N = sqrt(area)` is clamped to min/max and aligned to a multiple, and the output is scaled to area `N^2` with both sides rounded to that multiple; reuses Image Resize Universal's `fit` / `pad_color` / mask behaviour and supports an optional lazy `upscale_model` |
 
 ### 🌈 Color Nodes
 | Node Name | Description |

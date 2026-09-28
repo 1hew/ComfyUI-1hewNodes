@@ -28,14 +28,19 @@ class ImageAlphaSplit(io.ComfyNode):
         image: torch.Tensor,
         background_color: str = "1.0",
     ) -> io.NodeOutput:
+        # An empty image input (unconnected or a zero-length batch) yields
+        # empty outputs for both ports.
         if not isinstance(image, torch.Tensor):
-            raise ValueError("image is required")
+            return io.NodeOutput(None, None)
 
         images = image.detach().to(torch.float32)
         if images.ndim == 3:
             images = images.unsqueeze(0)
         if images.ndim != 4:
             raise ValueError("image tensor shape must be [H,W,C] or [B,H,W,C]")
+
+        if int(images.shape[0]) <= 0:
+            return io.NodeOutput(None, None)
 
         bg_rgb = torch.tensor(
             cls.parse_color(background_color),
