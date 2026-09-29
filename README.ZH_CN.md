@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.29.2**
+- fix(image)：将 `Image Alpha Split` 的 `sm` 智能背景选择改为完整复刻 stroke-aware refiner 的评分与选择策略（候选灰色按需求使用 `#808080`），包含 OKLab/亮度对比、alpha 边界、采样分组、低分位和灰色阈值规则；同时支持灰度+alpha 输入
+
 **v3.29.1**
 - feat(image)：`Image Alpha Split` 的 `background_color` 新增 `sm` 智能背景模式；对每张带 alpha 的图片从黑、白和 `#808080` 中选择更利于主体及半透明边缘辨识的底色
 

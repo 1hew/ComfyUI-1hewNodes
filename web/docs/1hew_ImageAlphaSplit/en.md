@@ -7,7 +7,7 @@
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | `image` | - | IMAGE | - | - | Input image, supports single image or batch; RGBA inputs extract alpha and composite against the background color; both outputs are empty when it is empty |
-| `background_color` | - | STRING | `1.0` | named / `#RRGGBB` / `r,g,b` / `0~1` grayscale / single-letter shorthand / `sm` | Background color used to fill transparent areas; `sm` selects black, white, or `#808080` per frame for subject and edge visibility |
+| `background_color` | - | STRING | `1.0` | named / `#RRGGBB` / `r,g,b` / `0~1` grayscale / single-letter shorthand / `sm` | Background color used to fill transparent areas; `sm` applies the complete stroke-aware refiner score per frame to select black, white, or `#808080` |
 
 ## Outputs
 
@@ -19,7 +19,7 @@
 ## Features
 
 - Empty `image` (unconnected or a zero-length batch): both the `image` and `mask` outputs are empty.
-- RGBA input: returns the original alpha as `mask` and composites transparency onto `background_color`; with `sm`, it selects black, white, or `#808080` per frame based on composited subject and translucent-edge visibility.
+- Alpha-bearing RGBA or grayscale+alpha input: returns the original alpha as `mask` and composites transparency onto `background_color`; with `sm`, each frame uses the complete stroke-aware refiner algorithm: actual 8-bit sRGB compositing, OKLab distance, linear-luminance contrast, three alpha inner-boundary bands, grouped sampling, weighted low-tail/worst-group scoring, endpoint tie-breaking, and the gray-score margin to select black, white, or `#808080`.
 - RGB input: passes `image` through unchanged and returns a full-white `mask`.
 - Batch support: image batches are processed frame by frame and return synchronized `image` and `mask` outputs.
 - Color parsing follows the same rules as the `Image Solid` node.

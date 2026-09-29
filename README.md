@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.29.2**
+- fix(image): Refine `Image Alpha Split` `sm` smart-background selection to fully replicate the stroke-aware refiner scoring and selection strategy (using the required `#808080` gray candidate), including OKLab/luminance contrast, alpha boundaries, grouped sampling, low-tail scoring, and the gray margin rule; grayscale+alpha inputs are supported as well
+
 **v3.29.1**
 - feat(image): Add `sm` smart-background mode to `Image Alpha Split` `background_color`; for each alpha image it selects black, white, or `#808080` to improve subject and translucent-edge visibility
 
