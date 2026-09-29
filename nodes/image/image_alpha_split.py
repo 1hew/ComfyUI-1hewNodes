@@ -42,7 +42,8 @@ class ImageAlphaSplit(io.ComfyNode):
         if int(images.shape[0]) <= 0:
             return io.NodeOutput(None, None)
 
-        bg_rgb = torch.tensor(
+        smart_background = str(background_color).strip().lower() == "sm"
+        bg_rgb = None if smart_background else torch.tensor(
             cls.parse_color(background_color),
             dtype=torch.float32,
             device=images.device,
@@ -51,13 +52,60 @@ class ImageAlphaSplit(io.ComfyNode):
         output_images: list[torch.Tensor] = []
         output_masks: list[torch.Tensor] = []
         for index in range(int(images.shape[0])):
-            flat_image, alpha_mask = cls._split_single(images[index], bg_rgb)
+            frame = images[index]
+            frame_bg_rgb = cls._choose_smart_background(frame) if smart_background else bg_rgb
+            flat_image, alpha_mask = cls._split_single(frame, frame_bg_rgb)
             output_images.append(flat_image)
             output_masks.append(alpha_mask)
 
         result_images = torch.stack(output_images, dim=0).to(dtype=torch.float32, device=image.device)
         result_masks = torch.stack(output_masks, dim=0).to(dtype=torch.float32, device=image.device)
         return io.NodeOutput(result_images, result_masks)
+
+    @classmethod
+    def _choose_smart_background(cls, frame: torch.Tensor) -> torch.Tensor:
+        """Choose black, white, or #808080 for a transparent image.
+
+        Candidates are scored from the *composited* subject pixels, weighted by
+        opacity and alpha-boundary pixels so fine translucent outlines remain
+        visible. RGB-only input has no background to fill, so it uses white.
+        """
+        current = frame.to(torch.float32).clamp(0.0, 1.0)
+        if current.ndim != 3 or int(current.shape[2]) < 4:
+            return torch.ones((1, 1, 3), dtype=torch.float32, device=current.device)
+
+        alpha = current[:, :, 3]
+        if not torch.any(alpha > 0.0) or torch.all(alpha >= 1.0):
+            return torch.ones((1, 1, 3), dtype=torch.float32, device=current.device)
+
+        rgb = current[:, :, :3]
+        # Give contour pixels extra influence without morphology dependencies.
+        alpha_pad = torch.nn.functional.pad(alpha.unsqueeze(0).unsqueeze(0), (1, 1, 1, 1), mode="replicate")[0, 0]
+        edge = torch.maximum(
+            (alpha - alpha_pad[1:-1, :-2]).abs(),
+            torch.maximum(
+                (alpha - alpha_pad[1:-1, 2:]).abs(),
+                torch.maximum((alpha - alpha_pad[:-2, 1:-1]).abs(), (alpha - alpha_pad[2:, 1:-1]).abs()),
+            ),
+        )
+        weight = alpha * (1.0 + 2.0 * edge)
+        candidates = torch.tensor(
+            ((0.0, 0.0, 0.0), (1.0, 1.0, 1.0), (128.0 / 255.0,) * 3),
+            dtype=torch.float32,
+            device=current.device,
+        )
+        # Subject/background distance after alpha compositing. The 10th
+        # percentile prevents a rare color or thin stroke from being ignored.
+        scores: list[torch.Tensor] = []
+        for candidate in candidates:
+            composite = rgb * alpha.unsqueeze(2) + candidate.view(1, 1, 3) * (1.0 - alpha.unsqueeze(2))
+            distance = torch.sqrt(torch.sum((composite - candidate.view(1, 1, 3)) ** 2, dim=2))
+            visible = distance[weight > 0.0]
+            visible_weight = weight[weight > 0.0]
+            average = torch.sum(visible * visible_weight) / torch.sum(visible_weight)
+            low_tail = torch.quantile(visible, 0.10) if visible.numel() > 1 else visible[0]
+            scores.append(0.75 * average + 0.25 * low_tail)
+        return candidates[int(torch.argmax(torch.stack(scores)))].view(1, 1, 3)
 
     @classmethod
     def _split_single(

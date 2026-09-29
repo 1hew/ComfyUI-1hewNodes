@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.29.1**
+- feat(image): Add `sm` smart-background mode to `Image Alpha Split` `background_color`; for each alpha image it selects black, white, or `#808080` to improve subject and translucent-edge visibility
+
 **v3.29.0**
 - feat(image_resize): Add `Image Resize Area`, an aspect-preserving area normalizer: clamp and align `sqrt(width × height)` to configurable bounds, synchronize optional masks, provide Image Resize Universal-compatible `fit` / `pad_color` handling, and lazily use an optional `upscale_model` only for undersized inputs
 - fix(image): Make `Image Alpha Join` return an empty output whenever the `image` input is empty (unconnected or a zero-length batch) instead of a transparent canvas, and treat a zero-length `mask` batch as no mask

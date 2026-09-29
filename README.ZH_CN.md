@@ -21,6 +21,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.29.1**
+- feat(image)：`Image Alpha Split` 的 `background_color` 新增 `sm` 智能背景模式；对每张带 alpha 的图片从黑、白和 `#808080` 中选择更利于主体及半透明边缘辨识的底色
+
 **v3.29.0**
 - feat(image_resize)：新增 `Image Resize Area`，按面积保持原比例缩放：将 `√(宽 × 高)` 夹到可配置区间并对齐倍数，同步处理可选遮罩，兼容 `Image Resize Universal` 的 `fit` / `pad_color` 行为，并且只在小图时懒加载可选 `upscale_model`
 - fix(image)：`Image Alpha Join` 在 `image` 输入为空（未连接或空批次）时改为输出空，不再输出透明画布；空批次的 `mask` 按未输入处理

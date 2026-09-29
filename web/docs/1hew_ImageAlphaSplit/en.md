@@ -7,7 +7,7 @@
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | `image` | - | IMAGE | - | - | Input image, supports single image or batch; RGBA inputs extract alpha and composite against the background color; both outputs are empty when it is empty |
-| `background_color` | - | STRING | `1.0` | same formats as `Image Solid` color: named / `#RRGGBB` / `r,g,b` / `0~1` grayscale / single-letter shorthand | Background color used to fill transparent areas |
+| `background_color` | - | STRING | `1.0` | named / `#RRGGBB` / `r,g,b` / `0~1` grayscale / single-letter shorthand / `sm` | Background color used to fill transparent areas; `sm` selects black, white, or `#808080` per frame for subject and edge visibility |
 
 ## Outputs
 
@@ -19,7 +19,7 @@
 ## Features
 
 - Empty `image` (unconnected or a zero-length batch): both the `image` and `mask` outputs are empty.
-- RGBA input: returns the original alpha as `mask` and composites transparency onto `background_color`.
+- RGBA input: returns the original alpha as `mask` and composites transparency onto `background_color`; with `sm`, it selects black, white, or `#808080` per frame based on composited subject and translucent-edge visibility.
 - RGB input: passes `image` through unchanged and returns a full-white `mask`.
 - Batch support: image batches are processed frame by frame and return synchronized `image` and `mask` outputs.
 - Color parsing follows the same rules as the `Image Solid` node.
