@@ -151,7 +151,12 @@ def _signal_handler(signum, frame):
             if _prev_sigint_handler is not None and _prev_sigint_handler != signal.SIG_IGN:
                 _prev_sigint_handler(signum, frame)
         elif hasattr(signal, 'SIGTERM') and signum == signal.SIGTERM:
-            if _prev_sigterm_handler not in (None, signal.SIG_IGN):
+            # ``signal.getsignal`` may return SIG_DFL/SIG_IGN (enum sentinels),
+            # not a callable handler.  Preserve explicit ignore; otherwise let
+            # the surrounding ComfyUI shutdown path continue after cleanup.
+            if _prev_sigterm_handler is signal.SIG_IGN:
+                return
+            if callable(_prev_sigterm_handler):
                 _prev_sigterm_handler(signum, frame)
     except KeyboardInterrupt:
         # 让上层按默认流程处理退出
