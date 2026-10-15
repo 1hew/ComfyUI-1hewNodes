@@ -21,6 +21,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.30.0**
+- feat(multi): Add `Multi Video Stitch` — stitch dynamic `video_X` inputs end-to-end with `crop` / `pad` / `stretch` size unification, an optional `get_video_size` reference video, and configurable `pad_color` / `fps` (`video_1` reuses the first segment; a number or `auto` also works); the dynamic-port table now pins `get_video_size` below every `video_X` port
+- feat(text): Add `String Resolution Seedance 2.5 Multimodal Video` — infer the nearest Seedance 2.5 video resolution tier (`480p` / `720p` / `1080p` / `2k` / `4k`) from the input video by pixel area, or pass through the selected label when no video is connected
+- feat(detect): Add `Detect Remove SolidBG UnMult` — estimate a flat background from the image border, unmultiply to alpha, then optionally clean low alpha with `threshold` and composite onto `background_color` (or `sm` smart background); outputs a foreground image plus alpha mask
+- refactor(image_resize): Make `Image Resize Area`'s `divisible_by` / `fit` behave like `Image Resize Universal` — align both output sides to the multiple in every branch (no more failure when the range contains no multiple) and rename the `int` output to `resolution`
+- fix(io): `Save Video by Image` now raises a clear error when audio preparation or encoding fails instead of silently dropping the audio track, and removes placeholder or partial output files when a save fails
+
 **v3.29.2**
 - fix(image): Refine `Image Alpha Split` `sm` smart-background selection to fully replicate the stroke-aware refiner scoring and selection strategy (using the required `#808080` gray candidate), including OKLab/luminance contrast, alpha boundaries, grouped sampling, low-tail scoring, and the gray margin rule; grayscale+alpha inputs are supported as well
 
@@ -609,6 +616,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Detect Remove BG | Multi-backend background removal (RMBG/BiRefNet/InSPyReNet) with image + alpha mask outputs |
 | Detect Remove BG Refine | RMBG mask post-refinement using original image + mask, outputs refined RGBA and alpha |
+| Detect Remove SolidBG UnMult | Solid-background UnMult keying: estimate the flat background from image borders, unmultiply to alpha, with optional low-alpha threshold cleanup and background composition |
 | Detect Yolo | YOLO model object detection with subfolder model support, customizable confidence thresholds, and optional label display control |
 | Detect Guide Line | Guide line detection combining Canny, HoughLinesP, and DBSCAN vanishing-point clustering |
 
@@ -698,6 +706,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | String Resolution Jimeng | Infer the nearest Jimeng resolution tier (`1k` / `2k` / `4k`) from input images, or pass through the selected label when no image is connected |
 | String Resolution Doubao Seedream 5.0 Pro | Infer the nearest Doubao Seedream 5.0 Pro resolution tier (`1k` / `1.5k` / `2k`) from input images, or pass through the selected label when no image is connected |
 | String Resolution Qwen Image 3.0 Pro | Infer the nearest Qwen Image 3.0 Pro resolution tier (`1k` / `2k`) from input images, or pass through the selected label when no image is connected |
+| String Resolution Seedance 2.5 Multimodal Video | Infer the nearest Seedance 2.5 video resolution tier (`480p` / `720p` / `1080p` / `2k` / `4k`) from the input video, or pass through the selected label when no video is connected |
 | String Filter | Text cleaner supporting `{input}` / `{n}` substitution from the `input` value, comment filtering (# and triple quotes), and optional empty-line removal |
 | String Join Multi | Join up to 5 text blocks with `{input}` substitution, comment/empty-line filtering, and composite separators |
 | List Custom Int | Build integer lists from flexible multiline value/range/stride text with reverse-order and mixed punctuation support |
@@ -715,6 +724,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Multi Image Stitch | Dynamic multi-image stitcher with direction, size matching, spacing, padding color control, and automatic RGBA preservation when any input has alpha |
 | Multi Mask Batch | Build mask batch from dynamic `mask_X` with crop/pad/stretch size unification and configurable gray padding |
 | Multi Mask Math Ops | Dynamic multi-mask operations (union/intersection/difference/XOR) with batch broadcasting and size alignment |
+| Multi Video Stitch | Stitch dynamic `video_X` inputs end-to-end into one video with crop/pad/stretch size unification, optional `get_video_size` reference size, and configurable pad color / fps |
 
 
 ### 📁 IO Nodes
@@ -762,6 +772,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 [comfyui_extractstoryboards](https://github.com/gitadmini/comfyui_extractstoryboards)
 
 [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
+
+[ComfyUI-RH-Nodes](https://github.com/dakun333/ComfyUI-RH-Nodes)
 
 
 

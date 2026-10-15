@@ -21,6 +21,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.30.0**
+- feat(multi)：新增 `Multi Video Stitch`，把动态 `video_X` 输入首尾拼接成一段视频，支持 `crop` / `pad` / `stretch` 尺寸统一、可选 `get_video_size` 参考视频尺寸，并可配置 `pad_color` 与 `fps`（默认 `video_1` 沿用第一段，也可填数字或 `auto`）；前端动态端口表会把 `get_video_size` 固定在所有 `video_X` 之后
+- feat(text)：新增 `String Resolution Seedance 2.5 Multimodal Video`，按输入视频的总像素面积推断最接近的 Seedance 2.5 分辨率档位（`480p` / `720p` / `1080p` / `2k` / `4k`），未连接视频时透传所选标签
+- feat(detect)：新增 `Detect Remove SolidBG UnMult`，从图像边缘自动估计纯色背景并做 UnMult 反解得到 alpha，可用 `threshold` 清理低 alpha、用 `background_color`（或 `sm` 智能底色）合成底色，输出前景图与 alpha 遮罩
+- refactor(image_resize)：让 `Image Resize Area` 的 `divisible_by` / `fit` 与 `Image Resize Universal` 对齐——所有分支都把输出宽高对齐到倍数（区间内无倍数时不再报错），并把 `int` 输出改名为 `resolution`
+- fix(io)：`Save Video by Image` 的音频准备/编码失败时改为抛出明确错误，不再静默丢弃音轨；保存失败时会清理占位与半成品文件
+
 **v3.29.2**
 - fix(image)：将 `Image Alpha Split` 的 `sm` 智能背景选择改为完整复刻 stroke-aware refiner 的评分与选择策略（候选灰色按需求使用 `#808080`），包含 OKLab/亮度对比、alpha 边界、采样分组、低分位和灰色阈值规则；同时支持灰度+alpha 输入
 
@@ -609,6 +616,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Detect Remove BG | 多后端抠图节点，支持 RMBG/BiRefNet/InSPyReNet，输出前景图与 alpha 遮罩 |
 | Detect Remove BG Refine | RMBG 掩码后处理细化，输入原图+mask，输出 refined RGBA 与 alpha |
+| Detect Remove SolidBG UnMult | 纯色背景 UnMult 抠图：从图像边缘估计背景并反解 alpha，支持低 alpha 阈值清理与底色合成 |
 | Detect Guide Line | 引导线检测，融合 Canny、HoughLinesP 与 DBSCAN 消失点聚类 |
 | Detect Yolo | YOLO模型目标检测，支持子文件夹模型、可自定义置信度阈值和可选标签显示控制 |
 
@@ -698,6 +706,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | String Resolution Jimeng | 从输入图像推断最接近的即梦分辨率档位（`1k` / `2k` / `4k`）；未连接图像时透传所选标签 |
 | String Resolution Doubao Seedream 5.0 Pro | 从输入图像推断最接近的 Doubao Seedream 5.0 Pro 分辨率档位（`1k` / `1.5k` / `2k`）；未连接图像时透传所选标签 |
 | String Resolution Qwen Image 3.0 Pro | 从输入图像推断最接近的 Qwen Image 3.0 Pro 分辨率档位（`1k` / `2k`）；未连接图像时透传所选标签 |
+| String Resolution Seedance 2.5 Multimodal Video | 从输入视频推断最接近的 Seedance 2.5 分辨率档位（`480p` / `720p` / `1080p` / `2k` / `4k`）；未连接视频时透传所选标签 |
 | String Filter | 文本过滤器，支持用 `input` 值替换 `{input}` / `{n}`、注释过滤（# 与三引号）、可选空行移除 |
 | String Join Multi | 多段文本拼接，支持 `{input}` 占位符、注释/空行过滤与复合分隔符 |
 | List Custom Int | 使用灵活的多行数值/区间/步长文本构建整数列表，支持倒序与中英文符号混合输入 |
@@ -715,6 +724,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Multi Image Stitch | 动态多图像拼接，支持方向、尺寸匹配、间距与填充颜色，并在任一输入带 alpha 时自动保留 RGBA |
 | Multi Mask Batch | 从动态 `mask_X` 构建批次，支持 crop/pad/stretch 尺寸统一与灰度填充 |
 | Multi Mask Math Ops | 动态多遮罩运算（交/并/差/异或），支持批次广播与统一尺寸 |
+| Multi Video Stitch | 将动态 `video_X` 输入首尾拼接为一段视频，支持 crop/pad/stretch 尺寸统一、可选 `get_video_size` 参考尺寸，并可配置填充颜色与帧率 |
 
 
 ### 📁 IO 节点
@@ -762,6 +772,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 [comfyui_extractstoryboards](https://github.com/gitadmini/comfyui_extractstoryboards)
 
 [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
+
+[ComfyUI-RH-Nodes](https://github.com/dakun333/ComfyUI-RH-Nodes)
 
 
 

@@ -12,12 +12,13 @@ from ...utils import first_torch_tensor, make_ui_text
 class ImageResizeArea(io.ComfyNode):
     """按面积自动缩放图像，保持原图比例，宽高对齐 divisible_by 的倍数。
 
-    - N = sqrt(width x height)，夹到 [min_sq_area, max_sq_area] 区间，并对齐 divisible_by 的倍数。
-    - 目标尺寸 = 原图按比例缩放到面积约 N^2，宽高再向上取整到 divisible_by 的倍数，
-      与 Image Resize Universal 的 length_to_sq_area 计算一致。
-    - 面积在 [min_sq_area^2, max_sq_area^2] 内：原图 / 原遮罩透传。
-    - 超过上限：用 method 缩小。
-    - 低于下限：接了 upscale_model 就先模型放大，再用 method 归一到目标尺寸；否则 method 直接放大。
+    - 目标面积由参考正方形边长 reference = clamp(sqrt(width x height), min_sq_area, max_sq_area)
+      决定，即目标面积约 reference^2，并保持原图比例。
+    - divisible_by 与 Image Resize Universal 一致：任何分支下输出宽高都向上取整到该倍数
+      （面积已在区间内的图像也会被对齐），且区间内不存在倍数时不再报错。
+    - fit / pad_color 与 Image Resize Universal 完全一致，只要目标尺寸与原图不同就会生效。
+    - 超过上限：用 method 缩小；低于下限：接了 upscale_model 就先模型放大，否则用 method 放大。
+    - 输出 resolution = 夹取并对齐后的参考正方形边长 N（INT，与旧 int 输出同值，仅改名）。
 
     本文件自包含：不 import 其它节点模块。fit / pad_color / mask 的缩放内核
     （fit_resize_image / fit_resize_mask / generate_default_mask / parse_color 等）
@@ -47,7 +48,7 @@ class ImageResizeArea(io.ComfyNode):
             outputs=[
                 io.Image.Output(display_name="image"),
                 io.Mask.Output(display_name="mask"),
-                io.Int.Output(display_name="int"),
+                io.Int.Output(display_name="resolution"),
             ],
         )
 
@@ -77,32 +78,37 @@ class ImageResizeArea(io.ComfyNode):
 
         mask_frames = cls.split_mask(mask, width, height)
 
-        low, high = int(min_sq_area), int(max_sq_area)
-        if low > high:
-            low, high = high, low
-
+        low, high = cls.normalize_bounds(min_sq_area, max_sq_area)
+        step = max(int(divisible_by), 1)
         raw = math.sqrt(width * height)
-        n = cls.sq_area_length(width, height, low, high, divisible_by)
 
-        if low <= raw <= high:
-            # 区间内：图像 / 遮罩原样透传，只报告对齐后的 N。
-            out_image = tensor
+        # 报告的参考正方形边长 N：夹到区间并对齐 divisible_by（与旧行为一致）。
+        n = cls.sq_area_length(width, height, low, high, step)
+        # 目标尺寸使用的参考边长：只夹区间、不做倍数对齐，
+        # 这样面积已在区间内时缩放系数恰好为 1，只有 divisible_by 的向上取整会改变尺寸。
+        reference = min(max(raw, float(low)), float(high))
+
+        work = tensor
+        # 低于下限且接了超分模型：先模型放大，再归一到目标尺寸。
+        if raw < low and upscale_model is not None:
+            work = cls.upscale_with_model(work, upscale_model)
+
+        source_width = int(work.shape[2])
+        source_height = int(work.shape[1])
+        target_width, target_height = cls.target_size(
+            source_width, source_height, reference, step
+        )
+
+        if target_width == source_width and target_height == source_height:
+            # 目标尺寸与原图一致：透传，避免无谓的重采样。
+            out_image = work
             if mask_frames is None:
-                out_mask = cls.default_mask(len(tensor), width, height, None, width, height)
+                out_mask = cls.default_mask(
+                    len(work), source_width, source_height, None, source_width, source_height
+                )
             else:
                 out_mask = torch.stack(mask_frames, dim=0)
         else:
-            work = tensor
-            # 低于下限且接了超分模型：先模型放大，再用 method 归一到目标尺寸。
-            if raw < low and upscale_model is not None:
-                work = cls.upscale_with_model(work, upscale_model)
-
-            source_width = int(work.shape[2])
-            source_height = int(work.shape[1])
-            target_width, target_height = cls.target_size(
-                source_width, source_height, n, divisible_by
-            )
-
             out_image = cls.resize_image_batch(
                 work, target_width, target_height, fit, pad_color, method
             )
@@ -145,38 +151,49 @@ class ImageResizeArea(io.ComfyNode):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def sq_area_length(width: int, height: int, min_sq_area: int, max_sq_area: int, divisible_by: int) -> int:
-        """返回 sqrt(width x height) 的区间夹取 + 倍数对齐结果 N。"""
+    def normalize_bounds(min_sq_area, max_sq_area):
+        """返回 (low, high)，自动交换上下限并保证至少为 1。"""
+        low, high = int(min_sq_area), int(max_sq_area)
+        if low > high:
+            low, high = high, low
+        return max(low, 1), max(high, 1)
+
+    @classmethod
+    def sq_area_length(cls, width: int, height: int, min_sq_area: int, max_sq_area: int, divisible_by: int) -> int:
+        """返回 sqrt(width x height) 的区间夹取 + 倍数对齐结果 N。
+
+        与旧实现一致：N 尽量取区间内 divisible_by 的倍数（就近取整 + 向内收缩）。
+        当区间内不存在任何倍数时不再报错，而是退回区间内最接近的整数值，
+        保证节点始终可用（与 Image Resize Universal 的 divisible_by 一样不会因参数组合失败）。
+        """
         step = max(int(divisible_by), 1)
-        low_bound, high_bound = int(min_sq_area), int(max_sq_area)
-        if low_bound > high_bound:
-            low_bound, high_bound = high_bound, low_bound
+        low, high = cls.normalize_bounds(min_sq_area, max_sq_area)
+        raw = math.sqrt(width * height)
+        clamped = min(max(raw, float(low)), float(high))
 
         # 区间内可用的 divisible_by 倍数（向内收缩，保证不越界）。
-        low = math.ceil(low_bound / step) * step
-        high = math.floor(high_bound / step) * step
-        if low > high:
-            raise ValueError(
-                f"no multiple of {step} exists within [{low_bound}, {high_bound}]"
-            )
-
-        raw = math.sqrt(width * height)
-        # 就近取整到 step 的倍数（half-up），再夹回可用区间。
-        value = int(math.floor(raw / step + 0.5)) * step
-        value = max(low, min(value, high))
+        lower_mult = math.ceil(low / step) * step
+        upper_mult = math.floor(high / step) * step
+        if lower_mult <= upper_mult:
+            # 就近取整到 step 的倍数（half-up），再夹回可用区间。
+            value = int(math.floor(clamped / step + 0.5)) * step
+            value = max(lower_mult, min(value, upper_mult))
+        else:
+            value = int(round(clamped))
         return max(value, 1)
 
     @staticmethod
-    def target_size(width: int, height: int, n: int, divisible_by: int):
-        """保持原图比例、面积约等于 n^2，并把宽高向上取整到 divisible_by 的倍数。
+    def target_size(width: int, height: int, reference: float, divisible_by: int):
+        """保持原图比例、面积约等于 reference^2，并把宽高向上取整到 divisible_by 的倍数。
 
-        与 Image Resize Universal 的 length_to_sq_area 计算保持一致。
+        与 Image Resize Universal 的 length_to_sq_area 计算保持一致：先由参考正方形边长
+        推出目标面积 reference^2，再按原图比例分配宽高。reference 取夹到
+        [min_sq_area, max_sq_area] 后的 sqrt(width x height)，因此面积已在区间内时
+        缩放系数恰好为 1，只有 divisible_by 的向上取整会带来尺寸变化。
         """
-        ratio = width / height
-        target_width = math.sqrt(ratio) * n
-        target_height = target_width / ratio
-        target_width = max(1, int(target_width))
-        target_height = max(1, int(target_height))
+        scale = float(reference) / math.sqrt(width * height)
+        target_width = max(1, int(math.ceil(width * scale)))
+        target_height = max(1, int(math.ceil(height * scale)))
 
         step = max(int(divisible_by), 1)
         if step > 1:

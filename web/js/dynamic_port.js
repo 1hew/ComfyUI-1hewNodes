@@ -10,6 +10,7 @@ app.registerExtension({
             "1hew_MultiImageOverlay": { base: "image_", addType: "IMAGE", select: null, initial: 1 },
             "1hew_IntImageCount": { base: "image_", addType: "IMAGE", select: null, initial: 1 },
             "1hew_IntVideoCount": { base: "video_", addType: "VIDEO", select: null, initial: 1 },
+            "1hew_MultiVideoStitch": { base: "video_", addType: "VIDEO", select: null, initial: 1, trailing: "get_video_size" },
             "1hew_MultiMaskBatch": { base: "mask_", addType: "MASK", select: null, initial: 1 },
             "1hew_MultiImageStitch": { base: "image_", addType: "IMAGE", select: null, initial: 2 },
             "1hew_MultiSwitchSelect": { base: "input_", addType: "*", select: "select", initial: 1, max: 10, outputBase: "output_", outputType: "*" },
@@ -31,6 +32,8 @@ app.registerExtension({
         const outputType = cfg.outputType || cfg.addType;
         const selectName = cfg.select;
         const cap = typeof cfg.max === "number" && cfg.max > 0 ? cfg.max : Infinity;
+        // 固定在末尾的非动态输入（如 get_video_size）名称。
+        const trailingName = cfg.trailing;
 
         const originalOnConnectionsChange = nodeType.prototype.onConnectionsChange;
 
@@ -96,6 +99,39 @@ app.registerExtension({
                 if (node.inputs[i]?.name?.startsWith(baseInput)) idxs.push(i);
             }
             return idxs;
+        }
+
+        function trailingAnchorIndex(node) {
+            if (!trailingName) return -1;
+            const inputs = node.inputs || [];
+            for (let i = 0; i < inputs.length; i++) {
+                if (inputs[i]?.name === trailingName) return i;
+            }
+            return -1;
+        }
+
+        // 把指定输入移到末尾，并同步被移动区间内链接的 target_slot。
+        function moveInputToEnd(node, index) {
+            const inputs = node.inputs || [];
+            if (index < 0 || index >= inputs.length - 1) return;
+            const [moved] = inputs.splice(index, 1);
+            inputs.push(moved);
+            const links = node.graph?.links;
+            if (links) {
+                for (let i = index; i < inputs.length; i++) {
+                    const linkId = inputs[i]?.link;
+                    if (linkId == null) continue;
+                    const link = links[linkId];
+                    if (link) link.target_slot = i;
+                }
+            }
+        }
+
+        // 动态端口总是追加到末尾，因此每次变动后都把 trailing 锚点重新压回最后。
+        function ensureTrailingAnchor(node) {
+            const index = trailingAnchorIndex(node);
+            if (index < 0) return;
+            moveInputToEnd(node, index);
         }
 
         function listDynamicOutputs(node) {
@@ -247,6 +283,7 @@ app.registerExtension({
                     ensureSingleTrailingEmpty(node);
                     syncSelectRange(node);
                     normalizeDynamicTypes(node);
+                    ensureTrailingAnchor(node);
                     node.setDirtyCanvas(true, true);
                 }
             }, 20);
@@ -290,6 +327,7 @@ app.registerExtension({
                 syncSelectRange(this);
                 normalizeDynamicTypes(this);
                 syncDynamicOutputs(this);
+                ensureTrailingAnchor(this);
                 this.setDirtyCanvas(true, true);
                 scheduleCompact(this);
             } catch (err) {
@@ -325,6 +363,7 @@ app.registerExtension({
                 syncSelectRange(this);
                 normalizeDynamicTypes(this);
                 syncDynamicOutputs(this);
+                ensureTrailingAnchor(this);
                 this.setDirtyCanvas(true, true);
             } catch (err) {
                 console.error("[1hewNodesV3.DynamicPorts] onAdded error", err);
@@ -339,6 +378,7 @@ app.registerExtension({
             const r = originalOnConfigure?.apply(this, arguments);
             try {
                 syncDynamicOutputs(this);
+                ensureTrailingAnchor(this);
                 scheduleCompact(this);
             } catch (_) {}
             return r;

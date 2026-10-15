@@ -297,30 +297,25 @@ class SaveVideoByImage(io.ComfyNode):
                         pass
 
         audio_path = None
-        if audio is not None:
-            try:
-                waveform = audio.get("waveform")
-                sample_rate = audio.get("sample_rate")
-                if waveform is not None and sample_rate:
+        try:
+            if audio is not None:
+                fd, audio_path = tempfile.mkstemp(
+                    prefix=f"{filename}_{counter:05}_",
+                    suffix="_audio.wav",
+                    dir=folder_paths.get_temp_directory(),
+                )
+                os.close(fd)
+                try:
+                    waveform = audio.get("waveform")
+                    sample_rate = audio.get("sample_rate")
+                    if waveform is None or not sample_rate:
+                        raise ValueError("AUDIO requires waveform and sample_rate")
                     if waveform.dim() == 3:
                         waveform = waveform.squeeze(0)
-
-                    audio_dir = folder_paths.get_temp_directory()
-                    fd, audio_path = tempfile.mkstemp(
-                        prefix=f"{filename}_{counter:05}_",
-                        suffix="_audio.wav",
-                        dir=audio_dir,
-                    )
-                    os.close(fd)
                     torchaudio.save(audio_path, waveform, sample_rate)
-            except Exception as exc:
-                print(
-                    "Info: Audio processing skipped; continuing without audio. "
-                    f"Details: {exc}"
-                )
-                audio_path = None
+                except Exception as exc:
+                    raise RuntimeError(f"Failed to prepare video audio: {exc}") from exc
 
-        try:
             frame_count = int(images.shape[0])
             encode_passes = 2 if (has_alpha and save_output) else 1
             progress_bar = _new_progress_bar(frame_count * encode_passes)
@@ -395,6 +390,12 @@ class SaveVideoByImage(io.ComfyNode):
                     progress_bar=progress_bar,
                     metadata_comment=metadata_comment,
                 )
+        except Exception:
+            # Do not leave placeholders or a partial alpha preview after a failed save.
+            for failed_path in {path, preview_path}:
+                if failed_path and os.path.exists(failed_path):
+                    await _remove_file_with_retries(failed_path)
+            raise
         finally:
             if audio_path and os.path.exists(audio_path):
                 await _remove_file_with_retries(audio_path)
@@ -475,18 +476,14 @@ class SaveVideoByImage(io.ComfyNode):
                 out_audio = None
                 audio_container = None
                 try:
-                    if audio_path and os.path.isfile(audio_path):
-                        try:
-                            audio_container = av.open(audio_path)
-                            if audio_container.streams.audio:
-                                in_audio = audio_container.streams.audio[0]
-                                out_audio = output.add_stream(
-                                    audio_codec, rate=in_audio.rate or 44100,
-                                )
-                        except Exception:
-                            if audio_container is not None:
-                                audio_container.close()
-                            audio_container = None
+                    if audio_path:
+                        audio_container = av.open(audio_path)
+                        if not audio_container.streams.audio:
+                            raise RuntimeError("Prepared audio file has no audio stream")
+                        in_audio = audio_container.streams.audio[0]
+                        out_audio = output.add_stream(
+                            audio_codec, rate=in_audio.rate or 44100,
+                        )
 
                     if metadata_comment:
                         output.metadata["comment"] = metadata_comment
@@ -549,8 +546,8 @@ class SaveVideoByImage(io.ComfyNode):
                                     break
                             for pkt in out_audio.encode(None):
                                 output.mux(pkt)
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            raise RuntimeError(f"Failed to encode video audio: {exc}") from exc
                 finally:
                     if audio_container is not None:
                         audio_container.close()
