@@ -20,7 +20,7 @@
 ## Features
 
 - Background estimation: samples the border strips, votes on quantized joint-RGB clusters, and picks the most spatially supported color per image.
-- UnMult: chooses one-sided or two-sided channel unmultiply based on whether the estimated background leans light or dark, then applies a gamut-safe unpremultiply so values stay in range.
+- UnMult: chooses one-sided or two-sided channel unmultiply based on whether the estimated background leans light or dark, then applies a gamut-safe unpremultiply that clips negative channels and jointly scales positive overflow, so values stay in range without one negative channel reverting the whole pixel to the observed RGB.
 - White-background gain: when the estimated background is nearly pure white, alpha receives an adaptive gain (median-driven, capped at 2.5) that improves translucent edges.
 - `threshold` black point: remaps matte alpha with `(a - t) / (1 - t)` and zeroes pixels below the threshold while preserving any input alpha.
 - Post compositing: `background_color` only affects the final image, never the background estimate; `sm` reuses `Image Alpha Split`'s smart background choice.

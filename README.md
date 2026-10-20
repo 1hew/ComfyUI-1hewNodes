@@ -21,6 +21,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v3.30.1**
+- refactor(logic): Move `Image Minimum Area`'s `divisible_by` input after `fit` / `pad_color` so the widget order matches `Image Resize Universal`; existing workflows should recheck that node's parameters
+- fix(detect): Align `Detect Remove SolidBG UnMult`'s gamut-safe unpremultiply with the `UnMult (Auto Background)` 2026-10-15 fix — negative channels are clipped and positive overflow is jointly scaled, so one bad channel no longer reverts the whole pixel to the observed RGB
+- fix(color): `Image Color Restore`'s hole filling now bails out when every border pixel is foreground (e.g. a 1–2px transparent fringe) instead of turning the whole image into foreground
+
 **v3.30.0**
 - feat(multi): Add `Multi Video Stitch` — stitch dynamic `video_X` inputs end-to-end with `crop` / `pad` / `stretch` size unification, an optional `get_video_size` reference video, and configurable `pad_color` / `fps` (`video_1` reuses the first segment; a number or `auto` also works); the dynamic-port table now pins `get_video_size` below every `video_X` port
 - feat(text): Add `String Resolution Seedance 2.5 Multimodal Video` — infer the nearest Seedance 2.5 video resolution tier (`480p` / `720p` / `1080p` / `2k` / `4k`) from the input video by pixel area, or pass through the selected label when no video is connected

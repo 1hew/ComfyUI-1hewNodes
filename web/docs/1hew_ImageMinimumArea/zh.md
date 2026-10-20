@@ -10,9 +10,9 @@
 | `mask` | 可选 | MASK | - | - | 随图像同步缩放的可选遮罩；未提供时自动生成默认遮罩 |
 | `length_to_sq_area` | - | INT | 1024 | 1–65536 | 参考方形边长 `N`；目标面积 = `N²` |
 | `method` | - | COMBO | `lanczos` | `nearest` / `bilinear` / `lanczos` / `bicubic` / `hamming` / `box` | 缩放采样方法 |
-| `divisible_by` | - | INT | 1 | 1–1024 | 将最终宽高向上取整到该值的整数倍 |
 | `fit` | - | COMBO | `crop` | `crop` / `pad` / `stretch` | 缩放时的适应模式 |
 | `pad_color` | - | STRING | `1.0` | 灰度/HEX/RGB | `fit=pad` 时的填充背景色 |
+| `divisible_by` | - | INT | 1 | 1–1024 | 将最终宽高向上取整到该值的整数倍 |
 
 ## 输出
 

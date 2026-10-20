@@ -21,6 +21,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v3.30.1**
+- refactor(logic)：`Image Minimum Area` 的 `divisible_by` 参数移到 `fit` / `pad_color` 之后，参数顺序与 `Image Resize Universal` 一致；旧工作流中的该节点建议重新检查参数
+- fix(detect)：`Detect Remove SolidBG UnMult` 的色域安全反预乘对齐 `UnMult (Auto Background)` 2026-10-15 的修复——负通道截断、正通道超限时按峰值整体缩放，单个负通道不再把整像素回退为原始 RGB
+- fix(color)：`Image Color Restore` 的孔洞填充在图像四周全为前景（如 1–2px 透明边）时直接跳过，不再把整张图误填为前景
+
 **v3.30.0**
 - feat(multi)：新增 `Multi Video Stitch`，把动态 `video_X` 输入首尾拼接成一段视频，支持 `crop` / `pad` / `stretch` 尺寸统一、可选 `get_video_size` 参考视频尺寸，并可配置 `pad_color` 与 `fps`（默认 `video_1` 沿用第一段，也可填数字或 `auto`）；前端动态端口表会把 `get_video_size` 固定在所有 `video_X` 之后
 - feat(text)：新增 `String Resolution Seedance 2.5 Multimodal Video`，按输入视频的总像素面积推断最接近的 Seedance 2.5 分辨率档位（`480p` / `720p` / `1080p` / `2k` / `4k`），未连接视频时透传所选标签

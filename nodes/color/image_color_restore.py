@@ -155,6 +155,12 @@ def _fill_binary_holes(mask: np.ndarray) -> np.ndarray:
         np.concatenate([labels[0], labels[-1], labels[:, 0], labels[:, -1]])
     )
     border_labels = border_labels[border_labels != 0]
+    if border_labels.size == 0:
+        # Every border pixel is foreground, so no background component touches
+        # the image edge and the exterior is undefined; treating all background
+        # as enclosed would turn the whole image into foreground.  A 1-2px
+        # transparent fringe (alpha ignored here) reproduces this, so bail out.
+        return mask
     exterior_background = np.isin(labels, border_labels)
     enclosed_background = (inverse > 0) & ~exterior_background
     return mask | enclosed_background

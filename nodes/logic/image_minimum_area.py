@@ -37,9 +37,9 @@ class ImageMinimumArea(io.ComfyNode):
                     step=1,
                 ),
                 io.Combo.Input("method", options=cls.METHODS, default="lanczos"),
-                io.Int.Input("divisible_by", default=1, min=1, max=1024, step=1),
                 io.Combo.Input("fit", options=cls.FIT_MODES, default="crop"),
                 io.String.Input("pad_color", default="1.0"),
+                io.Int.Input("divisible_by", default=1, min=1, max=1024, step=1),
             ],
             outputs=[
                 io.Image.Output(display_name="image"),

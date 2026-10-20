@@ -6,19 +6,24 @@ class AnySwitchSelect(io.ComfyNode):
 
     @classmethod
     def define_schema(cls) -> io.Schema:
-        dynamic_inputs = [
+        # Every dynamic port must be declared here, even though the front-end
+        # adds input_2..input_10 on demand. ComfyUI's TopologicalSort only
+        # skips an upstream branch when the port's schema entry carries
+        # "lazy"; undeclared inputs have no schema info and are treated as
+        # eager, which schedules every connected branch at once.
+        inputs = [
             io.Int.Input("select", default=1, min=1, max=cls.SELECT_MAX, step=1),
             io.Custom("*").Input("input_1", optional=True, lazy=True),
         ]
         for i in range(2, cls.SELECT_MAX + 1):
-            dynamic_inputs.append(
+            inputs.append(
                 io.Custom("*").Input(f"input_{i}", optional=True, lazy=True)
             )
         return io.Schema(
             node_id="1hew_AnySwitchSelect",
             display_name="Any Switch Select",
             category="1hewNodes/logic",
-            inputs=dynamic_inputs,
+            inputs=inputs,
             outputs=[
                 io.Custom("*").Output(display_name="output"),
                 io.Int.Output(display_name="select"),

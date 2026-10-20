@@ -6,6 +6,11 @@ class MultiSwitchSelect(io.ComfyNode):
 
     @classmethod
     def define_schema(cls):
+        # Every dynamic port must be declared here, even though the front-end
+        # adds input_2..input_10 on demand. ComfyUI's TopologicalSort only
+        # skips an upstream branch when the port's schema entry carries
+        # "lazy"; undeclared inputs have no schema info and are treated as
+        # eager, which schedules every connected branch at once.
         inputs = [
             io.Int.Input("select", default=1, min=1, max=cls.SELECT_MAX, step=1),
             io.Custom("*").Input("input_1", optional=True, lazy=True),

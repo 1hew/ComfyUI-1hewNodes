@@ -10,9 +10,9 @@
 | `mask` | optional | MASK | - | - | Optional mask resized in sync; when absent, a default mask is generated. |
 | `length_to_sq_area` | - | INT | 1024 | 1–65536 | Reference square side `N`; target area = `N²`. |
 | `method` | - | COMBO | `lanczos` | `nearest` / `bilinear` / `lanczos` / `bicubic` / `hamming` / `box` | Resampling method. |
-| `divisible_by` | - | INT | 1 | 1–1024 | Round both final dimensions up to a multiple of this value. |
 | `fit` | - | COMBO | `crop` | `crop` / `pad` / `stretch` | Fit mode applied while scaling. |
 | `pad_color` | - | STRING | `1.0` | grayscale/HEX/RGB | Padding background color when `fit=pad`. |
+| `divisible_by` | - | INT | 1 | 1–1024 | Round both final dimensions up to a multiple of this value. |
 
 ## Outputs
 

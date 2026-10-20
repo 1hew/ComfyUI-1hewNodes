@@ -5,15 +5,15 @@ from comfy_api.latest import io
 
 from ..image.image_alpha_split import ImageAlphaSplit
 
-# Fixed internal settings copied from ComfyUI-RH-Nodes' MekajikiUnMult core.
+# Fixed internal settings copied from ComfyUI-RH-Nodes' MekajikiUnMult core,
+# including the 2026-10-15 gamut fix: negative channels are clipped and the
+# positive channels are jointly scaled instead of reverting the whole pixel.
 _BACKGROUND_QUANTIZATION_LEVELS = 31
 _BACKGROUND_QUANTIZATION_RADIX = 32
 _BACKGROUND_MIN_SUPPORT_PERCENT = 20
 _BACKGROUND_HIGH_CONFIDENCE_PERCENT = 30
 _BACKGROUND_SIDE_SUPPORT_PERCENT = 5
 _DARK_BACKGROUND_MAX_CODE = 64
-_GAMUT_NEGATIVE_TOLERANCE = 2.0 / 255.0
-_GAMUT_NEGATIVE_STRAIGHT_TOLERANCE = 0.25
 
 
 class DetectRemoveSolidBGUnMult(io.ComfyNode):
@@ -67,20 +67,19 @@ class DetectRemoveSolidBGUnMult(io.ComfyNode):
 
     @staticmethod
     def _gamut_safe_unpremultiply(
-        observed_rgb: torch.Tensor,
         premultiplied_rgb: torch.Tensor,
         divisor: torch.Tensor,
         active: torch.Tensor,
     ) -> torch.Tensor:
+        """Clip negatives, then jointly scale positive overflow.
+
+        A negative channel no longer reverts the whole pixel to the observed RGB.
+        No background-direction rollback or neighborhood recoloring is applied.
+        """
         raw = premultiplied_rgb / divisor.unsqueeze(-1)
         nonnegative = raw.clamp_min(0.0)
         peak = torch.amax(nonnegative, dim=-1, keepdim=True)
         protected = nonnegative / peak.clamp_min(1.0)
-        severe_negative = torch.any(
-            (premultiplied_rgb < -_GAMUT_NEGATIVE_TOLERANCE)
-            & (raw < -_GAMUT_NEGATIVE_STRAIGHT_TOLERANCE), dim=-1, keepdim=True
-        )
-        protected = torch.where(severe_negative, observed_rgb, protected)
         return torch.where(active.unsqueeze(-1), protected, torch.zeros_like(protected))
 
     @staticmethod
@@ -170,7 +169,7 @@ class DetectRemoveSolidBGUnMult(io.ComfyNode):
 
         divisor = torch.where(matte_alpha > 0.0, matte_alpha, torch.ones_like(matte_alpha))
         premultiplied_rgb = rgb - background * (1.0 - matte_alpha.unsqueeze(-1))
-        output_rgb = cls._gamut_safe_unpremultiply(rgb, premultiplied_rgb, divisor, matte_alpha > 0.0)
+        output_rgb = cls._gamut_safe_unpremultiply(premultiplied_rgb, divisor, matte_alpha > 0.0)
 
         threshold_code = min(max(int(threshold), 0), 255)
         if threshold_code == 0:
