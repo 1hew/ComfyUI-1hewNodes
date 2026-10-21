@@ -4,6 +4,10 @@ from comfy_api.latest import io
 
 from ...utils import make_ui_text
 
+from ...utils._text_ops import (
+    normalize_text,
+)
+
 
 class ListCustomInt(io.ComfyNode):
     _BRACKET_RANGE_RE = re.compile(
@@ -38,23 +42,10 @@ class ListCustomInt(io.ComfyNode):
         count = len(items)
         return io.NodeOutput(items, count, ui=make_ui_text(str(count)))
 
-    @staticmethod
-    def _normalize_text(text: str) -> str:
-        return (
-            (text or "")
-            .replace("【", "[")
-            .replace("】", "]")
-            .replace("（", "(")
-            .replace("）", ")")
-            .replace("，", ",")
-            .replace("：", ":")
-            .replace("；", ",")
-            .replace(";", ",")
-        )
 
     @classmethod
     def _parse_values(cls, text: str) -> list[int]:
-        normalized = cls._normalize_text(text)
+        normalized = normalize_text(text)
         if not normalized.strip():
             return []
 

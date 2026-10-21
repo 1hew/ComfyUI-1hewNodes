@@ -1,5 +1,7 @@
 from comfy_api.latest import io
 
+from ...utils._index_range import parse_index_expressions
+
 
 class MultiSwitchSelect(io.ComfyNode):
     SELECT_MAX = 10
@@ -12,7 +14,15 @@ class MultiSwitchSelect(io.ComfyNode):
         # "lazy"; undeclared inputs have no schema info and are treated as
         # eager, which schedules every connected branch at once.
         inputs = [
-            io.Int.Input("select", default=1, min=1, max=cls.SELECT_MAX, step=1),
+            io.String.Input(
+                "select",
+                default="1",
+                tooltip=(
+                    "1-based indices, same syntax as Image Batch Index: "
+                    "1,3 / 1-3 / [1,3] / [1,3) / :step; "
+                    "[1:3] means 1 and 3; -1 = last connected input."
+                ),
+            ),
             io.Custom("*").Input("input_1", optional=True, lazy=True),
         ]
         for i in range(2, cls.SELECT_MAX + 1):
@@ -31,36 +41,65 @@ class MultiSwitchSelect(io.ComfyNode):
         )
 
     @classmethod
-    def validate_inputs(cls, **kwargs):
+    def validate_inputs(cls, input_types=None, **kwargs):
+        # Declaring an explicit `input_types` argument tells ComfyUI to skip the
+        # linked-type check for this node. That keeps legacy workflows and API
+        # prompts working when `select` is driven by an INT node; execute()
+        # accepts both integers and index-list strings.
         return True
 
     @classmethod
     def check_lazy_status(cls, select, **kwargs):
-        key = cls._selected_key(select)
-        if key not in kwargs:
-            return []
-        if kwargs.get(key) is None:
-            return [key]
-        return []
+        size = cls._connected_size(kwargs)
+        # Request every selected input that is connected but not resolved yet.
+        # Unconnected ports must be skipped: requesting one raises NodeInputError.
+        return [
+            key
+            for key in cls._selected_keys(select, size)
+            if key in kwargs and kwargs.get(key) is None
+        ]
 
     @classmethod
     async def execute(cls, select, **kwargs) -> io.NodeOutput:
-        idx = cls._clamp_select(select)
-        key = cls._selected_key(select)
-        value = kwargs.get(key)
-
         results = [None] * cls.SELECT_MAX
-        results[idx - 1] = value
+        for index in cls._selected_indices(select, cls._connected_size(kwargs)):
+            results[index - 1] = kwargs.get(f"input_{index}")
         return io.NodeOutput(*results)
 
     @classmethod
-    def _clamp_select(cls, select):
-        try:
-            idx = int(select)
-        except Exception:
-            idx = 1
-        return max(1, min(idx, cls.SELECT_MAX))
+    def _selected_indices(cls, select, size=None):
+        size = cls.SELECT_MAX if size is None else max(0, int(size))
+
+        def resolve(value):
+            # Image Batch Index resolves negatives against the batch size; the
+            # analogous 1-based base here is the highest connected input slot.
+            if value < 0:
+                return size + value + 1
+            return value
+
+        if isinstance(select, bool):
+            select = int(select)
+        if isinstance(select, (int, float)):
+            values = [resolve(int(select))]
+        else:
+            if isinstance(select, (list, tuple, set)):
+                raw = ",".join(str(item) for item in select)
+            else:
+                raw = "" if select is None else str(select)
+            values = parse_index_expressions(raw, resolve)
+
+        return sorted({value for value in values if 1 <= value <= size})
 
     @classmethod
-    def _selected_key(cls, select):
-        return f"input_{cls._clamp_select(select)}"
+    def _selected_keys(cls, select, size=None):
+        return [f"input_{index}" for index in cls._selected_indices(select, size)]
+
+    @staticmethod
+    def _connected_size(kwargs):
+        size = 0
+        for key in kwargs:
+            if key.startswith("input_"):
+                suffix = key[len("input_") :]
+                if suffix.isdigit():
+                    size = max(size, int(suffix))
+        return size

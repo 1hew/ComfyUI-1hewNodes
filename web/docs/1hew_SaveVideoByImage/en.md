@@ -6,7 +6,7 @@
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `image` | - | IMAGE | - | - | Image batch interpreted as frames in time order. |
+| `image` | optional | IMAGE | - | - | Image batch interpreted as frames in time order; when absent (or a zero-length batch), the node finishes with an empty output. |
 | `audio` | optional | AUDIO | - | - | Optional audio input; muxed into the output when provided. |
 | `fps` | - | FLOAT | `8.0` | 0.01-120.0 | Frame rate used when writing the video. |
 | `filename` | - | STRING | `video/ComfyUI` | - | Save prefix passed to ComfyUI path generation; typically supports date placeholders (e.g. `%date:yyyy-MM-dd%`). |

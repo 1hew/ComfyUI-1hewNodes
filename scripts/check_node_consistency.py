@@ -5,6 +5,12 @@ nodes/**/*.py is the single source of truth for every node's node_id
 and display_name. The README node lists and web/docs/<node_id>/ are
 derived views, so this script fails whenever those views drift apart:
 
+* every module under nodes/ must follow the one-node-per-file layout:
+  a nodes/<category>/*.py (and any nodes/*.py without a leading
+  underscore) defines exactly one node, while shared helpers live in
+  utils/_*.py at the package root;
+* no file may import a node module from another category, so a shared
+  helper cannot hide inside an unrelated node file;
 * node_id and display_name must be unique across the repository;
 * every node must ship web/docs/<node_id>/en.md and .../zh.md and the
   display_name must be mentioned in both;
@@ -18,6 +24,9 @@ derived views, so this script fails whenever those views drift apart:
   so the front-end dynamic-port table cannot drift from the schemas;
 * every quoted 1hew_* literal in web/**/*.js must be a current node_id,
   so a renamed or removed node cannot leave a stale front-end reference;
+* the Save Text metadata markers in utils/_text_metadata.py and
+  web/js/core/text_metadata.js must stay identical, so backend-written
+  blocks are always recognized by the front-end drop handler;
 * display_name should follow the spaced model/version convention
   (reported as a warning only, never fatal).
 
@@ -30,6 +39,8 @@ The exit code is non-zero when a hard error is found, so it can gate CI.
 
 from __future__ import annotations
 
+import ast
+import hashlib
 import re
 import sys
 from pathlib import Path
@@ -61,6 +72,14 @@ CHANGELOG_VERSION_RE = re.compile(r"^\*\*v([0-9][0-9A-Za-z.\-]*)\*\*$")
 
 # Front-end dynamic-port table: node_id -> {base, addType, select, initial, ...}
 DYNAMIC_PORTS_FILE = ROOT / "web" / "js" / "dynamic_port.js"
+TEXT_METADATA_PY = ROOT / "utils" / "_text_metadata.py"
+TEXT_METADATA_JS = ROOT / "web" / "js" / "core" / "text_metadata.js"
+PY_METADATA_MARKER_RE = re.compile(
+    r'^(METADATA_(BEGIN|END))\s*=\s*"([^"]+)"', re.MULTILINE
+)
+JS_METADATA_MARKER_RE = re.compile(
+    r'export const TEXT_METADATA_(BEGIN|END)\s*=\s*"([^"]+)"'
+)
 DYNAMIC_CONFIG_ENTRY_RE = re.compile(r'"(1hew_[A-Za-z0-9_]+)"\s*:\s*\{([^}]*)\}')
 DYNAMIC_CONFIG_FIELD_RE = re.compile(r'(\w+)\s*:\s*(?:"([^"]*)"|(\d+)|(null))')
 SCHEMA_INPUT_RE = re.compile(r'io\.(?:Custom\("([^"]+)"\)|([A-Za-z]+))\.Input\(\s*(f?)"([^"]*)"')
@@ -280,6 +299,123 @@ def check_js_node_ids(known_ids, errors):
                 )
 
 
+def check_text_metadata_markers(errors):
+    """The backend writer and the front-end reader must share markers."""
+    py_markers = {
+        match.group(1): match.group(3)
+        for match in PY_METADATA_MARKER_RE.finditer(
+            TEXT_METADATA_PY.read_text(encoding="utf-8")
+        )
+    }
+    js_markers = {
+        "METADATA_" + match.group(1): match.group(2)
+        for match in JS_METADATA_MARKER_RE.finditer(
+            TEXT_METADATA_JS.read_text(encoding="utf-8")
+        )
+    }
+    for name in ("METADATA_BEGIN", "METADATA_END"):
+        py_value = py_markers.get(name)
+        js_value = js_markers.get(name)
+        if py_value is None or js_value is None:
+            errors.append(
+                "Save Text metadata marker %s is missing from the Python "
+                "writer or the front-end reader" % name
+            )
+        elif py_value != js_value:
+            errors.append(
+                "Save Text metadata marker %s differs: Python %r != JS %r"
+                % (name, py_value, js_value)
+            )
+
+
+LIFECYCLE_METHODS = {
+    "define_schema",
+    "define_node",
+    "execute",
+    "validate_inputs",
+    "fingerprint_inputs",
+    "IS_CHANGED",
+    "__init__",
+    "unload",
+}
+DUPLICATE_HELPER_MIN_LINES = 20
+
+
+def check_node_file_layout(errors):
+    """Every node module defines exactly one node; helpers live in utils/_*.py."""
+    for path in sorted(NODES_DIR.rglob("*.py")):
+        rel = path.relative_to(NODES_DIR)
+        if "__pycache__" in rel.parts or path.name == "__init__.py":
+            continue
+        if len(rel.parts) == 1 and path.name.startswith("_"):
+            continue
+        count = len(NODE_ID_RE.findall(path.read_text(encoding="utf-8")))
+        if count != 1:
+            errors.append(
+                "nodes/%s defines %d node(s); exactly one node per file is required "
+                "(shared helpers belong in utils/_*.py)" % (rel.as_posix(), count)
+            )
+
+
+def _resolve_relative_import(importer, level, module):
+    target_dir = importer.parent
+    for _ in range(level - 1):
+        target_dir = target_dir.parent
+    return target_dir / module.replace(".", "/") if module else target_dir
+
+
+def check_node_module_imports(errors):
+    """A node module must never be imported from a different category."""
+    for path in sorted(NODES_DIR.rglob("*.py")):
+        if "__pycache__" in path.parts or path.name == "__init__.py":
+            continue
+        text = path.read_text(encoding="utf-8")
+        for node in ast.walk(ast.parse(text)):
+            if not isinstance(node, ast.ImportFrom) or not node.level:
+                continue
+            base = _resolve_relative_import(path, node.level, node.module)
+            target = base.with_suffix(".py")
+            if not target.is_file() or target == path:
+                continue
+            if not NODE_ID_RE.search(target.read_text(encoding="utf-8")):
+                continue
+            if target.parent == path.parent:
+                continue
+            errors.append(
+                "%s:%d imports node module %s from another category; move the "
+                "shared helper into utils/_*.py"
+                % (path.relative_to(ROOT), node.lineno, target.relative_to(ROOT))
+            )
+
+
+def check_duplicate_helpers(warnings):
+    """Warn when the same long helper body is copied into several files."""
+    seen = {}
+    for path in sorted(NODES_DIR.rglob("*.py")):
+        if "__pycache__" in path.parts or path.name == "__init__.py":
+            continue
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            if node.name in LIFECYCLE_METHODS:
+                continue
+            size = node.end_lineno - node.lineno + 1
+            if size < DUPLICATE_HELPER_MIN_LINES:
+                continue
+            digest = hashlib.sha1(
+                ast.dump(ast.Module(body=node.body, type_ignores=[])).encode()
+            ).hexdigest()
+            seen.setdefault(digest, []).append((path.relative_to(ROOT), node.name, size))
+    for group in seen.values():
+        if len(group) < 2:
+            continue
+        first = group[0]
+        warnings.append(
+            "%s is duplicated (%d lines) in %s; extract it into utils/_*.py"
+            % (first[1], first[2], ", ".join(str(p) for p, _, _ in group))
+        )
+
+
 def main():
     errors = []
     warnings = []
@@ -355,6 +491,10 @@ def main():
     nodes_by_id = {node_id: path for node_id, _, path in nodes}
     check_dynamic_ports(nodes_by_id, errors, warnings)
     check_js_node_ids(known_ids, errors)
+    check_text_metadata_markers(errors)
+    check_node_file_layout(errors)
+    check_node_module_imports(errors)
+    check_duplicate_helpers(warnings)
 
     for _, display_name, _ in nodes:
         if display_name in COMPACT_NAME_ALLOWLIST:

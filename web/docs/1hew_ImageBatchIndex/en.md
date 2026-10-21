@@ -33,6 +33,7 @@
 - Order preserved: output follows the written order of expressions.
 - Duplicates preserved: repeated indices produce repeated images in the output.
 - Out-of-range skip: parsed indices outside the batch are ignored automatically.
+- Shared parser: uses the same `utils/_index_range.py` as `Multi Switch Select`'s `select`, so the range syntax is identical.
 
 ## Typical Usage
 

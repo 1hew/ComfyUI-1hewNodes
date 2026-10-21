@@ -1,4 +1,4 @@
-from comfy_api.latest import io, ui
+from comfy_api.latest import io
 import asyncio
 import math
 import numpy as np
@@ -6,7 +6,6 @@ import os
 import re
 import torch
 from PIL import Image, ImageDraw, ImageFont
-from typing import List, Tuple
 
 
 WRAP_CACHE: dict = {}

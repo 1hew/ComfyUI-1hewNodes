@@ -26,7 +26,7 @@
 
 - Single-file input: loads one explicit PSD/PSB file and does not scan folders.
 - Drag-and-drop upload: drop `.psd` / `.psb` files onto the node, or use the `choose psd to upload` button.
-- Node preview: when `preview` is enabled, `merged` and `single_layer` show one preview image, while `all_layers` shows a layer grid preview.
+- Node preview: when `preview` is enabled, `merged` and `single_layer` show one preview image; in classic mode `all_layers` uses ComfyUI's native batch preview (grid/single, `x`, `1 / N`, dimensions), while Nodes 2.0 uses the single-layer viewer (arrows, layer name, dimensions). The node frame expands/collapses with the image aspect ratio.
 - Layer modes: `single_layer` selects one layer/group by `index`; `all_layers` outputs all valid layers/groups as a batch.
 - Layer-name output: `layer_name` stays aligned with the output images, so downstream nodes can consume names directly as a list.
 - Merged mode: `merged` outputs the full PSD composite and ignores `index` and `group_mode`.
@@ -43,4 +43,4 @@
 
 - This node requires `psd-tools`; make sure dependencies are installed.
 - Rasterized PSD layers are recommended. Complex layer styles, smart objects, and adjustment layers depend on what the PSD file and parser can provide.
-- For large or layer-heavy PSD files, keep `preview=false` and enable it only when needed.
+- For large or layer-heavy PSD files, keep `preview=false` and enable it only when needed. Layer previews are loaded on demand and cached, so switching layers does not recomposite the whole PSD.

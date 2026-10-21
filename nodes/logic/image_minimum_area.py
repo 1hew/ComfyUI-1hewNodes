@@ -4,7 +4,14 @@ from comfy_api.latest import io
 from PIL import Image
 import torch
 
-from ..image_resize.image_resize_universal import ImageResizeUniversal
+from ...utils._image_ops import (
+    fit_resize_image,
+    fit_resize_mask,
+    generate_default_mask,
+    image2mask,
+    pil2tensor,
+    tensor2pil,
+)
 
 
 class ImageMinimumArea(io.ComfyNode):
@@ -141,27 +148,27 @@ class ImageMinimumArea(io.ComfyNode):
         out = []
         for img in image:
             frame = torch.unsqueeze(img, 0)
-            pil = ImageResizeUniversal.tensor2pil(frame)
+            pil = tensor2pil(frame)
 
             if "A" in pil.getbands() or "transparency" in pil.info:
                 rgba = pil.convert("RGBA")
                 rgb = rgba.convert("RGB")
                 alpha = rgba.getchannel("A")
 
-                resized_rgb = ImageResizeUniversal.fit_resize_image(
+                resized_rgb = fit_resize_image(
                     rgb, target_width, target_height, fit, sampler, pad_color
                 ).convert("RGB")
-                resized_alpha = ImageResizeUniversal.fit_resize_mask(
+                resized_alpha = fit_resize_mask(
                     alpha, target_width, target_height, fit, sampler, orig_width, orig_height
                 ).convert("L")
 
                 resized_rgb.putalpha(resized_alpha)
-                out.append(ImageResizeUniversal.pil2tensor(resized_rgb))
+                out.append(pil2tensor(resized_rgb))
             else:
-                resized = ImageResizeUniversal.fit_resize_image(
+                resized = fit_resize_image(
                     pil.convert("RGB"), target_width, target_height, fit, sampler, pad_color
                 )
-                out.append(ImageResizeUniversal.pil2tensor(resized))
+                out.append(pil2tensor(resized))
 
         return torch.cat(out, dim=0)
 
@@ -184,17 +191,17 @@ class ImageMinimumArea(io.ComfyNode):
             out = []
             for m in mask:
                 frame = torch.unsqueeze(m, 0)
-                pil = ImageResizeUniversal.tensor2pil(frame).convert("L")
-                resized = ImageResizeUniversal.fit_resize_mask(
+                pil = tensor2pil(frame).convert("L")
+                resized = fit_resize_mask(
                     pil, target_width, target_height, fit, sampler, orig_width, orig_height
                 )
-                out.append(ImageResizeUniversal.image2mask(resized))
+                out.append(image2mask(resized))
             return torch.cat(out, dim=0)
 
         out = []
         for _ in range(image_count):
             default = cls._default_mask(target_width, target_height, fit, orig_width, orig_height)
-            out.append(ImageResizeUniversal.image2mask(default))
+            out.append(image2mask(default))
         return torch.cat(out, dim=0)
 
     @staticmethod
@@ -213,7 +220,7 @@ class ImageMinimumArea(io.ComfyNode):
         - stretch: target-sized all-white mask.
         """
         if fit in ("pad", "crop"):
-            return ImageResizeUniversal.generate_default_mask(
+            return generate_default_mask(
                 target_width, target_height, fit, orig_width, orig_height
             )
         return Image.new("L", (target_width, target_height), 255)
@@ -226,4 +233,4 @@ class ImageMinimumArea(io.ComfyNode):
     ) -> torch.Tensor:
         if mask is not None:
             return mask
-        return ImageResizeUniversal.image2mask(Image.new("L", (width, height), 255))
+        return image2mask(Image.new("L", (width, height), 255))

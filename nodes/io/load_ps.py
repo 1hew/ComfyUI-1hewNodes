@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import math
 import os
+import threading
 import time
+from collections import OrderedDict
 from io import BytesIO
 from typing import Any
 
@@ -17,7 +20,14 @@ import torch
 
 VALID_PS_EXTENSIONS = {".psd", ".psb"}
 MAX_PREVIEW_LAYERS = 24
+PREVIEW_LAYER_MAX_SIDE = 512
 UPLOAD_READ_CHUNK_SIZE = 4 * 1024 * 1024
+
+_INFO_CACHE: "OrderedDict[tuple, tuple[list[str], int]]" = OrderedDict()
+_LAYER_CACHE: "OrderedDict[tuple, bytes]" = OrderedDict()
+_CACHE_LOCK = threading.Lock()
+_INFO_CACHE_MAX = 32
+_LAYER_CACHE_MAX = 256
 
 
 class LoadPS(io.ComfyNode):
@@ -292,7 +302,7 @@ class LoadPS(io.ComfyNode):
 
     @staticmethod
     def _node_name(node: Any) -> str:
-        name = str(getattr(node, "name", "") or "").strip()
+        name = str(getattr(node, "name", "") or "").replace("\x00", "").strip()
         return name or "Layer"
 
     @staticmethod
@@ -302,13 +312,96 @@ class LoadPS(io.ComfyNode):
 
     @classmethod
     def _render_psd(cls, psd: Any) -> Image.Image:
+        width, height = cls._canvas_size(psd)
+        try:
+            embedded = psd.topil()
+            if embedded is not None and embedded.size == (width, height):
+                return embedded.convert("RGBA")
+        except Exception:
+            pass
         pil = cls._composite(psd, viewport=cls._canvas_viewport(psd))
         if pil is None:
             return cls._transparent_canvas(psd)
         return cls._ensure_canvas_rgba(pil, psd, None)
 
     @classmethod
+    def _fast_layer_canvas(cls, node: Any, psd: Any) -> Image.Image | None:
+        """Fast path for simple raster layers; None means use composite."""
+        if node is None or cls._is_group(node):
+            return None
+        if getattr(node, "mask", None) is not None:
+            return None
+        if getattr(node, "vector_mask", None) is not None:
+            return None
+        if bool(getattr(node, "clipping", False)):
+            return None
+        if getattr(node, "kind", None) not in {"pixel", "smartobject", "type"}:
+            return None
+        try:
+            effects = getattr(node, "effects", None)
+            if effects is not None and getattr(effects, "enabled", False) and len(list(effects)) > 0:
+                return None
+        except Exception:
+            pass
+        try:
+            from psd_tools.constants import Tag
+
+            if getattr(node, "tagged_blocks", None) is not None:
+                fill = int(node.tagged_blocks.get_data(Tag.BLEND_FILL_OPACITY, 255))
+                if fill != 255:
+                    return None
+        except Exception:
+            pass
+
+        bbox = getattr(node, "bbox", None)
+        if bbox is None:
+            return None
+        try:
+            left, top, right, bottom = (int(v) for v in bbox)
+        except Exception:
+            return None
+        expected_w = max(0, right - left)
+        expected_h = max(0, bottom - top)
+        if expected_w <= 0 or expected_h <= 0:
+            return None
+
+        try:
+            pil = node.topil()
+        except Exception:
+            return None
+        if pil is None:
+            return None
+        rgba = pil.convert("RGBA")
+        if rgba.size != (expected_w, expected_h):
+            return None
+
+        try:
+            opacity = int(getattr(node, "opacity", 255)) / 255.0
+        except Exception:
+            opacity = 1.0
+        if opacity < 0.999:
+            alpha = rgba.getchannel("A").point(
+                lambda value: int(round(value * opacity))
+            )
+            rgba.putalpha(alpha)
+
+        canvas_w, canvas_h = cls._canvas_size(psd)
+        canvas = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+        src_left = max(0, -left)
+        src_top = max(0, -top)
+        src_right = min(expected_w, canvas_w - left)
+        src_bottom = min(expected_h, canvas_h - top)
+        if src_right <= src_left or src_bottom <= src_top:
+            return canvas
+        cropped = rgba.crop((src_left, src_top, src_right, src_bottom))
+        canvas.alpha_composite(cropped, dest=(max(0, left), max(0, top)))
+        return canvas
+
+    @classmethod
     def _render_layer_item(cls, node: Any, psd: Any, include_hidden: bool) -> Image.Image:
+        fast = cls._fast_layer_canvas(node, psd)
+        if fast is not None:
+            return fast
         layer_filter = (lambda _layer: True) if include_hidden else None
         pil = cls._composite(node, viewport=cls._canvas_viewport(psd), layer_filter=layer_filter)
         return cls._ensure_canvas_rgba(pil, psd, node)
@@ -387,8 +480,8 @@ class LoadPS(io.ComfyNode):
     def _is_empty_rgba(image: Image.Image) -> bool:
         if image.mode != "RGBA":
             image = image.convert("RGBA")
-        alpha = np.asarray(image.getchannel("A"), dtype=np.uint8)
-        return bool(alpha.size == 0 or int(alpha.max(initial=0)) <= 0)
+        alpha = image.getchannel("A")
+        return alpha.getbbox() is None
 
     @classmethod
     def _build_output(cls, images: list[Image.Image], filename: str, names: list[str]) -> io.NodeOutput:
@@ -530,6 +623,148 @@ async def upload_ps(request):
     return web.json_response({"path": saved[0], "count": len(saved), "files": saved})
 
 
+def _cache_get(cache: OrderedDict, key: tuple):
+    with _CACHE_LOCK:
+        value = cache.get(key)
+        if value is not None:
+            cache.move_to_end(key)
+        return value
+
+
+def _cache_put(cache: OrderedDict, key: tuple, value: Any, limit: int) -> Any:
+    with _CACHE_LOCK:
+        cache[key] = value
+        cache.move_to_end(key)
+        while len(cache) > limit:
+            cache.popitem(last=False)
+    return value
+
+
+def _ps_cache_key(path: str, include_hidden: bool, group_mode: str) -> tuple:
+    stat = os.stat(path)
+    return (
+        os.path.normcase(os.path.abspath(path)),
+        int(stat.st_mtime_ns),
+        int(stat.st_size),
+        bool(include_hidden),
+        str(group_mode),
+    )
+
+
+def _ps_layer_info_sync(path: str, include_hidden: bool, group_mode: str):
+    key = _ps_cache_key(path, include_hidden, group_mode)
+    cached = _cache_get(_INFO_CACHE, key)
+    if cached is not None:
+        return cached, key
+    psd = LoadPS._open_psd(path)
+    items = LoadPS._collect_items(psd, group_mode, include_hidden)
+    names = [str(item.get("name") or "Layer") for item in items]
+    sizes = []
+    for item in items:
+        bbox = getattr(item.get("node"), "bbox", None)
+        try:
+            left, top, right, bottom = (int(v) for v in bbox)
+            sizes.append([max(0, right - left), max(0, bottom - top)])
+        except Exception:
+            sizes.append([psd.width, psd.height])
+    payload = (names, len(names), sizes)
+    _cache_put(_INFO_CACHE, key, payload, _INFO_CACHE_MAX)
+    return payload, key
+
+
+def _ps_layer_png_sync(
+    path: str,
+    include_hidden: bool,
+    group_mode: str,
+    index: int,
+    max_side: int = PREVIEW_LAYER_MAX_SIDE,
+) -> bytes:
+    key = _ps_cache_key(path, include_hidden, group_mode) + (int(index), int(max_side))
+    cached = _cache_get(_LAYER_CACHE, key)
+    if cached is not None:
+        return cached
+    psd = LoadPS._open_psd(path)
+    items = LoadPS._collect_items(psd, group_mode, include_hidden)
+    if not items:
+        return b""
+    item = items[int(index) % len(items)]
+    image = _fast_layer_preview(item["node"], psd, include_hidden)
+    image = _preview_resize(image, max_side)
+    stream = BytesIO()
+    image.save(stream, format="PNG", compress_level=1)
+    payload = stream.getvalue()
+    _cache_put(_LAYER_CACHE, key, payload, _LAYER_CACHE_MAX)
+    return payload
+
+
+def _fast_layer_preview(node: Any, psd: Any, include_hidden: bool) -> Image.Image:
+    """Fast path for UI previews; full-quality rendering is used by execute()."""
+    try:
+        pil = node.topil()
+        if pil is not None:
+            return LoadPS._ensure_canvas_rgba(pil, psd, node)
+    except Exception:
+        pass
+    return LoadPS._render_layer_item(node, psd, include_hidden)
+
+
+@PromptServer.instance.routes.get("/1hew/view_ps_info")
+async def view_ps_info(request):
+    path = request.query.get("file") or request.query.get("path")
+    if not path:
+        return web.json_response({"error": "missing file"}, status=400)
+    path = LoadPS._resolve_input_relative_path(path)
+    if not os.path.isfile(path) or os.path.splitext(path)[1].lower() not in VALID_PS_EXTENSIONS:
+        return web.json_response({"error": "psd not found"}, status=404)
+    include_hidden = (request.query.get("include_hidden") or "false").lower() == "true"
+    group_mode = request.query.get("group_mode") or "layer"
+    group_mode = group_mode if group_mode in LoadPS.GROUP_MODES else "layer"
+    try:
+        (names, count, sizes), key = await asyncio.to_thread(
+            _ps_layer_info_sync, path, include_hidden, group_mode
+        )
+        return web.json_response(
+            {
+                "count": count,
+                "names": names,
+                "sizes": sizes,
+                "version": f"{key[1]}-{key[2]}",
+            }
+        )
+    except Exception as exc:
+        return web.json_response({"error": str(exc)}, status=500)
+
+
+@PromptServer.instance.routes.get("/1hew/view_ps_layer")
+async def view_ps_layer(request):
+    path = request.query.get("file") or request.query.get("path")
+    if not path:
+        return web.Response(status=400)
+    path = LoadPS._resolve_input_relative_path(path)
+    if not os.path.isfile(path) or os.path.splitext(path)[1].lower() not in VALID_PS_EXTENSIONS:
+        return web.Response(status=404)
+    try:
+        index = int(request.query.get("index", "0"))
+    except (TypeError, ValueError):
+        index = 0
+    include_hidden = (request.query.get("include_hidden") or "false").lower() == "true"
+    group_mode = request.query.get("group_mode") or "layer"
+    group_mode = group_mode if group_mode in LoadPS.GROUP_MODES else "layer"
+    try:
+        body = await asyncio.to_thread(
+            _ps_layer_png_sync, path, include_hidden, group_mode, index
+        )
+        if not body:
+            return web.Response(status=404)
+        return web.Response(
+            body=body,
+            content_type="image/png",
+            headers={"Cache-Control": "no-store"},
+        )
+    except Exception as exc:
+        return web.json_response({"error": str(exc)}, status=500)
+
+
 @PromptServer.instance.routes.get("/1hew/view_ps")
 async def view_ps(request):
     path = request.query.get("file") or request.query.get("path")
@@ -553,6 +788,14 @@ async def view_ps(request):
     try:
         psd = LoadPS._open_psd(path)
         if output_mode == "merged":
+            # Photoshop's embedded render is pixel-perfect and orders of
+            # magnitude faster than recompositing for a preview.
+            try:
+                embedded = psd.topil()
+                if embedded is not None:
+                    return _preview_to_response(embedded.convert("RGBA"))
+            except Exception:
+                pass
             return _preview_to_response(LoadPS._render_psd(psd))
 
         items = LoadPS._collect_items(psd, group_mode, include_hidden)
@@ -561,14 +804,14 @@ async def view_ps(request):
 
         if output_mode == "single_layer":
             item = items[index % len(items)]
-            image = LoadPS._render_layer_item(item["node"], psd, include_hidden)
+            image = _fast_layer_preview(item["node"], psd, include_hidden)
             if LoadPS._is_empty_rgba(image):
                 return web.Response(status=404)
             return _preview_to_response(image)
 
         images: list[Image.Image] = []
         for item in items[:MAX_PREVIEW_LAYERS]:
-            image = LoadPS._render_layer_item(item["node"], psd, include_hidden)
+            image = _fast_layer_preview(item["node"], psd, include_hidden)
             if not LoadPS._is_empty_rgba(image):
                 images.append(image)
         grid = _grid_preview(images)

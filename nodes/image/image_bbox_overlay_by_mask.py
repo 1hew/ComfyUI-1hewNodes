@@ -1,7 +1,6 @@
 from comfy_api.latest import io
 import asyncio
 import numpy as np
-import os
 import torch
 from PIL import Image, ImageDraw
 from skimage.measure import label, regionprops

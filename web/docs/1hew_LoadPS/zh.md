@@ -26,7 +26,7 @@
 
 - 单文件输入：节点只读取一个明确的 PSD/PSB 文件，不扫描目录。
 - 拖拽上传：可将 `.psd` / `.psb` 文件拖到节点上，或使用 `choose psd to upload` 按钮选择文件。
-- 节点预览：开启 `preview` 后，`merged` 和 `single_layer` 显示单张预览，`all_layers` 显示图层网格预览。
+- 节点预览：开启 `preview` 后，`merged` 和 `single_layer` 显示单张预览；`all_layers` 在经典模式使用 ComfyUI 原生批次预览（缩略图/单张、`x`、`1 / N`、尺寸），Nodes 2.0 使用单层查看器（左右切换、层名、尺寸），节点框随图片比例展开/收起。
 - 图层模式：`single_layer` 按 `index` 选择一个图层/组，`all_layers` 输出全部有效图层/组为批次。
 - 图层名输出：`layer_name` 与输出图像保持一一对应，便于下游直接按列表处理，无需再手动拆行。
 - 合成模式：`merged` 输出整个 PSD 的合成图，忽略 `index` 和 `group_mode`。
@@ -43,4 +43,4 @@
 
 - 该节点依赖 `psd-tools`，请确保已安装依赖。
 - 建议输入已栅格化图层的 PSD；复杂图层样式、智能对象、调整图层等效果以 PSD/解析库可读取的结果为准。
-- 大尺寸或多图层 PSD 建议保持 `preview=false`，需要查看时再临时开启。
+- 大尺寸或多图层 PSD 建议保持 `preview=false`，需要查看时再临时开启；单层预览按需加载并缓存，切换图层不会重新合成整份 PSD。

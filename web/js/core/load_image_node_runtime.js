@@ -35,17 +35,19 @@ export function installLoadImageSetSizeGuard(nodeType) {
     const originalSetSize = nodeType.prototype.setSize;
     nodeType.prototype.setSize = function (size) {
         const preserveHeight = this._comfy1hewPreserveFrameHeightUntilPreview;
+        // size 可能来自 ComfyUI 内部的 Float64Array（node.size），不能只认普通 Array。
+        const nextWidth = Number(size?.[0]);
+        const nextHeight = Number(size?.[1]);
         if (
             !this._comfy1hewInternalPreviewResize
             && !this._comfy1hewInternalVideoPreviewResize
             && Number.isFinite(preserveHeight)
-            && Array.isArray(size)
-            && size.length >= 2
-            && Number.isFinite(size[1])
-            && size[1] < preserveHeight - 1
+            && Number.isFinite(nextWidth)
+            && Number.isFinite(nextHeight)
+            && nextHeight < preserveHeight - 1
             && isLoadImagePreviewStillResolving(this)
         ) {
-            return originalSetSize.call(this, [size[0], preserveHeight]);
+            return originalSetSize.call(this, [nextWidth, preserveHeight]);
         }
         return originalSetSize.apply(this, arguments);
     };
@@ -58,8 +60,11 @@ export function refreshLoadImagePreserveFrameHeight(node, opts = {}) {
             return;
         }
 
-        const width = Array.isArray(node.size) ? node.size[0] : 200;
-        const currentHeight = Array.isArray(node.size) ? node.size[1] : 0;
+        // ComfyUI 1.55 起 node.size 是 Float64Array，不能再用 Array.isArray 判断。
+        const sizeWidth = Number(node.size?.[0]);
+        const sizeHeight = Number(node.size?.[1]);
+        const width = Number.isFinite(sizeWidth) && sizeWidth > 0 ? sizeWidth : 200;
+        const currentHeight = Number.isFinite(sizeHeight) ? sizeHeight : 0;
         const desiredSize = node.computeSize?.([width, currentHeight]);
         const baseHeight =
             Array.isArray(desiredSize) && Number.isFinite(desiredSize[1])

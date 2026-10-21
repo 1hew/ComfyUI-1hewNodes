@@ -12,10 +12,13 @@ node_id 1hewOffice_RunningHubSeedance25MultimodalVideo）：按输入视频的�
 用面积而不是单边判断，竖屏（如 1080x1920）同样会被正确判为 1080p。
 """
 
-import math
 from typing import Any, Optional
 
 from comfy_api.latest import io
+
+from ...utils._text_ops import (
+    match_resolution,
+)
 
 
 class StringResolutionSeedance25MultimodalVideo(io.ComfyNode):
@@ -60,7 +63,7 @@ class StringResolutionSeedance25MultimodalVideo(io.ComfyNode):
             return io.NodeOutput(fallback)
 
         width, height = size
-        return io.NodeOutput(cls._match_resolution(width, height))
+        return io.NodeOutput(match_resolution(cls, width, height))
 
     @classmethod
     def _probe_size(cls, video: Any) -> Optional[tuple[int, int]]:
@@ -89,17 +92,3 @@ class StringResolutionSeedance25MultimodalVideo(io.ComfyNode):
             except Exception:
                 pass
         return None
-
-    @classmethod
-    def _match_resolution(cls, width: int, height: int) -> str:
-        area = max(width * height, 1)
-        best_label = cls.RESOLUTION_OPTIONS[0][0]
-        best_diff = float("inf")
-
-        for label, target_area in cls.RESOLUTION_OPTIONS:
-            diff = abs(math.log(area) - math.log(target_area))
-            if diff < best_diff:
-                best_diff = diff
-                best_label = label
-
-        return best_label

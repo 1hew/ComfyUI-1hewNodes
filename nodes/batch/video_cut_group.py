@@ -46,8 +46,8 @@ class VideoCutGroup(io.ComfyNode):
         min_frame_count: int,
         max_frame_count: int,
         fast: bool,
-        add_frame: str,
-        delete_frame: str,
+        add_frame: str = "",
+        delete_frame: str = "",
     ) -> io.NodeOutput:
         B = int(image.shape[0])
         if B <= 1:

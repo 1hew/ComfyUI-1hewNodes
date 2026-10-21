@@ -21,6 +21,24 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v4.0.0**
+- **Major I/O upgrade**: unify text reading/writing with metadata-aware `Load Text` / `Save Text`, add `Save Audio`, make `Save Video` container-safe, and switch `Load PS` to on-demand cached layer previews.
+- **Logic and shared foundation**: `Multi Switch Select` shares `Image Batch Index`'s range grammar and supports multi-selection; duplicated image/video/text/file helpers are centralized in `utils/_*.py`, covered by the expanded consistency checker and regression suite.
+- **Compatibility**: all node IDs stay `1hew_*`; `Save Text` uses the optional STRING `text` port (formerly `any`) and `Load Text` drops `encode`, with the front end migrating old widget values automatically; `Save Audio` requires PyAV.
+- **Docs**: bilingual node docs and README are synchronized; release notes before v4.0.0 are archived below.
+
+<details>
+<summary><b>3.x releases</b></summary>
+
+**v3.31.0**
+- fix(io): `Save Video` now names WebM/VP8 and other sources after their own container (`.webm` / `.mp4` / `.mkv`, Matroska when the codecs do not fit) instead of forcing MP4, which failed with `'mp4' format does not support 'vp8' codec`; metadata remux and silent-audio remux also work on current PyAV builds
+- feat(io): Add `Save Audio` — save AUDIO to FLAC / WAV / MP3 / Opus with output/temp routing, auto-increment or fixed filenames, optional metadata, batch splitting, and empty-input pass-through (nothing is written when no audio is connected); the node embeds an audio player that previews the saved file, matching the native `Save Audio (Advanced)` preview
+- feat(io): `Save Text` now supports `txt` / `csv` / `md` / `json`, always writes UTF-8, can append workflow/prompt metadata, and clears its in-node preview when the input is empty; the input port is now the optional STRING `text` (formerly `any`)
+- feat(io): `Load Text` adds file upload, live in-node preview, automatic encoding detection, and strips the metadata block written by `Save Text`; the `encode` input is removed and the front end migrates old workflows
+- feat(io): `Load PS` previews are now loaded on demand — new `/1hew/view_ps_info` and `/1hew/view_ps_layer` endpoints list layers and render individual PNG previews with an LRU cache, merged previews reuse the embedded composite, and `all_layers` uses the native batch preview on classic or a single-layer viewer on Nodes 2.0; the node frame follows the image aspect ratio
+- feat(logic): `Multi Switch Select` accepts the same 1-based range/list syntax as `Image Batch Index` (`1,3`, `1-3`, `[1,3]`, `:step`, negatives) and routes multiple inputs; both nodes share the new `utils/_index_range.py` parser
+- refactor(utils): Move duplicated image/video/text/file helpers into `utils/_*.py`, and enforce one-node-per-file plus no cross-category node imports in `scripts/check_node_consistency.py`
+
 **v3.30.1**
 - refactor(logic): Move `Image Minimum Area`'s `divisible_by` input after `fit` / `pad_color` so the widget order matches `Image Resize Universal`; existing workflows should recheck that node's parameters
 - fix(detect): Align `Detect Remove SolidBG UnMult`'s gamut-safe unpremultiply with the `UnMult (Auto Background)` 2026-10-15 fix — negative channels are clipped and positive overflow is jointly scaled, so one bad channel no longer reverts the whole pixel to the observed RGB
@@ -174,13 +192,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(mask): Add `Mask to Image` with configurable black/white area colors, `fill_hole`, and optional RGBA output
 
 **v3.5.2**
-- refactor(io): Adjust `Save Txt` naming settings and filename generation logic
+- refactor(io): Adjust `Save Text` naming settings and filename generation logic
 
 **v3.5.1**
 - refactor(io): Optimize video load/save compatibility and keep `Save Image` preview available when `save_output` is disabled
 
 **v3.5.0**
-- feat(io): Add `Load Txt` and `Save Txt` nodes
+- feat(io): Add `Load Text` and `Save Text` nodes
 
 **v3.4.0**
 - feat(nodes): Add `Image Resize Gemini30ProImage`, `Image Resize Gemini31FlashImage`, `Detect Remove BG`, `Detect Remove BG Refine`, and `text_match_rownum`; reorganize resize-related capabilities into the dedicated `image_resize` group, and sync related docs plus README node list updates.
@@ -230,6 +248,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 **v3.0.0**
 - build: bump version to 3.0.0
 
+</details>
+
 <details>
 <summary><b> 2.x releases</b></summary>
 
@@ -273,14 +293,14 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 - feat(logic): Added `Image Batch Group` node for intelligent image batch splitting with overlap support and flexible padding strategies
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.38</b></summary>
 
 - refactor(image): Enhanced `ImageResizeUniversal` node with comprehensive mask processing logic
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.37</b></summary>
@@ -288,21 +308,21 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(image): Enhanced `Image Solid` node with advanced color parameter
 - feat(image): Added the `ImageGridSplit` node for splitting images into grid layouts with flexible output options
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.36</b></summary>
 
 - feat(conversion): Enhanced `URL to Video` node
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.35</b></summary>
 
 - feat(image): Added `Image Resize Qwen Image` node for Qwen vision model optimized image resizing with 7 preset resolutions and automatic aspect ratio selection
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.32</b></summary>
@@ -310,14 +330,14 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(image): Added `Image Solid Flux Kontext` node for generating solid color images with Flux Kontext dimension presets
 - feat(image): Added `Image Solid Qwen Image` node for generating solid color images with QwenImage dimension presets
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.31</b></summary>
 
 - fix: Fixed various bugs and improved stability
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.28</b></summary>
@@ -327,21 +347,21 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(image): Added `Image Rotate with Mask` node for advanced image rotation with mask support and multiple fill modes
 - feat(text): Enhanced `Text Load Local` node with `user_prompt` parameter for combining JSON content with additional user prompts
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.26</b></summary>
 
 - feat(image_crop): Enhanced `Image Crop with BBox Mask` node with precise dimension control, added `crop_to_side` and `crop_to_length` parameters
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.25</b></summary>
 
 - feat(image_crop): Added `apply_paste_mask` parameter to `Image Paste by BBox Mask` node for controlling smart scaling behavior
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.24</b></summary>
@@ -349,7 +369,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(image_crop): Added `opacity` parameter to `Image Paste by BBox Mask` node for controlling paste image transparency
 - feat(image): Enhanced `Image Stroke by Mask` node with batch processing support for handling multiple images and masks
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.23</b></summary>
@@ -357,7 +377,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - fix(image): Enhanced `Image Stroke by Mask` node color parsing logic, supporting RGB string formats and improved default fallback to white color
 - fix(image): Enhanced `Image Paste by BBox Mask` node rotation parameter
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.21</b></summary>
@@ -366,21 +386,21 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(text): Added `Text Join by Text List` node for merging any type of list into a string with support for prefix, suffix, and custom separators
 - refactor(text): Refactored `Text Format` node to `Text Prefix Suffix`, optimizing wildcard input processing and formatting functionality
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.18</b></summary>
 
 - feat(sample): Added `Step Split` node for high-low frequency sampling step separation with support for percentage and integer input modes
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.17</b></summary>
 
 - feat(image_crop): Optimized `Image Crop with BBox Mask` node
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.15</b></summary>
@@ -389,28 +409,28 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(image_crop): Added `Image Edge Crop Pad` node with smart edge cropping and padding capabilities, featuring mask output functionality
 - feat(image_blend): Enhanced `Image Luma Matte` node with feathering and alpha output features, supporting multiple color formats and edge processing
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.13</b></summary>
 
 - feat(text): Added `Text Load Local` node for loading JSON format prompt files from prompt directory with bilingual Chinese and English output
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.12</b></summary>
 
 - feat(text): Added `Text Format` node for flexible text formatting with wildcard input support
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.9</b></summary>
 
 - feat(image_crop): Refactored `Image Crop with BBox Mask` node
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.8</b></summary>
@@ -418,42 +438,42 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(image): Added `Image Resize Flux Kontext` node with support for automatic and manual size selection for images and masks
 - feat(image): Enhanced `Image Edit Stitch` node with improved stitching algorithms and parameter handling
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.7</b></summary>
 
 - feat(text): Added `List Custom Seed` node for creating unique random seed lists with control after generate functionality
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.6</b></summary>
 
 - feat(image_hlfreq): Added high-low frequency separation node group, including `Image HLFreq Separate`, `Image HLFreq Combine`, and `Image HLFreq Transform` nodes with support for RGB, HSV, and IGBI frequency separation methods
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.5</b></summary>
 
 - feat(mask): Added the `Mask Fill Hole` node, which fills holes in enclosed areas of masks with support for batch processing.
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.3</b></summary>
 
 - fix(image_blend): Fixed the issue of inconsistency between devices for the `Image Blend Modes by Alpha` node.
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.2</b></summary>
 
 - feat(image): Added the `Image BBox Overlay by Mask` node, which overlays the image bounding box based on a mask.
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.1</b></summary>
@@ -461,21 +481,21 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - refactor(image/crop): Renamed node classes and updated related documentation
 - feat(image_crop): Enhanced the functionality and output options of the `ImageCropByMaskAlpha` node
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.0</b></summary>
 
 - feat: Added `conversion`, and restructured image mixing and masking processing
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.1.6</b></summary>
 
 - feat(ImageEditStitch): Add a “spacing” parameter to control the distance between stitched images
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.1.5</b></summary>
@@ -486,21 +506,21 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(text): Added `TextCustomList` and `TextCustomExtract` text processing nodes
 - style: Cleaned up node parameter labels to maintain simplicity and consistency
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.1.2</b></summary>
 
 - feat(image_tile): Improved the `Image Tile Merge` algorithm, using weight masks and cosine gradients to achieve perfect seamless stitching
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.1.1</b></summary>
 
 - feat (image_crop): Added intelligent batch processing for `Image BBox Paste`
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.1.0</b></summary>
@@ -509,21 +529,21 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat: Update node functionality
 - docs: Add bilingual documentation, improve node descriptions
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.0.5</b></summary>
 
 - Add Path Select
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.0.4</b></summary>
 
 - Fix Image Cropped Paste error, add batch processing feature.
 
-​	</details>
+</details>
 
 </details>
 
@@ -660,7 +680,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Any Switch Select | Multi-way selector node supporting multiple input options, lazily routing the chosen `input_k` to `output` and returning the effective `select` value |
 | Float Number Compare | Float comparison node that evaluates two FLOAT values with a selected operator and outputs a boolean |
 | Int Number Compare | Integer comparison node that evaluates two INT values with a selected operator and outputs a boolean |
-| Multi Switch Select | Multi-output selector for `input_1..input_N`; uses 1-based `select` to route the chosen input to its matching `output_k` |
+| Multi Switch Select | Multi-output selector for `input_1..input_N`; a 1-based `select` using the same range syntax as Image Batch Index (e.g. `1-3`, `[1,3]`) lazily routes each chosen input to its matching `output_k`, leaving the rest `None` |
 | Text Compare | Compares two strings with equality, containment, prefix/suffix, or regex operators and outputs a boolean |
 | Text Match Rownum | Match a single text against multi-line text and return first matched row number (1-based), or 0 when not found |
 | Text Match Value | Match single-line text against multi-line key-value pairs and return corresponding value with simple numeric/boolean auto-typing |
@@ -735,14 +755,15 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 📁 IO Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Get File Count | Count image/video/psd/txt files in a folder with optional recursive scanning, list-form `filename` / `file_path` outputs, and configurable filename extension retention |
+| Get File Count | Count image/video/psd/text files in a folder with optional recursive scanning, list-form `filename` / `file_path` outputs, and configurable filename extension retention |
 | Load Image | Load images from a file or folder with batch mode, size unification, derived masks, and list-form `filename` output |
-| Load PS | Load a PSD/PSB file as one indexed layer, all layer batches, or the merged document image, with drag-and-drop upload, optional node preview, hidden-layer, group-mode controls, and list-form `layer_name` output |
-| Load Txt | Load `.txt` content from a file or folder with `encode` selection and indexed folder picking |
+| Load PS | Load a PSD/PSB file as one indexed layer, all layer batches, or the merged document image, with drag-and-drop upload, lazy cached layer previews, hidden-layer, group-mode controls, and list-form `layer_name` output |
+| Load Text | Load `.txt` content from a file or folder with upload, live preview, auto encoding detection, and indexed folder picking |
 | Load Video | Select a video from a file or folder and apply trimming/FPS settings during decoding |
 | Load Video to Image | Decode a video into an image batch, audio, fps, and frame count |
+| Save Audio | Save an AUDIO object as FLAC/WAV/MP3/Opus with output/temp routing, optional metadata, batch splitting, empty-input pass-through, and an in-node audio player preview |
 | Save Image | Save image batches to output/temp and return absolute saved file paths |
-| Save Txt | Save any input as `.txt` with `encode` control, auto-increment naming, and preview-only mode |
+| Save Text | Save text input as `txt` / `csv` / `md` / `json` (UTF-8) with auto-increment naming, metadata, and preview-only mode |
 | Save Video by Image | Encode an image batch into a video with optional audio muxing and alpha support |
 | Save Video | Save a VIDEO object to disk with container extension preservation and alpha preview |
 

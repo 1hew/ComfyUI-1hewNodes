@@ -9,4 +9,3 @@ current_workflow.tmp
 
 /cache/
 .pytest_cache/
-/tests/

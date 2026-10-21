@@ -21,11 +21,16 @@
 ## Features
 
 - Output routing: choose output directory or temp directory via `save_output`.
-- Extension inference: uses the source file extension when available.
-- Metadata remux: uses `ffmpeg` to remux metadata into `comment` while keeping
-  streams copied.
-- Alpha preview: detects alpha via `ffprobe` and generates a WEBM preview in the
-  temp directory for UI playback.
+- Container inference: the saved file keeps the source container (`.webm`,
+  `.mp4`, `.mkv`) by probing the source stream, so WebM/VP8 inputs are remuxed
+  into WebM instead of failing with `'mp4' format does not support 'vp8' codec`.
+  Containers that cannot carry the source codecs (e.g. ProRes, MJPEG, AVI) fall
+  back to Matroska; trimmed or cropped videos, which must be re-encoded, use
+  MP4/H.264.
+- Metadata remux: remuxes the saved file with PyAV to write the metadata
+  `comment` while keeping streams copied.
+- Alpha preview: detects alpha while probing the source and generates a WEBM
+  preview in the temp directory for UI playback.
 - UI preview: shows a Preview Video entry for quick inspection.
 
 ## Typical Usage
@@ -36,6 +41,8 @@
 
 ## Notes & Tips
 
-- The node calls `ffprobe` for alpha/audio probing and calls `ffmpeg` for remux
-  and optional preview generation.
+- Sources are inspected with PyAV (`get_stream_source()`); component videos
+  that would have to be encoded are not probed, so no extra full encode runs.
+- Probing, metadata remux and preview encoding use PyAV; no external `ffprobe`
+  or `ffmpeg` binary is required.
 - Path allocation runs under a lock to keep counters stable under concurrency.

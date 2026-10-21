@@ -7,10 +7,13 @@ resolution 支持的档位之一（1k / 1.5k / 2k），未连接图像时直接�
 1k = 1024x1024，1.5k = 1536x1536，2k = 2048x2048。
 """
 
-import math
 
 import torch
 from comfy_api.latest import io
+
+from ...utils._text_ops import (
+    match_resolution,
+)
 
 
 class StringResolutionDoubaoSeedream50Pro(io.ComfyNode):
@@ -54,20 +57,6 @@ class StringResolutionDoubaoSeedream50Pro(io.ComfyNode):
         for index in range(batch):
             height = max(int(image[index].shape[0]), 1)
             width = max(int(image[index].shape[1]), 1)
-            labels.append(cls._match_resolution(width, height))
+            labels.append(match_resolution(cls, width, height))
 
         return io.NodeOutput("\n".join(labels))
-
-    @classmethod
-    def _match_resolution(cls, width: int, height: int) -> str:
-        area = max(width * height, 1)
-        best_label = cls.RESOLUTION_OPTIONS[0][0]
-        best_diff = float("inf")
-
-        for label, target_area in cls.RESOLUTION_OPTIONS:
-            diff = abs(math.log(area) - math.log(target_area))
-            if diff < best_diff:
-                best_diff = diff
-                best_label = label
-
-        return best_label

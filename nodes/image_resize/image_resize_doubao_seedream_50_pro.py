@@ -13,7 +13,16 @@ import math
 import torch
 import torch.nn.functional as F
 
-from .image_resize_gemini_30_pro_image import ImageResizeGemini30ProImage
+
+from ...utils._image_ops import (
+    pad_to_rgb,
+    parse_pad_color,
+)
+
+from ...utils._resize_ops import (
+    resize_pair,
+    resolve_target_size,
+)
 
 
 class ImageResizeDoubaoSeedream50Pro(io.ComfyNode):
@@ -115,8 +124,8 @@ class ImageResizeDoubaoSeedream50Pro(io.ComfyNode):
             raise ValueError(f"invalid preset_size: {preset_size!r}")
 
         source_w, source_h = cls._source_dimensions(image, mask)
-        tw, th = cls._resolve_target_size(source_w, source_h, preset_size)
-        pc = cls._parse_pad_color(pad_color)
+        tw, th = resolve_target_size(cls, source_w, source_h, preset_size)
+        pc = parse_pad_color(pad_color)
 
         device = None
         if isinstance(image, torch.Tensor):
@@ -134,7 +143,7 @@ class ImageResizeDoubaoSeedream50Pro(io.ComfyNode):
             b, h, w = int(m.shape[0]), int(m.shape[1]), int(m.shape[2])
             image_device = m.device
             image = cls._blank_image(b, h, w, pc, image_device)
-            out_img, out_msk, native_img, native_msk = cls._resize_pair(image, m, tw, th, fit, pc)
+            out_img, out_msk, native_img, native_msk = resize_pair(cls, image, m, tw, th, fit, pc)
             return cls._output(out_img, out_msk, native_img, native_msk)
 
         b, h, w, _ = image.shape
@@ -142,7 +151,7 @@ class ImageResizeDoubaoSeedream50Pro(io.ComfyNode):
         has_mask = isinstance(m, torch.Tensor)
         if not has_mask:
             m = torch.ones((b, h, w), dtype=torch.float32, device=image.device)
-        out_img, out_msk, native_img, native_msk = cls._resize_pair(image, m, tw, th, fit, pc)
+        out_img, out_msk, native_img, native_msk = resize_pair(cls, image, m, tw, th, fit, pc)
 
         if fit == "crop" and not has_mask:
             # 与其他 resize 节点一致：crop 且未接 mask 时，默认遮罩标记保留区域（源分辨率）。
@@ -177,7 +186,7 @@ class ImageResizeDoubaoSeedream50Pro(io.ComfyNode):
         mb = int(mask.shape[0]) if isinstance(mask, torch.Tensor) else 0
         mh = int(mask.shape[1]) if isinstance(mask, torch.Tensor) else 0
         mw = int(mask.shape[2]) if isinstance(mask, torch.Tensor) else 0
-        tw, th = cls._resolve_target_size(iw or mw or 1, ih or mh or 1, preset_size)
+        tw, th = resolve_target_size(cls, iw or mw or 1, ih or mh or 1, preset_size)
         return f"{preset_size}|target={tw}x{th}|fit={fit}|pad={pad_color}|img={ib}x{ih}x{iw}|mask={mb}x{mh}x{mw}"
 
     @classmethod
@@ -210,29 +219,6 @@ class ImageResizeDoubaoSeedream50Pro(io.ComfyNode):
             return True
         return False
 
-    @classmethod
-    def _resolve_target_size(cls, source_w: int, source_h: int, preset_size: str) -> tuple[int, int]:
-        preset = cls._find_preset_resolution(preset_size)
-        if preset is not None:
-            return preset
-
-        if cls._is_auto_preset(preset_size):
-            # auto（不带档位）：先按输入面积定档，再在该档内选最接近比例的预设。
-            # auto (1k)/(1.5k)/(2k)：直接限定在对应档内选比例。
-            if cls._normalize_preset_size(preset_size) == "auto":
-                target_key = cls._resolve_target_key(source_w, source_h, preset_size)
-                candidates = cls._preset_candidates(f"auto ({target_key})")
-            else:
-                candidates = cls._preset_candidates(preset_size)
-            return cls._find_best_resolution(source_w, source_h, candidates)
-
-        target_key = cls._resolve_target_key(source_w, source_h, preset_size)
-        max_pixels = cls.TARGET_PIXELS[target_key]
-        ratio = float(max(int(source_w), 1)) / float(max(int(source_h), 1))
-        ratio = min(max(ratio, cls.MIN_SAFE_ASPECT_RATIO), cls.MAX_SAFE_ASPECT_RATIO)
-        width = int(round((float(max_pixels) * ratio) ** 0.5))
-        height = int(round((float(max_pixels) / ratio) ** 0.5))
-        return cls._normalize_size(width, height, max_pixels)
 
     @staticmethod
     def _is_auto_preset(preset_size: str) -> bool:
@@ -346,57 +332,7 @@ class ImageResizeDoubaoSeedream50Pro(io.ComfyNode):
             return mask.unsqueeze(0)
         return mask
 
-    @staticmethod
-    def _parse_pad_color(color_str):
-        return ImageResizeGemini30ProImage._parse_pad_color(color_str)
 
-    @staticmethod
-    def _pad_to_rgb(img, target_h, target_w, fill_rgb):
-        return ImageResizeGemini30ProImage._pad_to_rgb(img, target_h, target_w, fill_rgb)
-
-    @classmethod
-    def _resize_pair(
-        cls,
-        image: torch.Tensor,
-        mask: torch.Tensor,
-        target_w: int,
-        target_h: int,
-        fit: str,
-        pad_color,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        b, h, w, _ = image.shape
-        if fit == "stretch":
-            out_img = cls._resize_image(image, target_h, target_w)
-            out_msk = cls._resize_mask(mask, target_h, target_w)
-        elif fit == "pad":
-            scale = min(target_w / max(w, 1), target_h / max(h, 1))
-            new_w = max(int(round(w * scale)), 1)
-            new_h = max(int(round(h * scale)), 1)
-            resized_img = cls._resize_image(image, new_h, new_w)
-            resized_msk = cls._resize_mask(mask, new_h, new_w)
-            out_img = cls._pad_to_rgb(resized_img, target_h, target_w, pad_color)
-            top = max((target_h - new_h) // 2, 0)
-            left = max((target_w - new_w) // 2, 0)
-            out_msk = torch.zeros((b, target_h, target_w), dtype=torch.float32, device=resized_msk.device)
-            out_msk[:, top : top + new_h, left : left + new_w] = resized_msk
-        else:
-            target_aspect = target_w / max(target_h, 1)
-            source_aspect = w / max(h, 1)
-            if source_aspect > target_aspect:
-                crop_w = max(int(round(h * target_aspect)), 1)
-                crop_h = h
-            else:
-                crop_h = max(int(round(w / target_aspect)), 1)
-                crop_w = w
-            left = max((w - crop_w) // 2, 0)
-            top = max((h - crop_h) // 2, 0)
-            cropped_img = image[:, top : top + crop_h, left : left + crop_w, :]
-            cropped_msk = mask[:, top : top + crop_h, left : left + crop_w]
-            out_img = cls._resize_image(cropped_img, target_h, target_w)
-            out_msk = cls._resize_mask(cropped_msk, target_h, target_w)
-
-        native_img, native_msk = cls._native_pair(image, mask, target_w, target_h, fit, pad_color)
-        return out_img, out_msk, native_img, native_msk
 
     @classmethod
     def _native_pair(
@@ -423,7 +359,7 @@ class ImageResizeDoubaoSeedream50Pro(io.ComfyNode):
                 cw, ch = w, max(h, int(math.ceil(w / ratio)))
             else:
                 cw, ch = max(w, int(math.ceil(h * ratio))), h
-            native_img = cls._pad_to_rgb(image, ch, cw, pad_color)
+            native_img = pad_to_rgb(image, ch, cw, pad_color)
             top = max((ch - h) // 2, 0)
             left = max((cw - w) // 2, 0)
             native_msk = torch.zeros((b, ch, cw), dtype=torch.float32, device=mask.device)

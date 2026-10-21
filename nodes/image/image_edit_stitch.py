@@ -1,9 +1,14 @@
-from comfy_api.latest import io, ui
-from PIL import Image, ImageColor
+from comfy_api.latest import io
+from PIL import Image
 import math
 import numpy as np
 import torch
 import torch.nn.functional as F
+
+from ...utils._image_ops import (
+    parse_pad_color,
+    parse_spacing_color,
+)
 
 
 class ImageEditStitch(io.ComfyNode):
@@ -111,7 +116,7 @@ class ImageEditStitch(io.ComfyNode):
             ref_batch, ref_height, ref_width, _ = reference_image.shape
 
         # 间隔条颜色解析（不支持 edge，严格 0..1 RGB）
-        color = cls._parse_spacing_color(spacing_color)
+        color = parse_spacing_color(spacing_color)
         space_rgb = (float(color[0]), float(color[1]), float(color[2]))
         spacing_color_tensor = torch.tensor(
             space_rgb, dtype=torch.float32
@@ -272,7 +277,7 @@ class ImageEditStitch(io.ComfyNode):
         bs = image.shape[0]
         out = []
         for i in range(bs):
-            fill = ImageEditStitch._parse_pad_color(pad_color)
+            fill = parse_pad_color(pad_color)
             img_np = (image[i].cpu().numpy() * 255).astype(np.uint8)
             img_pil = Image.fromarray(img_np)
 
@@ -295,140 +300,7 @@ class ImageEditStitch(io.ComfyNode):
 
         return torch.stack(out, dim=0)
 
-    @staticmethod
-    def _parse_pad_color(color_str):
-        if color_str is None:
-            return (1.0, 1.0, 1.0)
-        text = str(color_str).strip().lower()
-        if text in ("edge", "e"):
-            return "edge"
-        if text in ("extend", "ex"):
-            return "extend"
-        if text in ("mirror", "mr"):
-            return "mirror"
-        if text in ("average", "a"):
-            return "average"
-        if text.startswith("(") and text.endswith(")"):
-            text = text[1:-1].strip()
-        single = {
-            "r": "red",
-            "g": "lime",
-            "b": "blue",
-            "c": "cyan",
-            "m": "magenta",
-            "y": "yellow",
-            "k": "black",
-            "w": "white",
-            "o": "orange",
-            "p": "purple",
-            "n": "brown",
-            "s": "silver",
-            "l": "lime",
-            "i": "indigo",
-            "v": "violet",
-            "t": "turquoise",
-            "q": "aqua",
-            "f": "fuchsia",
-            "h": "hotpink",
-            "d": "darkblue",
-        }
-        if len(text) == 1 and text in single:
-            text = single[text]
-        try:
-            v = float(text)
-            if 0.0 <= v <= 1.0:
-                return (v, v, v)
-        except Exception:
-            pass
-        if "," in text:
-            try:
-                parts = [p.strip() for p in text.split(",")]
-                if len(parts) >= 3:
-                    r, g, b = [float(parts[i]) for i in range(3)]
-                    if max(r, g, b) <= 1.0:
-                        return (r, g, b)
-                    return (r / 255.0, g / 255.0, b / 255.0)
-            except Exception:
-                pass
-        if text.startswith("#") and len(text) in (4, 7):
-            try:
-                hex_str = text[1:]
-                if len(hex_str) == 3:
-                    hex_str = "".join(ch * 2 for ch in hex_str)
-                r = int(hex_str[0:2], 16) / 255.0
-                g = int(hex_str[2:4], 16) / 255.0
-                b = int(hex_str[4:6], 16) / 255.0
-                return (r, g, b)
-            except Exception:
-                pass
-        try:
-            rgb = ImageColor.getrgb(text)
-            return (rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0)
-        except Exception:
-            return (1.0, 1.0, 1.0)
 
-    @staticmethod
-    def _parse_spacing_color(color_str):
-        if color_str is None:
-            return (1.0, 1.0, 1.0)
-        text = str(color_str).strip().lower()
-        if text.startswith("(") and text.endswith(")"):
-            text = text[1:-1].strip()
-        single = {
-            "r": "red",
-            "g": "lime",
-            "b": "blue",
-            "c": "cyan",
-            "m": "magenta",
-            "y": "yellow",
-            "k": "black",
-            "w": "white",
-            "o": "orange",
-            "p": "purple",
-            "n": "brown",
-            "s": "silver",
-            "l": "lime",
-            "i": "indigo",
-            "v": "violet",
-            "t": "turquoise",
-            "f": "fuchsia",
-            "h": "hotpink",
-            "d": "darkblue",
-        }
-        if len(text) == 1 and text in single:
-            text = single[text]
-        try:
-            v = float(text)
-            if 0.0 <= v <= 1.0:
-                return (v, v, v)
-        except Exception:
-            pass
-        if "," in text:
-            try:
-                parts = [p.strip() for p in text.split(",")]
-                if len(parts) >= 3:
-                    r, g, b = [float(parts[i]) for i in range(3)]
-                    if max(r, g, b) <= 1.0:
-                        return (r, g, b)
-                    return (r / 255.0, g / 255.0, b / 255.0)
-            except Exception:
-                pass
-        if text.startswith("#") and len(text) in (4, 7):
-            try:
-                hex_str = text[1:]
-                if len(hex_str) == 3:
-                    hex_str = "".join(ch * 2 for ch in hex_str)
-                r = int(hex_str[0:2], 16) / 255.0
-                g = int(hex_str[2:4], 16) / 255.0
-                b = int(hex_str[4:6], 16) / 255.0
-                return (r, g, b)
-            except Exception:
-                pass
-        try:
-            rgb = ImageColor.getrgb(text)
-            return (rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0)
-        except Exception:
-            return (1.0, 1.0, 1.0)
 
     @staticmethod
     def _pad_to_rgb_like(img, target_h, target_w, fill_rgb):

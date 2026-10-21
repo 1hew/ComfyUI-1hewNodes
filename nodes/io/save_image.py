@@ -17,78 +17,13 @@ import torch
 from comfy_api.latest import io, ui
 from PIL import Image, PngImagePlugin
 
+from ...utils._file_ops import (
+    is_absolute_like,
+    sanitize_filename_prefix,
+    split_prefix_to_dir_and_stem,
+)
+
 _PATH_LOCK: Optional[asyncio.Lock] = None
-
-
-def _sanitize_filename_prefix(filename_prefix: str) -> str:
-    """Normalize user prefix to a safe relative path for ComfyUI."""
-    if not filename_prefix:
-        return "image/ComfyUI"
-
-    normalized = filename_prefix.replace("\\", "/").strip()
-
-    # ComfyUI forbids absolute paths; map them to a relative subfolder path.
-    drive, tail = os.path.splitdrive(normalized)
-    if os.path.isabs(normalized) or drive:
-        if drive:
-            drive_token = drive.rstrip(":").replace("/", "_").replace("\\", "_")
-            tail = tail.lstrip("/\\")
-            normalized = f"{drive_token}/{tail}" if tail else drive_token
-        else:
-            normalized = normalized.lstrip("/\\")
-
-    parts = []
-    for part in normalized.split("/"):
-        if not part or part == ".":
-            continue
-        if part == "..":
-            continue
-        parts.append(part)
-
-    return "/".join(parts) if parts else "image/ComfyUI"
-
-
-def _is_absolute_like(path_value: str) -> bool:
-    raw = str(path_value or "").strip().replace("\\", "/")
-    if not raw:
-        return False
-    drive, _ = os.path.splitdrive(raw)
-    return bool(drive) or raw.startswith("/")
-
-
-def _sanitize_filename_stem(name: str) -> str:
-    stem = str(name or "").strip()
-    if not stem:
-        return "ComfyUI"
-    for ch in '<>:"/\\|?*':
-        stem = stem.replace(ch, "_")
-    stem = stem.rstrip(". ")
-    return stem if stem else "ComfyUI"
-
-
-def _split_prefix_to_dir_and_stem(prefix: str) -> tuple[str, str]:
-    raw = str(prefix or "").strip().replace("\\", "/")
-    if not raw:
-        return "", "ComfyUI"
-
-    is_trailing_sep = raw.endswith("/")
-    cleaned = raw.rstrip("/")
-    if not cleaned:
-        return "", "ComfyUI"
-
-    if is_trailing_sep:
-        if len(cleaned) == 2 and cleaned[1] == ":":
-            cleaned += "/"
-        return cleaned, "ComfyUI"
-    if "/" not in cleaned:
-        stem = os.path.splitext(cleaned)[0]
-        return "", _sanitize_filename_stem(stem)
-
-    dir_part, stem_part = cleaned.rsplit("/", 1)
-    if len(dir_part) == 2 and dir_part[1] == ":":
-        dir_part += "/"
-    stem = os.path.splitext(stem_part)[0]
-    return dir_part, _sanitize_filename_stem(stem)
 
 
 def _tensor_to_pil(image_tensor: torch.Tensor) -> Image.Image:
@@ -150,8 +85,8 @@ def _next_increment_path(directory: str, stem: str) -> str:
 
 
 def _preview_filename_prefix(filename_prefix: str) -> str:
-    prefix = _sanitize_filename_prefix(filename_prefix)
-    dir_part, stem = _split_prefix_to_dir_and_stem(prefix)
+    prefix = sanitize_filename_prefix(filename_prefix, "image")
+    dir_part, stem = split_prefix_to_dir_and_stem(prefix)
     preview_dir = "1hew_preview"
     if dir_part:
         preview_dir = f"{preview_dir}/{dir_part}"
@@ -190,17 +125,17 @@ class SaveImage(io.ComfyNode):
     @classmethod
     async def execute(
         cls,
-        image: Optional[torch.Tensor],
-        filename: str,
-        auto_increment: bool,
-        save_output: bool,
-        save_metadata: bool,
+        image: Optional[torch.Tensor] = None,
+        filename: str = "image/ComfyUI",
+        auto_increment: bool = True,
+        save_output: bool = True,
+        save_metadata: bool = True,
     ) -> io.NodeOutput:
         if image is None:
             return io.NodeOutput()
 
         folder_type = io.FolderType.output
-        safe_filename_prefix = _sanitize_filename_prefix(filename)
+        safe_filename_prefix = sanitize_filename_prefix(filename, "image")
 
         global _PATH_LOCK
         if _PATH_LOCK is None:
@@ -226,7 +161,7 @@ class SaveImage(io.ComfyNode):
                 )
             return io.NodeOutput("", ui=ui.SavedImages(results))
 
-        use_helper = (not _is_absolute_like(filename)) and bool(auto_increment)
+        use_helper = (not is_absolute_like(filename)) and bool(auto_increment)
 
         if use_helper:
             async with _PATH_LOCK:
@@ -258,7 +193,7 @@ class SaveImage(io.ComfyNode):
         pnginfo = _build_pnginfo(metadata)
 
         raw_prefix = str(filename or "").strip()
-        abs_prefix = _is_absolute_like(raw_prefix)
+        abs_prefix = is_absolute_like(raw_prefix)
         base_dir = (
             folder_paths.get_output_directory()
             if folder_type == io.FolderType.output
@@ -266,10 +201,10 @@ class SaveImage(io.ComfyNode):
         )
 
         if abs_prefix:
-            target_dir_raw, stem = _split_prefix_to_dir_and_stem(raw_prefix)
+            target_dir_raw, stem = split_prefix_to_dir_and_stem(raw_prefix)
             target_dir = os.path.abspath(target_dir_raw) if target_dir_raw else os.path.abspath(base_dir)
         else:
-            rel_dir_raw, stem = _split_prefix_to_dir_and_stem(safe_filename_prefix)
+            rel_dir_raw, stem = split_prefix_to_dir_and_stem(safe_filename_prefix)
             rel_dir = rel_dir_raw.replace("/", os.sep) if rel_dir_raw else ""
             target_dir = os.path.abspath(os.path.join(base_dir, rel_dir))
 

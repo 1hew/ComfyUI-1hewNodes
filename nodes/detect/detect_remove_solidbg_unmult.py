@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 from comfy_api.latest import io
 
-from ..image.image_alpha_split import ImageAlphaSplit
+from ...utils._alpha_ops import choose_smart_background, parse_color
 
 # Fixed internal settings copied from ComfyUI-RH-Nodes' MekajikiUnMult core,
 # including the 2026-10-15 gamut fix: negative channels are clipped and the
@@ -191,13 +191,13 @@ class DetectRemoveSolidBGUnMult(io.ComfyNode):
                 output_images = []
                 for frame_rgb, frame_alpha in zip(output_rgb, output_alpha):
                     rgba = torch.cat((frame_rgb, frame_alpha.unsqueeze(-1)), dim=-1)
-                    bg_rgb = ImageAlphaSplit._choose_smart_background(rgba)
+                    bg_rgb = choose_smart_background(rgba)
                     composited = (frame_rgb * frame_alpha.unsqueeze(-1) + bg_rgb * (1.0 - frame_alpha.unsqueeze(-1))).clamp(0.0, 1.0)
                     output_images.append(composited)
                 output_image = torch.stack(output_images, dim=0)
             else:
                 bg_rgb = torch.tensor(
-                    ImageAlphaSplit.parse_color(color_text), dtype=output_rgb.dtype, device=output_rgb.device
+                    parse_color(color_text), dtype=output_rgb.dtype, device=output_rgb.device
                 ).clamp(0.0, 1.0).view(1, 1, 1, 3)
                 output_image = (output_rgb * output_alpha.unsqueeze(-1) + bg_rgb * (1.0 - output_alpha.unsqueeze(-1))).clamp(0.0, 1.0)
         else:

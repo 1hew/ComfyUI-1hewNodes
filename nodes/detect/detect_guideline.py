@@ -1,9 +1,8 @@
 import asyncio
 import os
-from comfy_api.latest import io, ui
+from comfy_api.latest import io
 import cv2
 import numpy as np
-from PIL import Image
 from sklearn.cluster import DBSCAN
 import torch
 
@@ -157,10 +156,6 @@ class DetectGuideLine(io.ComfyNode):
                     t_num = (x1_ext - x3_ext) * (y3_ext - y4_ext) - (
                         y1_ext - y3_ext
                     ) * (x3_ext - x4_ext)
-                    u_num = -(
-                        (x1_ext - x2_ext) * (y1_ext - y3_ext)
-                        - (y1_ext - y2_ext) * (x1_ext - x3_ext)
-                    )
                     t = t_num / den
                     x = x1_ext + t * (x2_ext - x1_ext)
                     y = y1_ext + t * (y2_ext - y1_ext)

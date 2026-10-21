@@ -10,6 +10,7 @@ import asyncio
 import json
 import os
 import shutil
+from dataclasses import dataclass
 from typing import Optional
 
 import av
@@ -20,6 +21,13 @@ from comfy_api.input import VideoInput
 from comfy_api.latest import io, ui
 from comfy_api.util import VideoContainer
 
+from ...utils._file_ops import (
+    is_absolute_like,
+    sanitize_filename_prefix,
+    split_prefix_to_dir_and_stem,
+    remove_file_with_retries,
+)
+
 try:
     from comfy.utils import ProgressBar
 except Exception:
@@ -27,70 +35,6 @@ except Exception:
 
 
 _PATH_LOCK: Optional[asyncio.Lock] = None
-
-
-def _sanitize_filename_prefix(filename: str) -> str:
-    if not filename:
-        return "video/ComfyUI"
-
-    normalized = filename.replace("\\", "/").strip()
-    drive, tail = os.path.splitdrive(normalized)
-    if os.path.isabs(normalized) or drive:
-        if drive:
-            drive_token = drive.rstrip(":").replace("/", "_").replace("\\", "_")
-            tail = tail.lstrip("/\\")
-            normalized = f"{drive_token}/{tail}" if tail else drive_token
-        else:
-            normalized = normalized.lstrip("/\\")
-
-    parts: list[str] = []
-    for part in normalized.split("/"):
-        if not part or part in {".", ".."}:
-            continue
-        parts.append(part)
-
-    return "/".join(parts) if parts else "video/ComfyUI"
-
-
-def _is_absolute_like(path_value: str) -> bool:
-    raw = str(path_value or "").strip().replace("\\", "/")
-    if not raw:
-        return False
-    drive, _ = os.path.splitdrive(raw)
-    return bool(drive) or raw.startswith("/")
-
-
-def _sanitize_filename_stem(name: str) -> str:
-    stem = str(name or "").strip()
-    if not stem:
-        return "ComfyUI"
-    for ch in '<>:"/\\|?*':
-        stem = stem.replace(ch, "_")
-    stem = stem.rstrip(". ")
-    return stem if stem else "ComfyUI"
-
-
-def _split_prefix_to_dir_and_stem(prefix: str) -> tuple[str, str]:
-    raw = str(prefix or "").strip().replace("\\", "/")
-    if not raw:
-        return "", "ComfyUI"
-
-    is_trailing_sep = raw.endswith("/")
-    cleaned = raw.rstrip("/")
-    if not cleaned:
-        return "", "ComfyUI"
-
-    if is_trailing_sep:
-        return cleaned, "ComfyUI"
-    if "/" not in cleaned:
-        stem = os.path.splitext(cleaned)[0]
-        return "", _sanitize_filename_stem(stem)
-
-    dir_part, stem_part = cleaned.rsplit("/", 1)
-    if len(dir_part) == 2 and dir_part[1] == ":":
-        dir_part += "/"
-    stem = os.path.splitext(stem_part)[0]
-    return dir_part, _sanitize_filename_stem(stem)
 
 
 def _relative_subfolder(path: str, base_dir: str) -> str:
@@ -114,24 +58,6 @@ def _new_progress_bar(total: int):
         return None
 
 
-async def _remove_file_with_retries(
-    path: str,
-    *,
-    attempts: int = 20,
-    base_delay_s: float = 0.05,
-) -> None:
-    for attempt in range(attempts):
-        try:
-            os.remove(path)
-            return
-        except FileNotFoundError:
-            return
-        except PermissionError:
-            if attempt >= attempts - 1:
-                return
-            await asyncio.sleep(base_delay_s * (attempt + 1))
-
-
 async def _replace_file_with_retries(
     src: str,
     dst: str,
@@ -147,6 +73,97 @@ async def _replace_file_with_retries(
             if attempt >= attempts - 1:
                 raise
             await asyncio.sleep(base_delay_s * (attempt + 1))
+
+
+# Containers PyAV can mux every stream of, keyed by output container. Matroska
+# is the fallback container because it accepts virtually any codec, which keeps
+# the fast remux path available for formats such as AVI.
+_CONTAINER_CODECS = {
+    "webm": {
+        "video": frozenset({"vp8", "vp9", "av1"}),
+        "audio": frozenset({"opus", "vorbis"}),
+        "subtitle": frozenset({"webvtt"}),
+    },
+    "mp4": {
+        "video": frozenset({"h264", "hevc", "av1", "mpeg4", "vp9", "mjpeg"}),
+        "audio": frozenset({"aac", "mp3", "opus", "ac3", "eac3", "flac", "alac"}),
+        "subtitle": frozenset({"mov_text"}),
+    },
+}
+
+# Source extensions that map onto a container this node can write. Anything
+# else (avi, ts, ...) is remuxed into Matroska instead of being mislabelled.
+_CONTAINER_EXTENSIONS = {
+    "mp4": "mp4",
+    "m4v": "mp4",
+    "mov": "mp4",
+    "mkv": "mkv",
+    "webm": "webm",
+}
+
+
+@dataclass(frozen=True)
+class _StreamProbe:
+    """Container, codecs and frame size of a source, as reported by FFmpeg."""
+
+    container_names: tuple[str, ...]
+    video_codecs: tuple[str, ...]
+    audio_codecs: tuple[str, ...]
+    subtitle_codecs: tuple[str, ...]
+    width: int = 0
+    height: int = 0
+
+    def fits(self, container: str) -> bool:
+        allowed = _CONTAINER_CODECS.get(container)
+        if allowed is None:
+            return True
+        return (
+            all(codec in allowed["video"] for codec in self.video_codecs)
+            and all(codec in allowed["audio"] for codec in self.audio_codecs)
+            and all(codec in allowed["subtitle"] for codec in self.subtitle_codecs)
+        )
+
+
+def _rewind(source) -> None:
+    """Reset a file-like source so probing and muxing start at the beginning."""
+    seek = getattr(source, "seek", None)
+    if seek is None:
+        return
+    try:
+        seek(0)
+    except (OSError, ValueError):
+        pass
+
+
+def _add_stream_from_template(container, template):
+    """Copy a source stream into a new container without re-encoding it.
+
+    PyAV 14+ removed the ``add_stream(template=...)`` keyword in favour of
+    ``add_stream_from_template()``, which is what current ComfyUI PyAV builds
+    expose; keep the old call as a fallback.
+    """
+    add_from_template = getattr(container, "add_stream_from_template", None)
+    if add_from_template is not None:
+        try:
+            return add_from_template(template=template, opaque=True)
+        except TypeError:
+            return add_from_template(template=template)
+    return container.add_stream(template=template)
+
+
+def _source_extension(path) -> str:
+    if not isinstance(path, str):
+        return ""
+    extension = os.path.splitext(path)[1].lstrip(".").lower()
+    return _CONTAINER_EXTENSIONS.get(extension, "")
+
+
+def _probe_extension(probe: _StreamProbe) -> str:
+    if "webm" in probe.container_names and probe.fits("webm"):
+        return "webm"
+    if "mp4" in probe.container_names and probe.fits("mp4"):
+        return "mp4"
+    return "mkv"
 
 
 class SaveVideo(io.ComfyNode):
@@ -177,11 +194,11 @@ class SaveVideo(io.ComfyNode):
     @classmethod
     async def execute(
         cls,
-        video: Optional[VideoInput],
-        filename: str,
-        auto_increment: bool,
-        save_output: bool,
-        save_metadata: bool,
+        video: Optional[VideoInput] = None,
+        filename: str = "video/ComfyUI",
+        auto_increment: bool = True,
+        save_output: bool = True,
+        save_metadata: bool = True,
     ) -> io.NodeOutput:
         if video is None:
             return io.NodeOutput()
@@ -198,35 +215,44 @@ class SaveVideo(io.ComfyNode):
         source_path = path_attr
         if not isinstance(source_path, str):
             source_path = cls._coerce_path(getattr(video, "source_path", None))
+        if not isinstance(source_path, str) or not os.path.isfile(source_path):
+            source_path = None
+
+        # ComfyUI's file-backed videos (VideoFromFile) expose the original
+        # stream through get_stream_source() rather than a path attribute.
+        # That stream is only inspected here (container, codecs, alpha); the
+        # write below still goes through save_to so trims, crops and colour
+        # changes survive.
+        source_stream = source_path
+        if source_stream is None:
+            source_stream = cls._stream_source(video)
 
         has_alpha = False
-        if isinstance(source_path, str) and os.path.exists(source_path):
-            has_alpha = await cls.check_has_alpha(source_path)
+        if source_stream is not None:
+            has_alpha = await cls.check_has_alpha(source_stream)
+
+        extension = await cls._resolve_extension(
+            video, width, height, source_path, source_stream
+        )
 
         global _PATH_LOCK
         if _PATH_LOCK is None:
             _PATH_LOCK = asyncio.Lock()
 
         raw_prefix = str(filename or "").strip()
-        safe_filename_prefix = _sanitize_filename_prefix(filename)
+        safe_filename_prefix = sanitize_filename_prefix(filename, "video")
         preview_file = ""
         preview_path = ""
         preview_subfolder = ""
 
+        # auto lets save_to() pick the muxer and encoder from the extension.
+        format = "auto"
+        codec = "auto"
+
         async with _PATH_LOCK:
-            format = "auto"
-            codec = "auto"
-            extension = VideoContainer.get_extension(format)
-
-            # Try to use source extension if available
-            if isinstance(source_path, str):
-                _, source_ext = os.path.splitext(source_path)
-                if source_ext:
-                    extension = source_ext.lstrip(".")
-
             if auto_increment:
-                if _is_absolute_like(raw_prefix):
-                    target_dir_raw, filename = _split_prefix_to_dir_and_stem(raw_prefix)
+                if is_absolute_like(raw_prefix):
+                    target_dir_raw, filename = split_prefix_to_dir_and_stem(raw_prefix)
                     full_output_folder = (
                         os.path.abspath(target_dir_raw)
                         if target_dir_raw
@@ -270,15 +296,15 @@ class SaveVideo(io.ComfyNode):
                     preview_path = os.path.join(preview_dir, preview_file)
                     preview_subfolder = subfolder
             else:
-                if _is_absolute_like(raw_prefix):
-                    target_dir_raw, filename = _split_prefix_to_dir_and_stem(raw_prefix)
+                if is_absolute_like(raw_prefix):
+                    target_dir_raw, filename = split_prefix_to_dir_and_stem(raw_prefix)
                     full_output_folder = (
                         os.path.abspath(target_dir_raw)
                         if target_dir_raw
                         else os.path.abspath(output_dir)
                     )
                 else:
-                    rel_dir_raw, filename = _split_prefix_to_dir_and_stem(
+                    rel_dir_raw, filename = split_prefix_to_dir_and_stem(
                         safe_filename_prefix
                     )
                     rel_dir = rel_dir_raw.replace("/", os.sep) if rel_dir_raw else ""
@@ -337,15 +363,25 @@ class SaveVideo(io.ComfyNode):
         # either ``path`` or ``source_path``. Prefer the original stream when
         # available so alpha-capable MOV/ProRes files are not unnecessarily
         # decoded and re-encoded as yuv420p.
-        if isinstance(source_path, str) and os.path.isfile(source_path):
-            has_audio = await cls._has_audio_stream(source_path)
-            if has_audio:
-                await asyncio.to_thread(shutil.copy2, source_path, path)
-            else:
-                await cls._write_silent_audio_video(
-                    input_path=source_path,
-                    output_path=path,
-                )
+        if source_path is not None:
+            # The source already sits at the target path when a file is saved
+            # over itself (fixed filename + same directory); leave it alone.
+            if os.path.abspath(source_path) != os.path.abspath(path):
+                has_audio = await cls._has_audio_stream(source_path)
+                if has_audio:
+                    await asyncio.to_thread(shutil.copy2, source_path, path)
+                else:
+                    try:
+                        await cls._write_silent_audio_video(
+                            input_path=source_path,
+                            output_path=path,
+                        )
+                    except Exception as e:
+                        # The target container cannot carry the silent track:
+                        # keep the original file instead of failing the save.
+                        print(f"Info: Silent audio skipped: {e}")
+                        await remove_file_with_retries(path)
+                        await asyncio.to_thread(shutil.copy2, source_path, path)
         else:
             try:
                 await asyncio.to_thread(
@@ -418,7 +454,7 @@ class SaveVideo(io.ComfyNode):
                 with av.open(tmp_path, "w") as out:
                     stream_map = {}
                     for s in inp.streams:
-                        stream_map[s.index] = out.add_stream(template=s)
+                        stream_map[s.index] = _add_stream_from_template(out, s)
 
                     if metadata_comment:
                         out.metadata["comment"] = metadata_comment
@@ -433,31 +469,35 @@ class SaveVideo(io.ComfyNode):
             await asyncio.to_thread(_remux)
         except Exception as e:
             if os.path.exists(tmp_path):
-                await _remove_file_with_retries(tmp_path)
+                await remove_file_with_retries(tmp_path)
             print(f"Info: Metadata remux skipped: {e}")
             return
 
         await _replace_file_with_retries(tmp_path, input_path)
 
     @staticmethod
-    async def check_has_alpha(path: str) -> bool:
+    async def check_has_alpha(source) -> bool:
         try:
             def _check():
-                with av.open(path) as container:
-                    if not container.streams.video:
-                        return False
-                    stream = container.streams.video[0]
-                    codec_context = stream.codec_context
-                    pix_fmt = getattr(codec_context, "pix_fmt", "") or ""
-                    context_format = getattr(codec_context, "format", None)
-                    context_format_name = getattr(context_format, "name", "") or ""
-                    stream_format = getattr(getattr(stream, "format", None), "name", "") or ""
-                    probe = f"{pix_fmt} {context_format_name} {stream_format}".lower()
-                    alpha_formats = [
-                        "yuva", "rgba", "argb", "abgr", "bgra",
-                        "gbrap", "ya8", "ya16", "ayuv",
-                    ]
-                    return any(fmt in probe for fmt in alpha_formats)
+                _rewind(source)
+                try:
+                    with av.open(source) as container:
+                        if not container.streams.video:
+                            return False
+                        stream = container.streams.video[0]
+                        codec_context = stream.codec_context
+                        pix_fmt = getattr(codec_context, "pix_fmt", "") or ""
+                        context_format = getattr(codec_context, "format", None)
+                        context_format_name = getattr(context_format, "name", "") or ""
+                        stream_format = getattr(getattr(stream, "format", None), "name", "") or ""
+                        probe = f"{pix_fmt} {context_format_name} {stream_format}".lower()
+                        alpha_formats = [
+                            "yuva", "rgba", "argb", "abgr", "bgra",
+                            "gbrap", "ya8", "ya16", "ayuv",
+                        ]
+                        return any(fmt in probe for fmt in alpha_formats)
+                finally:
+                    _rewind(source)
             return await asyncio.to_thread(_check)
         except Exception:
             return False
@@ -470,6 +510,125 @@ class SaveVideo(io.ComfyNode):
             return os.fspath(value)
         except TypeError:
             return None
+
+    @classmethod
+    def _stream_source(cls, video: object):
+        """Return an openable source (a path or file object) for video, if cheap.
+
+        File-backed videos such as ComfyUI's VideoFromFile override both
+        get_stream_source() and get_container_format(); component-based videos
+        only encode themselves inside get_stream_source(), so they are skipped
+        to avoid encoding the whole video just to inspect it.
+        """
+        stream_method = getattr(type(video), "get_stream_source", None)
+        container_method = getattr(type(video), "get_container_format", None)
+        base_stream = getattr(VideoInput, "get_stream_source", None)
+        base_container = getattr(VideoInput, "get_container_format", None)
+        if (
+            stream_method is None
+            or stream_method is base_stream
+            or container_method is None
+            or container_method is base_container
+        ):
+            return None
+
+        try:
+            source = video.get_stream_source()
+        except Exception:
+            return None
+
+        if isinstance(source, str):
+            return source if os.path.isfile(source) else None
+        if hasattr(source, "read"):
+            return source
+        return None
+
+    @classmethod
+    async def _probe_streams(cls, source) -> Optional[_StreamProbe]:
+        """Inspect the source container and codecs without encoding anything."""
+        if source is None:
+            return None
+
+        def _probe() -> _StreamProbe:
+            _rewind(source)
+            with av.open(source) as container:
+                names = tuple(
+                    name
+                    for name in str(container.format.name or "").split(",")
+                    if name
+                )
+                codecs: dict[str, list[str]] = {
+                    "video": [],
+                    "audio": [],
+                    "subtitle": [],
+                }
+                width = 0
+                height = 0
+                for stream in container.streams:
+                    try:
+                        codec = stream.codec.canonical_name
+                    except Exception:
+                        codec = ""
+                    if codec and stream.type in codecs:
+                        codecs[stream.type].append(codec)
+                    if stream.type == "video" and not width:
+                        width = int(getattr(stream, "width", 0) or 0)
+                        height = int(getattr(stream, "height", 0) or 0)
+                return _StreamProbe(
+                    container_names=names,
+                    video_codecs=tuple(codecs["video"]),
+                    audio_codecs=tuple(codecs["audio"]),
+                    subtitle_codecs=tuple(codecs["subtitle"]),
+                    width=width,
+                    height=height,
+                )
+
+        try:
+            probe = await asyncio.to_thread(_probe)
+        except Exception:
+            return None
+        finally:
+            _rewind(source)
+        return probe
+
+    @classmethod
+    async def _resolve_extension(cls, video, width, height, source_path, source_stream) -> str:
+        """Pick an extension whose container can hold the source streams.
+
+        Falling back to MP4 for a WebM/VP8 source makes save_to() remux VP8
+        into MP4, which FFmpeg rejects with "'mp4' format does not support
+        'vp8' codec".
+        """
+        if source_path is not None:
+            # Path-backed videos are copied verbatim, so keep their extension.
+            extension = os.path.splitext(source_path)[1].lstrip(".").lower()
+            if extension:
+                return extension
+        probe = await cls._probe_streams(source_stream)
+        if probe is not None and cls._requires_reencode(video, probe, width, height):
+            # Trimmed/cropped sources are re-encoded by save_to(); MP4/H.264 is
+            # far cheaper than the AV1 encode a WebM container would force.
+            return VideoContainer.get_extension(VideoContainer.AUTO)
+        extension = _source_extension(source_stream)
+        if extension and (probe is None or probe.fits(extension)):
+            return extension
+        if probe is not None:
+            return _probe_extension(probe)
+        return VideoContainer.get_extension(VideoContainer.AUTO)
+
+    @staticmethod
+    def _requires_reencode(video, probe: _StreamProbe, width: int, height: int) -> bool:
+        """True when save_to() has to decode the source instead of remuxing it."""
+        try:
+            start_time, duration = video.get_active_trim_window()
+        except Exception:
+            start_time, duration = 0.0, 0.0
+        if start_time or duration:
+            return True
+        # Cropped videos report the crop size while the source keeps its own.
+        if probe.width and probe.height and (probe.width, probe.height) != (width, height):
+            return True
+        return False
 
     @staticmethod
     def _strip_video_audio(video: object) -> None:
@@ -517,8 +676,10 @@ class SaveVideo(io.ComfyNode):
             audio_codec = "libopus"
 
         def _mux():
+            # movflags only belongs to the ISO-BMFF muxers; other containers
+            # reject it and log an unused-option warning.
             container_options = {}
-            if audio_codec == "aac":
+            if ext in {".mp4", ".m4v", ".mov"}:
                 container_options["movflags"] = "+faststart"
 
             with av.open(input_path) as inp:
@@ -526,7 +687,7 @@ class SaveVideo(io.ComfyNode):
 
                 with av.open(output_path, "w", options=container_options) as out:
                     in_video = inp.streams.video[0]
-                    out_video = out.add_stream(template=in_video)
+                    out_video = _add_stream_from_template(out, in_video)
 
                     sample_rate = 48000 if audio_codec == "libopus" else 44100
                     out_audio = out.add_stream(audio_codec, rate=sample_rate, layout="stereo")

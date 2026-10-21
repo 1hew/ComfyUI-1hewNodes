@@ -1,6 +1,6 @@
 # Get File Count - Count files in a folder
 
-**Node Purpose:** `Get File Count` scans a folder and returns the number of image, video, PSD, or txt files found, plus list-form `filename` and `file_path` outputs. `filename` can be configured to keep or strip the extension. It supports recursive scanning, stable sorting, and a change hash suitable for caching.
+**Node Purpose:** `Get File Count` scans a folder and returns the number of image, video, PSD, or text files found, plus list-form `filename` and `file_path` outputs. `filename` can be configured to keep or strip the extension. It supports recursive scanning, stable sorting, and a change hash suitable for caching.
 
 ## Inputs
 
@@ -23,7 +23,7 @@
 
 ## Features
 
-- Extension filtering: counts common image, video, PSD, or txt extensions.
+- Extension filtering: counts common image, video, PSD, or text extensions.
 - Deterministic order: paths are sorted case-insensitively for consistent results.
 - Filename output: exposes the sorted match list as a `filename` string list, with configurable extension keep/strip behavior.
 - Path output: exposes the sorted match list as a `file_path` string list for precise downstream file access.

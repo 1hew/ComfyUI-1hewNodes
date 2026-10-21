@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from collections import deque
 
 import numpy as np
 import torch
 from comfy_api.latest import io
+
+from ...utils._image_ops import (
+    remove_small_components,
+)
 
 
 class MaskAlphaClean(io.ComfyNode):
@@ -95,7 +98,7 @@ class MaskAlphaClean(io.ComfyNode):
         keep = visible.copy()
         removed = np.zeros_like(visible, dtype=bool)
         if remove_islands_px > 0:
-            keep = cls._remove_small_components(visible, min_area=remove_islands_px)
+            keep = remove_small_components(visible, min_area=remove_islands_px)
             removed = visible & (~keep)
 
         noise = weak_alpha | removed
@@ -109,39 +112,3 @@ class MaskAlphaClean(io.ComfyNode):
         out_t = torch.from_numpy(np.clip(out, 0.0, 1.0).astype(np.float32)).to(dtype=alpha.dtype, device=alpha.device)
         noise_t = torch.from_numpy(noise.astype(np.float32)).to(dtype=alpha.dtype, device=alpha.device)
         return out_t, noise_t
-
-    @staticmethod
-    def _remove_small_components(mask: np.ndarray, min_area: int) -> np.ndarray:
-        if min_area <= 1:
-            return mask
-        h, w = int(mask.shape[0]), int(mask.shape[1])
-        visited = np.zeros((h, w), dtype=bool)
-        keep = np.zeros((h, w), dtype=bool)
-        neighbors = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
-
-        ys, xs = np.nonzero(mask)
-        for y0, x0 in zip(ys.tolist(), xs.tolist()):
-            if visited[y0, x0]:
-                continue
-            visited[y0, x0] = True
-            q: deque[tuple[int, int]] = deque()
-            q.append((y0, x0))
-            comp: list[tuple[int, int]] = [(y0, x0)]
-
-            while q:
-                y, x = q.popleft()
-                for dy, dx in neighbors:
-                    ny = y + dy
-                    nx = x + dx
-                    if ny < 0 or ny >= h or nx < 0 or nx >= w:
-                        continue
-                    if visited[ny, nx] or (not mask[ny, nx]):
-                        continue
-                    visited[ny, nx] = True
-                    q.append((ny, nx))
-                    comp.append((ny, nx))
-
-            if len(comp) >= int(min_area):
-                for cy, cx in comp:
-                    keep[cy, cx] = True
-        return keep

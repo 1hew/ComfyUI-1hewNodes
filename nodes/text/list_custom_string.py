@@ -1,8 +1,11 @@
-import re
 
 from comfy_api.latest import io
 
 from ...utils import make_ui_text
+
+from ...utils._text_ops import (
+    split_text,
+)
 
 
 class ListCustomString(io.ComfyNode):
@@ -24,7 +27,7 @@ class ListCustomString(io.ComfyNode):
     @classmethod
     async def execute(cls, custom_text: str) -> io.NodeOutput:
         text = custom_text or ""
-        items = cls._split_text(text)
+        items = split_text(cls, text)
         if not items:
             items = ["default"]
         count = len(items)
@@ -36,28 +39,3 @@ class ListCustomString(io.ComfyNode):
         if len(s) >= 2 and ((s[0] == s[-1]) and s[0] in ('"', "'")):
             s = s[1:-1].strip()
         return s
-
-    @classmethod
-    def _split_text(cls, text: str) -> list[str]:
-        t = text or ""
-        if not t.strip():
-            return []
-
-        dash_line_pattern = r"^\s*-+\s*$"
-        if re.search(dash_line_pattern, t, flags=re.MULTILINE):
-            parts = re.split(dash_line_pattern, t, flags=re.MULTILINE)
-        elif ("\n" in t) or ("\r" in t):
-            parts = re.split(r"\r?\n", t)
-        elif ("。" in t) or ("." in t):
-            parts = re.split(r"[。\.]+", t)
-        elif ("；" in t) or (";" in t):
-            parts = re.split(r"[；;]+", t)
-        else:
-            parts = re.split(r"[，,]+", t)
-
-        out: list[str] = []
-        for p in parts:
-            s = cls._strip_item(p)
-            if s:
-                out.append(str(s))
-        return out

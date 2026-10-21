@@ -6,6 +6,10 @@ import numpy as np
 import torch
 from comfy_api.latest import io
 
+from ...utils._image_ops import (
+    remove_small_components,
+)
+
 
 class ImageAlphaClean(io.ComfyNode):
     @classmethod
@@ -99,7 +103,7 @@ class ImageAlphaClean(io.ComfyNode):
         keep = visible.copy()
         removed = np.zeros_like(visible, dtype=bool)
         if remove_islands_px > 0:
-            keep = cls._remove_small_components(visible, min_area=remove_islands_px)
+            keep = remove_small_components(visible, min_area=remove_islands_px)
             removed = visible & (~keep)
         if keep_largest_component:
             largest = cls._keep_largest_component(keep)
@@ -138,41 +142,6 @@ class ImageAlphaClean(io.ComfyNode):
             return (0.02, 16, 16, 2)
         return (0.01, 10, 8, 2)
 
-    @staticmethod
-    def _remove_small_components(mask: np.ndarray, min_area: int) -> np.ndarray:
-        if min_area <= 1:
-            return mask
-        h, w = int(mask.shape[0]), int(mask.shape[1])
-        visited = np.zeros((h, w), dtype=bool)
-        keep = np.zeros((h, w), dtype=bool)
-        neighbors = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
-
-        ys, xs = np.nonzero(mask)
-        for y0, x0 in zip(ys.tolist(), xs.tolist()):
-            if visited[y0, x0]:
-                continue
-            visited[y0, x0] = True
-            q: deque[tuple[int, int]] = deque()
-            q.append((y0, x0))
-            comp: list[tuple[int, int]] = [(y0, x0)]
-
-            while q:
-                y, x = q.popleft()
-                for dy, dx in neighbors:
-                    ny = y + dy
-                    nx = x + dx
-                    if ny < 0 or ny >= h or nx < 0 or nx >= w:
-                        continue
-                    if visited[ny, nx] or (not mask[ny, nx]):
-                        continue
-                    visited[ny, nx] = True
-                    q.append((ny, nx))
-                    comp.append((ny, nx))
-
-            if len(comp) >= int(min_area):
-                for cy, cx in comp:
-                    keep[cy, cx] = True
-        return keep
 
     @staticmethod
     def _keep_largest_component(mask: np.ndarray) -> np.ndarray:

@@ -295,6 +295,9 @@ app.registerExtension({
             if (!node.widgets) return;
             const w = node.widgets.find(w => w.name === selectName);
             if (!w) return;
+            // 多选节点的 select 是编号列表字符串（如 "1,2,4"），没有数值上限，
+            // 由后端解析；不要按端口数量对文本值做数值夹取。
+            if (typeof w.value === "string") return;
             if (!w.options) w.options = {};
             w.options.max = Math.max(1, Math.min(total, cap));
             if (typeof w.value === "number" && w.value > w.options.max) {

@@ -4,6 +4,10 @@ import torch
 
 from comfy_api.latest import io
 
+from ...utils._image_ops import (
+    apply_levels_numpy,
+)
+
 BLUR_COEFFICIENT = 1
 
 
@@ -81,7 +85,7 @@ class ImageHLFreqSeparate(io.ComfyNode):
         hu8 = (high * 255.0).astype(np.uint8)
         lu8 = (low * 255.0).astype(np.uint8)
         mixed = (hu8.astype(np.float32) * 0.65 + lu8.astype(np.float32) * 0.35).astype(np.uint8)
-        out = cls._apply_levels_numpy(mixed, 83, 172, 1.0, 0, 255)
+        out = apply_levels_numpy(mixed, 83, 172, 1.0, 0, 255)
         return out.astype(np.float32) / 255.0
 
     @staticmethod
@@ -124,29 +128,3 @@ class ImageHLFreqSeparate(io.ComfyNode):
         comb_hsv = cv2.merge([h_ch, s_ch, v_comb])
         comb_rgb = cv2.cvtColor(comb_hsv, cv2.COLOR_HSV2RGB)
         return comb_rgb.astype(np.float32) / 255.0
-
-    @staticmethod
-    def _apply_levels_numpy(
-        image_array: np.ndarray,
-        black_point: int,
-        white_point: int,
-        gray_point: float = 1.0,
-        output_black_point: int = 0,
-        output_white_point: int = 255,
-    ) -> np.ndarray:
-        bp = int(max(0, min(255, black_point)))
-        wp = int(max(0, min(255, white_point)))
-        obp = int(max(0, min(255, output_black_point)))
-        owp = int(max(0, min(255, output_white_point)))
-
-        result = np.zeros_like(image_array)
-        for i in range(image_array.shape[2]):
-            ch = image_array[:, :, i].astype(np.float32)
-            ch = np.clip(ch, bp, wp)
-            denom = max(1, (wp - bp))
-            ch = (ch - bp) / float(denom) * 255.0
-            if gray_point != 1.0:
-                ch = 255.0 * (ch / 255.0) ** (1.0 / float(gray_point))
-            ch = (ch / 255.0) * (owp - obp) + obp
-            result[:, :, i] = np.clip(ch, 0, 255).astype(np.uint8)
-        return result

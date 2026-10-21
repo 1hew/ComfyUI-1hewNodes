@@ -21,6 +21,24 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v4.0.0**
+- **I/O 大版本升级**：统一 `Load Text` / `Save Text` 的文本读写与元数据链路，新增 `Save Audio`，`Save Video` 按源容器安全保存，`Load PS` 改为按需图层预览与缓存。
+- **逻辑与共享层**：`Multi Switch Select` 共用 `Image Batch Index` 的区间语法并支持多选；重复的图像/视频/文本/文件辅助代码收敛到 `utils/_*.py`，由扩展后的一致性检查与回归测试覆盖。
+- **兼容性**：所有节点 ID 保持 `1hew_*` 不变；`Save Text` 使用可选 STRING `text` 端口（原 `any`），`Load Text` 移除 `encode`，旧工作流由前端自动迁移；`Save Audio` 依赖 PyAV。
+- **文档**：中英文节点文档与 README 同步；v4.0.0 之前的更新日志折叠归档。
+
+<details>
+<summary><b>3.x 版本更新日志</b></summary>
+
+**v3.31.0**
+- fix(io)：`Save Video` 保存 WebM/VP8 等源视频时按源容器命名（`.webm` / `.mp4` / `.mkv`，编码不兼容时回退 Matroska），不再强制 MP4 并报 `'mp4' format does not support 'vp8' codec`；元数据 remux 与静音音轨封装也兼容当前 PyAV 版本
+- feat(io)：新增 `Save Audio`，将 AUDIO 保存为 FLAC / WAV / MP3 / Opus，支持输出/临时目录、自动编号或固定文件名、可选元数据与批量拆分，并在未连接音频时直接空输出、不写文件；节点内嵌音频播放器，保存后可直接试听，效果与原生 `Save Audio (Advanced)` 一致
+- feat(io)：`Save Text` 支持 `txt` / `csv` / `md` / `json`，固定 UTF-8 输出，可选追加 workflow/prompt 元数据，输入为空时同步清空节点内预览；输入端口由 `any` 改为可选 STRING `text`
+- feat(io)：`Load Text` 新增文件上传、节点内即时预览、自动编码识别，并自动剥离 `Save Text` 写入的元数据块；移除 `encode` 输入，旧工作流由前端自动迁移
+- feat(io)：`Load PS` 预览改为按需加载——新增 `/1hew/view_ps_info` 与 `/1hew/view_ps_layer` 接口列出图层并用 LRU 缓存生成单层 PNG 预览，merged 预览复用内嵌合成图，`all_layers` 在经典模式使用原生批次预览、Nodes 2.0 使用单层查看器，节点框随图片比例展开/收起
+- feat(logic)：`Multi Switch Select` 的 `select` 改为与 `Image Batch Index` 相同的 1-based 区间/列表写法（`1,3`、`1-3`、`[1,3]`、`:步长`、负数），支持多路选择；两节点共用新增的 `utils/_index_range.py`
+- refactor(utils)：把重复的图像/视频/文本/文件辅助函数收敛到 `utils/_*.py`，并在 `scripts/check_node_consistency.py` 中强制一文件一节点、禁止跨分类引用节点模块
+
 **v3.30.1**
 - refactor(logic)：`Image Minimum Area` 的 `divisible_by` 参数移到 `fit` / `pad_color` 之后，参数顺序与 `Image Resize Universal` 一致；旧工作流中的该节点建议重新检查参数
 - fix(detect)：`Detect Remove SolidBG UnMult` 的色域安全反预乘对齐 `UnMult (Auto Background)` 2026-10-15 的修复——负通道截断、正通道超限时按峰值整体缩放，单个负通道不再把整像素回退为原始 RGB
@@ -174,13 +192,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(mask): 添加 `Mask to Image` 节点，支持黑白区域颜色映射、`fill_hole` 与可选 RGBA 输出
 
 **v3.5.2**
-- refactor(io): 调整 `Save Txt` 节点命名设置与文件名生成逻辑
+- refactor(io): 调整 `Save Text` 节点命名设置与文件名生成逻辑
 
 **v3.5.1**
 - refactor(io): 优化视频加载/保存兼容性，并在 `save_output` 关闭时保留 `Save Image` 预览
 
 **v3.5.0**
-- feat(io): 添加 `Load Txt` 与 `Save Txt` 节点
+- feat(io): 添加 `Load Text` 与 `Save Text` 节点
 
 **v3.4.0**
 - feat(nodes): 新增 `Image Resize Gemini30ProImage`、`Image Resize Gemini31FlashImage`、`Detect Remove BG`、`Detect Remove BG Refine`、`text_match_rownum` 节点；同时将 resize 相关能力独立整理为 `image_resize` 分组，并同步补齐对应文档与 README 节点列表说明。
@@ -230,6 +248,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 **v3.0.0**
 - build: 版本升级至 3.0.0
 
+</details>
+
 <details>
 <summary><b>2.x 版本更新日志</b></summary>
 
@@ -273,14 +293,14 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 - feat(logic): 添加 `Image Batch Group` 节点，支持智能图像批次分组，具有重叠处理和灵活填充策略
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.38</b></summary>
 
 - refactor(image): 增强 `ImageResizeUniversal` 节点，完善 mask 处理逻辑
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.37</b></summary>
@@ -288,21 +308,21 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(image): 增强 `Image Solid` 节点，新增高级颜色参数
 - feat(image): 添加 `ImageGridSplit` 节点，支持将图像分割为网格布局，提供灵活的输出选项
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.36</b></summary>
 
 - feat(conversion): 增强 `URL to Video` 节点
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.35</b></summary>
 
 - feat(image): 添加 `Image Resize Qwen Image` 节点，专为 Qwen 视觉模型优化的图像缩放器，提供 7 种预设分辨率和自动宽高比选择
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.32</b></summary>
@@ -310,14 +330,14 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(image): 添加 `Image Solid Flux Kontext` 节点，支持基于 Flux Kontext 尺寸预设生成纯色图像
 - feat(image): 添加 `Image Solid Qwen Image` 节点，支持基于 QwenImage 尺寸预设生成纯色图像
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.31</b></summary>
 
 - fix: 修复相关bug，提升稳定性
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.28</b></summary>
@@ -327,21 +347,21 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(image): 添加 `Image Rotate with Mask` 节点，支持高级图像旋转，具有遮罩支持和多种填充模式
 - feat(text): 增强 `Text Load Local` 节点，新增 `user_prompt` 参数，支持将JSON内容与额外用户提示词结合
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.26</b></summary>
 
 - feat(image_crop): 增强 `Image Crop with BBox Mask` 节点，添加精确尺寸控制功能，新增 `crop_to_side` 和 `crop_to_length` 参数
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.25</b></summary>
 
 - feat(image_crop): 为 `Image Paste by BBox Mask` 节点添加 `apply_paste_mask` 参数，用于控制智能缩放行为
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.24</b></summary>
@@ -349,7 +369,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(image_crop): 为 `Image Paste by BBox Mask` 节点添加 `opacity` 透明度参数，用于控制粘贴图像的透明度
 - feat(image): 增强 `Image Stroke by Mask` 节点，添加批处理支持，可处理多个图像和遮罩
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.23</b></summary>
@@ -357,7 +377,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - fix(image): 增强 `Image Stroke by Mask` 节点颜色解析逻辑，支持RGB字符串格式并改进默认兜底为白色
 - fix(image): 增强 `Image Paste by BBox Mask` 节点旋转参数
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.21</b></summary>
@@ -366,21 +386,21 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(text): 添加 `Text Join by Text List` 节点，支持将任意类型列表合并为字符串，支持前缀、后缀和自定义分隔符
 - refactor(text): 重构 `Text Format` 节点为 `Text Prefix Suffix`，优化通配符输入处理和格式化功能
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.18</b></summary>
 
 - feat(sample): 添加 `Step Split` 节点，用于高低频采样步数分离，支持百分比和整数输入模式
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.17</b></summary>
 
 - feat(image_crop): 优化 `Image Crop with BBox Mask` 节点
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.15</b></summary>
@@ -389,28 +409,28 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(image_crop): 添加 `Image Edge Crop Pad` 节点，支持智能边缘裁剪和填充，提供遮罩输出功能
 - feat(image_blend): 增强 `Image Luma Matte` 节点，新增羽化和透明度输出功能，支持多种颜色格式和边缘处理
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.13</b></summary>
 
 - feat(text): 添加 `Text Load Local` 节点，支持从prompt目录加载JSON格式提示词文件，提供中英文双语输出
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.12</b></summary>
 
 - feat(text): 添加 `Text Format` 节点，支持通配符输入的灵活文本格式化功能
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.9</b></summary>
 
 - feat(image_crop): 重构 Image Crop with BBox Mask 节点
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.8</b></summary>
@@ -418,42 +438,42 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(image): 添加 `Image Resize Flux Kontext` 节点，支持图像和遮罩的尺寸自动选择和手动选择
 - feat(image): 优化 `Image Edit Stitch` 节点图像拼接算法和参数处理
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.7</b></summary>
 
 - feat(text): 添加 `List Custom Seed` 节点，支持生成唯一随机种子列表和control after generate功能
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.6</b></summary>
 
 - feat(image_hlfreq): 添加高低频分离节点组，包含 `Image HLFreq Separate`、`Image HLFreq Combine` 和 `Image HLFreq Transform` 三个节点，支持RGB、HSV、IGBI三种频率分离方法
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.5</b></summary>
 
 - feat(mask): 添加 `Mask Fill Hole` 节点，用于填充遮罩中的封闭区域孔洞，支持批量处理。
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.3</b></summary>
 
 - fix(image_blend): 修复 `Image Blend Modes by Alpha` 节点设备不一致的问题
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.2</b></summary>
 
 - feat(image): 添加 `Image BBox Overlay by Mask` 节点，基于遮罩的图像边界框叠加
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.1</b></summary>
@@ -461,21 +481,21 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - refactor(image/crop): 重命名节点类并更新相关文档
 - feat(image_crop): 增强 `ImageCropByMaskAlpha` 节点的功能和输出选项
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.2.0</b></summary>
 
 - feat: 新增 `conversion` ，重构图像混合与遮罩处理
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.1.6</b></summary>
 
 - feat(ImageEditStitch): 添加 spacing 参数控制拼接图像间的间距
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.1.5</b></summary>
@@ -486,21 +506,21 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat(text): 新增 `TextCustomList` 和 `TextCustomExtract` 文本处理节点
 - style: 清理节点参数标签，保持简洁统一
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.1.2</b></summary>
 
 - feat(image_tile): 改进 `Image Tile Merge`算法，使用权重蒙版和余弦渐变实现完美无缝拼接
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.1.1</b></summary>
 
 - feat(image_crop): 为 `Image BBox Paste` 添加智能批次处理功能
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.1.0</b></summary>
@@ -509,21 +529,21 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - feat: 更新节点功能
 - docs: 添加中英文文档，完善节点说明
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.0.5</b></summary>
 
 - 添加 `Path Select` 
 
-​	</details>
+</details>
 
 <details>
 <summary><b>v1.0.4</b></summary>
 
 - 修复 `Image Cropped Paste` 错误，添加批处理功能。
 
-​	</details>
+</details>
 
 </details>
 
@@ -660,7 +680,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Any Switch Select | 多路选择节点，支持多个输入选项的惰性切换，将选中的 `input_k` 路由到 `output`，并返回实际生效的 `select` 值 |
 | Float Number Compare | 浮点数值比较节点，支持通过比较符判断两个 FLOAT 并输出布尔值 |
 | Int Number Compare | 整数数值比较节点，支持通过比较符判断两个 INT 并输出布尔值 |
-| Multi Switch Select | 多输出选择节点，使用 1-based 的 `select` 在 `input_1..input_N` 中选中一路，并输出到对应的 `output_k` |
+| Multi Switch Select | 多输出多选节点，使用与 Image Batch Index 相同的区间写法（1-based，如 `1-3`、`[1,3]`）惰性选中多路 `input_k` 并输出到对应 `output_k`，其余输出为 `None` |
 | Text Compare | 比较两个字符串，支持相等、包含、前后缀和正则等运算符，并输出布尔值 |
 | Text Match Rownum | 多行文本行号匹配，返回首个匹配项的行号（1-based），未命中返回 0 |
 | Text Match Value | 在多行键值对中匹配单行文本并返回对应值，支持简单数字与布尔文本自动转类型 |
@@ -737,12 +757,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Get File Count | 统计目录中图片/视频/psd/文本文件数量，支持递归扫描、列表形式的 `filename` / `file_path` 输出，以及 `filename` 后缀保留控制 |
 | Load Image | 从文件/目录加载图片，支持批量加载、尺寸统一、遮罩输出与列表形式 `filename` |
-| Load PS | 从 PSD/PSB 文件读取指定图层、全部图层批次或完整合成图，支持拖拽上传、可选节点预览、隐藏图层、组模式与列表形式 `layer_name` |
-| Load Txt | 从文件或目录读取 `.txt` 文本，支持 `encode` 选择与按索引取文件 |
+| Load PS | 从 PSD/PSB 文件读取指定图层、全部图层批次或完整合成图，支持拖拽上传、按需缓存的图层预览、隐藏图层、组模式与列表形式 `layer_name` |
+| Load Text | 从文件或目录读取 `.txt` 文本，支持上传、即时预览、自动编码识别与按索引取文件 |
 | Load Video | 从文件/目录选择视频并输出 VIDEO 对象，解码阶段应用裁切与 FPS 设置 |
 | Load Video to Image | 将视频解码为图像帧批次、音频、fps 与帧数信息 |
+| Save Audio | 将 AUDIO 保存为 FLAC/WAV/MP3/Opus，支持输出/临时目录、元数据写入、批量拆分、空输入直通与节点内播放器预览 |
 | Save Image | 保存图像批次到输出/临时目录，并输出保存后的绝对路径 |
-| Save Txt | 将任意输入保存为 `.txt`，支持 `encode` 控制、自动编号与仅预览模式 |
+| Save Text | 将文本输入保存为 `txt` / `csv` / `md` / `json`（固定 UTF-8），支持自动编号、元数据与仅预览模式 |
 | Save Video by Image | 将图像批次编码为视频，支持可选音频混流与 Alpha 输出策略 |
 | Save Video | 保存 VIDEO 对象并返回路径，沿用容器扩展名并生成 Alpha 预览 |
 

@@ -1,7 +1,10 @@
-import math
 
 import torch
 from comfy_api.latest import io
+
+from ...utils._text_ops import (
+    match_ratio,
+)
 
 
 class StringRatioGpt20Image(io.ComfyNode):
@@ -53,21 +56,6 @@ class StringRatioGpt20Image(io.ComfyNode):
         for index in range(batch):
             height = max(int(image[index].shape[0]), 1)
             width = max(int(image[index].shape[1]), 1)
-            ratios.append(cls._match_ratio(width, height))
+            ratios.append(match_ratio(cls, width, height))
 
         return io.NodeOutput("\n".join(ratios))
-
-    @classmethod
-    def _match_ratio(cls, width: int, height: int) -> str:
-        image_ratio = width / max(height, 1)
-        best_label = cls.RATIO_OPTIONS[0][0]
-        best_diff = float("inf")
-
-        for label, rw, rh in cls.RATIO_OPTIONS:
-            ratio = rw / rh
-            diff = abs(math.log(image_ratio) - math.log(ratio))
-            if diff < best_diff:
-                best_diff = diff
-                best_label = label
-
-        return best_label

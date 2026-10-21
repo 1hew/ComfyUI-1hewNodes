@@ -1,5 +1,9 @@
 from comfy_api.latest import io
 
+from ...utils._logic_ops import (
+    compare,
+)
+
 
 class IntNumberCompare(io.ComfyNode):
     OPERATORS = ["==", "!=", ">", ">=", "<", "<="]
@@ -25,23 +29,7 @@ class IntNumberCompare(io.ComfyNode):
     @classmethod
     async def execute(cls, a: int, operator: str, b: int) -> io.NodeOutput:
         try:
-            return io.NodeOutput(cls._compare(int(a), operator, int(b)))
+            return io.NodeOutput(compare(int(a), operator, int(b)))
         except Exception as e:
             print(f"IntNumberCompare error: {e}")
             return io.NodeOutput(False)
-
-    @staticmethod
-    def _compare(a: int, operator: str, b: int) -> bool:
-        if operator == "==":
-            return a == b
-        if operator == "!=":
-            return a != b
-        if operator == ">":
-            return a > b
-        if operator == ">=":
-            return a >= b
-        if operator == "<":
-            return a < b
-        if operator == "<=":
-            return a <= b
-        return False

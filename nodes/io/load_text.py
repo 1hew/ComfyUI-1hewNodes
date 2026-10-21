@@ -3,8 +3,12 @@ from __future__ import annotations
 import hashlib
 import os
 
+from aiohttp import web
 import folder_paths
 from comfy_api.latest import io
+from server import PromptServer
+
+from ...utils._text_metadata import strip_metadata
 
 VALID_TEXT_EXTENSIONS = {
     ".txt",
@@ -48,29 +52,25 @@ def _resolve_existing_path(file: str) -> str:
     return ""
 
 
-def _read_text(path: str, encoding: str) -> str:
-    encoding_name = str(encoding or "auto").strip().lower()
-    if encoding_name == "auto":
-        for candidate_encoding in ("utf-8", "utf-8-sig", "gbk", "utf-16"):
-            try:
-                with open(path, "r", encoding=candidate_encoding) as f:
-                    return f.read()
-            except UnicodeDecodeError:
-                continue
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            return f.read()
-
-    with open(path, "r", encoding=encoding_name, errors="replace") as f:
+def _read_text(path: str) -> str:
+    # 与界面保持一致：自动识别编码，优先处理 BOM 与 UTF-16，再尝试 GBK。
+    for candidate_encoding in ("utf-8-sig", "utf-16", "gbk"):
+        try:
+            with open(path, "r", encoding=candidate_encoding) as f:
+                return f.read()
+        except UnicodeDecodeError:
+            continue
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
         return f.read()
 
 
 def _get_filename_stem(path: str) -> str:
     base_name = os.path.basename(str(path or "").strip())
     stem, _ext = os.path.splitext(base_name)
-    return stem or "txt"
+    return stem or "text"
 
 
-class LoadTxt(io.ComfyNode):
+class LoadText(io.ComfyNode):
     @staticmethod
     def _preview_ui(text: str) -> dict:
         return {"text": (str(text),)}
@@ -107,15 +107,10 @@ class LoadTxt(io.ComfyNode):
     def define_schema(cls):
         return io.Schema(
             node_id="1hew_LoadTxt",
-            display_name="Load Txt",
+            display_name="Load Text",
             category="1hewNodes/io",
             inputs=[
                 io.String.Input("file", default=""),
-                io.Combo.Input(
-                    "encode",
-                    default="auto",
-                    options=["auto", "utf-8", "utf-8-sig", "gbk", "utf-16"],
-                ),
                 io.Int.Input("index", default=0, min=-8192, max=8192, step=1),
                 io.Boolean.Input("include_subdir", default=False),
             ],
@@ -129,7 +124,6 @@ class LoadTxt(io.ComfyNode):
     def IS_CHANGED(
         cls,
         file: str,
-        encode: str,
         index: int,
         include_subdir: bool,
         **kwargs,
@@ -140,9 +134,7 @@ class LoadTxt(io.ComfyNode):
 
         m = hashlib.sha256()
         m.update(
-            f"index:{int(index)}|include_subdir:{bool(include_subdir)}|encode:{encode}".encode(
-                "utf-8"
-            )
+            f"index:{int(index)}|include_subdir:{bool(include_subdir)}".encode("utf-8")
         )
         for path in paths:
             try:
@@ -156,19 +148,56 @@ class LoadTxt(io.ComfyNode):
     def execute(
         cls,
         file: str,
-        encode: str,
         index: int,
         include_subdir: bool,
+        **kwargs,
     ) -> io.NodeOutput:
         paths = cls.get_text_paths(file, include_subdir)
         if not paths:
-            raise ValueError(f"Txt file not found: {file}")
+            raise ValueError(f"Text file not found: {file}")
 
         idx = int(index) % len(paths)
         path = paths[idx]
-        text = _read_text(path, encode)
+        text = strip_metadata(_read_text(path))
         return io.NodeOutput(
             text,
             _get_filename_stem(path),
             ui=cls._preview_ui(text),
         )
+
+
+@PromptServer.instance.routes.get("/1hew/read_text_preview")
+async def read_text_preview(request):
+    """Preview the selected text file without queueing the workflow."""
+    file = str(request.query.get("file") or "").strip()
+    include_subdir = (
+        str(request.query.get("include_subdir") or "false").lower() == "true"
+    )
+    try:
+        index = int(request.query.get("index") or 0)
+    except (TypeError, ValueError):
+        index = 0
+
+    paths = LoadText.get_text_paths(file, include_subdir)
+    if not paths:
+        return web.json_response(
+            {"error": "text file not found", "text": ""},
+            status=404,
+        )
+
+    path = paths[index % len(paths)]
+    try:
+        text = strip_metadata(_read_text(path))
+    except Exception as exc:
+        return web.json_response(
+            {"error": str(exc), "text": ""},
+            status=500,
+        )
+
+    return web.json_response(
+        {
+            "text": text,
+            "filename": _get_filename_stem(path),
+            "path": path,
+        }
+    )

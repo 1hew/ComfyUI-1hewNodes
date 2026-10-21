@@ -19,76 +19,19 @@ import torch.nn.functional as functional
 import torchaudio
 from comfy_api.latest import io, ui
 
+from ...utils._file_ops import (
+    is_absolute_like,
+    sanitize_filename_prefix,
+    split_prefix_to_dir_and_stem,
+    remove_file_with_retries,
+)
+
 try:
     from comfy.utils import ProgressBar
 except Exception:
     ProgressBar = None
 
 _PATH_LOCK: Optional[asyncio.Lock] = None
-
-
-def _sanitize_filename_prefix(filename: str) -> str:
-    if not filename:
-        return "video/ComfyUI"
-
-    normalized = filename.replace("\\", "/").strip()
-    drive, tail = os.path.splitdrive(normalized)
-    if os.path.isabs(normalized) or drive:
-        if drive:
-            drive_token = drive.rstrip(":").replace("/", "_").replace("\\", "_")
-            tail = tail.lstrip("/\\")
-            normalized = f"{drive_token}/{tail}" if tail else drive_token
-        else:
-            normalized = normalized.lstrip("/\\")
-
-    parts: list[str] = []
-    for part in normalized.split("/"):
-        if not part or part in {".", ".."}:
-            continue
-        parts.append(part)
-
-    return "/".join(parts) if parts else "video/ComfyUI"
-
-
-def _is_absolute_like(path_value: str) -> bool:
-    raw = str(path_value or "").strip().replace("\\", "/")
-    if not raw:
-        return False
-    drive, _ = os.path.splitdrive(raw)
-    return bool(drive) or raw.startswith("/")
-
-
-def _sanitize_filename_stem(name: str) -> str:
-    stem = str(name or "").strip()
-    if not stem:
-        return "ComfyUI"
-    for ch in '<>:"/\\|?*':
-        stem = stem.replace(ch, "_")
-    stem = stem.rstrip(". ")
-    return stem if stem else "ComfyUI"
-
-
-def _split_prefix_to_dir_and_stem(prefix: str) -> tuple[str, str]:
-    raw = str(prefix or "").strip().replace("\\", "/")
-    if not raw:
-        return "", "ComfyUI"
-
-    is_trailing_sep = raw.endswith("/")
-    cleaned = raw.rstrip("/")
-    if not cleaned:
-        return "", "ComfyUI"
-
-    if is_trailing_sep:
-        return cleaned, "ComfyUI"
-    if "/" not in cleaned:
-        stem = os.path.splitext(cleaned)[0]
-        return "", _sanitize_filename_stem(stem)
-
-    dir_part, stem_part = cleaned.rsplit("/", 1)
-    if len(dir_part) == 2 and dir_part[1] == ":":
-        dir_part += "/"
-    stem = os.path.splitext(stem_part)[0]
-    return dir_part, _sanitize_filename_stem(stem)
 
 
 def _relative_subfolder(path: str, base_dir: str) -> str:
@@ -112,24 +55,6 @@ def _new_progress_bar(total: int):
         return None
 
 
-async def _remove_file_with_retries(
-    path: str,
-    *,
-    attempts: int = 20,
-    base_delay_s: float = 0.05,
-) -> None:
-    for attempt in range(attempts):
-        try:
-            os.remove(path)
-            return
-        except FileNotFoundError:
-            return
-        except PermissionError:
-            if attempt >= attempts - 1:
-                return
-            await asyncio.sleep(base_delay_s * (attempt + 1))
-
-
 class SaveVideoByImage(io.ComfyNode):
     @classmethod
     def define_schema(cls):
@@ -138,7 +63,7 @@ class SaveVideoByImage(io.ComfyNode):
             display_name="Save Video by Image",
             category="1hewNodes/io",
             inputs=[
-                io.Image.Input("image"),
+                io.Image.Input("image", optional=True, tooltip="要保存为视频的图像批次；为空时节点直接通过。"),
                 io.Audio.Input("audio", optional=True),
                 io.Float.Input("fps", default=8.0, min=0.01, max=120.0, step=0.01),
                 io.String.Input("filename", default="video/ComfyUI"),
@@ -160,14 +85,17 @@ class SaveVideoByImage(io.ComfyNode):
     @classmethod
     async def execute(
         cls,
-        image: torch.Tensor,
-        fps: float,
-        filename: str,
-        auto_increment: bool,
-        save_output: bool,
-        save_metadata: bool,
+        image: Optional[torch.Tensor] = None,
+        fps: float = 8.0,
+        filename: str = "video/ComfyUI",
+        auto_increment: bool = True,
+        save_output: bool = True,
+        save_metadata: bool = True,
         audio: Optional[dict] = None,
     ) -> io.NodeOutput:
+        if image is None or int(image.shape[0]) == 0:
+            return io.NodeOutput()
+
         images = image
         height, width, channels = images.shape[1:]
         has_alpha = channels == 4
@@ -189,7 +117,7 @@ class SaveVideoByImage(io.ComfyNode):
             _PATH_LOCK = asyncio.Lock()
 
         raw_prefix = str(filename or "").strip()
-        safe_filename_prefix = _sanitize_filename_prefix(filename)
+        safe_filename_prefix = sanitize_filename_prefix(filename, "video")
         preview_file = ""
         preview_path = ""
         preview_subfolder = ""
@@ -197,8 +125,8 @@ class SaveVideoByImage(io.ComfyNode):
 
         async with _PATH_LOCK:
             if auto_increment:
-                if _is_absolute_like(raw_prefix):
-                    target_dir_raw, filename = _split_prefix_to_dir_and_stem(raw_prefix)
+                if is_absolute_like(raw_prefix):
+                    target_dir_raw, filename = split_prefix_to_dir_and_stem(raw_prefix)
                     full_output_folder = (
                         os.path.abspath(target_dir_raw)
                         if target_dir_raw
@@ -248,15 +176,15 @@ class SaveVideoByImage(io.ComfyNode):
                     preview_path = path
                     preview_subfolder = subfolder
             else:
-                if _is_absolute_like(raw_prefix):
-                    target_dir_raw, filename = _split_prefix_to_dir_and_stem(raw_prefix)
+                if is_absolute_like(raw_prefix):
+                    target_dir_raw, filename = split_prefix_to_dir_and_stem(raw_prefix)
                     full_output_folder = (
                         os.path.abspath(target_dir_raw)
                         if target_dir_raw
                         else os.path.abspath(output_dir)
                     )
                 else:
-                    rel_dir_raw, filename = _split_prefix_to_dir_and_stem(
+                    rel_dir_raw, filename = split_prefix_to_dir_and_stem(
                         safe_filename_prefix
                     )
                     rel_dir = rel_dir_raw.replace("/", os.sep) if rel_dir_raw else ""
@@ -394,11 +322,11 @@ class SaveVideoByImage(io.ComfyNode):
             # Do not leave placeholders or a partial alpha preview after a failed save.
             for failed_path in {path, preview_path}:
                 if failed_path and os.path.exists(failed_path):
-                    await _remove_file_with_retries(failed_path)
+                    await remove_file_with_retries(failed_path)
             raise
         finally:
             if audio_path and os.path.exists(audio_path):
-                await _remove_file_with_retries(audio_path)
+                await remove_file_with_retries(audio_path)
 
         file_path = os.path.abspath(path)
 

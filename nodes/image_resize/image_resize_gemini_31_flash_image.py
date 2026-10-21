@@ -4,6 +4,10 @@ import torch
 
 from .image_resize_gemini_30_pro_image import ImageResizeGemini30ProImage
 
+from ...utils._image_ops import (
+    pad_to_rgb,
+)
+
 
 class ImageResizeGemini31FlashImage(ImageResizeGemini30ProImage):
     PRESET_RESOLUTIONS = [
@@ -174,7 +178,7 @@ class ImageResizeGemini31FlashImage(ImageResizeGemini30ProImage):
                 cw, ch = w, max(h, int(math.ceil(w / ratio)))
             else:
                 cw, ch = max(w, int(math.ceil(h * ratio))), h
-            native_img = cls._pad_to_rgb(image, ch, cw, pad_color)
+            native_img = pad_to_rgb(image, ch, cw, pad_color)
             top = max((ch - h) // 2, 0)
             left = max((cw - w) // 2, 0)
             native_msk = torch.zeros((b, ch, cw), dtype=torch.float32, device=mask.device)

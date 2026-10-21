@@ -35,12 +35,15 @@ def _load_node():
     detect_pkg.__path__ = [str(root / "nodes" / "detect")]
     image_pkg = types.ModuleType("solidbg_unmult_test.nodes.image")
     image_pkg.__path__ = [str(root / "nodes" / "image")]
+    utils_pkg = types.ModuleType("solidbg_unmult_test.utils")
+    utils_pkg.__path__ = [str(root / "utils")]
     sys.modules.update(
         {
             "solidbg_unmult_test": package,
             "solidbg_unmult_test.nodes": nodes_pkg,
             "solidbg_unmult_test.nodes.detect": detect_pkg,
             "solidbg_unmult_test.nodes.image": image_pkg,
+            "solidbg_unmult_test.utils": utils_pkg,
         }
     )
     module = importlib.import_module(

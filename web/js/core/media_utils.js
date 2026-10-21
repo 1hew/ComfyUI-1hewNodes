@@ -327,7 +327,8 @@ function bindPreviewResizeHandler(node, {
             ? originalOnResize.apply(this, arguments)
             : undefined;
         try {
-            const nextWidth = Array.isArray(size) ? size[0] : node.size?.[0];
+            // size 可能是 Float64Array；直接取下标即可。
+            const nextWidth = size?.[0] ?? node.size?.[0];
             const prevWidth = node[prevWidthKey];
             node[prevWidthKey] = nextWidth;
 
@@ -621,7 +622,7 @@ export function installImagePreviewLayout({
                 0,
                 node.size[1] - imageWidget.last_y - 15,
             );
-        } else if (Array.isArray(node.size) && node.size[1] > 140) {
+        } else if (Number(node.size?.[1]) > 140) {
             const baseGuess = 130;
             placeholderH = Math.max(
                 40,
@@ -795,7 +796,8 @@ export function installVideoPreviewLayout({
             ? originalOnResize.apply(this, arguments)
             : undefined;
         try {
-            const nextWidth = Array.isArray(size) ? size[0] : node.size?.[0];
+            // size 可能是 Float64Array；直接取下标即可。
+            const nextWidth = size?.[0] ?? node.size?.[0];
             const prevWidth = node._comfy1hewLastPreviewVideoNodeWidth;
             node._comfy1hewLastPreviewVideoNodeWidth = nextWidth;
 

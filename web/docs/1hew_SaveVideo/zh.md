@@ -21,10 +21,14 @@
 ## 功能说明
 
 - 输出位置控制：通过 `save_output` 选择输出目录或临时目录。
-- 扩展名推导：在可获取源文件扩展名时，保存文件采用源扩展名。
-- 元数据封装：通过 `ffmpeg` 对媒体进行 remux，将元数据写入 `comment`
+- 容器推导：保存前先探测源视频流，保存文件沿用源容器（`.webm`、`.mp4`、
+  `.mkv`），WebM/VP8 输入会被封装为 WebM，不再报
+  `'mp4' format does not support 'vp8' codec`；源编码无法放入对应容器时（如
+  ProRes、MJPEG、AVI）改用 Matroska；需要重新编码的区间裁剪/画面裁剪视频
+  使用 MP4/H.264。
+- 元数据封装：通过 PyAV 对保存后的文件做 remux，将元数据写入 `comment`
   字段并保持流拷贝。
-- 透明预览：通过 `ffprobe` 检测透明通道，生成 WEBM 预览到临时目录便于
+- 透明预览：探测源视频时检测透明通道，生成 WEBM 预览到临时目录便于
   UI 播放查看。
 - 界面预览：在 UI 面板展示 Preview Video 入口。
 
@@ -36,5 +40,7 @@
 
 ## 注意与建议
 
-- 节点调用 `ffprobe` 进行透明/音频探测，调用 `ffmpeg` 完成 remux 与预览生成。
+- 源探测会通过 PyAV（`get_stream_source()`）检查；组件类视频不会被探测，
+  避免额外整段编码。
+- 探测、元数据 remux 与预览编码均使用 PyAV，无需外部 `ffprobe` / `ffmpeg`。
 - 节点对路径分配过程做串行化处理，计数器更稳定。

@@ -53,9 +53,9 @@ registerExtensionOnce("__comfy1hewLoadImageExtensionRegistered", () => app.regis
             const allWidget = this.widgets.find((w) => w.name === "all");
 
             try {
+                // ComfyUI 1.55 起 node.size 是 Float64Array，不能用 Array.isArray 判断。
                 const baseW =
-                    Array.isArray(this.size) &&
-                    typeof this.size[0] === "number" &&
+                    Number.isFinite(this.size?.[0]) &&
                     this.size[0] > 0
                         ? this.size[0]
                         : 200;

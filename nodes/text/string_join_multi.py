@@ -44,10 +44,10 @@ class StringJoinMulti(io.ComfyNode):
         in_val = "" if input is None else str(input)
 
         text_list = []
-        for txt in [text1, text2, text3, text4, text5]:
-            if txt and txt.strip():
+        for part in [text1, text2, text3, text4, text5]:
+            if part and part.strip():
                 parsed = cls._parse_text_with_input(
-                    txt, in_val, filter_comment, filter_empty_line
+                    part, in_val, filter_comment, filter_empty_line
                 )
                 if parsed.strip():
                     text_list.append(parsed)

@@ -1,5 +1,9 @@
 from comfy_api.latest import io
 
+from ...utils._logic_ops import (
+    compare,
+)
+
 
 class FloatNumberCompare(io.ComfyNode):
     OPERATORS = ["==", "!=", ">", ">=", "<", "<="]
@@ -25,23 +29,7 @@ class FloatNumberCompare(io.ComfyNode):
     @classmethod
     async def execute(cls, a: float, operator: str, b: float) -> io.NodeOutput:
         try:
-            return io.NodeOutput(cls._compare(float(a), operator, float(b)))
+            return io.NodeOutput(compare(float(a), operator, float(b)))
         except Exception as e:
             print(f"FloatNumberCompare error: {e}")
             return io.NodeOutput(False)
-
-    @staticmethod
-    def _compare(a: float, operator: str, b: float) -> bool:
-        if operator == "==":
-            return a == b
-        if operator == "!=":
-            return a != b
-        if operator == ">":
-            return a > b
-        if operator == ">=":
-            return a >= b
-        if operator == "<":
-            return a < b
-        if operator == "<=":
-            return a <= b
-        return False

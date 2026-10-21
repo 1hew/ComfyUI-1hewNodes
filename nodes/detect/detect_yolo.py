@@ -1,5 +1,5 @@
 import asyncio
-from comfy_api.latest import io, ui
+from comfy_api.latest import io
 import cv2
 import folder_paths
 import glob

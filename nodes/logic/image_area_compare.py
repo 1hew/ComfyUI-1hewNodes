@@ -3,6 +3,10 @@ from comfy_api.latest import io
 
 from ...utils import first_torch_tensor
 
+from ...utils._logic_ops import (
+    compare,
+)
+
 
 class ImageAreaCompare(io.ComfyNode):
     """Compare the pixel area (width x height) of two IMAGE inputs.
@@ -42,7 +46,7 @@ class ImageAreaCompare(io.ComfyNode):
             area_b = cls._area(b)
             if area_a is None or area_b is None:
                 return io.NodeOutput(False)
-            return io.NodeOutput(cls._compare(area_a, operator, area_b))
+            return io.NodeOutput(compare(area_a, operator, area_b))
         except Exception as e:
             print(f"ImageAreaCompare error: {e}")
             return io.NodeOutput(False)
@@ -59,19 +63,3 @@ class ImageAreaCompare(io.ComfyNode):
         if height < 1 or width < 1:
             return None
         return height * width
-
-    @staticmethod
-    def _compare(a: int, operator: str, b: int) -> bool:
-        if operator == "==":
-            return a == b
-        if operator == "!=":
-            return a != b
-        if operator == ">":
-            return a > b
-        if operator == ">=":
-            return a >= b
-        if operator == "<":
-            return a < b
-        if operator == "<=":
-            return a <= b
-        return False

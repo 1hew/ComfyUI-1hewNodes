@@ -1,10 +1,16 @@
 import asyncio
 import math
-import numpy as np
 import torch
 import torch.nn.functional as F
-from PIL import ImageColor
 from comfy_api.latest import io
+
+from ...utils._image_ops import (
+    adapt_fill_to_channels,
+    ensure_channels,
+    pad_to_rgb,
+    parse_pad_color,
+    parse_spacing_color,
+)
 
 
 class ImageMainStitch(io.ComfyNode):
@@ -75,8 +81,8 @@ class ImageMainStitch(io.ComfyNode):
         target_channels = 4 if any(
             int(t.shape[3]) == 4 for t in [a, *others]
         ) else 3
-        a = cls._ensure_channels(a, target_channels)
-        others = [cls._ensure_channels(t, target_channels) for t in others]
+        a = ensure_channels(a, target_channels)
+        others = [ensure_channels(t, target_channels) for t in others]
 
         if len(others) == 0:
             image = a.to(dtype=torch.float32).clamp(0.0, 1.0)
@@ -93,8 +99,8 @@ class ImageMainStitch(io.ComfyNode):
         a = cls._broadcast_image(a, bs)
         others = [cls._broadcast_image(t, bs) for t in others]
 
-        space_rgb = cls._parse_spacing_color(spacing_color)
-        pad_rgb = cls._parse_pad_color(pad_color)
+        space_rgb = parse_spacing_color(spacing_color)
+        pad_rgb = parse_pad_color(pad_color)
 
         if direction in ("top", "bottom"):
 
@@ -172,8 +178,8 @@ class ImageMainStitch(io.ComfyNode):
             img3 = cls._resize_keep_ratio(img3, None, target_h)
         else:
             target_h = max(h2, h3)
-            img2 = cls._pad_to_rgb(img2, target_h, w2, pad_rgb)
-            img3 = cls._pad_to_rgb(img3, target_h, w3, pad_rgb)
+            img2 = pad_to_rgb(img2, target_h, w2, pad_rgb)
+            img3 = pad_to_rgb(img3, target_h, w3, pad_rgb)
 
         _, hh2, ww2, _ = img2.shape
         _, hh3, ww3, _ = img3.shape
@@ -199,8 +205,8 @@ class ImageMainStitch(io.ComfyNode):
             img3 = cls._resize_keep_ratio(img3, target_w, None)
         else:
             target_w = max(w2, w3)
-            img2 = cls._pad_to_rgb(img2, h2, target_w, pad_rgb)
-            img3 = cls._pad_to_rgb(img3, h3, target_w, pad_rgb)
+            img2 = pad_to_rgb(img2, h2, target_w, pad_rgb)
+            img3 = pad_to_rgb(img3, h3, target_w, pad_rgb)
 
         _, hh2, ww2, _ = img2.shape
         _, hh3, ww3, _ = img3.shape
@@ -234,8 +240,8 @@ class ImageMainStitch(io.ComfyNode):
             pair = cls._resize_keep_ratio(pair, target_w, None)
         else:
             unified_w = max(w1, wp)
-            img1 = cls._pad_to_rgb(img1, h1, unified_w, pad_rgb)
-            pair = cls._pad_to_rgb(pair, hp, unified_w, pad_rgb)
+            img1 = pad_to_rgb(img1, h1, unified_w, pad_rgb)
+            pair = pad_to_rgb(pair, hp, unified_w, pad_rgb)
 
         _, h1, w1, _ = img1.shape
         _, hp, wp, _ = pair.shape
@@ -280,8 +286,8 @@ class ImageMainStitch(io.ComfyNode):
             pair = cls._resize_keep_ratio(pair, None, target_h)
         else:
             unified_h = max(h1, hp)
-            img1 = cls._pad_to_rgb(img1, unified_h, w1, pad_rgb)
-            pair = cls._pad_to_rgb(pair, unified_h, wp, pad_rgb)
+            img1 = pad_to_rgb(img1, unified_h, w1, pad_rgb)
+            pair = pad_to_rgb(pair, unified_h, wp, pad_rgb)
 
         _, h1, w1, _ = img1.shape
         _, hp, wp, _ = pair.shape
@@ -327,75 +333,6 @@ class ImageMainStitch(io.ComfyNode):
         ).permute(0, 2, 3, 1)
         return out
 
-    @staticmethod
-    def _pad_to_rgb(img, target_h, target_w, fill_rgb):
-        """居中填充到指定尺寸，自动适配当前图像通道数。"""
-        b, h, w, c = img.shape
-        top = max((target_h - h) // 2, 0)
-        left = max((target_w - w) // 2, 0)
-        h_end = min(top + h, target_h)
-        w_end = min(left + w, target_w)
-        if isinstance(fill_rgb, str) and fill_rgb == "extend":
-            pad_top = top
-            pad_bottom = max(target_h - (top + h), 0)
-            pad_left = left
-            pad_right = max(target_w - (left + w), 0)
-            nchw = img.permute(0, 3, 1, 2)
-            padded = F.pad(
-                nchw, (pad_left, pad_right, pad_top, pad_bottom), mode="replicate"
-            )
-            return padded.permute(0, 2, 3, 1)
-        if isinstance(fill_rgb, str) and fill_rgb == "mirror":
-            pad_top = top
-            pad_bottom = max(target_h - (top + h), 0)
-            pad_left = left
-            pad_right = max(target_w - (left + w), 0)
-            nchw = img.permute(0, 3, 1, 2)
-            while pad_top > 0 or pad_bottom > 0 or pad_left > 0 or pad_right > 0:
-                hh = int(nchw.shape[2])
-                ww = int(nchw.shape[3])
-                st = min(pad_top, max(hh - 1, 0))
-                sb = min(pad_bottom, max(hh - 1, 0))
-                sl = min(pad_left, max(ww - 1, 0))
-                sr = min(pad_right, max(ww - 1, 0))
-                nchw = F.pad(nchw, (sl, sr, st, sb), mode="reflect")
-                pad_top -= st
-                pad_bottom -= sb
-                pad_left -= sl
-                pad_right -= sr
-            return nchw.permute(0, 2, 3, 1)
-        out = torch.zeros((b, target_h, target_w, c), dtype=img.dtype, device=img.device)
-        if isinstance(fill_rgb, str) and fill_rgb == "edge":
-            if top > 0 or (target_h - h_end) > 0:
-                top_row = img[:, 0:1, :, :].mean(dim=(1, 2))
-                top_color = top_row.view(b, 1, 1, c)
-                bottom_row = img[:, -1:, :, :].mean(dim=(1, 2))
-                bottom_color = bottom_row.view(b, 1, 1, c)
-                if top > 0:
-                    out[:, :top, :, :] = top_color.expand(b, top, target_w, c)
-                if (target_h - h_end) > 0:
-                    bottom_pad = target_h - h_end
-                    out[:, h_end:, :, :] = bottom_color.expand(b, bottom_pad, target_w, c)
-            if left > 0 or (target_w - w_end) > 0:
-                left_col = img[:, :, 0:1, :].mean(dim=(1, 2))
-                left_color = left_col.view(b, 1, 1, c)
-                right_col = img[:, :, -1:, :].mean(dim=(1, 2))
-                right_color = right_col.view(b, 1, 1, c)
-                if left > 0:
-                    out[:, :, :left, :] = left_color.expand(b, target_h, left, c)
-                if (target_w - w_end) > 0:
-                    right_pad = target_w - w_end
-                    out[:, :, w_end:, :] = right_color.expand(b, target_h, right_pad, c)
-        elif isinstance(fill_rgb, str) and fill_rgb == "average":
-            avg = img.mean(dim=(1, 2))
-            avg_color = avg.view(b, 1, 1, c)
-            out[:] = avg_color.expand(b, target_h, target_w, c)
-        else:
-            fill_value = ImageMainStitch._adapt_fill_to_channels(fill_rgb, c)
-            fill_t = torch.tensor(fill_value, dtype=img.dtype, device=img.device)
-            out[:] = fill_t
-        out[:, top:h_end, left:w_end, :] = img[:, : h_end - top, : w_end - left, :]
-        return out
 
     @staticmethod
     def _pad_or_crop_to_rgb(img, target_h, target_w, fill_rgb):
@@ -408,7 +345,7 @@ class ImageMainStitch(io.ComfyNode):
         out = torch.zeros(
             (b, target_h, target_w, c), dtype=img.dtype, device=img.device
         )
-        fill_value = ImageMainStitch._adapt_fill_to_channels(fill_rgb, c)
+        fill_value = adapt_fill_to_channels(fill_rgb, c)
         fill_t = torch.tensor(fill_value, dtype=img.dtype, device=img.device)
         out[:] = fill_t
 
@@ -432,7 +369,7 @@ class ImageMainStitch(io.ComfyNode):
         """生成间隔条：axis='v' 垂直条，axis='h' 水平条。"""
         if w <= 0:
             return torch.zeros((batch_size, h, 0, channels), dtype=dtype, device=device)
-        fill_value = ImageMainStitch._adapt_fill_to_channels(fill_rgb, channels)
+        fill_value = adapt_fill_to_channels(fill_rgb, channels)
         fill_t = torch.tensor(fill_value, dtype=dtype, device=device)
         if axis == "v":
             out = torch.zeros((batch_size, h, w, channels), dtype=dtype, device=device)
@@ -452,169 +389,3 @@ class ImageMainStitch(io.ComfyNode):
         reps = int(math.ceil(batch_size / b))
         tiled = img.repeat(reps, 1, 1, 1)[:batch_size]
         return tiled
-
-    @staticmethod
-    def _ensure_channels(img, target_channels):
-        current_channels = int(img.shape[3])
-        if current_channels == target_channels:
-            return img
-        if current_channels == 3 and target_channels == 4:
-            alpha = torch.ones(
-                (img.shape[0], img.shape[1], img.shape[2], 1),
-                dtype=img.dtype,
-                device=img.device,
-            )
-            return torch.cat([img, alpha], dim=3)
-        if current_channels == 4 and target_channels == 3:
-            return img[:, :, :, :3]
-        return img
-
-    @staticmethod
-    def _adapt_fill_to_channels(fill_rgb, channels):
-        if isinstance(fill_rgb, str):
-            return fill_rgb
-        if not isinstance(fill_rgb, (tuple, list)):
-            return fill_rgb
-        values = list(fill_rgb)
-        if channels == 4:
-            if len(values) >= 4:
-                return tuple(values[:4])
-            if len(values) == 3:
-                return (values[0], values[1], values[2], 1.0)
-        if channels == 3 and len(values) >= 3:
-            return tuple(values[:3])
-        return tuple(values)
-    @staticmethod
-    def _parse_pad_color(color_str):
-        if color_str is None:
-            return (1.0, 1.0, 1.0)
-        text = str(color_str).strip().lower()
-        if text in ("edge", "e"):
-            return "edge"
-        if text in ("extend", "ex"):
-            return "extend"
-        if text in ("mirror", "mr"):
-            return "mirror"
-        if text in ("average", "a"):
-            return "average"
-        if text.startswith("(") and text.endswith(")"):
-            text = text[1:-1].strip()
-        single = {
-            "r": "red",
-            "g": "lime",
-            "b": "blue",
-            "c": "cyan",
-            "m": "magenta",
-            "y": "yellow",
-            "k": "black",
-            "w": "white",
-            "o": "orange",
-            "p": "purple",
-            "n": "brown",
-            "s": "silver",
-            "l": "lime",
-            "i": "indigo",
-            "v": "violet",
-            "t": "turquoise",
-            "q": "aqua",
-            "f": "fuchsia",
-            "h": "hotpink",
-            "d": "darkblue",
-        }
-        if len(text) == 1 and text in single:
-            text = single[text]
-        try:
-            v = float(text)
-            if 0.0 <= v <= 1.0:
-                return (v, v, v)
-        except Exception:
-            pass
-        if "," in text:
-            try:
-                parts = [p.strip() for p in text.split(",")]
-                if len(parts) >= 3:
-                    r, g, b = [float(parts[i]) for i in range(3)]
-                    if max(r, g, b) <= 1.0:
-                        return (r, g, b)
-                    return (r / 255.0, g / 255.0, b / 255.0)
-            except Exception:
-                pass
-        if text.startswith("#") and len(text) in (4, 7):
-            try:
-                hex_str = text[1:]
-                if len(hex_str) == 3:
-                    hex_str = "".join(ch * 2 for ch in hex_str)
-                r = int(hex_str[0:2], 16) / 255.0
-                g = int(hex_str[2:4], 16) / 255.0
-                b = int(hex_str[4:6], 16) / 255.0
-                return (r, g, b)
-            except Exception:
-                pass
-        try:
-            rgb = ImageColor.getrgb(text)
-            return (rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0)
-        except Exception:
-            return (1.0, 1.0, 1.0)
-
-    @staticmethod
-    def _parse_spacing_color(color_str):
-        if color_str is None:
-            return (1.0, 1.0, 1.0)
-        text = str(color_str).strip().lower()
-        if text.startswith("(") and text.endswith(")"):
-            text = text[1:-1].strip()
-        single = {
-            "r": "red",
-            "g": "lime",
-            "b": "blue",
-            "c": "cyan",
-            "m": "magenta",
-            "y": "yellow",
-            "k": "black",
-            "w": "white",
-            "o": "orange",
-            "p": "purple",
-            "n": "brown",
-            "s": "silver",
-            "l": "lime",
-            "i": "indigo",
-            "v": "violet",
-            "t": "turquoise",
-            "f": "fuchsia",
-            "h": "hotpink",
-            "d": "darkblue",
-        }
-        if len(text) == 1 and text in single:
-            text = single[text]
-        try:
-            v = float(text)
-            if 0.0 <= v <= 1.0:
-                return (v, v, v)
-        except Exception:
-            pass
-        if "," in text:
-            try:
-                parts = [p.strip() for p in text.split(",")]
-                if len(parts) >= 3:
-                    r, g, b = [float(parts[i]) for i in range(3)]
-                    if max(r, g, b) <= 1.0:
-                        return (r, g, b)
-                    return (r / 255.0, g / 255.0, b / 255.0)
-            except Exception:
-                pass
-        if text.startswith("#") and len(text) in (4, 7):
-            try:
-                hex_str = text[1:]
-                if len(hex_str) == 3:
-                    hex_str = "".join(ch * 2 for ch in hex_str)
-                r = int(hex_str[0:2], 16) / 255.0
-                g = int(hex_str[2:4], 16) / 255.0
-                b = int(hex_str[4:6], 16) / 255.0
-                return (r, g, b)
-            except Exception:
-                pass
-        try:
-            rgb = ImageColor.getrgb(text)
-            return (rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0)
-        except Exception:
-            return (1.0, 1.0, 1.0)

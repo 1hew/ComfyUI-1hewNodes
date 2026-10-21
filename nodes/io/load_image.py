@@ -8,7 +8,7 @@ import os
 import time
 
 from aiohttp import web
-from comfy_api.latest import io, ui
+from comfy_api.latest import io
 import folder_paths
 import numpy as np
 from PIL import Image, ImageOps
