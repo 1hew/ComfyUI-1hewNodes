@@ -8,7 +8,7 @@
 | -------- | -------- | -------- | ------ | -------- | ---- |
 | `audio` | 可选 | AUDIO | - | - | 要保存的音频（`waveform` 形如 `[batch, channels, samples]`，附带 `sample_rate`）；为空时节点输出空结果。 |
 | `filename` | - | STRING | `audio/ComfyUI` | - | 保存文件名或路径前缀，交由 ComfyUI 路径生成处理；支持日期占位符（如 `%date:yyyy-MM-dd%`）。 |
-| `format` | - | COMBO | `flac` | `flac` / `wav` / `mp3` / `opus` | 保存格式；mp3 / opus 在采样率不受编码器支持时会自动重采样。 |
+| `format` | - | COMBO | `mp3` | `flac` / `wav` / `mp3` / `opus` | 保存格式；默认 mp3（320 kbps，有损），需要无损归档时选 flac / wav；mp3 / opus 在采样率不受编码器支持时会自动重采样。 |
 | `auto_increment` | - | BOOLEAN | `true` | - | 为 `true` 时自动编号生成新文件；为 `false` 时使用固定文件名并覆盖。 |
 | `save_output` | - | BOOLEAN | `true` | - | 开启时保存到输出目录；未开启时保存到临时目录。 |
 | `save_metadata` | - | BOOLEAN | `true` | - | 开启时将 prompt/workflow 元数据写入音频容器。 |
@@ -27,7 +27,7 @@
 - 采样率适配：flac / wav 原样保存；mp3 / opus 会就近选择编码器支持的采样率并重采样。
 - 元数据：可选把 prompt/workflow 写入容器 metadata；ComfyUI 以 `--disable-metadata` 启动时自动跳过。
 - 失败清理：单个文件编码失败会删除半成品并抛出带文件名的错误。
-- 节点内播放器：前端扩展会在节点里嵌入一个音频播放器，执行完成后自动指向刚保存的文件（`/view?filename=...&type=output`），可直接试听，与原生 `Save Audio (Advanced)` 的预览一致；没有产出音频时播放器自动隐藏。
+- 节点内播放器：前端扩展会在节点里嵌入一个音频播放器，执行完成后自动指向刚保存的文件（`/view?filename=...&type=output`），可直接试听；播放器使用独立 DOM 容器，在经典画布与 Nodes 2.0 下都保持完整宽度，没有产出音频时自动隐藏。
 - UI 数据：同时返回 `SavedAudios`（旧版本回退为 `PreviewAudio`），供前端读取音频文件名、子目录与目录类型。
 
 ## 典型用法
@@ -38,6 +38,7 @@
 
 ## 注意与建议
 
+- 默认 mp3 为 320 kbps 有损编码，适合直接交付或试听；若保存的文件还要参与后续转码、混音或对齐，请改用 flac / wav 保留无损源。
 - 节点依赖 `PyAV`（ComfyUI 自带）编码；若环境缺少某个编码器（如 `libopus`），该格式会报错，可改用 flac / wav。
 - `auto_increment=false` 会覆盖同名文件，批量保存时请确认目标目录。
 - 绝对路径前缀会跳过输出目录直接写入指定位置；若保存的文件不在 ComfyUI 的静态目录下，预览会回退为 `PreviewAudio(audio)`，播放的是输入音频而不是已保存文件（旧版本可能没有预览）。

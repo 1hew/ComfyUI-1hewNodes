@@ -10,7 +10,7 @@
 | `filter_comment` | - | BOOLEAN | False | - | Remove comments and triple-quoted blocks. |
 | `separator` | - | STRING | `\n` | - | Join separator; supports escapes `\n`, `\t`, `\r`. |
 | `input` | - | STRING | `` | - | Value to substitute into `{input}` placeholders. |
-| `string_1` | - | STRING | - | - | First string.
+| `string_1` | optional | STRING | - | - | First string (socket only, no text box).
 | `string_2…string_N` | optional | STRING | - | - | Additional strings recognized by numeric suffix ordering.
 
 ## Outputs

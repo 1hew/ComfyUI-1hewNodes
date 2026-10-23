@@ -21,6 +21,17 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v4.1.0**
+- feat(conversion): Add `Any to Any`, a wildcard pass-through that forwards any value unchanged through `*` ports, so outputs and inputs with different declared types can be linked without a real conversion.
+- feat(int): Add `Int Mask Count`, `Int Audio Count`, and `Int Text Count` for dynamic `mask_X` / `audio_X` / wildcard `text_X` ports; emptiness follows `Any Empty Bool`, image/mask batches count per frame, list outputs are flattened before counting, and `Int Image Count` / `Int Video Count` now share the same `utils/_count_ops.py` helpers.
+- feat(logic): `Multi Switch Select`'s `select` accepts a standalone `a` / `all` (case-insensitive) to route every connected input lazily; `Image Batch Index` keeps its numeric-only grammar.
+- feat(io): `Load PS` now defaults `preview=true`, and psd_tools INFO chatter from unknown image resources or tagged blocks is suppressed by setting the `psd_tools` logger to WARNING (WARNING/ERROR stay visible).
+- feat(io): `Save Audio` defaults to `mp3` (320 kbps) for new nodes and unknown legacy values; its in-node player uses a dedicated DOM container so it keeps full width on both the classic canvas and Nodes 2.0, and keeps its last preview when an unrelated execution message arrives.
+- fix(multi): `Multi String Join`'s `string_1` is now an optional socket-only input, so dynamically appended `string_N` sockets stay below the settings instead of shifting to the top of the node.
+- refactor(shared): Reuse `utils/_image_ops.py`'s `parse_pad_color` / `pad_to_rgb` in `Multi Image Batch`, `Multi Video Stitch`, and the shared resize helpers instead of node-local copies.
+- test: Add regression coverage for `Any to Any`, the three new count nodes, `Multi Switch Select` select-all, and `Save Audio`'s mp3 fallback.
+- docs: Add bilingual docs for the four new nodes, update the `Load PS` / `Save Audio` / `Multi Switch Select` / `Multi String Join` and count-node docs, and synchronize the README node lists and changelog.
+
 **v4.0.0**
 - **Major I/O upgrade**: unify text reading/writing with metadata-aware `Load Text` / `Save Text`, add `Save Audio`, make `Save Video` container-safe, and switch `Load PS` to on-demand cached layer previews.
 - **Logic and shared foundation**: `Multi Switch Select` shares `Image Batch Index`'s range grammar and supports multi-selection; duplicated image/video/text/file helpers are centralized in `utils/_*.py`, covered by the expanded consistency checker and regression suite.
@@ -670,6 +681,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | String Coordinate to BBox Mask | Convert string format coordinates to BBoxMask format with image dimension support and flexible output modes |
 | Text List to String | Merge a text list by applying per-item prefix/suffix and joining with a separator; supports escape sequences and composite separators |
 | Text to Any | Output text as a wildcard payload for flexible connections (e.g., COMBO inputs) |
+| Any to Any | Pass any value through unchanged as a wildcard (`*`), so outputs and inputs with different declared types can be connected |
 
 ### 🧠 Logic Nodes
 | Node Name | Description |
@@ -680,7 +692,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Any Switch Select | Multi-way selector node supporting multiple input options, lazily routing the chosen `input_k` to `output` and returning the effective `select` value |
 | Float Number Compare | Float comparison node that evaluates two FLOAT values with a selected operator and outputs a boolean |
 | Int Number Compare | Integer comparison node that evaluates two INT values with a selected operator and outputs a boolean |
-| Multi Switch Select | Multi-output selector for `input_1..input_N`; a 1-based `select` using the same range syntax as Image Batch Index (e.g. `1-3`, `[1,3]`) lazily routes each chosen input to its matching `output_k`, leaving the rest `None` |
+| Multi Switch Select | Multi-output selector for `input_1..input_N`; a 1-based `select` using the same range syntax as Image Batch Index (e.g. `1-3`, `[1,3]`, or `a`/`all` for every connected input) lazily routes each chosen input to its matching `output_k`, leaving the rest `None` |
 | Text Compare | Compares two strings with equality, containment, prefix/suffix, or regex operators and outputs a boolean |
 | Text Match Rownum | Match a single text against multi-line text and return first matched row number (1-based), or 0 when not found |
 | Text Match Value | Match single-line text against multi-line key-value pairs and return corresponding value with simple numeric/boolean auto-typing |
@@ -692,10 +704,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|-------------|
 | Int Image Count | Count valid images from dynamic `image_X` inputs, ignoring empty inputs, empty tensors, and all-zero images |
+| Int Mask Count | Count valid masks from dynamic `mask_X` inputs, ignoring empty inputs, empty tensors, and all-zero masks |
 | Int Image Side Length | Output selected side length (longest/shortest/width/height) from image dimensions |
 | Int Image Size | Output width and height integers from image dimensions |
 | Int Mask Side Length | Output selected side length (longest/shortest/width/height) from mask dimensions |
-| Int Video Count | Count connected videos from dynamic `video_X` inputs |
+| Int Video Count | Count non-empty videos from dynamic `video_X` inputs (list outputs counted per item) |
+| Int Audio Count | Count non-empty audio inputs from dynamic `audio_X` ports (list outputs counted per item) |
+| Int Text Count | Count non-empty STRING / INT / FLOAT inputs (BOOLEAN is treated as INT) from dynamic wildcard `text_X` ports |
 | Int Split | Split a total value into two parts, supporting percentage and integer split point |
 | Int Wan | Generate 4n+1 arithmetic sequences with step and range validation |
 
@@ -742,7 +757,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🔗 Multi Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Multi String Join | Concatenate dynamic `string_X` inputs with `{input}` variable support and comment/triple-quote filtering; customizable separator |
+| Multi String Join | Concatenate dynamic `string_X` sockets (`string_1` is socket-only) with `{input}` variable support and comment/triple-quote filtering; customizable separator |
 | Multi Image Batch | Build image batches from dynamic `image_X` with crop/pad/stretch size unification and automatic RGBA preservation when any input has alpha |
 | Multi Image List | Build `image_list` from dynamic `image_X` batch or list inputs, splitting them into single-image list items |
 | Multi Image Overlay | Overlay multiple image layers sequentially with alpha compositing, fit modes, and automatic RGBA preservation when any input has alpha |
@@ -757,11 +772,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Get File Count | Count image/video/psd/text files in a folder with optional recursive scanning, list-form `filename` / `file_path` outputs, and configurable filename extension retention |
 | Load Image | Load images from a file or folder with batch mode, size unification, derived masks, and list-form `filename` output |
-| Load PS | Load a PSD/PSB file as one indexed layer, all layer batches, or the merged document image, with drag-and-drop upload, lazy cached layer previews, hidden-layer, group-mode controls, and list-form `layer_name` output |
+| Load PS | Load a PSD/PSB file as one indexed layer, all layer batches, or the merged document image, with drag-and-drop upload, lazy cached layer previews (enabled by default), hidden-layer, group-mode controls, and list-form `layer_name` output |
 | Load Text | Load `.txt` content from a file or folder with upload, live preview, auto encoding detection, and indexed folder picking |
 | Load Video | Select a video from a file or folder and apply trimming/FPS settings during decoding |
 | Load Video to Image | Decode a video into an image batch, audio, fps, and frame count |
-| Save Audio | Save an AUDIO object as FLAC/WAV/MP3/Opus with output/temp routing, optional metadata, batch splitting, empty-input pass-through, and an in-node audio player preview |
+| Save Audio | Save an AUDIO object as FLAC/WAV/MP3/Opus (default mp3) with output/temp routing, optional metadata, batch splitting, empty-input pass-through, and an in-node audio player preview |
 | Save Image | Save image batches to output/temp and return absolute saved file paths |
 | Save Text | Save text input as `txt` / `csv` / `md` / `json` (UTF-8) with auto-increment naming, metadata, and preview-only mode |
 | Save Video by Image | Encode an image batch into a video with optional audio muxing and alpha support |

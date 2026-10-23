@@ -11,7 +11,7 @@
 | `include_hidden` | - | BOOLEAN | `false` | - | 是否包含 Photoshop 中关闭眼睛的隐藏图层或隐藏组。 |
 | `group_mode` | - | COMBO | `layer` | `layer`, `merged` | `layer` 展开组内图层；`merged` 将组作为一张合成图参与索引或批次。 |
 | `output_mode` | - | COMBO | `all_layers` | `single_layer`, `all_layers`, `merged` | 输出指定单层、全部图层批次或完整 PSD 合成图。 |
-| `preview` | - | BOOLEAN | `false` | - | 是否在节点上显示预览；关闭时拖拽上传只填入 `file`，不会触发 PSD 合成预览。 |
+| `preview` | - | BOOLEAN | `true` | - | 是否在节点上显示预览（默认开启）；关闭时拖拽上传只填入 `file`，不会触发 PSD 合成预览。 |
 
 ## 输出
 
@@ -43,4 +43,5 @@
 
 - 该节点依赖 `psd-tools`，请确保已安装依赖。
 - 建议输入已栅格化图层的 PSD；复杂图层样式、智能对象、调整图层等效果以 PSD/解析库可读取的结果为准。
-- 大尺寸或多图层 PSD 建议保持 `preview=false`，需要查看时再临时开启；单层预览按需加载并缓存，切换图层不会重新合成整份 PSD。
+- 预览默认开启；大尺寸或多图层 PSD 可以关闭 `preview` 省掉合成与缩略图开销，需要查看时再临时开启。单层预览按需加载并缓存，切换图层不会重新合成整份 PSD。
+- psd_tools 关于未知 image resource / tagged block 的 INFO 日志会被屏蔽，WARNING 与 ERROR 仍会显示。

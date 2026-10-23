@@ -12,7 +12,10 @@ class MultiStringJoin(io.ComfyNode):
                 io.Boolean.Input("filter_comment", default=False),
                 io.String.Input("separator", default="\\n"),
                 io.String.Input("input", default=""),
-                io.String.Input("string_1", default=""),
+                # string_1 由前端动态端口脚本创建为纯插槽（force_input），
+                # 不能再声明成带文本框的普通 String 输入：那会把首个端口变成
+                # widget-input，使后续动态追加的 string_N 纯插槽错位到节点顶部。
+                io.String.Input("string_1", default="", optional=True, force_input=True),
             ],
             outputs=[io.String.Output(display_name="string")],
         )

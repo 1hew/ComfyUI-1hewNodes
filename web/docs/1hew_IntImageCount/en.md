@@ -19,6 +19,7 @@
 - Dynamic inputs: connecting the last `image_X` port automatically appends the next image port.
 - Validity check: disconnected values, empty tensors, and all-zero / black images are ignored.
 - Batch-compatible: batched image inputs are checked and counted frame by frame.
+- List-aware: list outputs are flattened, and each image/frame is checked independently.
 
 ## Typical Usage
 

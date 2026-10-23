@@ -1,10 +1,13 @@
 from comfy_api.latest import io
 
-from ...utils._index_range import parse_index_expressions
+from ...utils._index_range import normalize_text, parse_index_expressions
 
 
 class MultiSwitchSelect(io.ComfyNode):
     SELECT_MAX = 10
+    # Whole-token shortcuts for "every connected input". Handled here instead
+    # of in the shared parser so Image Batch Index keeps its numeric grammar.
+    SELECT_ALL_KEYWORDS = frozenset({"a", "all"})
 
     @classmethod
     def define_schema(cls):
@@ -20,7 +23,8 @@ class MultiSwitchSelect(io.ComfyNode):
                 tooltip=(
                     "1-based indices, same syntax as Image Batch Index: "
                     "1,3 / 1-3 / [1,3] / [1,3) / :step; "
-                    "[1:3] means 1 and 3; -1 = last connected input."
+                    "[1:3] means 1 and 3; -1 = last connected input; "
+                    "a / all = every connected input."
                 ),
             ),
             io.Custom("*").Input("input_1", optional=True, lazy=True),
@@ -86,9 +90,17 @@ class MultiSwitchSelect(io.ComfyNode):
                 raw = ",".join(str(item) for item in select)
             else:
                 raw = "" if select is None else str(select)
+            if cls._selects_all(raw):
+                return list(range(1, size + 1))
             values = parse_index_expressions(raw, resolve)
 
         return sorted({value for value in values if 1 <= value <= size})
+
+    @classmethod
+    def _selects_all(cls, raw):
+        # Only a standalone token counts: "a1" still means index 1, not all.
+        text = normalize_text(str(raw)).lower().replace(";", " ").replace(",", " ")
+        return any(token in cls.SELECT_ALL_KEYWORDS for token in text.split())
 
     @classmethod
     def _selected_keys(cls, select, size=None):

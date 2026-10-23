@@ -25,6 +25,11 @@ from ...utils._file_ops import (
 
 _PATH_LOCK: Optional[asyncio.Lock] = None
 
+# Default format used for new nodes and for unknown values coming from old
+# serialized workflows. mp3 keeps delivered files small and universally
+# playable; lossless archiving stays one click away (flac / wav).
+DEFAULT_FORMAT = "mp3"
+
 # format -> (container format, codec, file extension)
 _FORMAT_SPECS: dict[str, tuple[str, str, str]] = {
     "flac": ("flac", "flac", "flac"),
@@ -235,8 +240,8 @@ class SaveAudio(io.ComfyNode):
                 io.Combo.Input(
                     "format",
                     options=["flac", "wav", "mp3", "opus"],
-                    default="flac",
-                    tooltip="保存格式；flac / wav 无损，mp3 / opus 在采样率不受支持时会重采样。",
+                    default=DEFAULT_FORMAT,
+                    tooltip="保存格式；默认 mp3（320 kbps，有损，体积小、兼容性好），需要无损归档时选 flac / wav；mp3 / opus 在采样率不受支持时会重采样。",
                 ),
                 io.Boolean.Input(
                     "auto_increment",
@@ -266,7 +271,7 @@ class SaveAudio(io.ComfyNode):
         cls,
         audio: Optional[dict] = None,
         filename: str = "audio/ComfyUI",
-        format: str = "flac",
+        format: str = DEFAULT_FORMAT,
         auto_increment: bool = True,
         save_output: bool = True,
         save_metadata: bool = True,
@@ -278,9 +283,9 @@ class SaveAudio(io.ComfyNode):
         if waveform is None or int(waveform.shape[0]) <= 0:
             return cls._empty_output()
 
-        fmt = str(format or "flac").lower()
+        fmt = str(format or DEFAULT_FORMAT).lower()
         if fmt not in _FORMAT_SPECS:
-            fmt = "flac"
+            fmt = DEFAULT_FORMAT
         _muxer, _codec, extension = _FORMAT_SPECS[fmt]
 
         base_dir = (

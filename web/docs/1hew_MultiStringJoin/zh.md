@@ -10,7 +10,7 @@
 | `filter_comment` | - | BOOLEAN | False | - | 移除注释与三引号块 |
 | `separator` | - | STRING | `\n` | - | 拼接分隔符；支持转义 `\n`、`\t`、`\r` |
 | `input` | - | STRING | `` | - | 用于替换 `{input}` 占位符的值 |
-| `string_1` | - | STRING | - | - | 第一段字符串 |
+| `string_1` | 可选 | STRING | - | - | 第一段字符串（纯插槽，无文本框） |
 | `string_2…string_N` | 可选 | STRING | - | - | 其他字符串，按数字后缀排序识别 |
 
 ## 输出

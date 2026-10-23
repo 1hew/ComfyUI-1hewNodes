@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 import math
 import os
 import threading
@@ -46,7 +47,7 @@ class LoadPS(io.ComfyNode):
                 io.Boolean.Input("include_hidden", default=False),
                 io.Combo.Input("group_mode", options=cls.GROUP_MODES, default="layer"),
                 io.Combo.Input("output_mode", options=cls.OUTPUT_MODES, default="all_layers"),
-                io.Boolean.Input("preview", default=False),
+                io.Boolean.Input("preview", default=True),
             ],
             outputs=[
                 io.Image.Output(display_name="image"),
@@ -113,7 +114,7 @@ class LoadPS(io.ComfyNode):
         include_hidden: bool = False,
         group_mode: str = "layer",
         output_mode: str = "all_layers",
-        preview: bool = False,
+        preview: bool = True,
     ) -> io.NodeOutput:
         del preview
         path = cls._resolve_input_relative_path(file)
@@ -165,6 +166,11 @@ class LoadPS(io.ComfyNode):
         except Exception as exc:
             raise RuntimeError(f"Load PS 需要 psd-tools 依赖，请先安装: python -m pip install psd-tools ({exc})") from exc
         LoadPS._patch_psd_tools_metadata_padding()
+        # psd_tools 打开 PSD 时会把未收录的 image resource / tagged block 以 INFO
+        # 级别打印（例如 "Unknown image resource 1092"、"Unknown tagged block: b'CAI '"），
+        # 每次 UI 预览解析都会刷屏。上游 psd-tools#454 给出的处理方式就是调日志级别，
+        # 这里在 psd_tools 边界统一抬到 WARNING：INFO 噪音静音，WARNING/ERROR 保留。
+        logging.getLogger("psd_tools").setLevel(logging.WARNING)
         return PSDImage.open(path)
 
     @staticmethod

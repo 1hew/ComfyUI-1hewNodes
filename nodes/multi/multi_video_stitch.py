@@ -22,6 +22,7 @@ from comfy_api.latest import io
 from ...utils._image_ops import (
     ensure_channels,
     pad_to_rgb,
+    parse_pad_color,
 )
 
 
@@ -82,7 +83,7 @@ class MultiVideoStitch(io.ComfyNode):
             kwargs.get("get_video_size"), decoded
         )
         target_fps = cls._resolve_target_fps(fps, decoded)
-        pad_rgb = cls._parse_color_string(pad_color)
+        pad_rgb = parse_pad_color(pad_color)
         target_channels = (
             4
             if any(int(item["images"].shape[3]) == 4 for item in decoded)

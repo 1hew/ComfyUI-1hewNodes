@@ -124,14 +124,14 @@ class SaveAudioOptionalInputTests(unittest.TestCase):
         self.assertEqual(audio_port[1], "AUDIO")
         self.assertTrue(audio_port[3].get("optional"))
 
-    def test_unknown_format_falls_back_to_flac(self):
+    def test_unknown_format_falls_back_to_mp3(self):
         result = self.save(_audio(torch.zeros(1, 1, 441)), format="bogus")
-        self.assertTrue(result.values[0].endswith(".flac"))
+        self.assertTrue(result.values[0].endswith(".mp3"))
 
     def test_execute_has_python_defaults(self):
         signature = inspect.signature(self.module.SaveAudio.execute)
         self.assertIsNone(signature.parameters["audio"].default)
-        self.assertIs(signature.parameters["format"].default, "flac")
+        self.assertEqual(signature.parameters["format"].default, "mp3")
 
     def test_unconnected_audio_writes_nothing(self):
         # Mirrors a prompt with the optional port left empty: no "audio" key.

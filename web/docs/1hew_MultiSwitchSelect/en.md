@@ -1,14 +1,14 @@
 # Multi Switch Select - Multi-Output Routing Selector
 
-**Node Purpose:** `Multi Switch Select` uses a 1-based `select` expression to choose one or more inputs from dynamic `input_1..input_N`, then emits each chosen value only on the matching `output_k`. All other outputs remain `None`.
+**Node Purpose:** `Multi Switch Select` uses a 1-based `select` expression to choose one or more inputs from dynamic `input_1..input_N`, then emits each chosen value only on the matching `output_k`. All other outputs remain `None`; setting `select` to `a` or `all` selects every connected input at once.
 
-**Shared rules:** `select` and `Image Batch Index`'s `index` use the same parser (`utils/_index_range.py`) and accept exactly the same range syntax. The differences are that `select` is 1-based and its results are deduplicated and sorted.
+**Shared rules:** `select` and `Image Batch Index`'s `index` use the same parser (`utils/_index_range.py`) and accept exactly the same range syntax. The differences are that `select` is 1-based, its results are deduplicated and sorted, and it additionally accepts the `a` / `all` select-all shortcuts (`Image Batch Index` has no such keyword).
 
 ## Inputs
 
 | Name | Port | Type | Default | Range | Description |
 | ---- | ---- | ---- | ------- | ----- | ----------- |
-| `select` | - | STRING | `1` | 1..10 index/range expressions | Same syntax as `Image Batch Index`'s `index`: `1,3`, `1-3`, `[1,3]`, `[1,3)`, `:step`, negative indices |
+| `select` | - | STRING | `1` | 1..10 index/range expressions, or `a` / `all` | Same syntax as `Image Batch Index`'s `index`: `1,3`, `1-3`, `[1,3]`, `[1,3)`, `:step`, negative indices; `a` / `all` means every connected input |
 | `input_1` | optional | ANY (`*`) | - | - | First candidate input |
 | `input_2…input_10` | optional (dynamic) | ANY (`*`) | - | - | Additional candidate inputs |
 
@@ -33,16 +33,21 @@
 | `[1:3]` | 1 and 3 (`:` is only step syntax; it does not expand 1, 2, 3) |
 | `-1` | Last connected input; e.g. with `input_1..input_4` connected, this is `input_4` |
 | `[8,12]` | Out-of-range parts are dropped; only 8, 9, 10 remain |
+| `a`, `all`, `ALL` | Every connected input: 1..N (N = highest connected slot); case-insensitive |
 
 - `[1:3]` is not a range: `:` belongs to the step syntax; use `[1,3]` or `1-3` for a range.
 - Only `-` separates a range; `1~3` yields 1 and 3, not a range.
 - Negative indices resolve against the highest connected input slot: with 1..4 connected, `-1` = `input_4` and `-4` = `input_1`.
 - Out-of-range indices are skipped; an empty or fully invalid `select` selects nothing (all `output` values are `None`).
 - Results are deduplicated and sorted; duplicates and input order do not affect the final selection.
+- `a` / `all` must be a standalone token (separated by a comma, semicolon or whitespace); `a1` and `all1` still parse as the number `1`.
+- `a` / `all` takes precedence: numbers in the same expression are ignored (`all,2` is still everything).
+- Select-all keeps empty slots in 1..N: a connected-but-empty slot, or an unconnected slot at or below N, still leaves its `output_k` as `None`.
 
 ## Features
 
 - Multi-selection: `select=1,2,4` evaluates `input_1`, `input_2` and `input_4`; `input_3` is never evaluated.
+- Select-all: `select=a` (or `all`) behaves like selecting 1..N, and stays lazy so only actually connected inputs are requested.
 - Fixed routing: `input_k` always maps to `output_k`.
 - Lazy evaluation: `check_lazy_status` requests every selected input that is connected but unresolved in one pass; unselected branches are never added to the execution graph.
 - Missing-input safety: a selected but unconnected input is not requested, its output stays `None`, and no `NodeInputError` is raised.
@@ -55,6 +60,7 @@
 - Contiguous range: `select=1-3` runs branches 1/2/3.
 - Only 1 and 3: `select=1,3`, `select=[1:3]` or `select=[1,3]:2`.
 - Last connected branch: `select=-1`.
+- Release everything: `select=all` (or `a`) runs every connected branch.
 - Dynamic routing driven by another logic node that produces the `select` string.
 
 ## Notes & Tips

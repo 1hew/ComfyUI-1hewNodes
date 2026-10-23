@@ -13,6 +13,8 @@ import math
 
 import torch
 
+from ._image_ops import pad_to_rgb
+
 
 
 def resolve_target_size(cls, source_w: int, source_h: int, preset_size: str) -> tuple[int, int]:
@@ -64,7 +66,7 @@ def native_pair(
                 cw, ch = w, max(h, int(math.ceil(w / ratio)))
             else:
                 cw, ch = max(w, int(math.ceil(h * ratio))), h
-            native_img = cls._pad_to_rgb(image, ch, cw, pad_color)
+            native_img = pad_to_rgb(image, ch, cw, pad_color)
             top = max((ch - h) // 2, 0)
             left = max((cw - w) // 2, 0)
             native_msk = torch.zeros((b, ch, cw), dtype=torch.float32, device=mask.device)
@@ -112,7 +114,7 @@ def resize_pair(
             new_h = max(int(round(h * scale)), 1)
             resized_img = cls._resize_image(image, new_h, new_w)
             resized_msk = cls._resize_mask(mask, new_h, new_w)
-            out_img = cls._pad_to_rgb(resized_img, target_h, target_w, pad_color)
+            out_img = pad_to_rgb(resized_img, target_h, target_w, pad_color)
             top = max((target_h - new_h) // 2, 0)
             left = max((target_w - new_w) // 2, 0)
             out_msk = torch.zeros((b, target_h, target_w), dtype=torch.float32, device=resized_msk.device)

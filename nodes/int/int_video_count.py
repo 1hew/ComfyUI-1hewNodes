@@ -3,6 +3,7 @@ from typing import Any
 from comfy_api.latest import io
 
 from ...utils import make_ui_text
+from ...utils._count_ops import collect_prefixed_values, count_video_items
 
 
 class IntVideoCount(io.ComfyNode):
@@ -21,39 +22,14 @@ class IntVideoCount(io.ComfyNode):
     @classmethod
     async def execute(
         cls,
-        video_1=None,
+        video_1: Any = None,
         **kwargs,
     ) -> io.NodeOutput:
-        count = 0
-        videos = cls._collect_ordered_videos(video_1, kwargs)
-        for _, video in videos:
-            count += cls._count_connected_video(video)
-
+        count = sum(
+            count_video_items(value)
+            for value in collect_prefixed_values("video_", video_1, kwargs)
+        )
         return io.NodeOutput(
             int(count),
             ui=make_ui_text(str(int(count))),
         )
-
-    @classmethod
-    def _collect_ordered_videos(
-        cls,
-        video_1: Any,
-        kwargs: dict[str, Any],
-    ) -> list[tuple[int, Any]]:
-        videos: list[tuple[int, Any]] = [(1, video_1)]
-        for key, value in kwargs.items():
-            if not isinstance(key, str) or not key.startswith("video_"):
-                continue
-            suffix = key[len("video_") :]
-            if not suffix.isdigit():
-                continue
-            index = int(suffix)
-            if index == 1:
-                continue
-            videos.append((index, value))
-        videos.sort(key=lambda item: item[0])
-        return videos
-
-    @staticmethod
-    def _count_connected_video(video) -> int:
-        return 1 if video is not None else 0

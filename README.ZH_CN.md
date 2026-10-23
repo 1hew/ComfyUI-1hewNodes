@@ -21,6 +21,17 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v4.1.0**
+- feat(conversion)：新增 `Any to Any`，通过 `*` 通配端口把任意值原样透传，让声明类型不同的输出与输入也能连线，不做真正的类型转换。
+- feat(int)：新增 `Int Mask Count`、`Int Audio Count`、`Int Text Count`，分别统计动态 `mask_X` / `audio_X` / 通配 `text_X` 输入；空值判定与 `Any Empty Bool` 一致，图像/遮罩批次按帧计数、列表输出先展开再计数，`Int Image Count` / `Int Video Count` 同步改用 `utils/_count_ops.py` 共享实现。
+- feat(logic)：`Multi Switch Select` 的 `select` 支持独立写法 `a` / `all`（大小写不敏感），一次惰性选中全部已连接输入；`Image Batch Index` 仍只接受数字语法。
+- feat(io)：`Load PS` 的 `preview` 默认改为 `true`；同时把 psd_tools 日志级别设为 WARNING，屏蔽未知 image resource / tagged block 的 INFO 噪音，保留 WARNING/ERROR。
+- feat(io)：`Save Audio` 的新节点与未知旧值默认使用 `mp3`（320 kbps）；节点内播放器改用独立 DOM 容器，在经典画布与 Nodes 2.0 下都保持完整宽度，并在无关执行消息到达时保留上一次预览。
+- fix(multi)：`Multi String Join` 的 `string_1` 改为可选纯插槽输入，动态追加的 `string_N` 不再错位到节点顶部设置区。
+- refactor(shared)：`Multi Image Batch`、`Multi Video Stitch` 与 resize 共享层改用 `utils/_image_ops.py` 的 `parse_pad_color` / `pad_to_rgb`，去掉节点内重复实现。
+- test：补充 `Any to Any`、三个新计数节点、`Multi Switch Select` 全选与 `Save Audio` mp3 回退的回归测试。
+- docs：新增 4 个节点的中英文文档，更新 `Load PS` / `Save Audio` / `Multi Switch Select` / `Multi String Join` 以及计数节点文档，并同步 README 节点列表与更新日志。
+
 **v4.0.0**
 - **I/O 大版本升级**：统一 `Load Text` / `Save Text` 的文本读写与元数据链路，新增 `Save Audio`，`Save Video` 按源容器安全保存，`Load PS` 改为按需图层预览与缓存。
 - **逻辑与共享层**：`Multi Switch Select` 共用 `Image Batch Index` 的区间语法并支持多选；重复的图像/视频/文本/文件辅助代码收敛到 `utils/_*.py`，由扩展后的一致性检查与回归测试覆盖。
@@ -670,6 +681,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | String Coordinate to BBox Mask | 将字符串格式坐标转换为BBoxMask格式，支持图像尺寸获取和灵活的输出模式 |
 | Text List to String | 文本列表合并，逐项应用前后缀并按分隔符拼接，支持转义与复合分隔符 |
 | Text to Any | 将文本输出为通配类型，便于连接到更多输入端 |
+| Any to Any | 将任意输入原样透传为通配类型（`*`），让声明类型不同的输出与输入也能连接 |
 
 ### 🧠 逻辑节点
 | 节点名称 | 功能描述 |
@@ -680,7 +692,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Any Switch Select | 多路选择节点，支持多个输入选项的惰性切换，将选中的 `input_k` 路由到 `output`，并返回实际生效的 `select` 值 |
 | Float Number Compare | 浮点数值比较节点，支持通过比较符判断两个 FLOAT 并输出布尔值 |
 | Int Number Compare | 整数数值比较节点，支持通过比较符判断两个 INT 并输出布尔值 |
-| Multi Switch Select | 多输出多选节点，使用与 Image Batch Index 相同的区间写法（1-based，如 `1-3`、`[1,3]`）惰性选中多路 `input_k` 并输出到对应 `output_k`，其余输出为 `None` |
+| Multi Switch Select | 多输出多选节点，使用与 Image Batch Index 相同的区间写法（1-based，如 `1-3`、`[1,3]`，或 `a`/`all` 表示全部已连接）惰性选中多路 `input_k` 并输出到对应 `output_k`，其余输出为 `None` |
 | Text Compare | 比较两个字符串，支持相等、包含、前后缀和正则等运算符，并输出布尔值 |
 | Text Match Rownum | 多行文本行号匹配，返回首个匹配项的行号（1-based），未命中返回 0 |
 | Text Match Value | 在多行键值对中匹配单行文本并返回对应值，支持简单数字与布尔文本自动转类型 |
@@ -692,10 +704,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Int Image Count | 统计动态 `image_X` 输入中的有效图像数量，忽略空输入、空张量与全 0 图像 |
+| Int Mask Count | 统计动态 `mask_X` 输入中的有效遮罩数量，忽略空输入、空张量与全 0 遮罩 |
 | Int Image Side Length | 基于图像尺寸输出选定边长（最长/最短/宽/高） |
 | Int Image Size | 输出图像宽度与高度两个整数 |
 | Int Mask Side Length | 基于遮罩尺寸输出选定边长（最长/最短/宽/高） |
-| Int Video Count | 统计动态 `video_X` 输入中的已连接视频数量 |
+| Int Video Count | 统计动态 `video_X` 输入中的非空视频数量（列表输出按元素计数） |
+| Int Audio Count | 统计动态 `audio_X` 输入中的非空音频数量（列表输出按元素计数） |
+| Int Text Count | 统计动态通配 `text_X` 输入中的非空 STRING / INT / FLOAT 数量（BOOLEAN 按 INT 处理） |
 | Int Split | 将总数值分割为两部分，支持百分比与整数分割点 |
 | Int Wan | 生成 4n+1 等差数列，支持步长与范围校验 |
 
@@ -742,7 +757,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🔗 多输入节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Multi String Join | 动态多输入字符串连接，支持 `{input}` 变量与注释/三引号过滤，可自定义分隔符 |
+| Multi String Join | 动态多输入字符串连接（`string_1` 为纯插槽），支持 `{input}` 变量与注释/三引号过滤，可自定义分隔符 |
 | Multi Image Batch | 从动态 `image_X` 构建批次，支持 crop/pad/stretch 尺寸统一，并在任一输入带 alpha 时自动保留 RGBA |
 | Multi Image List | 从动态 `image_X` 批次或列表输入构建 `image_list`，并拆分为单张图像列表项 |
 | Multi Image Overlay | 按顺序叠加多个图像图层，支持 alpha 合成、尺寸适应，并在任一输入带 alpha 时自动保留 RGBA |
@@ -757,11 +772,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Get File Count | 统计目录中图片/视频/psd/文本文件数量，支持递归扫描、列表形式的 `filename` / `file_path` 输出，以及 `filename` 后缀保留控制 |
 | Load Image | 从文件/目录加载图片，支持批量加载、尺寸统一、遮罩输出与列表形式 `filename` |
-| Load PS | 从 PSD/PSB 文件读取指定图层、全部图层批次或完整合成图，支持拖拽上传、按需缓存的图层预览、隐藏图层、组模式与列表形式 `layer_name` |
+| Load PS | 从 PSD/PSB 文件读取指定图层、全部图层批次或完整合成图，支持拖拽上传、默认开启的按需缓存图层预览、隐藏图层、组模式与列表形式 `layer_name` |
 | Load Text | 从文件或目录读取 `.txt` 文本，支持上传、即时预览、自动编码识别与按索引取文件 |
 | Load Video | 从文件/目录选择视频并输出 VIDEO 对象，解码阶段应用裁切与 FPS 设置 |
 | Load Video to Image | 将视频解码为图像帧批次、音频、fps 与帧数信息 |
-| Save Audio | 将 AUDIO 保存为 FLAC/WAV/MP3/Opus，支持输出/临时目录、元数据写入、批量拆分、空输入直通与节点内播放器预览 |
+| Save Audio | 将 AUDIO 保存为 FLAC/WAV/MP3/Opus（默认 mp3），支持输出/临时目录、元数据写入、批量拆分、空输入直通与节点内播放器预览 |
 | Save Image | 保存图像批次到输出/临时目录，并输出保存后的绝对路径 |
 | Save Text | 将文本输入保存为 `txt` / `csv` / `md` / `json`（固定 UTF-8），支持自动编号、元数据与仅预览模式 |
 | Save Video by Image | 将图像批次编码为视频，支持可选音频混流与 Alpha 输出策略 |

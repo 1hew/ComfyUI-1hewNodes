@@ -11,7 +11,7 @@
 | `include_hidden` | - | BOOLEAN | `false` | - | Include hidden Photoshop layers or hidden groups. |
 | `group_mode` | - | COMBO | `layer` | `layer`, `merged` | `layer` expands group children; `merged` treats each group as one composited image. |
 | `output_mode` | - | COMBO | `all_layers` | `single_layer`, `all_layers`, `merged` | Output one indexed layer, all valid layers as a batch, or the merged PSD image. |
-| `preview` | - | BOOLEAN | `false` | - | Show a node preview. When disabled, drag-and-drop upload only fills `file` and does not trigger PSD compositing for preview. |
+| `preview` | - | BOOLEAN | `true` | - | Show a node preview (enabled by default). When disabled, drag-and-drop upload only fills `file` and does not trigger PSD compositing for preview. |
 
 ## Outputs
 
@@ -43,4 +43,5 @@
 
 - This node requires `psd-tools`; make sure dependencies are installed.
 - Rasterized PSD layers are recommended. Complex layer styles, smart objects, and adjustment layers depend on what the PSD file and parser can provide.
-- For large or layer-heavy PSD files, keep `preview=false` and enable it only when needed. Layer previews are loaded on demand and cached, so switching layers does not recomposite the whole PSD.
+- Previews are enabled by default; turn `preview` off for large or layer-heavy PSD files to skip compositing and thumbnail work, and enable it again only when needed. Layer previews are loaded on demand and cached, so switching layers does not recomposite the whole PSD.
+- psd_tools INFO messages about unknown image resources or tagged blocks are suppressed; WARNING and ERROR remain visible.

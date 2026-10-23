@@ -5,6 +5,7 @@ from comfy_api.latest import io
 from ...utils._image_ops import (
     ensure_channels,
     pad_to_rgb,
+    parse_pad_color,
 )
 
 
@@ -50,7 +51,7 @@ class MultiImageBatch(io.ComfyNode):
 
         ref_h = int(images[0].shape[1])
         ref_w = int(images[0].shape[2])
-        pad_rgb = cls._parse_color_string(pad_color)
+        pad_rgb = parse_pad_color(pad_color)
 
         aligned = []
         for img in images:

@@ -150,6 +150,25 @@ def test_out_of_range_and_empty_select_nothing():
     assert MULTI._selected_indices([], 10) == []
 
 
+def test_select_all_keyword_covers_every_connected_slot():
+    assert MULTI._selected_indices("all", 4) == [1, 2, 3, 4]
+    assert MULTI._selected_indices("a", 4) == [1, 2, 3, 4]
+    assert MULTI._selected_indices("ALL", 10) == list(range(1, 11))
+    assert MULTI._selected_indices(" a ", 4) == [1, 2, 3, 4]
+    assert MULTI._selected_indices(["all"], 4) == [1, 2, 3, 4]
+    # With no connected input there is nothing to select.
+    assert MULTI._selected_indices("all", 0) == []
+
+
+def test_select_all_keyword_wins_over_numbers_and_is_whole_token_only():
+    assert MULTI._selected_indices(" a , 3 ", 4) == [1, 2, 3, 4]
+    assert MULTI._selected_indices("all,2", 4) == [1, 2, 3, 4]
+    # Only a standalone token is a shortcut; "a1"/"all1" stay numeric.
+    assert MULTI._selected_indices("a1", 4) == [1]
+    assert MULTI._selected_indices("all1", 4) == [1]
+    assert MULTI._selected_indices("abc", 4) == []
+
+
 def test_bracket_ranges_drop_slots_outside_valid_range():
     assert MULTI._selected_indices("[0,2]", 10) == [1, 2]
     assert MULTI._selected_indices("[8,12]", 10) == [8, 9, 10]
@@ -170,6 +189,9 @@ def test_image_batch_index_uses_the_same_grammar():
     assert IBI._parse_indices("[1:3]", 10) == [1, 3]
     assert IBI._parse_indices("-1", 10) == [9]
     assert MULTI._selected_indices("-1", 10) == [10]
+    # "a"/"all" is a Multi Switch Select shortcut, not part of the shared grammar.
+    assert IBI._parse_indices("all", 10) == []
+    assert MULTI._selected_indices("all", 10) == list(range(1, 11))
 
 
 def test_lazy_status_requests_all_selected_connected_inputs():
@@ -189,6 +211,12 @@ def test_lazy_status_skips_resolved_inputs():
 def test_lazy_status_uses_connected_size_for_negative_index():
     status = MULTI.check_lazy_status(select="-1", input_1=object(), input_4=None)
     assert status == ["input_4"]
+
+
+def test_lazy_status_requests_every_connected_input_for_select_all():
+    status = MULTI.check_lazy_status(select="all", input_1=None, input_3=None)
+    # input_2 is not connected, so it is never requested; input_3 is.
+    assert status == ["input_1", "input_3"]
 
 
 def test_lazy_status_skips_unconnected_port():
@@ -234,6 +262,14 @@ def test_execute_resolves_negative_against_connected_size():
     out = asyncio.run(MULTI.execute(select="-1", input_1="a", input_4="d"))
     assert out[0] is None
     assert out[3] == "d"
+
+
+def test_execute_select_all_routes_every_connected_input():
+    out = asyncio.run(
+        MULTI.execute(select="all", input_1="a", input_2="b", input_3="c")
+    )
+    assert out[:3] == ("a", "b", "c")
+    assert out[3:] == (None,) * 7
 
 
 def test_execute_unmatched_select_outputs_all_none():

@@ -8,7 +8,7 @@
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | `audio` | optional | AUDIO | - | - | Audio to save (`waveform` shaped `[batch, channels, samples]` plus `sample_rate`); when absent, the node finishes with an empty output. |
 | `filename` | - | STRING | `audio/ComfyUI` | - | Save prefix passed to ComfyUI path generation; typically supports date placeholders (e.g. `%date:yyyy-MM-dd%`). |
-| `format` | - | COMBO | `flac` | `flac` / `wav` / `mp3` / `opus` | Save format; mp3 / opus are resampled when the encoder does not support the source rate. |
+| `format` | - | COMBO | `mp3` | `flac` / `wav` / `mp3` / `opus` | Save format; defaults to mp3 (320 kbps, lossy) — choose flac / wav for lossless archiving; mp3 / opus are resampled when the encoder does not support the source rate. |
 | `auto_increment` | - | BOOLEAN | `true` | - | When `true`, creates a new numbered file; when `false`, uses a fixed filename and overwrites it. |
 | `save_output` | - | BOOLEAN | `true` | - | Save to output directory when enabled; save to the temp directory when disabled. |
 | `save_metadata` | - | BOOLEAN | `true` | - | Write prompt/workflow metadata into the audio container when enabled. |
@@ -26,7 +26,7 @@
 - Channels: mono and stereo are supported; more channels raise a clear error instead of writing a broken file.
 - Sample rates: flac / wav keep the source rate; mp3 / opus snap to the nearest encoder-supported rate and resample.
 - Metadata: optionally writes prompt/workflow into the container metadata; skipped automatically when ComfyUI runs with `--disable-metadata`.
-- In-node player: a frontend extension embeds an audio player in the node and points it at the freshly saved file (`/view?filename=...&type=output`) after each run, so results can be auditioned immediately — the same preview the native `Save Audio (Advanced)` node shows. The player hides itself when no audio was produced.
+- In-node player: a frontend extension embeds an audio player in the node and points it at the freshly saved file (`/view?filename=...&type=output`) after each run, so results can be auditioned immediately. The player keeps its own DOM container, so it stays full-width on both the classic canvas and Nodes 2.0, and it hides itself when no audio was produced.
 - UI payload: also returns `SavedAudios` (falling back to `PreviewAudio` on older builds) so the frontend can read the filename, subfolder, and folder type.
 
 ## Typical Usage
@@ -37,6 +37,7 @@
 
 ## Notes & Tips
 
+- The default mp3 output is lossy at 320 kbps, which suits direct delivery and auditioning; if the saved file will be transcoded, mixed, or aligned downstream, switch to flac / wav to keep a lossless source.
 - Encoding uses `PyAV` (bundled with ComfyUI); if a codec is missing from the build (e.g. `libopus`), that format fails — use flac or wav instead.
 - `auto_increment=false` overwrites an existing file; double-check the target directory when saving batches.
 - An absolute path prefix bypasses the output directory; when the saved file is outside ComfyUI's served directories the node falls back to `PreviewAudio(audio)`, which plays the input audio rather than the saved file (older builds may show no preview).
