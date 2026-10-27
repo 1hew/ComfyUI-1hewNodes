@@ -9,3 +9,5 @@ current_workflow.tmp
 
 /cache/
 .pytest_cache/
+# Playwright MCP browser artifacts (console logs, page snapshots)
+.playwright-mcp/

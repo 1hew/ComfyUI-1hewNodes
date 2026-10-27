@@ -21,6 +21,14 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v4.2.0**
+- feat(text)：新增 `Text Path Extract`，从 `text` 输入框（JSON、代码块 JSON、Python 字面量、宽松 JSON 或普通文本）用 `[0].content`、`[-1].bbox[0]`、`[*].content` 等路径取值，输出 `auto` / `json` / `text` / `csv` 文本、`value` 原值与 `count` 数量；默认路径 `[*]` 列出所有项，`[*].content` / `[*].bbox` 可收集整组（`json` 输出一个完整 JSON 数组），路径末尾写 `.count` / `.length` / `[#]` 可直接计数；`count` 输出名在前端会显示该数字（如 `3 count`）。
+- refactor(shared)：把 `Text Custom Extract` 的类 JSON 解析迁到 `utils/_json_path.py`，与新的路径查询、格式化方法共用一份实现。
+- test：补充路径语法、宽松解析回退、输出格式与 `Text Custom Extract` 共享解析的回归测试。
+- docs：新增该节点的中英文文档，并同步 README 节点列表与更新日志。
+- feat(conversion)：新增 `Seedream BBox to Mask`，把 Seedream 的 `<bbox>x1 y1 x2 y2</bbox>` 千分位坐标（`x = round(px / width * 1000)`）或图层 `bounding_box` 反解回像素并栅格化成矩形遮罩（只处理 bbox，`<point>` 忽略）：`separate` 每个框一张 mask、`merge` 合并为一张，并输出 `count`；解析不绑格式（标签、`bbox(...)`、JSON、裸数字、全角标点、`图1` / `Image 1` 前缀）；坐标单位只有 `normalized`（千分位 0-1000）与 `absolute`（像素）二选一，格式固定 xyxy（right/bottom 是边界）；图层拆分的 `bounding_box` 可整段贴入，两个字段都在时按 `coord_mode` 取、只剩一个时用该字段自己的单位，每层只出一个框；normalized 下遇到 >1000 的像素值直接报错提示改 `absolute`。
+- test：补充归一化反解、多点/多框批次、点选圆点、xywh 与 auto 空间、越界收敛与空输入的回归测试。
+
 **v4.1.0**
 - feat(conversion)：新增 `Any to Any`，通过 `*` 通配端口把任意值原样透传，让声明类型不同的输出与输入也能连线，不做真正的类型转换。
 - feat(int)：新增 `Int Mask Count`、`Int Audio Count`、`Int Text Count`，分别统计动态 `mask_X` / `audio_X` / 通配 `text_X` 输入；空值判定与 `Any Empty Bool` 一致，图像/遮罩批次按帧计数、列表输出先展开再计数，`Int Image Count` / `Int Video Count` 同步改用 `utils/_count_ops.py` 共享实现。
@@ -679,6 +687,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Mask to SAM3 Box | 将遮罩转换为 SAM3 框提示（归一化 cx,cy,bw,bh），支持正/负与合并/分离模式 |
 | String Coordinate to BBoxes | 将字符串格式坐标转换为BBOXES格式，增强格式支持并改进SAM2兼容性 |
 | String Coordinate to BBox Mask | 将字符串格式坐标转换为BBoxMask格式，支持图像尺寸获取和灵活的输出模式 |
+| Seedream BBox to Mask | 把 Seedream 的 `<bbox>` 千分位坐标或图层 `bounding_box` 还原为矩形遮罩（只处理 bbox），`coord_mode` 二选一千分位/像素，`separate` 逐框批次、`merge` 合并，固定按 xyxy 解析 |
 | Text List to String | 文本列表合并，逐项应用前后缀并按分隔符拼接，支持转义与复合分隔符 |
 | Text to Any | 将文本输出为通配类型，便于连接到更多输入端 |
 | Any to Any | 将任意输入原样透传为通配类型（`*`），让声明类型不同的输出与输入也能连接 |
@@ -736,6 +745,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Text Prefix Suffix | 文本前缀后缀器，支持通配符输入的灵活数据格式化，可自定义前缀和后缀 |
 | Text Custom Extract | 文本自定义提取器，从JSON中提取指定键值 |
+| Text Path Extract | 按 `[0].content`、`[-1].bbox[0]`、`[*].content` 等路径从 JSON 文本、字典或普通文本中取值，可用 `[*].bbox` 收集整组、用 `.count` / `.length` / `[#]` 计数，输出 auto/json/text/csv 文本、`value` 原值与 `count` 数量 |
 | String Ratio GPT Image 2.0 | 从输入图像推断最接近的 GPT 2.0 图像模型支持比例；未连接图像时透传所选比例 |
 | String Ratio Gemini 3.1 Flash Image | 从输入图像推断最接近的 Gemini 3.1 Flash 支持比例；未连接图像时透传所选比例 |
 | String Ratio Jimeng | 从输入图像推断最接近的 Jimeng 支持比例；未连接图像时透传所选比例 |

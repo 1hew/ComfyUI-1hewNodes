@@ -21,6 +21,14 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v4.2.0**
+- feat(text): Add `Text Path Extract` — read a value out of the `text` widget (JSON, fenced JSON, a Python literal, relaxed JSON or plain text) with a path such as `[0].content`, `[-1].bbox[0]` or `[*].content`, then emit it as `auto` / `json` / `text` / `csv` text, the raw `value` and a match `count`; the default path `[*]` lists every item, `[*].content` / `[*].bbox` collect whole lists (`json` returns one JSON array), and `.count` / `.length` / `[#]` count inside the path; the `count` port label shows the number in the front end (e.g. `3 count`).
+- refactor(shared): Move the JSON-like parser used by `Text Custom Extract` into `utils/_json_path.py`, which also hosts the new path query and value formatting helpers.
+- test: Add regression coverage for the path grammar, the loose parsing fallbacks, the output formats and the shared `Text Custom Extract` parser.
+- docs: Add bilingual docs for the new node and synchronize the README node lists and changelog.
+- feat(conversion): Add `Seedream BBox to Mask`, which inverts Seedream `<bbox>x1 y1 x2 y2</bbox>` per-mille coordinates (`x = round(px / width * 1000)`) or a layer `bounding_box` back to pixels and rasterizes them into rectangular masks (bboxes only, `<point>` is ignored): `separate` emits one mask per box, `merge` unions them, plus a `count` output; parsing is format-agnostic (tags, `bbox(...)` calls, JSON, bare numbers, full-width punctuation, `图1` / `Image 1` prefixes); the unit is a plain `coord_mode` choice between `normalized` (per-mille 0-1000) and `absolute` (pixels), boxes are always xyxy (right/bottom are edges); a layer `bounding_box` can be pasted as-is, the field is picked by `coord_mode` when both exist and by its own unit when only one does, so each layer yields a single box; pixel values above 1000 in normalized mode raise an explicit error instead of producing a wrong mask.
+- test: Add regression coverage for the normalized inverse mapping, multi-box batches, point dots, xywh and auto spaces, out-of-range clamping and empty input.
+
 **v4.1.0**
 - feat(conversion): Add `Any to Any`, a wildcard pass-through that forwards any value unchanged through `*` ports, so outputs and inputs with different declared types can be linked without a real conversion.
 - feat(int): Add `Int Mask Count`, `Int Audio Count`, and `Int Text Count` for dynamic `mask_X` / `audio_X` / wildcard `text_X` ports; emptiness follows `Any Empty Bool`, image/mask batches count per frame, list outputs are flattened before counting, and `Int Image Count` / `Int Video Count` now share the same `utils/_count_ops.py` helpers.
@@ -679,6 +687,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Mask to SAM3 Box | Convert masks to SAM3 box prompts (normalized cx, cy, bw, bh), supporting positive/negative and merge/separate modes |
 | String Coordinate to BBoxes | Convert string format coordinates to BBOXES format with enhanced format support and improved SAM2 compatibility |
 | String Coordinate to BBox Mask | Convert string format coordinates to BBoxMask format with image dimension support and flexible output modes |
+| Seedream BBox to Mask | Invert Seedream `<bbox>` per-mille coordinates or a layer `bounding_box` into rectangular masks (bboxes only): `coord_mode` picks per-mille or pixel, `separate` emits per-box batches, `merge` unions them, always xyxy |
 | Text List to String | Merge a text list by applying per-item prefix/suffix and joining with a separator; supports escape sequences and composite separators |
 | Text to Any | Output text as a wildcard payload for flexible connections (e.g., COMBO inputs) |
 | Any to Any | Pass any value through unchanged as a wildcard (`*`), so outputs and inputs with different declared types can be connected |
@@ -736,6 +745,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Text Prefix Suffix | Text prefix suffix formatter with wildcard input support for flexible data formatting with custom prefix and suffix |
 | Text Custom Extract | Text custom extractor for extracting specified key values from JSON |
+| Text Path Extract | Read values from JSON text, dicts or plain text by path such as `[0].content`, `[-1].bbox[0]` or `[*].content`, collect every match (`[*].bbox`), count with `.count` / `.length` / `[#]`, and emit auto/json/text/csv text plus a raw `value` and a `count` output |
 | String Ratio GPT Image 2.0 | Infer the nearest GPT 2.0 image supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
 | String Ratio Gemini 3.1 Flash Image | Infer the nearest Gemini 3.1 Flash supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
 | String Ratio Jimeng | Infer the nearest Jimeng supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
