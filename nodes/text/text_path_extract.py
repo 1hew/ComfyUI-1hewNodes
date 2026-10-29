@@ -60,7 +60,10 @@ class TextPathExtract(io.ComfyNode):
             matches = query_all(text, path)
         except Exception as exc:
             print(f"text_path_extract error: {exc}")
-            return io.NodeOutput(fallback, None, 0, ui=make_ui_text("0"))
+            # Keep both outputs on the declared fallback. Returning None on the
+            # value port made downstream nodes receive an unexpected type while
+            # the text port already reported the fallback.
+            return io.NodeOutput(fallback, fallback, 0, ui=make_ui_text("0"))
 
         if not matches:
             return io.NodeOutput(fallback, fallback, 0, ui=make_ui_text("0"))

@@ -323,6 +323,19 @@ def test_empty_input_returns_fallback():
     assert _run(text="   ", path="[0].content", fallback="none")[0] == "none"
 
 
+def test_parser_exception_returns_fallback_on_both_outputs(monkeypatch):
+    node_module = sys.modules[NODE.__module__]
+
+    def boom(*_args, **_kwargs):
+        raise ValueError("boom")
+
+    monkeypatch.setattr(node_module, "query_all", boom)
+    output = _run(text=SAMPLE, path="[*].content", fallback="N/A")
+    assert output[0] == "N/A"
+    assert output[1] == "N/A"
+    assert output[2] == 0
+
+
 def test_case_sensitive_keys_are_not_guessed():
     assert _run(text='{"Content": "犀牛"}', path="content", fallback="x")[0] == "x"
 
