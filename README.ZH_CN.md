@@ -21,6 +21,15 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v4.3.0**
+- feat(image)：新增 `Image Shift`，按 `shift_x` / `shift_y` 平移整批图像，可循环卷回（`cyclic`）或用 `background_color`（写法与 `Image Alpha Split` 相同，含 `sm`）填充空位，输出平移后的 `image`、对应的 `mask` 与用于无缝贴图的模糊接缝 `border_mask`；保持通道数（含 alpha），遮罩按帧匹配，非循环模式边界像素级精确；可选 `pad` 会把平移结果环向扩展（另出 `pad_mask` 标出补边），让穿过画布边界的接缝可以带上下文 inpaint。
+- test：补充循环/非循环边界、零位移、alpha 遮罩、逐帧遮罩匹配、接缝带几何、`pad` 环向扩展 / `pad_mask` 与空批次的回归测试。
+- docs：新增 `Image Shift` 中英文文档，并同步 README 节点列表与更新日志。
+
+**v4.2.1**
+- fix(text)：`Text Path Extract` 路径解析异常时 `value` 输出也返回 `fallback`（原先返回 `None`），避免下游收到端口未声明的类型；并为异常路径补了回归测试。
+- docs：在 `Text Path Extract` 文档中补充解析异常时的 fallback 说明。
+
 **v4.2.0**
 - feat(text)：新增 `Text Path Extract`，从 `text` 输入框（JSON、代码块 JSON、Python 字面量、宽松 JSON 或普通文本）用 `[0].content`、`[-1].bbox[0]`、`[*].content` 等路径取值，输出 `auto` / `json` / `text` / `csv` 文本、`value` 原值与 `count` 数量；默认路径 `[*]` 列出所有项，`[*].content` / `[*].bbox` 可收集整组（`json` 输出一个完整 JSON 数组），路径末尾写 `.count` / `.length` / `[#]` 可直接计数；`count` 输出名在前端会显示该数字（如 `3 count`）。
 - refactor(shared)：把 `Text Custom Extract` 的类 JSON 解析迁到 `utils/_json_path.py`，与新的路径查询、格式化方法共用一份实现。
@@ -588,6 +597,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image BW Matte | 从图像生成适合抠图的 `mask`，固定使用 `auto + soft` 流程，并提供 `gamma`、向内收边与羽化参数 |
 | Image Align Change Mask | 将 AI 编辑图与原图对齐，输出 clean/raw 变化遮罩、变化评分与叠加图，抑制小幅全局色彩漂移 |
 | Image Blur | 整图高斯模糊，支持小数半径、逐帧批量处理，blur 为 0 时原图透传 |
+| Image Shift | 按 `shift_x` / `shift_y` 平移整批图像，可循环卷回或用 `background_color` 填充空位（写法与 `Image Alpha Split` 相同，含 `sm`），并输出平移后的 `mask` 与用于无缝贴图的接缝 `border_mask`；可选环向扩展 `pad`（`0` = 关闭，另出 `pad_mask` 标出补边区域）可在 inpaint 前给跑出画布的接缝补上边界外上下文；保持通道数不变 |
 
 ### 📐 图像尺寸节点
 | 节点名称 | 功能描述 |

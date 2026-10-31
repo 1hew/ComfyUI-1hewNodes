@@ -21,6 +21,15 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v4.3.0**
+- feat(image): Add `Image Shift` — translate a whole image batch by `shift_x` / `shift_y`, either wrapping the overflow (`cyclic`) or filling it with `background_color` (the same `Image Alpha Split` syntax, `sm` included), and return the shifted `image`, the matching `mask` and a blurred seam `border_mask` for seamless-tile work; channel count (alpha included) is preserved, masks are matched per frame, the non-cyclic bounds are pixel-exact, and an optional `pad` wrap-extends the shifted outputs (with a `pad_mask` marking the added frame) so seams that cross the canvas border can be inpainted with outside context.
+- test: Add regression coverage for cyclic/non-cyclic bounds, zero shift, alpha masks, per-frame mask matching, seam-band geometry, wrap padding / `pad_mask`, and empty batches.
+- docs: Add bilingual `Image Shift` docs and synchronize the README node lists and changelog.
+
+**v4.2.1**
+- fix(text): `Text Path Extract` now returns `fallback` on the `value` port as well when the path parser raises (it used to emit `None`), so downstream nodes no longer receive a type the port never declared; the error path gains its own regression test.
+- docs: Document the parser-error fallback in the `Text Path Extract` docs.
+
 **v4.2.0**
 - feat(text): Add `Text Path Extract` — read a value out of the `text` widget (JSON, fenced JSON, a Python literal, relaxed JSON or plain text) with a path such as `[0].content`, `[-1].bbox[0]` or `[*].content`, then emit it as `auto` / `json` / `text` / `csv` text, the raw `value` and a match `count`; the default path `[*]` lists every item, `[*].content` / `[*].bbox` collect whole lists (`json` returns one JSON array), and `.count` / `.length` / `[#]` count inside the path; the `count` port label shows the number in the front end (e.g. `3 count`).
 - refactor(shared): Move the JSON-like parser used by `Text Custom Extract` into `utils/_json_path.py`, which also hosts the new path query and value formatting helpers.
@@ -588,6 +597,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Image BW Matte | Generate a cutout-friendly `mask` with a fixed `auto + soft` pipeline, plus `gamma`, inward shrink, and blur controls |
 | Image Align Change Mask | Align an AI-edited image to its original and extract clean/raw change masks, a change score, and an overlay while rejecting small global color drift |
 | Image Blur | Whole-image Gaussian blur with fractional radius, per-frame batch processing, and pass-through when blur is 0 |
+| Image Shift | Shift a whole image batch by `shift_x` / `shift_y` with cyclic wrap or a `background_color` fill (same syntax as `Image Alpha Split`, `sm` included), and return the shifted `mask` plus a blurred seam `border_mask` for seamless tiling; an optional wrap `pad` (`0` = off, with a `pad_mask` marking the added frame) gives seams that run off the canvas outside context before inpainting, and channel count is preserved |
 
 ### 📐 Image Resize Nodes
 | Node Name | Description |

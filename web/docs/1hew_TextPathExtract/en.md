@@ -71,6 +71,7 @@ Full-width `【】`, `“”` and `‘’` are normalised, so a Chinese IME typi
 
 - Blank `text` returns `fallback` directly and never raises.
 - A missing path also returns `fallback`; leave it empty to pass an empty value downstream.
+- If the parser raises on an unexpected payload, `text` and `value` both return `fallback` and `count` is 0 (the error is printed to the console), so downstream nodes never receive a type the port does not declare.
 - Plain text has no items to walk, so `[*]` finds nothing; leave `path` empty to pass plain text through unchanged.
 - With `auto` strings stay raw while lists / dicts become compact JSON; choose `json` when strings must keep their quotes.
 - A real `count` key is not shadowed: if the object has that key its value wins; write `["count"]` to force literal key access.
