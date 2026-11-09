@@ -6,6 +6,7 @@ from comfy_api.latest import io
 from ...utils._image_ops import (
     adapt_fill_to_channels,
     ensure_channels,
+    pad_color_is_transparent,
     pad_to_rgb,
     parse_pad_color,
     parse_spacing_color,
@@ -60,7 +61,12 @@ class MultiImageStitch(io.ComfyNode):
             empty = torch.zeros((0, 64, 64, 3), dtype=torch.float32)
             return io.NodeOutput(empty)
 
-        target_channels = 4 if any(int(img.shape[3]) == 4 for img in images) else 3
+        target_channels = (
+            4
+            if pad_color_is_transparent(pad_color)
+            or any(int(img.shape[3]) == 4 for img in images)
+            else 3
+        )
         images = [ensure_channels(img, target_channels) for img in images]
 
         if len(images) == 1:

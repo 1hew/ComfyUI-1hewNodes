@@ -26,6 +26,7 @@
 - `crop`: scale to cover target, then center-crop.
 - `pad`: scale to fit inside target, then pad with `pad_color`.
 - Advanced padding: `extend` replicate, `mirror` reflect (segmented), `edge` per-side averages, `average` global average, or explicit colors.
+- Transparent padding: an empty `pad_color` (or `transparent`) outputs RGBA — opaque content with `(0,0,0,0)` padding — and 3-channel input is expanded to 4 channels.
 - Ordering: collects `image_*` inputs by numeric suffix to preserve sequence.
 
 ## Typical Usage
@@ -37,5 +38,5 @@
 ## Notes & Tips
 
 - The first image determines target height/width; ensure it matches desired output.
-- When the output is RGBA, explicit padding colors are automatically extended with opaque alpha.
+- When the output is RGBA, explicit padding colors are automatically extended with opaque alpha; only empty / `transparent` pads transparency.
 - Padding color parser supports grayscale floats, `R,G,B` in `0..1` or `0..255`, `#hex`, and common names.

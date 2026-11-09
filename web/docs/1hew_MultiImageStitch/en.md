@@ -10,7 +10,7 @@
 | `match_image_size` | - | BOOLEAN | True | - | Match sizes by resizing when `True`; otherwise pad to unify. |
 | `spacing_width` | - | INT | 10 | 0–1000 | Spacer thickness between images. |
 | `spacing_color` | - | STRING | `1.0` | grayscale/HEX/RGB/name | Spacer color. |
-| `pad_color` | - | STRING | `1.0` | color strategy for padding | Padding strategy or color.
+| `pad_color` | - | STRING | `1.0` | color strategy for padding | Padding strategy or color; empty or `transparent` outputs RGBA with transparent padding (3-channel input expanded to 4 channels).
 | `image_1` | - | IMAGE | - | - | First image. |
 | `image_2…image_N` | optional | IMAGE | - | - | Additional images recognized by numeric suffix ordering.
 
@@ -30,6 +30,7 @@
 - Pad to unify: when `match_image_size=False` with `pad_color` strategies.
 - Spacers: vertical or horizontal strips with `spacing_color`; `spacing_width=0` yields no gap.
 - Advanced padding: `extend`, `mirror`, `edge`, `average`, or explicit colors.
+- Transparent padding: an empty `pad_color` (or `transparent`) outputs RGBA — opaque content with `(0,0,0,0)` padding — and 3-channel input is expanded to 4 channels.
 
 ## Typical Usage
 
@@ -40,5 +41,5 @@
 ## Notes & Tips
 
 - `spacing_color` supports grayscale floats, `R,G,B` in `0..1` or `0..255`, `#hex`, and common names.
-- When the output is RGBA, explicit `spacing_color` and `pad_color` values are automatically extended with opaque alpha.
+- When the output is RGBA, explicit `spacing_color` and `pad_color` values are automatically extended with opaque alpha; an empty / `transparent` `pad_color` pads transparency `(0,0,0,0)` instead.
 - For precise alignment in left/right, target heights are unified; for top/bottom, target widths are unified.

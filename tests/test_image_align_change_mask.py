@@ -46,11 +46,17 @@ def _load_node():
     nodes_pkg.__path__ = [str(root / "nodes")]
     image_pkg = types.ModuleType("align_mask_test.nodes.image")
     image_pkg.__path__ = [str(root / "nodes" / "image")]
+    # The node imports the shared colour-fit kernel from ...utils._color_fit, so
+    # the synthetic utils package must exist; registering it keeps utils/__init__
+    # (which starts the workflow monitor) out of the test run.
+    utils_pkg = types.ModuleType("align_mask_test.utils")
+    utils_pkg.__path__ = [str(root / "utils")]
     sys.modules.update(
         {
             "align_mask_test": package,
             "align_mask_test.nodes": nodes_pkg,
             "align_mask_test.nodes.image": image_pkg,
+            "align_mask_test.utils": utils_pkg,
         }
     )
     module = importlib.import_module(

@@ -16,7 +16,7 @@
 | `scale_to_side` | - | COMBO | `None` | `None` / `longest` / `shortest` / `width` / `height` / `length_to_sq_area` | Target-side control; e.g., set the longest/shortest side or explicit width/height. |
 | `scale_to_length` | - | INT | 1024 | 1-8192 | Target length for the selected `scale_to_side` mode. |
 | `fit` | - | COMBO | `crop` | `crop` / `pad` / `stretch` | Fit mode: crop, pad, or stretch. |
-| `pad_color` | - | STRING | 1.0 | grayscale/HEX/RGB/`edge`/`average`/`extend`/`mirror` | Padding background strategy; see “Padding Strategies”. |
+| `pad_color` | - | STRING | 1.0 | grayscale/HEX/RGB/`transparent`/`edge`/`average`/`extend`/`mirror` | Padding background strategy; empty or `transparent` makes `pad` mode output RGBA with transparent padding; see “Padding Strategies”. |
 | `divisible_by` | - | INT | 8 | 1-1024 | Ensure output width/height round up to a multiple of this value (often required by models). |
 
 ## Outputs
@@ -54,6 +54,7 @@
 - `average`: fill with the global average color of the image.
 - `extend`: replicate edge pixels (`replicate`).
 - `mirror`: reflect edge pixels (`reflect`, with segmented extension support).
+- Empty / `transparent`: `pad` mode outputs RGBA — content alpha 1, padded area `(0,0,0,0)` — and RGB input is expanded to 4 channels; `crop` / `stretch` add no padding, so the output stays RGB.
 
 ## Typical Usage
 

@@ -9,6 +9,7 @@ from ...utils._image_ops import (
     fit_resize_mask,
     generate_default_mask,
     image2mask,
+    pad_color_is_transparent,
     pil2tensor,
     tensor2pil,
 )
@@ -146,14 +147,17 @@ class ImageMinimumArea(io.ComfyNode):
     ) -> torch.Tensor:
         """Resize every image frame with the requested fit mode, keeping alpha."""
         out = []
+        # 空 pad_color = 透明补边：pad 模式下 RGB 输入也输出 RGBA（内容不透明）
+        transparent_pad = fit == "pad" and pad_color_is_transparent(pad_color)
         for img in image:
             frame = torch.unsqueeze(img, 0)
             pil = tensor2pil(frame)
+            has_alpha = "A" in pil.getbands() or "transparency" in pil.info
 
-            if "A" in pil.getbands() or "transparency" in pil.info:
+            if has_alpha or transparent_pad:
                 rgba = pil.convert("RGBA")
                 rgb = rgba.convert("RGB")
-                alpha = rgba.getchannel("A")
+                alpha = rgba.getchannel("A") if has_alpha else Image.new("L", pil.size, 255)
 
                 resized_rgb = fit_resize_image(
                     rgb, target_width, target_height, fit, sampler, pad_color

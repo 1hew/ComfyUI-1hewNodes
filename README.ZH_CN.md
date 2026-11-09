@@ -21,6 +21,16 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v4.4.0**
+- feat(float)：新增 `Float Mask Area Ratio`，把遮罩覆盖整张图像的面积比例输出为 `0–1` 浮点数：遮罩软值按权重计算（羽化、抗锯齿边缘得到真实覆盖率，而不是按整像素放大），批次取平均，超出 `0–1` 先钳制，`None` / 空张量 / 非遮罩输入返回 `0.0`；`round`（`0–10`，默认 `2`，名称与范围同 `Range Mapping`）控制小数位；前端会直接在 `float` 输出上显示该数值。
+- feat(text)：新增 `Text System Prompt`，把 `utils/system_prompt/` 下的每个 `.txt` 作为单层 `<模型>/[<语言>] <名称>` 下拉项，选中后原样输出到 `string`；键表在启动时扫描一次，改已有条目正文按 mtime 生效、不必重启，`_` / `.` 开头的文件不进下拉，目录为空或键不存在时输出 `""` 而不阻塞工作流。内置 Qwen-Image-2.1 的 `t2i` / `edit` 正文改编自 benjiyaya/ComfyUI-Qwen-Image-2.1-Prompt-Enhancer（MIT），已改为纯文本输出。
+- feat(image)：重构 `Image Crop With BBox Mask` 的 `auto` 预设为自适应构图——先忽略稀疏噪点（只丢掉比最密行/列轻 10 倍、且累计不超过总量 1% 的边），去噪 bbox 的比例与最近标准比例的线性偏差 ≤30% 时才吸附，对齐后的框必然能放进原图、不会再“装不下就整幅返回”；`scale_strength` 改为取景权重，`0` 贴遮罩、`1` 近似全图，宽高各自在对数尺度上过渡；`crop_to_side` / `crop_to_length` 非 `None` 时仍由它们接管尺寸、`scale_strength` 不参与。旧版 `auto`（按原图比例吸附标准比例）保存的工作流重新打开后输出会变化，属预期。
+- feat(util)：`Range Mapping` 的小数位输入由 `rounding` 更名为 `round`（范围 `0–10`、默认 `3` 不变），与新浮点节点统一；旧工作流的该参数会回落到默认值。
+- refactor(shared)：把成对像素颜色估计迁到 `utils/_color_fit.py` 并被 `Image Align Change Mask` 复用，结构一致性采样、增益/偏置上限与留出验证收敛到一处；实际施加的校正幅度与原先一致，渲染结果不变。
+- refactor(pad)：统一 `pad_color` 的空值语义，覆盖 `Image Pad By BBox Mask`、`Image Edge Crop/Pad`、`Multi Image Batch`、`Multi Image Stitch`、`Multi Video Stitch`、`Image Main Stitch`、`Image Edit Stitch`、`Image Resize Universal` / `Area` 与 `Image Minimum Area`——留空（或填 `transparent`）时一律输出 RGBA：3 通道输入会扩成 4 通道，原内容保持不透明、补边区域为 `(0,0,0,0)`（resize 系列只在 `pad` 模式下扩展，`crop` / `stretch` 没有补边、仍为 RGB）。显式颜色继续补不透明 alpha，resize 系列的空值底色不再回落到黑色。留空过该字段的 RGB 工作流输出通道数会变化，建议重新检查。
+- test：补充颜色拟合内核、`Float Mask Area Ratio`、`Text System Prompt`、`auto` 取景链路（噪点、长条图、比例吸附、`divisible_by`、`scale_strength` 过渡、贴边主体平移、批次）以及空值 / `transparent` 补边的回归测试。
+- docs：新增两个新节点的中英文文档，更新 `Image Crop With BBox Mask` / `Range Mapping` 文档，在 README 节点列表中新增「浮点节点」分区，并在致谢中标注内置 Qwen-Image-2.1 提示词的来源，同步更新日志。
+
 **v4.3.0**
 - feat(image)：新增 `Image Shift`，按 `shift_x` / `shift_y` 平移整批图像，可循环卷回（`cyclic`）或用 `background_color`（写法与 `Image Alpha Split` 相同，含 `sm`）填充空位，输出平移后的 `image`、对应的 `mask` 与用于无缝贴图的模糊接缝 `border_mask`；保持通道数（含 alpha），遮罩按帧匹配，非循环模式边界像素级精确；可选 `pad` 会把平移结果环向扩展（另出 `pad_mask` 标出补边），让穿过画布边界的接缝可以带上下文 inpaint。
 - test：补充循环/非循环边界、零位移、alpha 遮罩、逐帧遮罩匹配、接缝带几何、`pad` 环向扩展 / `pad_mask` 与空批次的回归测试。
@@ -633,7 +643,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Image Mask Crop | 基于遮罩的批量裁剪，支持 RGB/RGBA 通道保持与可选遮罩 alpha 输出 |
 | Image Crop Square | 方形裁剪，支持遮罩引导和缩放 |
-| Image Crop With BBox Mask | 智能边界框裁剪，支持精确比例控制和缩放强度调节 |
+| Image Crop With BBox Mask | 智能边界框裁剪，支持比例预设、`auto` 自适应构图（`0` 贴遮罩、`1` 近似全图，长条图与脏遮罩也不会把主体裁小）、缩放强度与整除约束 |
 | Image Paste By BBox Mask | 裁剪图像回贴，支持多种混合模式 |
 | Image Pad By BBox Mask | 按 bbox 遮罩将局部图像补回整张画布，并用指定颜色或策略填充空白区域 |
 | Image Edge Crop/Pad | 智能边缘裁剪和填充，支持多种填充模式和遮罩输出 |
@@ -733,6 +743,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Int Split | 将总数值分割为两部分，支持百分比与整数分割点 |
 | Int Wan | 生成 4n+1 等差数列，支持步长与范围校验 |
 
+### 🧮 浮点节点
+| 节点名称 | 功能描述 |
+|---------|----------|
+| Float Mask Area Ratio | 输出遮罩覆盖整张图像的面积比例（0-1 浮点数，`round` 默认保留 2 位小数）|
+
 ### 📦 批处理节点
 | 节点名称 | 功能描述 |
 |---------|----------|
@@ -756,6 +771,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Text Prefix Suffix | 文本前缀后缀器，支持通配符输入的灵活数据格式化，可自定义前缀和后缀 |
 | Text Custom Extract | 文本自定义提取器，从JSON中提取指定键值 |
 | Text Path Extract | 按 `[0].content`、`[-1].bbox[0]`、`[*].content` 等路径从 JSON 文本、字典或普通文本中取值，可用 `[*].bbox` 收集整组、用 `.count` / `.length` / `[#]` 计数，输出 auto/json/text/csv 文本、`value` 原值与 `count` 数量 |
+| Text System Prompt | 从 `utils/system_prompt/<模型>/[<语言>] <名称>.txt` 中选一条内置系统提示词，原样输出到 `string` 输出；内置 Qwen-Image-2.1 的 `t2i` / `edit`，新增的 `.txt` 重载后会出现在下拉中 |
 | String Ratio GPT Image 2.0 | 从输入图像推断最接近的 GPT 2.0 图像模型支持比例；未连接图像时透传所选比例 |
 | String Ratio Gemini 3.1 Flash Image | 从输入图像推断最接近的 Gemini 3.1 Flash 支持比例；未连接图像时透传所选比例 |
 | String Ratio Jimeng | 从输入图像推断最接近的 Jimeng 支持比例；未连接图像时透传所选比例 |
@@ -835,6 +851,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
 
 [ComfyUI-RH-Nodes](https://github.com/dakun333/ComfyUI-RH-Nodes)
+
+[ComfyUI-Qwen-Image-2.1-Prompt-Enhancer](https://github.com/benjiyaya/ComfyUI-Qwen-Image-2.1-Prompt-Enhancer)（内置 Qwen-Image-2.1 系统提示词，MIT）
 
 
 

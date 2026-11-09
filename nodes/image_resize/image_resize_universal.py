@@ -7,6 +7,7 @@ from comfy_api.latest import io
 from ...utils._image_ops import (
     generate_default_mask,
     fit_resize_mask,
+    pad_color_is_transparent,
     parse_color,
     fit_resize_image,
     tensor2pil,
@@ -195,14 +196,20 @@ class ImageResizeUniversal(io.ComfyNode):
 
         # 处理图像缩放
         if len(orig_images) > 0:
+            # 空 pad_color = 透明补边：pad 模式下 RGB 输入也输出 RGBA（内容不透明）
+            transparent_pad = fit == "pad" and pad_color_is_transparent(pad_color)
             for i in orig_images:
                 src_image = tensor2pil(i)
+                has_alpha = 'A' in src_image.getbands() or ('transparency' in src_image.info)
 
-                # 保持现有 RGB 流程；如果输入含 alpha，则在缩放后合并回 alpha 通道
-                if 'A' in src_image.getbands() or ('transparency' in src_image.info):
+                # 保持现有 RGB 流程；如果输入含 alpha（或需要透明补边），缩放后合并 alpha 通道
+                if has_alpha or transparent_pad:
                     rgba_image = src_image.convert('RGBA')
                     rgb_image = rgba_image.convert('RGB')
-                    alpha_channel = rgba_image.getchannel('A')
+                    if has_alpha:
+                        alpha_channel = rgba_image.getchannel('A')
+                    else:
+                        alpha_channel = Image.new('L', src_image.size, 255)
 
                     resized_rgb = fit_resize_image(
                         rgb_image, target_width, target_height, fit, resize_sampler, pad_color

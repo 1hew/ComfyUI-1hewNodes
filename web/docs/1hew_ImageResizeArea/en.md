@@ -45,6 +45,7 @@
 ## Padding Strategies (`pad_color`)
 
 Same as `Image Resize Universal`: grayscale (`0.5`), HEX (`#FF0000`), RGB (`255,0,0` or `0.5,0.2,0.8`), `edge`, `average`, `extend`, `mirror`.
+An empty value or `transparent` makes `pad` mode output RGBA — content alpha 1, padded area `(0,0,0,0)` — and RGB input is expanded to 4 channels; `crop` / `stretch` add no padding, so the output stays RGB.
 
 ## Typical Usage
 

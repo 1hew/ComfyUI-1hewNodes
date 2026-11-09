@@ -35,7 +35,7 @@ class RangeMapping(io.ComfyNode):
                     display_mode=io.NumberDisplay.number,
                 ),
                 io.Int.Input(
-                    "rounding",
+                    "round",
                     default=3,
                     min=0,
                     max=10,
@@ -52,12 +52,18 @@ class RangeMapping(io.ComfyNode):
         value: float,
         min: float,
         max: float,
-        rounding: int,
+        round: int,
     ) -> io.NodeOutput:
         actual_value = min + value * (max - min)
-        if rounding > 0:
-            actual_value = round(actual_value, rounding)
+        if round > 0:
+            actual_value = cls._rounded(actual_value, round)
         else:
             actual_value = int(actual_value)
         return io.NodeOutput(actual_value, int(actual_value))
+
+    @staticmethod
+    def _rounded(value: float, digits: int) -> float:
+        # Kept in a scope where the `round` builtin is not shadowed by the
+        # widget parameter of the same name.
+        return round(value, digits)
 

@@ -10,7 +10,7 @@
 | `match_image_size` | - | BOOLEAN | True | - | `True` 时按比例缩放匹配；否则按 `pad_color` 补边统一 |
 | `spacing_width` | - | INT | 10 | 0–1000 | 图像间的间距宽度 |
 | `spacing_color` | - | STRING | `1.0` | 灰度/HEX/RGB/颜色名 | 间距颜色 |
-| `pad_color` | - | STRING | `1.0` | 补边策略或颜色 | 补边策略或颜色 |
+| `pad_color` | - | STRING | `1.0` | 补边策略或颜色 | 补边策略或颜色；留空或填 `transparent` 时输出 RGBA 并补透明（3 通道输入也会扩成 4 通道） |
 | `image_1` | - | IMAGE | - | - | 第一张图像 |
 | `image_2…image_N` | 可选 | IMAGE | - | - | 额外图像，按数字后缀排序识别 |
 
@@ -30,6 +30,7 @@
 - 补边统一：`match_image_size=False`，使用 `pad_color` 策略。
 - 间距条：按方向生成纵/横条，颜色由 `spacing_color` 决定；`spacing_width=0` 时无间距。
 - 高级补边：支持 `extend`、`mirror`、`edge`、`average` 或显式颜色。
+- 透明补边：`pad_color` 留空或填 `transparent` 时输出 RGBA，原内容不透明、补边区域为 `(0,0,0,0)`；3 通道输入也会自动扩成 4 通道。
 
 ## 典型用法
 
@@ -40,5 +41,5 @@
 ## 注意与建议
 
 - `spacing_color` 支持灰度浮点、`R,G,B`（`0..1` 或 `0..255`）、`#hex` 与常见颜色名。
-- 当输出为 RGBA 时，显式 `spacing_color` / `pad_color` 会自动补成不透明 alpha。
+- 当输出为 RGBA 时，显式 `spacing_color` / `pad_color` 会自动补成不透明 alpha；`pad_color` 留空或填 `transparent` 时补边区域为透明 `(0,0,0,0)`。
 - 左/右方向统一高度，顶/底方向统一宽度以保证对齐。

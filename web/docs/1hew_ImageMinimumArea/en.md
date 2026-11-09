@@ -11,7 +11,7 @@
 | `length_to_sq_area` | - | INT | 1024 | 1–65536 | Reference square side `N`; target area = `N²`. |
 | `method` | - | COMBO | `lanczos` | `nearest` / `bilinear` / `lanczos` / `bicubic` / `hamming` / `box` | Resampling method. |
 | `fit` | - | COMBO | `crop` | `crop` / `pad` / `stretch` | Fit mode applied while scaling. |
-| `pad_color` | - | STRING | `1.0` | grayscale/HEX/RGB | Padding background color when `fit=pad`. |
+| `pad_color` | - | STRING | `1.0` | grayscale/HEX/RGB/`transparent` | Padding background color when `fit=pad`; empty or `transparent` outputs RGBA with transparent padding. |
 | `divisible_by` | - | INT | 1 | 1–1024 | Round both final dimensions up to a multiple of this value. |
 
 ## Outputs
@@ -27,6 +27,7 @@
 - Minimum-area target: scales both sides by a single factor so the result area reaches `length_to_sq_area²`.
 - Universal-style fit: `crop` / `pad` / `stretch` behave like `Image Resize Universal`.
 - Divisibility: `divisible_by` may add a few pixels so both dimensions satisfy a model size constraint.
+- Transparent padding: an empty / `transparent` `pad_color` makes an actually-resized `fit=pad` output RGBA (opaque content, `(0,0,0,0)` padding; RGB input is expanded to 4 channels); the pass-through path keeps the input channel count.
 - Synchronized mask: an input mask is resized with the image; otherwise a default mask is synthesized.
 - Pass-through: when the input area already meets the target, everything is returned unchanged and `resize_bool` is `False`.
 

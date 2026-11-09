@@ -4,6 +4,7 @@ from comfy_api.latest import io
 
 from ...utils._image_ops import (
     ensure_channels,
+    pad_color_is_transparent,
     pad_to_rgb,
     parse_pad_color,
 )
@@ -45,8 +46,13 @@ class MultiImageBatch(io.ComfyNode):
             empty = torch.zeros((0, 64, 64, 3), dtype=torch.float32)
             return io.NodeOutput(empty)
 
-        # 任一输入含 alpha 时，统一所有输入为 RGBA，确保输出保留 alpha
-        target_channels = 4 if any(int(img.shape[3]) == 4 for img in images) else 3
+        # 任一输入含 alpha（或 pad_color 留空 = 透明补边）时，统一为 RGBA
+        target_channels = (
+            4
+            if pad_color_is_transparent(pad_color)
+            or any(int(img.shape[3]) == 4 for img in images)
+            else 3
+        )
         images = [ensure_channels(img, target_channels) for img in images]
 
         ref_h = int(images[0].shape[1])

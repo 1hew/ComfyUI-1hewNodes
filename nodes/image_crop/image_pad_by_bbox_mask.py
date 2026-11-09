@@ -40,12 +40,18 @@ class ImagePadByBBoxMask(io.ComfyNode):
         image_bs = paste_image.shape[0]
         mask_bs = bbox_mask.shape[0]
         max_bs = max(image_bs, mask_bs)
+        # 空值 / "transparent" = 透明补边：3 通道输入也扩成 RGBA（内容不透明）。
+        transparent_pad = cls._parse_pad_color(pad_color) == "transparent"
 
         async def _proc(b: int):
             def _do():
                 image_idx = b % image_bs
                 mask_idx = b % mask_bs
                 image = paste_image[image_idx]
+                if transparent_pad and int(image.shape[2]) == 3:
+                    image = torch.cat(
+                        [image, torch.ones_like(image[..., :1])], dim=2
+                    )
                 mask = bbox_mask[mask_idx]
                 out_h, out_w = int(mask.shape[0]), int(mask.shape[1])
                 bbox = cls.get_bbox_from_mask(mask)
@@ -137,6 +143,8 @@ class ImagePadByBBoxMask(io.ComfyNode):
         pad_color: str,
     ) -> torch.Tensor:
         fill_spec = cls._parse_pad_color(pad_color)
+        if fill_spec == "transparent":
+            return cls._fill_with_color(source, out_h, out_w, cls._transparent_fill(source))
         if fill_spec == "extend":
             return cls._pad_from_resized(resized, out_h, out_w, paste_x, paste_y, "replicate")
         if fill_spec == "mirror":
@@ -158,7 +166,9 @@ class ImagePadByBBoxMask(io.ComfyNode):
         pad_color: str,
     ) -> torch.Tensor:
         fill_spec = cls._parse_pad_color(pad_color)
-        if fill_spec == "edge":
+        if fill_spec == "transparent":
+            fill_spec = cls._transparent_fill(source)
+        elif fill_spec == "edge":
             fill_spec = cls._edge_color(source)
         elif fill_spec in ("extend", "mirror", "average"):
             fill_spec = source.mean(dim=(0, 1))
@@ -208,6 +218,12 @@ class ImagePadByBBoxMask(io.ComfyNode):
         return padded.squeeze(0).permute(1, 2, 0)
 
     @staticmethod
+    def _transparent_fill(source: torch.Tensor):
+        """空 pad_color 的落地值；透明补边时源图已被扩成 RGBA。"""
+        channels = int(source.shape[2])
+        return (0.0, 0.0, 0.0, 0.0) if channels == 4 else (1.0, 1.0, 1.0)
+
+    @staticmethod
     def _fill_with_color(source: torch.Tensor, out_h: int, out_w: int, color) -> torch.Tensor:
         channels = int(source.shape[2])
         if isinstance(color, torch.Tensor):
@@ -243,9 +259,12 @@ class ImagePadByBBoxMask(io.ComfyNode):
 
     @staticmethod
     def _parse_pad_color(color_str):
+        # 空值 / "transparent" 统一表示透明：4 通道补 (0,0,0,0)，3 通道退回白色。
         if color_str is None:
-            return (1.0, 1.0, 1.0)
+            return "transparent"
         text = str(color_str).strip().lower()
+        if text in ("", "transparent"):
+            return "transparent"
         if text in ("edge", "e"):
             return "edge"
         if text in ("extend", "ex"):

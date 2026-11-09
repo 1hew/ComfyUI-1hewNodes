@@ -169,11 +169,20 @@ class ImageEdgeCropPad(io.ComfyNode):
             new_height = H + pad_top + pad_bottom
             new_width = W + pad_left + pad_right
             
+            fill_spec = ImageEdgeCropPad._parse_pad_color(pad_color, channels=C)
+            if isinstance(fill_spec, str) and fill_spec == 'transparent':
+                # 透明补边：3 通道也扩成 RGBA（原内容 alpha=1，补边 (0,0,0,0)）。
+                img_tensor = torch.cat(
+                    [img_tensor, torch.ones_like(img_tensor[..., :1])], dim=-1
+                )
+                B, H, W, C = img_tensor.shape
+
             # 创建输出tensor和mask
             out_tensor = torch.zeros((B, new_height, new_width, C), dtype=img_tensor.dtype, device=img_tensor.device)
             out_mask = torch.ones((B, new_height, new_width), dtype=torch.float32, device=img_tensor.device)
             
-            fill_spec = ImageEdgeCropPad._parse_pad_color(pad_color, channels=C)
+            if isinstance(fill_spec, str) and fill_spec == 'transparent':
+                fill_spec = (0.0, 0.0, 0.0, 0.0)
             if isinstance(fill_spec, str) and fill_spec in ('extend', 'mirror'):
                 nchw = img_tensor.permute(0, 3, 1, 2)
                 if fill_spec == 'extend':
@@ -246,11 +255,12 @@ class ImageEdgeCropPad(io.ComfyNode):
         default_rgba = (0.0, 0.0, 0.0, 0.0) if channels == 4 else (1.0, 1.0, 1.0)
         default_rgb = (1.0, 1.0, 1.0)
 
+        # 空值 / "transparent" 表示透明：调用方会先把 3 通道扩成 RGBA。
         if color_str is None:
-            return default_rgba if channels == 4 else default_rgb
+            return 'transparent'
         text = str(color_str).strip().lower()
         if text in ('', 'transparent'):
-            return default_rgba if channels == 4 else default_rgb
+            return 'transparent'
         if text in ('edge', 'e'):
             return 'edge'
         if text in ('extend', 'ex'):

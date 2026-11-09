@@ -7,9 +7,11 @@ from comfy_api.latest import io
 from ...utils._image_ops import (
     adapt_fill_to_channels,
     ensure_channels,
+    pad_color_is_transparent,
     pad_to_rgb,
     parse_pad_color,
     parse_spacing_color,
+    resolve_pad_fill,
 )
 
 
@@ -78,8 +80,9 @@ class ImageMainStitch(io.ComfyNode):
             else:
                 others.append(torch.zeros_like(a))
 
-        target_channels = 4 if any(
-            int(t.shape[3]) == 4 for t in [a, *others]
+        target_channels = 4 if (
+            pad_color_is_transparent(pad_color)
+            or any(int(t.shape[3]) == 4 for t in [a, *others])
         ) else 3
         a = ensure_channels(a, target_channels)
         others = [ensure_channels(t, target_channels) for t in others]
@@ -345,7 +348,7 @@ class ImageMainStitch(io.ComfyNode):
         out = torch.zeros(
             (b, target_h, target_w, c), dtype=img.dtype, device=img.device
         )
-        fill_value = adapt_fill_to_channels(fill_rgb, c)
+        fill_value = resolve_pad_fill(fill_rgb, c)
         fill_t = torch.tensor(fill_value, dtype=img.dtype, device=img.device)
         out[:] = fill_t
 

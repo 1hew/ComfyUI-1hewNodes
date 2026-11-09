@@ -80,6 +80,11 @@ function parseSingleNumber(text) {
 }
 
 const CONFIGS = {
+    "1hew_FloatMaskAreaRatio": {
+        base: ["float"],
+        delimiter: null,
+        slots: [{ out: 0, value: 0, suffix: "float" }],
+    },
     "1hew_IntImageSize": {
         base: ["width", "height"],
         delimiter: "x",

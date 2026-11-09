@@ -21,6 +21,7 @@ from comfy_api.latest import io
 
 from ...utils._image_ops import (
     ensure_channels,
+    pad_color_is_transparent,
     pad_to_rgb,
     parse_pad_color,
 )
@@ -86,7 +87,8 @@ class MultiVideoStitch(io.ComfyNode):
         pad_rgb = parse_pad_color(pad_color)
         target_channels = (
             4
-            if any(int(item["images"].shape[3]) == 4 for item in decoded)
+            if pad_color_is_transparent(pad_color)
+            or any(int(item["images"].shape[3]) == 4 for item in decoded)
             else 3
         )
 

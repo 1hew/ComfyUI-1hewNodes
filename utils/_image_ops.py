@@ -251,8 +251,8 @@ def fit_resize_image(
     img, target_width, target_height, fit_mode, resize_sampler, background_color=None
 ):
     """根据不同适应模式调整图像大小"""
-    # 解析背景颜色
-    bg_color = parse_color(background_color) if background_color else (0, 0, 0)
+    # 解析背景颜色：空值统一为白色（RGB 无法表达透明，透明由 alpha 通道负责）
+    bg_color = parse_color(background_color)
 
     # 获取原始尺寸
     orig_width, orig_height = img.size
@@ -461,6 +461,18 @@ def adapt_fill_to_channels(fill_rgb, channels):
     return tuple(values)
 
 
+def resolve_pad_fill(fill, channels):
+    """把 pad_color 的解析结果落成具体通道值。
+
+    统一约定：空值 / "transparent" 表示透明 —— 输出补 (0,0,0,0)。
+    3 通道调用方应先扩成 RGBA（见 pad_to_rgb / pad_color_is_transparent）；
+    这里对 3 通道仍退回白色，仅作为防御性兜底。
+    """
+    if isinstance(fill, str) and fill == "transparent":
+        return (0.0, 0.0, 0.0, 0.0) if int(channels) == 4 else (1.0, 1.0, 1.0)
+    return adapt_fill_to_channels(fill, channels)
+
+
 def ensure_channels(img, target_channels):
     current_channels = int(img.shape[3])
     if current_channels == target_channels:
@@ -540,10 +552,24 @@ def parse_spacing_color(color_str):
         return (1.0, 1.0, 1.0)
 
 
-def parse_pad_color(color_str):
+def pad_color_is_transparent(color_str) -> bool:
+    """空值 / "transparent" 表示透明补边。
+
+    统一约定：3 通道输入也会扩成 RGBA（内容不透明、补边透明），
+    因此调用方需要先按此判断决定是否补 alpha 通道。
+    """
     if color_str is None:
-        return (1.0, 1.0, 1.0)
+        return True
+    return str(color_str).strip().lower() in ("", "transparent")
+
+
+def parse_pad_color(color_str):
+    # 空值 / "transparent" 统一表示透明：由 resolve_pad_fill 按通道数落地。
+    if color_str is None:
+        return "transparent"
     text = str(color_str).strip().lower()
+    if text in ("", "transparent"):
+        return "transparent"
     if text in ("edge", "e"):
         return "edge"
     if text in ("extend", "ex"):
@@ -615,7 +641,13 @@ def parse_pad_color(color_str):
 
 
 def pad_to_rgb(img, target_h, target_w, fill_rgb):
-    """居中填充到指定尺寸，自动适配当前图像通道数。"""
+    """居中填充到指定尺寸，自动适配当前图像通道数。
+
+    空值 / "transparent" 填充表示透明：3 通道输入也会补成 RGBA，
+    原内容 alpha=1、补边区域 (0,0,0,0)。
+    """
+    if isinstance(fill_rgb, str) and fill_rgb == "transparent":
+        img = ensure_channels(img, 4)
     b, h, w, c = img.shape
     top = max((target_h - h) // 2, 0)
     left = max((target_w - w) // 2, 0)
@@ -677,7 +709,7 @@ def pad_to_rgb(img, target_h, target_w, fill_rgb):
         avg_color = avg.view(b, 1, 1, c)
         out[:] = avg_color.expand(b, target_h, target_w, c)
     else:
-        fill_value = adapt_fill_to_channels(fill_rgb, c)
+        fill_value = resolve_pad_fill(fill_rgb, c)
         fill_t = torch.tensor(fill_value, dtype=img.dtype, device=img.device)
         out[:] = fill_t
     out[:, top:h_end, left:w_end, :] = img[:, : h_end - top, : w_end - left, :]

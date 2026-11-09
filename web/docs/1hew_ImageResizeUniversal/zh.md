@@ -16,7 +16,7 @@
 | `scale_to_side` | - | COMBO | `None` | `None` / `longest` / `shortest` / `width` / `height` / `length_to_sq_area` | 目标边控制；例如按最长边或指定宽/高设定目标长度 |
 | `scale_to_length` | - | INT | 1024 | 1-8192 | 当选择 `scale_to_side` 为上述模式时的目标长度 |
 | `fit` | - | COMBO | `crop` | `crop` / `pad` / `stretch` | 适应模式：裁剪、填充或拉伸 |
-| `pad_color` | - | STRING | 1.0 | 灰度/HEX/RGB/`edge`/`average`/`extend`/`mirror` | 填充背景策略；详见下文“填充策略” |
+| `pad_color` | - | STRING | 1.0 | 灰度/HEX/RGB/`transparent`/`edge`/`average`/`extend`/`mirror` | 填充背景策略；留空或填 `transparent` 时 `pad` 模式输出 RGBA（补边透明），详见下文“填充策略” |
 | `divisible_by` | - | INT | 8 | 1-1024 | 输出尺寸按该数值取整倍（常用于模型输入尺寸要求） |
 
 ## 输出
@@ -54,6 +54,7 @@
 - `average`：按整图平均色填充。
 - `extend`：复制边缘像素进行填充（`replicate`）。
 - `mirror`：镜像边缘像素进行填充（`reflect`，含分段扩展）。
+- 空值 / `transparent`：`pad` 模式下输出 RGBA —— 原内容 alpha 为 1、补边区域为 `(0,0,0,0)`（RGB 输入也会自动扩成 4 通道）；`crop` / `stretch` 没有补边，输出仍为 RGB。
 
 ## 典型用法
 

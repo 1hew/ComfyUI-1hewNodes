@@ -45,6 +45,7 @@
 ## 填充策略（`pad_color`）
 
 与 `Image Resize Universal` 相同：灰度（`0.5`）、HEX（`#FF0000`）、RGB（`255,0,0` 或 `0.5,0.2,0.8`）、`edge`、`average`、`extend`、`mirror`。
+留空或填 `transparent` 时：`pad` 模式下输出 RGBA —— 原内容 alpha 为 1、补边区域为 `(0,0,0,0)`（RGB 输入也会自动扩成 4 通道）；`crop` / `stretch` 没有补边，输出仍为 RGB。
 
 ## 典型用法
 

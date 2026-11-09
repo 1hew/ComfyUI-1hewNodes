@@ -8,7 +8,7 @@
 | -------- | -------- | -------- | ------ | -------- | ---- |
 | `paste_image` | - | IMAGE | - | - | 需要放入 bbox 区域的图像；RGBA 输入会保留 alpha 通道 |
 | `bbox_mask` | - | MASK | - | - | 用于计算输出尺寸与白色区域外接框的遮罩 |
-| `pad_color` | - | STRING | `1.0` | 灰度/HEX/RGB/颜色名/`edge`/`average`/`extend`/`mirror` | 非图像区域的填充颜色或填充策略 |
+| `pad_color` | - | STRING | `1.0` | 灰度/HEX/RGB/颜色名/`transparent`/`edge`/`average`/`extend`/`mirror` | 非图像区域的填充颜色或填充策略；留空或填 `transparent` 时输出 RGBA（原内容不透明、非图像区域完全透明，3 通道输入也会扩成 4 通道） |
 
 ## 输出
 
@@ -34,4 +34,5 @@
 
 - `bbox_mask` 只用于计算外接矩形，不按任意形状逐像素混合。
 - 当 `bbox_mask` 为空时，节点会输出一张与遮罩同尺寸的 `pad_color` 背景图。
+- 填充色留空（或填 `transparent`）表示透明：输出为 RGBA，`paste_image` 内容保持不透明，补边区域填入 `(0,0,0,0)`；3 通道输入也会自动扩成 4 通道。
 - 如果 `paste_image` 与 bbox 比例不同，bbox 内未覆盖的边缘也会使用 `pad_color` 填充。

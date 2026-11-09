@@ -14,7 +14,7 @@
 | `match_image_size` | - | BOOLEAN | True | - | 为 True 时按等比缩放匹配拼接边长；为 False 时按居中填充对齐尺寸。 |
 | `spacing_width` | - | INT | 10 | 0–1000 | 主画面与组合之间、组合内部图像之间的间隔条宽度/高度。 |
 | `spacing_color` | - | STRING | `1.0` | 灰度/HEX/RGB | 间隔条颜色。 |
-| `pad_color` | - | STRING | `1.0` | 灰度/HEX/RGB/`edge`/`average`/`extend`/`mirror` | 尺寸对齐时的填充策略。 |
+| `pad_color` | - | STRING | `1.0` | 灰度/HEX/RGB/`transparent`/`edge`/`average`/`extend`/`mirror` | 尺寸对齐时的填充策略；留空或填 `transparent` 时输出 RGBA 并补透明（3 通道输入也会扩成 4 通道） |
 
 ## 输出
 
@@ -34,7 +34,7 @@
   - `match_image_size=False`：使用 `pad_color` 进行居中填充对齐尺寸。
 - 颜色解析：
   - `spacing_color`：支持灰度、HEX、RGB 与常见颜色名。
-  - `pad_color`：在此基础上支持 `edge`、`average`、`extend`、`mirror` 策略。
+  - `pad_color`：在此基础上支持 `edge`、`average`、`extend`、`mirror` 策略；留空或填 `transparent` 时输出 RGBA，补边区域为 `(0,0,0,0)`，3 通道输入也会自动扩成 4 通道。
 
 ## 典型用法
 
@@ -46,4 +46,4 @@
 
 - 仅连接 `image_1` 时，节点输出 `image_1` 与全白 `mask`。
 - `spacing_width=0` 时区域之间直接贴合。
-- 当输出为 RGBA 时，显式 `spacing_color` / `pad_color` 会自动补成不透明 alpha。
+- 当输出为 RGBA 时，显式 `spacing_color` / `pad_color` 会自动补成不透明 alpha；只有留空 / `transparent` 才是透明补边。

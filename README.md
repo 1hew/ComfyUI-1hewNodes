@@ -21,6 +21,16 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v4.4.0**
+- feat(float): Add `Float Mask Area Ratio` — report how much of the frame a mask covers as a `0–1` float, weighted by the soft mask values (feathered and anti-aliased edges count their real coverage instead of a whole pixel), averaged across a batch, clipped to `0–1`, safe on empty / non-mask input, and rounded by `round` (`0–10`, default `2`, the same name and range as `Range Mapping`); the `float` output label shows the measured value in the front end.
+- feat(text): Add `Text System Prompt` — offer every `.txt` under `utils/system_prompt/` as one flat `<model>/[<lang>] <name>` dropdown and emit the selected body verbatim on a `string` output; the key list is scanned once at startup, an edited body is re-read when its mtime changes (no restart needed), `_` / `.`-prefixed files stay out of the dropdown, and an empty folder or an unknown key returns `""` instead of blocking the graph. The bundled Qwen-Image-2.1 `t2i` / `edit` prompts are adapted from benjiyaya/ComfyUI-Qwen-Image-2.1-Prompt-Enhancer (MIT) and rewritten to answer in plain text.
+- feat(image): Rework `Image Crop With BBox Mask`'s `auto` preset into adaptive framing — sparse specks are trimmed first (only edges 10x lighter than the densest row/column and within 1% of the total mass), the de-speckled bbox ratio snaps to the nearest standard ratio only within a 30% linear mismatch, the aligned box always fits inside the image instead of silently returning the whole frame, and `scale_strength` becomes a geometric framing weight from mask-tight (`0`) to almost the whole image (`1`) with width and height blending independently; `crop_to_side` / `crop_to_length` still take over the size and `scale_strength` is then ignored. Workflows saved with the old `auto` (image ratio snapped to a standard ratio) render differently by design.
+- feat(util): `Range Mapping`'s decimal input is renamed `rounding` → `round` (same `0–10` range and default `3`), matching the new float node; saved workflows fall back to the default value.
+- refactor(shared): Move the paired-pixel colour estimator into `utils/_color_fit.py` and use it in `Image Align Change Mask`, so structure-gated sampling, capped gain/bias fitting and held-out validation live in one place; the applied correction keeps the previous magnitude envelope, so the rendered result is unchanged.
+- refactor(pad): Unify `pad_color`'s empty-value semantics across `Image Pad By BBox Mask`, `Image Edge Crop/Pad`, `Multi Image Batch`, `Multi Image Stitch`, `Multi Video Stitch`, `Image Main Stitch`, `Image Edit Stitch`, `Image Resize Universal` / `Area` and `Image Minimum Area` — an empty value (or `transparent`) now always produces RGBA: 3-channel input is expanded to 4 channels, the original content stays opaque and the padded area is `(0,0,0,0)` (the resize family expands in `pad` mode; `crop` / `stretch` add no padding and stay RGB). Explicit colours keep their opaque alpha and the resize family's empty colour no longer falls back to black. This changes the output channel count for RGB graphs that left the field empty, so re-check saved workflows.
+- test: Add regression coverage for the colour-fit kernel, `Float Mask Area Ratio`, `Text System Prompt`, the `auto` framing ladder (specks, long strips, ratio snapping, `divisible_by`, `scale_strength` blending, edge-subject shift, batches), and empty / `transparent` pad fills.
+- docs: Add bilingual docs for the two new nodes, update the `Image Crop With BBox Mask` / `Range Mapping` docs, add a `Float Nodes` section to the README node list, credit the bundled Qwen-Image-2.1 prompts in the acknowledgments, and synchronize the changelog.
+
 **v4.3.0**
 - feat(image): Add `Image Shift` — translate a whole image batch by `shift_x` / `shift_y`, either wrapping the overflow (`cyclic`) or filling it with `background_color` (the same `Image Alpha Split` syntax, `sm` included), and return the shifted `image`, the matching `mask` and a blurred seam `border_mask` for seamless-tile work; channel count (alpha included) is preserved, masks are matched per frame, the non-cyclic bounds are pixel-exact, and an optional `pad` wrap-extends the shifted outputs (with a `pad_mask` marking the added frame) so seams that cross the canvas border can be inpainted with outside context.
 - test: Add regression coverage for cyclic/non-cyclic bounds, zero shift, alpha masks, per-frame mask matching, seam-band geometry, wrap padding / `pad_mask`, and empty batches.
@@ -633,7 +643,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Image Mask Crop | Batch mask-based cropping with RGB/RGBA channel preservation and optional mask alpha output |
 | Image Crop Square | Square cropping with mask guidance and scaling support |
-| Image Crop With BBox Mask | Smart bounding box cropping with precise aspect ratio control and scale strength adjustment |
+| Image Crop With BBox Mask | Smart bounding box cropping with aspect ratio presets, an `auto` adaptive-framing mode (`0` = mask-tight, `1` = whole image) that also survives long strips and dirty masks, scale strength and divisible-by control |
 | Image Paste By BBox Mask | Paste cropped images back with multiple blend modes |
 | Image Pad By BBox Mask | Restore a local image into the full bbox mask canvas and fill uncovered areas with a configurable color or strategy |
 | Image Edge Crop/Pad | Smart edge cropping and padding with multiple padding modes and mask output |
@@ -733,6 +743,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Int Split | Split a total value into two parts, supporting percentage and integer split point |
 | Int Wan | Generate 4n+1 arithmetic sequences with step and range validation |
 
+### 🧮 Float Nodes
+| Node Name | Description |
+|-----------|-------------|
+| Float Mask Area Ratio | Output how much of the whole image a mask covers as a 0-1 float; the `round` input defaults to 2 decimals |
+
 ### 📦 Batch Processing Nodes
 | Node Name | Description |
 |-----------|-------------|
@@ -756,6 +771,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Text Prefix Suffix | Text prefix suffix formatter with wildcard input support for flexible data formatting with custom prefix and suffix |
 | Text Custom Extract | Text custom extractor for extracting specified key values from JSON |
 | Text Path Extract | Read values from JSON text, dicts or plain text by path such as `[0].content`, `[-1].bbox[0]` or `[*].content`, collect every match (`[*].bbox`), count with `.count` / `.length` / `[#]`, and emit auto/json/text/csv text plus a raw `value` and a `count` output |
+| Text System Prompt | Pick one builtin system prompt from `utils/system_prompt/<model>/[<lang>] <name>.txt` and output its body verbatim on a single `string` output; bundled Qwen-Image-2.1 `t2i` / `edit` prompts, and any new `.txt` you drop in shows up after a reload |
 | String Ratio GPT Image 2.0 | Infer the nearest GPT 2.0 image supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
 | String Ratio Gemini 3.1 Flash Image | Infer the nearest Gemini 3.1 Flash supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
 | String Ratio Jimeng | Infer the nearest Jimeng supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
@@ -835,6 +851,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)
 
 [ComfyUI-RH-Nodes](https://github.com/dakun333/ComfyUI-RH-Nodes)
+
+[ComfyUI-Qwen-Image-2.1-Prompt-Enhancer](https://github.com/benjiyaya/ComfyUI-Qwen-Image-2.1-Prompt-Enhancer) (bundled Qwen-Image-2.1 system prompts, MIT)
 
 
 

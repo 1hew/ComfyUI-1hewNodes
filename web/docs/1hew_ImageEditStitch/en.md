@@ -28,6 +28,7 @@
 - Aspect handling: preserves reference aspect ratio when not matching edit size; otherwise pads to match target side.
 - Mask alignment: resizes edit mask to edit image using nearest-neighbor to preserve binary nature.
 - Color parsing: supports `edge`, `average`, `extend`, `mirror` for padding; spacing color uses strict RGB.
+- Transparent padding: an empty `pad_color` (or `transparent`) outputs RGBA — opaque content with `(0,0,0,0)` padding — and 3-channel input is expanded to 4 channels.
 - Batch broadcasting: automatically repeats inputs to maximum batch size across `reference`, `edit`, and `mask`.
 - Position variants: `top`, `bottom`, `left`, `right` with consistent spacing behavior and mask composition.
 

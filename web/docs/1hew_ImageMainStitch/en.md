@@ -14,7 +14,7 @@
 | `match_image_size` | - | BOOLEAN | True | - | When True, uses aspect-preserving resize to match edge length for stitching; when False, uses centered padding to reconcile sizes. |
 | `spacing_width` | - | INT | 10 | 0–1000 | Spacing strip width/height between the main image and the group, and between images inside the group. |
 | `spacing_color` | - | STRING | `1.0` | Gray/HEX/RGB | Spacing strip color. |
-| `pad_color` | - | STRING | `1.0` | Gray/HEX/RGB/`edge`/`average`/`extend`/`mirror` | Padding strategy used when reconciling sizes. |
+| `pad_color` | - | STRING | `1.0` | Gray/HEX/RGB/`transparent`/`edge`/`average`/`extend`/`mirror` | Padding strategy used when reconciling sizes; empty or `transparent` outputs RGBA with transparent padding (3-channel input expanded to 4 channels). |
 
 ## Outputs
 
@@ -34,7 +34,7 @@
   - `match_image_size=False`: uses centered padding with `pad_color` for size alignment.
 - Color parsing:
   - `spacing_color`: grayscale, HEX, RGB, and named colors.
-  - `pad_color`: adds `edge`, `average`, `extend`, `mirror` strategies.
+  - `pad_color`: adds `edge`, `average`, `extend`, `mirror` strategies; empty or `transparent` outputs RGBA with `(0,0,0,0)` padding, expanding 3-channel input to 4 channels.
 
 ## Typical Usage
 
@@ -46,4 +46,4 @@
 
 - When only `image_1` is provided, the node returns `image_1` and a full-white mask.
 - `spacing_width=0` yields a direct adjacency between regions.
-- When the output is RGBA, explicit `spacing_color` and `pad_color` values are automatically extended with opaque alpha.
+- When the output is RGBA, explicit `spacing_color` and `pad_color` values are automatically extended with opaque alpha; only empty / `transparent` pads transparency.

@@ -1,4 +1,5 @@
 import asyncio
+import math
 from fractions import Fraction
 from math import gcd
 import numpy as np
@@ -114,37 +115,73 @@ class ImageCropWithBBoxMask(io.ComfyNode):
                             (img_height, img_width), dtype=torch.float32, device=image.device
                         )
                         return image[b], bbox_mask, mask[b]
-                    x_min, y_min, x_max, y_max = bbox
-                    mask_width = x_max - x_min
-                    mask_height = y_max - y_min
-                    mask_center_x = (x_min + x_max) / 2.0
-                    mask_center_y = (y_min + y_max) / 2.0
-                    orientation, target_ratio = cls.determine_ratio_orientation(
-                        preset_ratio, img_width, img_height, mask_width, mask_height
-                    )
-                    if preset_ratio == "mask":
-                        valid_sizes = cls.generate_flexible_mask_sizes(
-                            mask_width, mask_height, divisible_by
+                    if preset_ratio == "auto":
+                        # auto：先去离群噪点，再以遮罩比例为准（只在贴近标准比例时吸附），
+                        # 保证主体不会因为固定比例被压成一条小窄条。
+                        bbox = cls._auto_bbox(mask_np)
+                        if bbox is None:
+                            bbox_mask = torch.ones(
+                                (img_height, img_width), dtype=torch.float32, device=image.device
+                            )
+                            return image[b], bbox_mask, mask[b]
+                        x_min, y_min, x_max, y_max = bbox
+                        mask_width = x_max - x_min
+                        mask_height = y_max - y_min
+                        mask_center_x = (x_min + x_max) / 2.0
+                        mask_center_y = (y_min + y_max) / 2.0
+                        valid_sizes = cls.generate_auto_sizes(
+                            mask_width, mask_height, img_width, img_height, divisible_by
                         )
+                        if not valid_sizes:
+                            bbox_mask = torch.ones(
+                                (img_height, img_width), dtype=torch.float32, device=image.device
+                            )
+                            return image[b], bbox_mask, mask[b]
+                        min_valid_size, max_valid_size = valid_sizes[0], valid_sizes[-1]
+                        size_ratio = min_valid_size[0] / min_valid_size[1]
+                        if abs(size_ratio - 1.0) < 0.01:
+                            orientation = "square"
+                        elif size_ratio > 1.0:
+                            orientation = "landscape"
+                        else:
+                            orientation = "portrait"
                     else:
-                        valid_sizes = cls.generate_valid_sizes(target_ratio, divisible_by)
-                    if not valid_sizes:
-                        bbox_mask = torch.ones(
-                            (img_height, img_width), dtype=torch.float32, device=image.device
+                        x_min, y_min, x_max, y_max = bbox
+                        mask_width = x_max - x_min
+                        mask_height = y_max - y_min
+                        mask_center_x = (x_min + x_max) / 2.0
+                        mask_center_y = (y_min + y_max) / 2.0
+                        orientation, target_ratio = cls.determine_ratio_orientation(
+                            preset_ratio, img_width, img_height, mask_width, mask_height
                         )
-                        return image[b], bbox_mask, mask[b]
-                    min_valid_size, max_valid_size = cls.find_valid_size_range(
-                        valid_sizes, bbox, img_width, img_height, preset_ratio
-                    )
-                    if min_valid_size is None or max_valid_size is None:
-                        bbox_mask = torch.ones(
-                            (img_height, img_width), dtype=torch.float32, device=image.device
+                        if preset_ratio == "mask":
+                            valid_sizes = cls.generate_flexible_mask_sizes(
+                                mask_width, mask_height, divisible_by
+                            )
+                        else:
+                            valid_sizes = cls.generate_valid_sizes(target_ratio, divisible_by)
+                        if not valid_sizes:
+                            bbox_mask = torch.ones(
+                                (img_height, img_width), dtype=torch.float32, device=image.device
+                            )
+                            return image[b], bbox_mask, mask[b]
+                        min_valid_size, max_valid_size = cls.find_valid_size_range(
+                            valid_sizes, bbox, img_width, img_height, preset_ratio
                         )
-                        return image[b], bbox_mask, mask[b]
+                        if min_valid_size is None or max_valid_size is None:
+                            bbox_mask = torch.ones(
+                                (img_height, img_width), dtype=torch.float32, device=image.device
+                            )
+                            return image[b], bbox_mask, mask[b]
                     if crop_to_side == "None":
-                        target_size = cls.calculate_target_size_from_range(
-                            min_valid_size, max_valid_size, scale_strength, valid_sizes
-                        )
+                        if preset_ratio == "auto":
+                            target_size = cls.calculate_auto_target_size(
+                                min_valid_size, img_width, img_height, scale_strength, divisible_by
+                            )
+                        else:
+                            target_size = cls.calculate_target_size_from_range(
+                                min_valid_size, max_valid_size, scale_strength, valid_sizes
+                            )
                     else:
                         target_dimension = cls.map_crop_side_to_dimension(
                             crop_to_side, orientation
@@ -223,6 +260,137 @@ class ImageCropWithBBoxMask(io.ComfyNode):
             return None
         return bbox
 
+    # auto 模式参数：只丢弃“稀疏且轻量”的离群行/列（累计不超过总量的 1%），
+    # 实心主体的边缘不会被削掉；只有当标准比例与该比例的线性偏差在 30% 以内时才吸附。
+    AUTO_TRIM_MASS_RATIO = 0.01
+    AUTO_TRIM_LINE_RATIO = 0.1
+    AUTO_RATIO_TOLERANCE = 1.3
+    AUTO_RATIO_CANDIDATES = [
+        (1, 1), (3, 2), (4, 3), (5, 4), (16, 9), (21, 9),
+        (2, 3), (3, 4), (4, 5), (9, 16),
+    ]
+
+    @classmethod
+    def _auto_line_bounds(cls, line_mass, total):
+        """从两端去掉稀疏的离群行/列，返回 (lo, hi)（闭区间）。"""
+        if total <= 0:
+            return 0, len(line_mass) - 1
+        # 比最密行/列还轻 10 倍的线才可能是噪点；实心主体的边缘行/列不会被丢掉。
+        limit = max(1.0, cls.AUTO_TRIM_LINE_RATIO * float(line_mass.max()))
+        cap = total * cls.AUTO_TRIM_MASS_RATIO
+        lo, removed = 0, 0.0
+        while lo < len(line_mass) and line_mass[lo] <= limit and removed + line_mass[lo] <= cap:
+            removed += line_mass[lo]
+            lo += 1
+        hi, removed = len(line_mass) - 1, 0.0
+        while hi >= lo and line_mass[hi] <= limit and removed + line_mass[hi] <= cap:
+            removed += line_mass[hi]
+            hi -= 1
+        return lo, hi
+
+    @classmethod
+    def _auto_bbox(cls, mask_np):
+        """忽略零散噪点后的 bbox，返回 (x_min, y_min, x_max, y_max)（右/下为开区间）或 None。"""
+        binary = mask_np > 10
+        total = int(binary.sum())
+        if total == 0:
+            return None
+        row_lo, row_hi = cls._auto_line_bounds(binary.sum(axis=1), total)
+        col_lo, col_hi = cls._auto_line_bounds(binary.sum(axis=0), total)
+        if row_hi < row_lo or col_hi < col_lo:
+            return None
+        return (col_lo, row_lo, col_hi + 1, row_hi + 1)
+
+    @staticmethod
+    def _align_up(value, divisible_by):
+        """向上对齐到 divisible_by 的倍数；减 1e-9 避免浮点误差多进一档。"""
+        steps = int(math.ceil(value / divisible_by - 1e-9))
+        return max(divisible_by, steps * divisible_by)
+
+    @staticmethod
+    def _auto_interpolate(tight, loose, strength, divisible_by):
+        """在对数尺度上从 tight 等比放大到 loose，再对齐到 divisible_by 的倍数。"""
+        if loose <= tight:
+            return int(tight)
+        value = tight * (loose / tight) ** strength
+        if divisible_by > 0:
+            value = int(round(value / divisible_by)) * divisible_by
+        return int(min(max(value, tight), loose))
+
+    @classmethod
+    def calculate_auto_target_size(
+        cls, min_size, img_width, img_height, scale_strength, divisible_by
+    ):
+        """auto：0 为刚好装下遮罩的框，1 为原图能提供的最大对齐框（近似全图）。
+
+        宽高各自从遮罩比例等比过渡到原图比例，0 到 1 之间每 0.1 是固定倍率，
+        因此大图/小图的手感一致；遮罩靠边时由裁剪区域的平移逻辑自然多带背景。
+        """
+        if min_size is None:
+            return None
+        tight_w, tight_h = min_size
+        loose_w = min(img_width, (img_width // divisible_by) * divisible_by)
+        loose_h = min(img_height, (img_height // divisible_by) * divisible_by)
+        if loose_w <= 0 or loose_h <= 0:
+            return min_size
+        strength = min(1.0, max(0.0, float(scale_strength)))
+        return (
+            cls._auto_interpolate(tight_w, loose_w, strength, divisible_by),
+            cls._auto_interpolate(tight_h, loose_h, strength, divisible_by),
+        )
+
+    @classmethod
+    def _auto_ratio(cls, mask_width, mask_height):
+        """遮罩比例与最近标准比例的线性偏差在容差内时吸附，否则保留遮罩比例。"""
+        mask_ratio = mask_width / mask_height
+        if mask_ratio <= 0:
+            return mask_ratio
+        log_ratio = math.log(mask_ratio)
+
+        def _distance(wh):
+            return abs(log_ratio - math.log(wh[0] / wh[1]))
+
+        snapped_w, snapped_h = min(cls.AUTO_RATIO_CANDIDATES, key=_distance)
+        snapped_ratio = snapped_w / snapped_h
+        mismatch = max(snapped_ratio / mask_ratio, mask_ratio / snapped_ratio)
+        if mismatch <= cls.AUTO_RATIO_TOLERANCE:
+            return snapped_ratio
+        return mask_ratio
+
+    @classmethod
+    def generate_auto_sizes(
+        cls, mask_width, mask_height, img_width, img_height, divisible_by,
+        max_size=4096,
+    ):
+        """按 auto 比例生成尺寸序列：第一个尺寸刚好装下遮罩，后续为它的整数倍。"""
+        bbox_ratio = mask_width / mask_height
+        ratios = [cls._auto_ratio(mask_width, mask_height)]
+        if abs(ratios[0] - bbox_ratio) > 1e-9:
+            # 吸附后的比例在图像里放不下时，退回遮罩自身比例（必然能装下）。
+            ratios.append(bbox_ratio)
+
+        for ratio in ratios:
+            if ratio >= bbox_ratio:
+                base_w, base_h = mask_height * ratio, mask_height
+            else:
+                base_w, base_h = mask_width, mask_width / ratio
+            width = cls._align_up(base_w, divisible_by)
+            height = cls._align_up(base_h, divisible_by)
+            if width > img_width or height > img_height:
+                continue
+            sizes = []
+            multiplier = 1
+            while width * multiplier <= max_size and height * multiplier <= max_size:
+                if (
+                    width * multiplier <= img_width
+                    and height * multiplier <= img_height
+                ):
+                    sizes.append((width * multiplier, height * multiplier))
+                multiplier += 1
+            if sizes:
+                return sizes
+        return []
+
     @staticmethod
     def determine_ratio_orientation(
         preset_ratio, img_width, img_height, mask_width, mask_height
@@ -232,17 +400,6 @@ class ImageCropWithBBoxMask(io.ComfyNode):
             ratio = mask_width / mask_height
         elif preset_ratio == "image":
             ratio = img_width / img_height
-        elif preset_ratio == "auto":
-            img_ratio = img_width / img_height
-            candidates = [
-                (1, 1), (3, 2), (4, 3), (5, 4), (16, 9), (21, 9),
-                (2, 3), (3, 4), (4, 5), (9, 16)
-            ]
-            best = min(
-                candidates,
-                key=lambda wh: abs(img_ratio - (wh[0] / wh[1]))
-            )
-            ratio = best[0] / best[1]
         else:
             try:
                 parts = preset_ratio.split(":")

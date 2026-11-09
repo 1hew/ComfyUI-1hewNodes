@@ -238,16 +238,28 @@ class ImageResizeArea(io.ComfyNode):
         single = cls.pil_to_mask_tensor(base)
         return single.repeat(max(int(count), 1), 1, 1)
 
+    @staticmethod
+    def _pad_is_transparent(pad_color):
+        """空值 / transparent 表示透明补边（与 Image Resize Universal 一致）。"""
+        if pad_color is None:
+            return True
+        return str(pad_color).strip().lower() in ("", "transparent")
+
     @classmethod
     def resize_image_batch(cls, image: torch.Tensor, target_width: int, target_height: int, fit: str, pad_color: str, method: str):
-        """按 fit / pad_color 逐帧缩放，保留 alpha。"""
+        """按 fit / pad_color 逐帧缩放，保留 alpha；空 pad_color 在 pad 模式下补透明。"""
         sampler = cls.resolve_sampler(method)
+        transparent_pad = fit == "pad" and cls._pad_is_transparent(pad_color)
         frames = []
         for frame in image:
             pil = cls.tensor_to_pil(frame)
-            if "A" in pil.getbands():
-                alpha = pil.getchannel("A")
-                rgb = pil.convert("RGB")
+            if "A" in pil.getbands() or transparent_pad:
+                if "A" in pil.getbands():
+                    alpha = pil.getchannel("A")
+                    rgb = pil.convert("RGB")
+                else:
+                    alpha = Image.new("L", pil.size, 255)
+                    rgb = pil.convert("RGB")
                 resized_rgb = cls.fit_resize_image(
                     rgb, target_width, target_height, fit, sampler, pad_color
                 ).convert("RGB")
@@ -324,7 +336,7 @@ class ImageResizeArea(io.ComfyNode):
     @classmethod
     def fit_resize_image(cls, img, target_width, target_height, fit_mode, resize_sampler, background_color=None):
         """按 fit_mode 缩放单张 PIL 图像；pad 模式下支持颜色 / edge / average / extend / mirror。"""
-        bg_color = cls.parse_color(background_color) if background_color else (0, 0, 0)
+        bg_color = cls.parse_color(background_color)
         orig_width, orig_height = img.size
         orig_ratio = orig_width / orig_height
         target_ratio = target_width / target_height

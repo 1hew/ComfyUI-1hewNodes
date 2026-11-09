@@ -8,7 +8,7 @@
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | `paste_image` | - | IMAGE | - | - | Image to place inside the bbox; RGBA alpha is preserved. |
 | `bbox_mask` | - | MASK | - | - | Mask used to determine the output size and white-region bounding box. |
-| `pad_color` | - | STRING | `1.0` | grayscale/HEX/RGB/color name/`edge`/`average`/`extend`/`mirror` | Fill color or fill strategy for areas outside the placed image. |
+| `pad_color` | - | STRING | `1.0` | grayscale/HEX/RGB/color name/`transparent`/`edge`/`average`/`extend`/`mirror` | Fill color or fill strategy for areas outside the placed image; empty or `transparent` outputs RGBA (opaque content, fully transparent padding, 3-channel input expanded to 4 channels). |
 
 ## Outputs
 
@@ -34,4 +34,5 @@
 
 - `bbox_mask` is only used to compute the bounding rectangle; arbitrary mask shapes are not blended pixel by pixel.
 - If `bbox_mask` is empty, the node outputs a `pad_color` background image with the same size as the mask.
+- Leaving `pad_color` empty (or `transparent`) means transparency: the output is RGBA, `paste_image` stays opaque and the padded area is `(0,0,0,0)`; 3-channel input is expanded to 4 channels automatically.
 - When `paste_image` and the bbox have different aspect ratios, the uncovered edges inside the bbox are also filled with `pad_color`.

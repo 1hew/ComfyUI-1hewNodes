@@ -12,7 +12,7 @@
 | `bottom_amount` | - | FLOAT | 0.0 | -8192–8192 | Crop/pad amount for the bottom edge; `<1` treated as ratio of height. |
 | `left_amount` | - | FLOAT | 0.0 | -8192–8192 | Crop/pad amount for the left edge; `<1` treated as ratio of width. |
 | `right_amount` | - | FLOAT | 0.0 | -8192–8192 | Crop/pad amount for the right edge; `<1` treated as ratio of width. |
-| `pad_color` | - | STRING | `0.0` | formats | Padding color/strategy: grayscale/HEX/RGB/name or `extend`/`mirror`/`edge`/`average` (supports abbreviations). |
+| `pad_color` | - | STRING | `0.0` | formats | Padding color/strategy: grayscale/HEX/RGB/name, `extend`/`mirror`/`edge`/`average` (abbreviations supported), or empty / `transparent` for transparency (outputs RGBA; 3-channel input is expanded to 4 channels). |
 | `divisible_by` | - | INT | 8 | 1–1024 | Round each edge amount to a multiple of this value to keep aligned sizes. |
 
 ## Outputs
@@ -33,6 +33,7 @@
   - `edge`: fill with the average color of each edge (top/bottom/left/right).
   - `average`: fill with the global average color.
 - Color formats: grayscale (`0.0`–`1.0`), HEX (`#RRGGBB` or `RGB`), RGB (`255,0,0` or `1.0,0.0,0.0`), and color names; single-letter aliases supported.
+- Transparent padding: an empty `pad_color` (or `transparent`) outputs RGBA — opaque content with fully transparent `(0,0,0,0)` padding — and 3-channel input is expanded to 4 channels.
 
 ## Mask Rules
 

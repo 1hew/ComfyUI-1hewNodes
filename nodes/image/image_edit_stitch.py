@@ -6,8 +6,11 @@ import torch
 import torch.nn.functional as F
 
 from ...utils._image_ops import (
+    ensure_channels,
+    pad_color_is_transparent,
     parse_pad_color,
     parse_spacing_color,
+    resolve_pad_fill,
 )
 
 
@@ -94,6 +97,11 @@ class ImageEditStitch(io.ComfyNode):
         reference_image = cls._broadcast_image(reference_image, bs)
         edit_image = cls._broadcast_image(edit_image, bs)
         edit_mask = cls._broadcast_mask(edit_mask, bs)
+
+        # 空 pad_color = 透明补边：两侧都扩成 RGBA，保证拼接通道一致。
+        if pad_color_is_transparent(pad_color):
+            reference_image = ensure_channels(reference_image, 4)
+            edit_image = ensure_channels(edit_image, 4)
 
         # 获取图像尺寸
         ref_batch, ref_height, ref_width, _ = reference_image.shape
@@ -304,6 +312,9 @@ class ImageEditStitch(io.ComfyNode):
 
     @staticmethod
     def _pad_to_rgb_like(img, target_h, target_w, fill_rgb):
+        if isinstance(fill_rgb, str) and fill_rgb == "transparent":
+            # 透明补边时输出 RGBA：内容 alpha=1，补边 (0,0,0,0)。
+            img = ensure_channels(img, 4)
         b, h, w, c = img.shape
         top = max((target_h - h) // 2, 0)
         left = max((target_w - w) // 2, 0)
@@ -363,7 +374,8 @@ class ImageEditStitch(io.ComfyNode):
             avg_color = avg.view(b, 1, 1, c)
             out[:] = avg_color.expand(b, target_h, target_w, c)
         else:
-            fill_t = torch.tensor(fill_rgb, dtype=img.dtype, device=img.device)
+            fill_value = resolve_pad_fill(fill_rgb, c)
+            fill_t = torch.tensor(fill_value, dtype=img.dtype, device=img.device)
             out[:] = fill_t
         out[:, top:h_end, left:w_end, :] = img[:, : h_end - top, : w_end - left, :]
         return out

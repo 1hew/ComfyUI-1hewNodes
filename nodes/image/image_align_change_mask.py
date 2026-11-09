@@ -10,6 +10,10 @@ import numpy as np
 import torch
 from comfy_api.latest import io
 
+from ...utils._color_fit import apply as apply_color_fit
+from ...utils._color_fit import fit as color_fit
+from ...utils._color_fit import sampling_mask as color_sampling_mask
+
 
 class ImageAlignChangeMask(io.ComfyNode):
     """Create diagnostic and production masks from original and edited images."""
@@ -395,53 +399,34 @@ class ImageAlignChangeMask(io.ComfyNode):
     def _robust_diagonal_map(
         moving: np.ndarray, base: np.ndarray, background: np.ndarray | None = None,
     ) -> tuple[np.ndarray, bool]:
-        """Fit only stable pixels, then require a held-out improvement before use.
+        """Fit a per-channel gain+bias on trusted pixels, validated on held-out tiles.
 
-        Local correlation is deliberately not a hard gate: it is unreliable in flat
-        areas, and the trimmed residual fit below already rejects edited outliers.
+        Delegates to utils/_color_fit so this node and the other colour-aware
+        nodes share one estimator. Sampling keeps pixels whose content still
+        matches (relative structure agreement, which a global gain preserves and a
+        repaint does not), honours the caller's background mask, and leaves a 2px
+        inner margin for warp edge artefacts. Local correlation is still not a
+        gate: it is unreliable in flat areas, which is why the sampling test is
+        relative to the local detail amplitude instead.
         """
-        mapped = moving.copy()
-        height, width = base.shape[:2]
-        yy, xx = np.indices((height, width))
-        valid = np.ones((height, width), dtype=bool)
-        valid[:2] = valid[-2:] = False; valid[:, :2] = valid[:, -2:] = False
-        if background is not None:
-            valid &= background
-        used = False
-        for _ in range(2):
-            residual = np.max(np.abs(mapped - base), axis=2)
-            candidates = residual[valid]
-            if candidates.size < 200:
-                break
-            cutoff = float(np.quantile(candidates, 0.60))
-            trusted = valid & (residual <= cutoff)
-            if np.count_nonzero(trusted) < 200:
-                break
-            # Per-channel gain+bias is deliberately safer than a full 3x3 color matrix.
-            candidate = np.empty_like(moving)
-            for channel in range(3):
-                x = moving[..., channel][trusted].astype(np.float64)
-                y = base[..., channel][trusted].astype(np.float64)
-                variance = float(np.var(x))
-                if variance < 1e-6:
-                    slope, intercept = 1.0, float(np.mean(y - x))
-                else:
-                    slope = float(np.mean((x - np.mean(x)) * (y - np.mean(y))) / variance)
-                    intercept = float(np.mean(y) - slope * np.mean(x))
-                slope = float(np.clip(slope, 0.75, 1.25))
-                intercept = float(np.clip(intercept, -0.12, 0.12))
-                candidate[..., channel] = np.clip(moving[..., channel] * slope + intercept, 0.0, 1.0)
-            holdout = trusted & (((yy // 16 + xx // 16) % 4) == 0)
-            if np.count_nonzero(holdout) < 50:
-                break
-            before = float(np.mean(np.abs(mapped[holdout] - base[holdout])))
-            after = float(np.mean(np.abs(candidate[holdout] - base[holdout])))
-            if np.isfinite(after) and after < before * 0.99:
-                mapped = candidate.astype(np.float32)
-                used = True
-            else:
-                break
-        return mapped, used
+        valid = color_sampling_mask(
+            moving,
+            base,
+            exclude=None if background is None else ~background,
+            border=2,
+        )
+        fitted = color_fit(
+            moving,
+            base,
+            valid,
+            model="diagonal",
+            # Same magnitude envelope as before: a drift correction, not a grade.
+            max_gain=0.25,
+            max_offset=0.12,
+        )
+        if not fitted["ok"]:
+            return moving.copy(), False
+        return apply_color_fit(moving, fitted["matrix"], fitted["offset"]), True
 
     @staticmethod
     def _robust_z(value: np.ndarray, stable: np.ndarray, fallback: np.ndarray | None = None) -> np.ndarray:

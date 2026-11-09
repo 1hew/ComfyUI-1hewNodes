@@ -8,7 +8,7 @@
 | ---- | ---- | ---- | ------- | ----- | ----------- |
 | fps | - | STRING | video_1 | video_N / vN / a number | Output frame rate. video_1 (default) reuses the first segment frame rate; video_2 / v2 / v_2 target that segment; a number like 8 or 29.5 sets an explicit rate. |
 | fit | - | COMBO | pad | crop / pad / stretch | Size alignment mode. |
-| pad_color | - | STRING | 1.0 | color name/HEX/RGB/edge/average/extend/mirror | Padding color or strategy used by pad. |
+| pad_color | - | STRING | 1.0 | color name/HEX/RGB/transparent/edge/average/extend/mirror | Padding color or strategy used by pad; empty or transparent outputs RGBA with transparent padding (3-channel segments expanded to 4 channels). |
 | video_1 | optional | VIDEO | - | - | First segment; extra segments arrive through the dynamic video_2...video_N ports. |
 | get_video_size | optional | VIDEO | - | - | Reference video; its width/height become the target size. Pinned below every video port. |
 
@@ -24,6 +24,7 @@
 - Target size: get_video_size wins when connected, otherwise the first valid segment defines the size.
 - Fit modes: stretch resizes directly; crop scales to cover then center-crops; pad scales to fit then pads with pad_color.
 - Padding strategies: explicit colors plus extend, mirror, edge and average.
+- Transparent padding: an empty pad_color (or transparent) outputs RGBA (WebM/VP9) with opaque content and (0,0,0,0) padding; 3-channel segments are expanded to 4 channels.
 - Frame rate: video_1 (default) follows the first segment; video_N / vN / v_N reuse another segment's rate; a numeric fps is used directly and every segment is resampled to it while keeping its duration.
 - Alpha: if any segment has alpha, all segments are promoted to RGBA and the result is written as WebM/VP9 so the bundled encoder can carry alpha where it is supported; otherwise MP4/H.264.
 - Audio: segments with audio are resampled and concatenated, missing tracks become silence so the timeline stays aligned; a video without any audio keeps no audio track.
