@@ -1,6 +1,6 @@
 import { app } from "../../../scripts/app.js";
 
-const LOAD_TEXT_NODE = "1hew_LoadTxt";
+const LOAD_TEXT_NODE = "1hew_LoadText";
 
 function normalizeNamedValues(input) {
     const index = Number(input.index);

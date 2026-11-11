@@ -1,6 +1,6 @@
 import { app } from "../../../scripts/app.js";
 
-const TEXT_PREVIEW_NODES = ["1hew_SaveTxt", "1hew_LoadTxt"];
+const TEXT_PREVIEW_NODES = ["1hew_SaveText", "1hew_LoadText"];
 const PREVIEW_WIDGET_NAME = "text_preview";
 const PREVIEW_PROPERTY = "_comfy1hewPreviewText";
 const MIN_PREVIEW_HEIGHT = 64;

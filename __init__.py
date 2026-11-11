@@ -65,6 +65,15 @@ def _discover_nodes() -> list[type[io.ComfyNode]]:
 
 
 class NodesV3Extension(ComfyExtension):
+    async def on_load(self) -> None:
+        # 旧 node_id 的迁移只在 on_load 阶段注册；任何失败都不能影响节点加载。
+        try:
+            from .utils._node_replacements import register_legacy_node_replacements
+
+            await register_legacy_node_replacements()
+        except Exception as exc:  # pragma: no cover - 运行期保护
+            logging.warning(f"[ComfyUI-1hewNodes] 注册节点替换映射失败: {exc}")
+
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
         return _discover_nodes()
 

@@ -38,4 +38,5 @@
 - Uploaded files are stored under `ComfyUI/input/text/`.
 - The metadata block written by `Save Text` only affects the file on disk; the `text` output of `Load Text` never includes it.
 - The node raises an error when the path does not exist or no valid text files are found.
+- The node ID is `1hew_LoadText` (renamed from `1hew_LoadTxt` in v4.5.0; the display name and ports are unchanged). Old UI nodes can be swapped for the new one from the missing-node panel, and API prompts that still send `1hew_LoadTxt` are rewritten before execution; builds without ComfyUI's node replacement support need the node re-added manually.
 - The old `encode` widget is removed from the UI; loading an older workflow migrates the widget order automatically.

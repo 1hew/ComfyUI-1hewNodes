@@ -16,8 +16,12 @@
 - 模型名与版本号一律用空格分词，禁止连写：
   "Image Resize Gemini 3.1 Flash Image"（不是 "Gemini31FlashImage"）、
   "String Ratio GPT Image 2.0"（不是 "Gpt20Image"）。
-- node_id 是工作流兼容键，发布后不再改动；display_name 只影响界面显示，
+- node_id 是工作流兼容键，发布后原则上不再改动；display_name 只影响界面显示，
   可以随时调整。
+- 确需修改 node_id（例如修正拼写）时，必须在 `utils/_node_replacements.py`
+  登记旧 → 新映射（由 `on_load` 注册到 ComfyUI Node replacement），让旧工作流
+  与旧 API prompt 自动迁移，并同步 `web/docs/<node_id>/`、`web/js` 中的引用与
+  README 更新日志。
 - 改动 display_name 后必须同步 README 节点列表与 web/docs/<node_id>，
   运行 scripts/check_node_consistency.py 可校验三处是否一致。
 """

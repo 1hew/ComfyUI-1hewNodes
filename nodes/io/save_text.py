@@ -136,7 +136,7 @@ class SaveText(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
-            node_id="1hew_SaveTxt",
+            node_id="1hew_SaveText",
             display_name="Save Text",
             category="1hewNodes/io",
             inputs=[

@@ -2,7 +2,7 @@ import { app } from "../../../scripts/app.js";
 import { api } from "../../../scripts/api.js";
 import { setTextPreview } from "./text_preview.js";
 
-const LOAD_TEXT_NODE = "1hew_LoadTxt";
+const LOAD_TEXT_NODE = "1hew_LoadText";
 const UPLOAD_SUBFOLDER = "text";
 
 const previewTimers = new WeakMap();

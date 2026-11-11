@@ -170,6 +170,38 @@ class SaveTextMetadataTests(unittest.TestCase):
         filename_kwargs = dict(inputs)["filename"]
         self.assertEqual(filename_kwargs["default"], "text/ComfyUI")
 
+    def test_node_ids_use_full_text_word(self):
+        self.assertEqual(
+            self.save_text_module.SaveText.define_schema()["node_id"],
+            "1hew_SaveText",
+        )
+        self.assertEqual(
+            self.load_text_module.LoadText.define_schema()["node_id"],
+            "1hew_LoadText",
+        )
+
+    def test_legacy_id_replacements_follow_the_schemas(self):
+        replacements = _load_module(
+            self.package_name + ".utils._node_replacements",
+            ROOT / "utils" / "_node_replacements.py",
+        ).LEGACY_NODE_REPLACEMENTS
+        self.assertEqual(set(replacements), {"1hew_SaveTxt", "1hew_LoadTxt"})
+
+        schemas = {
+            "1hew_SaveText": self.save_text_module.SaveText.define_schema(),
+            "1hew_LoadText": self.load_text_module.LoadText.define_schema(),
+        }
+        for old_id, (new_id, widget_ids, input_ids) in replacements.items():
+            self.assertIn(new_id, schemas, old_id)
+            inputs = [item[2] for item in schemas[new_id]["inputs"]]
+            self.assertEqual(input_ids, inputs, old_id)
+            widgets = [
+                item[2]
+                for item in schemas[new_id]["inputs"]
+                if not item[3].get("force_input")
+            ]
+            self.assertEqual(widget_ids, widgets, old_id)
+
     def test_default_filename_writes_to_text_folder(self):
         self._attach_hidden({"nodes": [], "links": []}, {})
         result = asyncio.run(

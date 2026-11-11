@@ -44,5 +44,6 @@
 - 批量并发保存时，节点内部会串行分配文件路径，减少重名冲突。
 - 开启 `save_metadata` 后，文本/Markdown 文件正文末尾会多出元数据注释块；需要交付纯净文本（如给外部脚本或 LLM 直接读取）时请关闭该选项。`Load Text` 读取时会自动剥离该块，仍返回原始正文。csv/json 格式下元数据会被自动跳过。
 - 文本文件拖拽复现依赖本节点包自带的前端脚本；仅更新后端或禁用前端扩展时，ComfyUI 原生前端不会读取文本元数据。
-- `format` 位于 `filename` 下方。`encode` 已移除（固定 UTF-8）；加载旧工作流时前端会自动迁移旧的 `widgets_values` 顺序，缺少 `format` 时默认 `txt`，无需手动重设参数。
+- 节点 ID 为 `1hew_SaveText`（v4.5.0 由 `1hew_SaveTxt` 改名；显示名、端口、默认值与文件格式均未变）。扩展注册了 ComfyUI 节点替换：旧 ID 的工作流可在「缺失节点」面板一键换成新节点（连线与 widget 值会一并迁移），仍发送 `1hew_SaveTxt` 的 API prompt 会在执行前自动改写；不支持节点替换的旧版 ComfyUI 需手动重新添加节点。
+- `format` 位于 `filename` 下方；`encode` 已移除（固定 UTF-8）。v4.0.0 之前保存的工作流可能还带旧的 `encode` 值，替换旧节点后请复核 `auto_increment` / `save_output` / `save_metadata`。
 - 输入端口已从 `any` 更名为 `text`（类型 STRING）；旧工作流需要把连线重新接到 `text`。

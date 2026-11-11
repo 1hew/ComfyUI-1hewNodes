@@ -1,6 +1,6 @@
 import { app } from "../../../scripts/app.js";
 
-const SAVE_TEXT_NODE = "1hew_SaveTxt";
+const SAVE_TEXT_NODE = "1hew_SaveText";
 
 const FORMAT_VALUES = new Set(["txt", "csv", "md", "json"]);
 

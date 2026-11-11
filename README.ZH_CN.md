@@ -21,6 +21,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v4.5.0**
+- **破坏性变更（节点 ID）**：`1hew_SaveTxt` → `1hew_SaveText`、`1hew_LoadTxt` → `1hew_LoadText`，让 ID 与 `SaveText` / `LoadText` 类名、`Save Text` / `Load Text` 显示名以及其它 I/O 节点的完整单词写法一致；`Save Text` 现在支持 `txt` / `csv` / `md` / `json`，`Txt` 也已名不副实。显示名、端口、默认值与文件格式均未变化。
+- refactor(io)：通过 ComfyUI 的 Node replacement API 注册这两个改名（`utils/_node_replacements.py`，由 `on_load` 调用）：旧 ID 的工作流可在「缺失节点」面板一键换到新节点（连线与 widget 值一并迁移，`old_widget_ids` 负责旧 `widgets_values` 的位置映射），仍使用旧 class_type 的 API prompt 会在执行前自动改写（服务端会按 `input_mapping` 重建 `inputs`，因此映射必须显式列全）。不支持节点替换的旧版 ComfyUI 仍需手动重新添加节点。
+- test：锁定两个新 node_id，并校验迁移表与节点 schema 的输入名 / widget 顺序一致。
+- docs：在 `Save Text` / `Load Text` 文档补充改名与迁移说明，并在 `nodes/__init__.py` 写明改名规范。
+
 **v4.4.0**
 - feat(float)：新增 `Float Mask Area Ratio`，把遮罩覆盖整张图像的面积比例输出为 `0–1` 浮点数：遮罩软值按权重计算（羽化、抗锯齿边缘得到真实覆盖率，而不是按整像素放大），批次取平均，超出 `0–1` 先钳制，`None` / 空张量 / 非遮罩输入返回 `0.0`；`round`（`0–10`，默认 `2`，名称与范围同 `Range Mapping`）控制小数位；前端会直接在 `float` 输出上显示该数值。
 - feat(text)：新增 `Text System Prompt`，把 `utils/system_prompt/` 下的每个 `.txt` 作为单层 `<模型>/[<语言>] <名称>` 下拉项，选中后原样输出到 `string`；键表在启动时扫描一次，改已有条目正文按 mtime 生效、不必重启，`_` / `.` 开头的文件不进下拉，目录为空或键不存在时输出 `""` 而不阻塞工作流。内置 Qwen-Image-2.1 的 `t2i` / `edit` 正文改编自 benjiyaya/ComfyUI-Qwen-Image-2.1-Prompt-Enhancer（MIT），已改为纯文本输出。

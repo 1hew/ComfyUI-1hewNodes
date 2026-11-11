@@ -106,7 +106,7 @@ class LoadText(io.ComfyNode):
     @classmethod
     def define_schema(cls):
         return io.Schema(
-            node_id="1hew_LoadTxt",
+            node_id="1hew_LoadText",
             display_name="Load Text",
             category="1hewNodes/io",
             inputs=[

@@ -38,4 +38,5 @@
 - 上传的文件会保存到 `ComfyUI/input/text/`。
 - `Save Text` 写入的元数据块只影响磁盘文件，`Load Text` 的 `text` 输出不会包含该块。
 - 当目录中没有可用文本文件，或路径不存在时，节点会报错。
+- 节点 ID 为 `1hew_LoadText`（v4.5.0 由 `1hew_LoadTxt` 改名；显示名与端口未变）。旧 ID 的工作流可在「缺失节点」面板换成新节点，仍发送 `1hew_LoadTxt` 的 API prompt 会在执行前自动改写；不支持节点替换的旧版 ComfyUI 需手动重新添加节点。
 - 已移除旧工作流中的 `encode` 控件；加载旧工作流时前端会自动迁移 widget 顺序。

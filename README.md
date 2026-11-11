@@ -21,6 +21,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v4.5.0**
+- **Breaking (node IDs)**: Rename `1hew_SaveTxt` → `1hew_SaveText` and `1hew_LoadTxt` → `1hew_LoadText` so the IDs match the `SaveText` / `LoadText` classes, the `Save Text` / `Load Text` display names and the full-word IDs used by every other I/O node; the abbreviation was also misleading now that `Save Text` writes `txt` / `csv` / `md` / `json`. Display names, ports, defaults and file formats are unchanged.
+- refactor(io): Register both renames through ComfyUI's Node replacement API (`utils/_node_replacements.py`, wired from `on_load`): a workflow saved with an old ID can be converted from the missing-node panel (links and widget values carry over, `old_widget_ids` maps the old `widgets_values` order), and API prompts that still send the old class types are rewritten before execution (`input_mapping` is explicit because the backend rebuilds `inputs` from it). ComfyUI builds without node-replacement support still need the node re-added by hand.
+- test: Pin both new node IDs and cross-check the replacement table against the declared schema inputs and widget order.
+- docs: Note the rename and migration path in the `Save Text` / `Load Text` docs and document the rename rule in `nodes/__init__.py`.
+
 **v4.4.0**
 - feat(float): Add `Float Mask Area Ratio` — report how much of the frame a mask covers as a `0–1` float, weighted by the soft mask values (feathered and anti-aliased edges count their real coverage instead of a whole pixel), averaged across a batch, clipped to `0–1`, safe on empty / non-mask input, and rounded by `round` (`0–10`, default `2`, the same name and range as `Range Mapping`); the `float` output label shows the measured value in the front end.
 - feat(text): Add `Text System Prompt` — offer every `.txt` under `utils/system_prompt/` as one flat `<model>/[<lang>] <name>` dropdown and emit the selected body verbatim on a `string` output; the key list is scanned once at startup, an edited body is re-read when its mtime changes (no restart needed), `_` / `.`-prefixed files stay out of the dropdown, and an empty folder or an unknown key returns `""` instead of blocking the graph. The bundled Qwen-Image-2.1 `t2i` / `edit` prompts are adapted from benjiyaya/ComfyUI-Qwen-Image-2.1-Prompt-Enhancer (MIT) and rewritten to answer in plain text.
