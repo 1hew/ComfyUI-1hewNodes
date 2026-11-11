@@ -160,13 +160,17 @@ def _signal_handler(signum, frame):
             if _prev_sigint_handler is not None and _prev_sigint_handler != signal.SIG_IGN:
                 _prev_sigint_handler(signum, frame)
         elif hasattr(signal, 'SIGTERM') and signum == signal.SIGTERM:
-            # ``signal.getsignal`` may return SIG_DFL/SIG_IGN (enum sentinels),
-            # not a callable handler.  Preserve explicit ignore; otherwise let
-            # the surrounding ComfyUI shutdown path continue after cleanup.
+            # Preserve explicit ignore and callable host shutdown policies.
+            # SIG_DFL is not callable: restore it and re-deliver TERM to this
+            # process after cleanup, otherwise installing this hook swallows
+            # the operating system's default termination behavior.
             if _prev_sigterm_handler is signal.SIG_IGN:
                 return
             if callable(_prev_sigterm_handler):
                 _prev_sigterm_handler(signum, frame)
+            elif _prev_sigterm_handler in (signal.SIG_DFL, None):
+                signal.signal(signum, signal.SIG_DFL)
+                os.kill(os.getpid(), signum)
     except KeyboardInterrupt:
         # 让上层按默认流程处理退出
         raise
