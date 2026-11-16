@@ -9,8 +9,12 @@ disabled for direct comparison.
 Hard requirements:
 - edit_image and org_image must be pixel-aligned; only a few pixels of drift
   are tolerated.  edit_image is resized to org_image's size when they differ.
-- edit_image must place the subject on an approximately solid background, or
-  foreground segmentation (and therefore the whole fit) fails.
+- edit_image is assumed to place the subject on an approximately solid
+  background.  When that does not hold (full-bleed subject, edge-cropped
+  subject, tiny subject, dirty background, unreliable colour fit) the node does
+  NOT fail: it skips the restoration and passes edit_image through unchanged
+  with an empty unchanged_mask, because a refinement pass must never drop a
+  usable matting result.
 
 The pure algorithm core is inlined below (ported
 byte-for-byte from the original algorithm.py; retains the original MIT
@@ -25,6 +29,16 @@ import cv2
 import numpy as np
 import torch
 from comfy_api.latest import io
+
+
+class _RestoreUnavailable(RuntimeError):
+    """Inputs cannot support a trustworthy restoration.
+
+    The node degrades to passing `edit_image` through unchanged instead of
+    failing the whole workflow: a refinement step must never drop a usable
+    matting result.
+    """
+
 
 # ============================================================================
 # Pure algorithm core. Ported byte-for-byte from ComfyUI-RH-Nodes algorithm.py
@@ -98,7 +112,7 @@ def _robust_fit(
         residual *= 255.0
         active = residual[weights > 0.05 * np.mean(base_weights)]
         if len(active) == 0:
-            raise RuntimeError("Robust fitting rejected every sample")
+            raise _RestoreUnavailable("Robust fitting rejected every sample")
         median = float(np.median(active))
         mad = 1.4826 * float(np.median(np.abs(active - median)))
         scale = max(2.0, median + 2.0 * mad)
@@ -215,9 +229,11 @@ def segment_solid_background(
     foreground = _fill_binary_holes(foreground)
     fraction = float(np.mean(foreground))
     if fraction < 0.005 or fraction > 0.80:
-        raise RuntimeError(
-            f"Implausible solid-background foreground fraction ({100*fraction:.2f}%); "
-            "adjust the background threshold or verify that AI image is connected first"
+        # Do not fail the workflow: the caller skips restoration and passes the
+        # edit through.  Full-bleed subjects, edge-cropped subjects and dirty
+        # backgrounds legitimately break the "islands on a solid border" model.
+        raise _RestoreUnavailable(
+            f"implausible solid-background foreground fraction ({100*fraction:.2f}%)"
         )
     return foreground, tuple(int(x) for x in background), float(threshold)
 
@@ -1131,7 +1147,7 @@ def _detect_occlusion_region(
     return direct, indirect, zone
 
 
-def restore_reference_colors(
+def _restore_reference_colors_impl(
     edited: np.ndarray,
     reference: np.ndarray,
     *,
@@ -1195,7 +1211,7 @@ def restore_reference_colors(
             edited, reference, interior, max_samples
         )
         if len(sample_edited) < 100:
-            raise RuntimeError("Too few foreground correspondences for color correction")
+            raise _RestoreUnavailable("too few foreground correspondences for color correction")
         transform = _robust_fit(
             sample_edited,
             sample_reference,
@@ -1261,9 +1277,8 @@ def restore_reference_colors(
 
     relative_unchanged = float(np.sum(unchanged) / max(1, np.sum(foreground)))
     if relative_unchanged < 0.20:
-        raise RuntimeError(
-            f"Only {100*relative_unchanged:.1f}% of foreground is confidently unchanged; "
-            "refusing reference restoration"
+        raise _RestoreUnavailable(
+            f"only {100*relative_unchanged:.1f}% of foreground is confidently unchanged"
         )
     foreground_distance = cv2.distanceTransform(
         foreground.astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_PRECISE
@@ -1440,6 +1455,66 @@ def restore_reference_colors(
     return output, foreground, unchanged, report
 
 
+def _passthrough_restoration(
+    edited: np.ndarray,
+    *,
+    return_occlusion_masks: bool = False,
+    return_diagnostics: bool = False,
+) -> tuple:
+    """Return the edit unchanged when no trustworthy restoration can be built.
+
+    "Cannot do it" must never mean "produce nothing": the caller keeps the AI
+    edit (a usable matting result) and only loses this color-refinement pass.
+    """
+    image = np.clip(np.asarray(edited, dtype=np.float64), 0.0, 1.0)
+    empty = np.zeros(image.shape[:2], dtype=bool)
+    report = RestorationReport(
+        background_rgb=(0, 0, 0),
+        foreground_fraction=0.0,
+        unchanged_fraction=0.0,
+        threshold=0.0,
+        before_mae=0.0,
+        mapped_mae=0.0,
+        structural_rescued_fraction=0.0,
+        hard_restored_fraction=0.0,
+        seam_compensated_fraction=0.0,
+    )
+    if return_diagnostics and not return_occlusion_masks:
+        raise ValueError("return_diagnostics requires return_occlusion_masks=True")
+    if return_occlusion_masks:
+        outputs = (image, empty, empty, report, empty, empty, empty)
+        if return_diagnostics:
+            return (*outputs, {"base": image})
+        return outputs
+    return image, empty, empty, report
+
+
+def restore_reference_colors(
+    edited: np.ndarray,
+    reference: np.ndarray,
+    **options,
+) -> tuple:
+    """Restore aligned reference colors, degrading to a pass-through if needed.
+
+    Any input that cannot support a trustworthy restoration (full-bleed subject,
+    edge-cropped subject, tiny subject, dirty background, unreliable fit) returns
+    `edit_image` unchanged with empty masks instead of raising, so the workflow
+    still delivers the AI edit.
+    """
+    try:
+        return _restore_reference_colors_impl(edited, reference, **options)
+    except _RestoreUnavailable as exc:
+        print(
+            "[1hewNodes][Image Color Restore] skipped color restoration and "
+            f"passed the edit image through: {exc}"
+        )
+        return _passthrough_restoration(
+            edited,
+            return_occlusion_masks=bool(options.get("return_occlusion_masks")),
+            return_diagnostics=bool(options.get("return_diagnostics")),
+        )
+
+
 def _as_image_batch(image: torch.Tensor, name: str) -> torch.Tensor:
     if not isinstance(image, torch.Tensor):
         raise TypeError(f"{name} must be a torch.Tensor")
@@ -1592,40 +1667,62 @@ class ImageColorRestore(io.ComfyNode):
         occlusion_residual_blur: float,
         occlusion_bridge_width: float,
     ) -> io.NodeOutput:
-        result = cls._restore_batch(
-            edit_image,
-            org_image,
-            max_samples=300_000,
-            background_threshold=(
+        try:
+            result = cls._restore_batch(
+                edit_image,
+                org_image,
+                max_samples=300_000,
+                background_threshold=(
                 None if background_threshold <= 0 else background_threshold
-            ),
-            unchanged_threshold=(
+                ),
+                unchanged_threshold=(
                 None if unchanged_threshold <= 0 else unchanged_threshold
-            ),
-            boundary_guard=4,
-            transition=6.0,
-            structural_rescue=True,
-            structural_threshold=0.95,
-            structural_max_shift=2,
-            hard_restore_high_confidence=True,
-            hard_restore_threshold=0.995,
-            small_hole_no_feather_area=16,
-            seam_color_propagation=True,
-            seam_max_distance=seam_max_distance,
-            seam_decay=seam_decay,
-            seam_residual_blur=seam_residual_blur,
-            seam_color_sigma=seam_color_sigma,
-            seam_bridge_width=12.0,
-            occlusion_residual_blur=occlusion_residual_blur,
-            occlusion_bridge_width=occlusion_bridge_width,
-            component_internal_handoff=False,
-            seam_handoff_smoothing=False,
-            seam_handoff_silhouette_guard=3.0,
-            continuous_seam_field=True,
-            trusted_fit=True,
-            structural_unchanged_cleanup=False,
-        )
-        return io.NodeOutput(*result)
+                ),
+                boundary_guard=4,
+                transition=6.0,
+                structural_rescue=True,
+                structural_threshold=0.95,
+                structural_max_shift=2,
+                hard_restore_high_confidence=True,
+                hard_restore_threshold=0.995,
+                small_hole_no_feather_area=16,
+                seam_color_propagation=True,
+                seam_max_distance=seam_max_distance,
+                seam_decay=seam_decay,
+                seam_residual_blur=seam_residual_blur,
+                seam_color_sigma=seam_color_sigma,
+                seam_bridge_width=12.0,
+                occlusion_residual_blur=occlusion_residual_blur,
+                occlusion_bridge_width=occlusion_bridge_width,
+                component_internal_handoff=False,
+                seam_handoff_smoothing=False,
+                seam_handoff_silhouette_guard=3.0,
+                continuous_seam_field=True,
+                trusted_fit=True,
+                structural_unchanged_cleanup=False,
+            )
+            return io.NodeOutput(*result)
+        except Exception as exc:
+            # Absolute last resort: return the AI edit unchanged so the node can
+            # never drop a usable matting result (only a miswired input, i.e. a
+            # non-IMAGE tensor, is allowed to fail here).
+            print(
+                "[1hewNodes][Image Color Restore] skipped color restoration and "
+                f"passed the edit image through: {exc}"
+            )
+            image = edit_image
+            if image.ndim == 3:
+                image = image.unsqueeze(0)
+            if image.ndim != 4 or image.shape[-1] < 3:
+                raise
+            image = image[..., :3].detach().float().cpu().clamp(0.0, 1.0)
+            alpha = _as_alpha_batch(edit_image)
+            if alpha is not None:
+                image = torch.cat([image, alpha], dim=-1)
+            unchanged = torch.zeros(
+                image.shape[0], image.shape[1], image.shape[2], dtype=torch.float32
+            )
+            return io.NodeOutput(image, unchanged)
 
     @classmethod
     def _restore_batch(
@@ -1640,11 +1737,15 @@ class ImageColorRestore(io.ComfyNode):
         edited_count = edited_batch.shape[0]
         reference_count = reference_batch.shape[0]
         if edited_count != reference_count and edited_count != 1 and reference_count != 1:
-            raise ValueError(
-                "Image batches must have equal sizes, or one input batch must "
-                "contain one image; "
-                f"got {edited_count} and {reference_count}"
+            # Cannot pair the batches, so there is nothing to restore.  Still
+            # deliver the AI edit instead of failing the workflow.
+            print(
+                "[1hewNodes][Image Color Restore] skipped color restoration: "
+                f"batch sizes {edited_count} and {reference_count} cannot be paired"
             )
+            images = edited_batch.numpy().astype(np.float32)
+            masks = np.zeros(images.shape[:3], dtype=np.float32)
+            return torch.from_numpy(images), torch.from_numpy(masks)
 
         corrected_items = []
         unchanged_items = []
@@ -1661,27 +1762,42 @@ class ImageColorRestore(io.ComfyNode):
             reference = reference_batch[
                 0 if reference_count == 1 else index
             ].numpy().astype(np.float64, copy=False)
-            if edited.shape != reference.shape:
-                edited = _resize_image_to(edited, reference.shape[:2])
-                if edited_alpha is not None:
-                    edited_alpha = _resize_image_to(edited_alpha, reference.shape[:2])
             try:
+                if edited.shape != reference.shape:
+                    edited = _resize_image_to(edited, reference.shape[:2])
+                    if edited_alpha is not None:
+                        edited_alpha = _resize_image_to(
+                            edited_alpha, reference.shape[:2]
+                        )
                 output, _foreground, unchanged, _report = restore_reference_colors(
                     edited,
                     reference,
                     **options,
                 )
             except Exception as exc:
-                raise RuntimeError(
-                    f"Image Color Restore failed at batch item "
-                    f"{index}: {exc}"
-                ) from exc
+                # Last resort: keep the AI edit so the task still produces an
+                # image.  A refinement pass must not drop the whole result.
+                print(
+                    "[1hewNodes][Image Color Restore] skipped color restoration at "
+                    f"batch item {index} and passed the edit image through: {exc}"
+                )
+                output = np.clip(np.asarray(edited, dtype=np.float64), 0.0, 1.0)
+                unchanged = np.zeros(output.shape[:2], dtype=bool)
             if edited_alpha is not None:
                 output = np.concatenate([output, edited_alpha], axis=-1)
             corrected_items.append(output.astype(np.float32))
             unchanged_items.append(unchanged.astype(np.float32))
 
-        return (
-            torch.from_numpy(np.stack(corrected_items)),
-            torch.from_numpy(np.stack(unchanged_items)),
-        )
+        try:
+            return (
+                torch.from_numpy(np.stack(corrected_items)),
+                torch.from_numpy(np.stack(unchanged_items)),
+            )
+        except Exception as exc:
+            print(
+                "[1hewNodes][Image Color Restore] skipped color restoration: "
+                f"batch items cannot be stacked ({exc})"
+            )
+            images = edited_batch.numpy().astype(np.float32)
+            masks = np.zeros(images.shape[:3], dtype=np.float32)
+            return torch.from_numpy(images), torch.from_numpy(masks)
