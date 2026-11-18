@@ -21,6 +21,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v4.6.0**
+- feat(multi): Add `Multi Dict` and `Multi List` — `Multi Dict` merges dynamic `dict_X` inputs in port order and then adds or overwrites one key from the `key` / `value` sockets (later keys win, the key/value pair is applied last, and a `value_type` converter handles `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null`), while `Multi List` combines dynamic items into an array with `extend` / `append` modes; both nodes expose native `dict` / `list` and compact `json` outputs.
+- feat(io): `Save Text` now accepts a wildcard `text` input, so dicts, lists, numbers and booleans can be saved directly; `json` pretty-prints containers, `txt` / `md` write pretty JSON text, `csv` stays text-only, and non-JSON values raise path-aware errors instead of being silently stringified.
+- feat(text): `Text Path Extract` adds `keys[*]` / `values[*]` to read either side of an object (an unknown key name is still addressable), lets `[0]` / `[-1]` index an object's values the way Python does, and defaults `path` to `values[*]`; the bare `*` / `[*]` wildcard keeps its old meaning.
+- test: Cover dict merge order and overwrite behavior, key/value sockets, extend vs append, the Save Text conversion matrix, and the `keys` / `values` selectors plus object indexing.
+- docs: Add bilingual docs for the two new nodes and update the `Save Text` / `Text Path Extract` docs, README node lists and changelog.
+
 **v4.5.0**
 - **Breaking (node IDs)**: Rename `1hew_SaveTxt` → `1hew_SaveText` and `1hew_LoadTxt` → `1hew_LoadText` so the IDs match the `SaveText` / `LoadText` classes, the `Save Text` / `Load Text` display names and the full-word IDs used by every other I/O node; the abbreviation was also misleading now that `Save Text` writes `txt` / `csv` / `md` / `json`. Display names, ports, defaults and file formats are unchanged.
 - refactor(io): Register both renames through ComfyUI's Node replacement API (`utils/_node_replacements.py`, wired from `on_load`): a workflow saved with an old ID can be converted from the missing-node panel (links and widget values carry over, `old_widget_ids` maps the old `widgets_values` order), and API prompts that still send the old class types are rewritten before execution (`input_mapping` is explicit because the backend rebuilds `inputs` from it). ComfyUI builds without node-replacement support still need the node re-added by hand.
@@ -776,7 +783,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Text Prefix Suffix | Text prefix suffix formatter with wildcard input support for flexible data formatting with custom prefix and suffix |
 | Text Custom Extract | Text custom extractor for extracting specified key values from JSON |
-| Text Path Extract | Read values from JSON text, dicts or plain text by path such as `[0].content`, `[-1].bbox[0]` or `[*].content`, collect every match (`[*].bbox`), count with `.count` / `.length` / `[#]`, and emit auto/json/text/csv text plus a raw `value` and a `count` output |
+| Text Path Extract | Read values from JSON text, dicts or plain text by path such as `[0].content`, `[-1].bbox[0]` or `values[*].content`, pick the key or value side with `keys[*]` / `values[*]` (so an unknown key name is still addressable), count with `.count` / `.length` / `[#]`, and emit auto/json/text/csv text plus a raw `value` and a `count` output |
 | Text System Prompt | Pick one builtin system prompt from `utils/system_prompt/<model>/[<lang>] <name>.txt` and output its body verbatim on a single `string` output; bundled Qwen-Image-2.1 `t2i` / `edit` prompts, and any new `.txt` you drop in shows up after a reload |
 | String Ratio GPT Image 2.0 | Infer the nearest GPT 2.0 image supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
 | String Ratio Gemini 3.1 Flash Image | Infer the nearest Gemini 3.1 Flash supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
@@ -800,6 +807,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Node Name | Description |
 |-----------|-------------|
 | Multi String Join | Concatenate dynamic `string_X` sockets (`string_1` is socket-only) with `{input}` variable support and comment/triple-quote filtering; customizable separator |
+| Multi Dict | Merge dynamic `dict_X` inputs in port order, then add or overwrite one key from the `key` / `value` sockets; a `value_type` converter (`auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null`) applies to `value`, later keys win, and both `dict` / `json` outputs are provided |
 | Multi Image Batch | Build image batches from dynamic `image_X` with crop/pad/stretch size unification and automatic RGBA preservation when any input has alpha |
 | Multi Image List | Build `image_list` from dynamic `image_X` batch or list inputs, splitting them into single-image list items |
 | Multi Image Overlay | Overlay multiple image layers sequentially with alpha compositing, fit modes, and automatic RGBA preservation when any input has alpha |
@@ -807,6 +815,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Multi Mask Batch | Build mask batch from dynamic `mask_X` with crop/pad/stretch size unification and configurable gray padding |
 | Multi Mask Math Ops | Dynamic multi-mask operations (union/intersection/difference/XOR) with batch broadcasting and size alignment |
 | Multi Video Stitch | Stitch dynamic `video_X` inputs end-to-end into one video with crop/pad/stretch size unification, optional `get_video_size` reference size, and configurable pad color / fps |
+| Multi List | Combine dynamic `item_X` inputs into one array; `extend` splices list/tuple inputs one level, `append` keeps them nested |
 
 
 ### 📁 IO Nodes
@@ -820,7 +829,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Load Video to Image | Decode a video into an image batch, audio, fps, and frame count |
 | Save Audio | Save an AUDIO object as FLAC/WAV/MP3/Opus (default mp3) with output/temp routing, optional metadata, batch splitting, empty-input pass-through, and an in-node audio player preview |
 | Save Image | Save image batches to output/temp and return absolute saved file paths |
-| Save Text | Save text input as `txt` / `csv` / `md` / `json` (UTF-8) with auto-increment naming, metadata, and preview-only mode |
+| Save Text | Save wildcard text, dict, list or scalar input as `txt` / `csv` / `md` / `json` (UTF-8) with auto-increment naming, metadata, and preview-only mode |
 | Save Video by Image | Encode an image batch into a video with optional audio muxing and alpha support |
 | Save Video | Save a VIDEO object to disk with container extension preservation and alpha preview |
 

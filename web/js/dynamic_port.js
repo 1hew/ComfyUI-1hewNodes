@@ -5,6 +5,8 @@ app.registerExtension({
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         const configs = {
             "1hew_MultiStringJoin": { base: "string_", addType: "STRING", select: null, initial: 1 },
+            "1hew_MultiDict": { base: "dict_", addType: "*", select: null, initial: 1, trailing: ["key", "value"] },
+            "1hew_MultiList": { base: "item_", addType: "*", select: null, initial: 1 },
             "1hew_MultiImageBatch": { base: "image_", addType: "IMAGE", select: null, initial: 1 },
             "1hew_MultiImageList": { base: "image_", addType: "IMAGE", select: null, initial: 1 },
             "1hew_MultiImageOverlay": { base: "image_", addType: "IMAGE", select: null, initial: 1 },
@@ -35,8 +37,10 @@ app.registerExtension({
         const outputType = cfg.outputType || cfg.addType;
         const selectName = cfg.select;
         const cap = typeof cfg.max === "number" && cfg.max > 0 ? cfg.max : Infinity;
-        // 固定在末尾的非动态输入（如 get_video_size）名称。
-        const trailingName = cfg.trailing;
+        // 固定在末尾的非动态输入；支持单个名称或名称数组。
+        const trailingNames = Array.isArray(cfg.trailing)
+            ? cfg.trailing
+            : (cfg.trailing ? [cfg.trailing] : []);
 
         const originalOnConnectionsChange = nodeType.prototype.onConnectionsChange;
 
@@ -104,11 +108,10 @@ app.registerExtension({
             return idxs;
         }
 
-        function trailingAnchorIndex(node) {
-            if (!trailingName) return -1;
+        function findInputIndex(node, name) {
             const inputs = node.inputs || [];
             for (let i = 0; i < inputs.length; i++) {
-                if (inputs[i]?.name === trailingName) return i;
+                if (inputs[i]?.name === name) return i;
             }
             return -1;
         }
@@ -132,9 +135,21 @@ app.registerExtension({
 
         // 动态端口总是追加到末尾，因此每次变动后都把 trailing 锚点重新压回最后。
         function ensureTrailingAnchor(node) {
-            const index = trailingAnchorIndex(node);
-            if (index < 0) return;
-            moveInputToEnd(node, index);
+            if (trailingNames.length === 0) return;
+            const inputs = node.inputs || [];
+            const tail = inputs
+                .slice(-trailingNames.length)
+                .map(input => input?.name);
+            if (
+                tail.length === trailingNames.length
+                && tail.every((name, i) => name === trailingNames[i])
+            ) {
+                return;
+            }
+            for (const name of trailingNames) {
+                const index = findInputIndex(node, name);
+                if (index >= 0) moveInputToEnd(node, index);
+            }
         }
 
         function listDynamicOutputs(node) {

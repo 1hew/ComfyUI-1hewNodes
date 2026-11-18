@@ -12,10 +12,30 @@ import types
 try:
     import comfy_api  # noqa: F401
 except ImportError:
+    class _PortType:
+        def __init__(self, type_name):
+            self.type_name = type_name
+
+        def Input(self, name, **kwargs):
+            return {"kind": "input", "type": self.type_name, "id": name, **kwargs}
+
+        def Output(self, **kwargs):
+            return {"kind": "output", "type": self.type_name, **kwargs}
+
     io = types.SimpleNamespace(
         ComfyNode=object,
         Schema=lambda **kwargs: kwargs,
         NodeOutput=lambda *values, **kwargs: values,
+        Custom=_PortType,
+        String=_PortType("STRING"),
+        Combo=_PortType("COMBO"),
+        Boolean=_PortType("BOOLEAN"),
+        Int=_PortType("INT"),
+        Float=_PortType("FLOAT"),
+        Image=_PortType("IMAGE"),
+        Mask=_PortType("MASK"),
+        Video=_PortType("VIDEO"),
+        Audio=_PortType("AUDIO"),
     )
     latest = types.ModuleType("comfy_api.latest")
     latest.io = io

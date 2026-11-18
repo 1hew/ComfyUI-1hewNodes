@@ -12,18 +12,32 @@ JSON with single quotes / trailing commas / True|False|None, or JSON with
 unquoted keys), an already-parsed dict / list, or any other value, which is
 returned unchanged.
 
-query walks that object with a JavaScript-flavoured path:
+query walks that object with Python-style indices plus JSONPath-style
+keys:
 
-    [0].content          list index, then key
-    [-1].bbox            negative index
+    [0].content          first item, then its key
+    [-1].bbox            last item (negative indices work like Python)
     content              bare key == ["content"]
     $.data.items[0].zh   optional JSONPath-ish root
     [0]["content"]       quoted bracket key
     [0].'content'        single quotes work too
-    data[*].content      wildcard: collect every element's content
-    data.*.content       dot form of the wildcard
-    [*].content.count    count / length / size / [#]: how many
+    values[*].content    every value's content (the default path)
+    keys[*]              every key of an object (a list has none)
+    values[0].ids        first value, whatever its key is called
+    values[*].bbox.count count / length / size / [#]: how many
     [0].bbox.length      length of the matched list (4)
+
+values / value and keys / key pick the value or the key side of an object,
+so {"reference_image_1": {...}} is readable as values[0].ids without
+naming the key. A list has no key names, so keys finds nothing there
+while values is the list itself -- a list is addressable by position
+([0], values[2]) only; a real field with the same name still wins on an
+object, so quote it (["values"]) for the literal key. An index
+also works on a bare object: [0].ids reads the first value and a quoted
+["0"] is always the literal key "0", the same split as Python's d[0] vs
+d["0"].
+The older [*] / * wildcard still means "every child", i.e. values[*], so
+graphs saved before the selectors existed keep working.
 
 Full-width brackets / quotes / commas from a Chinese IME are normalised, so
 a path typed as [0].“content” behaves like [0]."content".
@@ -411,6 +425,10 @@ _WILDCARD = object()
 _MISSING = object()
 _INT_TOKEN_RE = re.compile(r"[+-]?\d+")
 _COUNT_TOKENS = {"count", "length", "size", "len"}
+# keys / values (and their singular spellings) select the key or value side
+# of an object; a real field with the same name still wins.
+_KEY_TOKENS = {"key", "keys"}
+_VALUE_TOKENS = {"value", "values"}
 
 
 class _Key(str):
@@ -548,9 +566,31 @@ def _pick(node, token):
         text = str(token)
         if text in node:
             return node[text]
+        if type(token) is not _Key:
+            lowered = text.strip().lower()
+            if lowered in _KEY_TOKENS:
+                return list(node.keys())
+            if lowered in _VALUE_TOKENS:
+                return list(node.values())
+            # [0] / [-1] on an object: the value at that position in
+            # insertion order, so {"reference_image_1": ..., "image_1": ...}
+            # is addressable without naming the key. Any real key wins over
+            # the position, and a quoted ["0"] is only ever the literal key.
+            index = _as_index(token)
+            if index is not None:
+                try:
+                    return list(node.values())[index]
+                except IndexError:
+                    return _MISSING
         return _MISSING
 
     if isinstance(node, Sequence) and not isinstance(node, (str, bytes, bytearray)):
+        if type(token) is not _Key:
+            if str(token).strip().lower() in _VALUE_TOKENS:
+                # A list only has values: values[0] is the first item and
+                # values[*] is every item. keys has no meaning here (a list
+                # has no key names), so it simply misses.
+                return node
         index = _as_index(token)
         if index is None:
             return _MISSING

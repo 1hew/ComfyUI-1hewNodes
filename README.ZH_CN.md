@@ -21,6 +21,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v4.6.0**
+- feat(multi)：新增 `Multi Dict`、`Multi List`——`Multi Dict` 先按端口顺序合并动态 `dict_X`，再用 `key` / `value` 添加或覆盖一个键（后出现的同名键覆盖前面的，`key` / `value` 最后应用，`value_type` 支持 `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` 转换）；`Multi List` 把动态 `item_X` 合并为数组，支持 `extend` 摊平与 `append` 嵌套；两个节点都同时输出原生 `dict` / `list` 和紧凑 `json` 文本。
+- feat(io)：`Save Text` 的 `text` 改为通配输入，dict/list/数字/布尔可直接保存；`json` 对容器做缩进美化，`txt` / `md` 写美化后的 JSON 文本，`csv` 仍只接受文本；set、tensor、NaN 等非 JSON 值会带路径报错，不再被悄悄转成字符串。
+- feat(text)：`Text Path Extract` 新增 `keys[*]` / `values[*]` 分别取对象的所有键名 / 所有值（键名未知也能取），`[0]` / `[-1]` 可按位置取对象的值（与 Python 一致），`path` 默认值改为 `values[*]`；裸 `*` / `[*]` 通配保持原有语义。
+- test：补充字典合并顺序与覆盖、key/value 连线、extend 与 append 差异、Save Text 转换矩阵，以及 `keys` / `values` 选择器与对象下标的回归测试。
+- docs：新增两个新节点的中英文文档，更新 `Save Text` / `Text Path Extract` 文档、README 节点列表与更新日志。
+
 **v4.5.0**
 - **破坏性变更（节点 ID）**：`1hew_SaveTxt` → `1hew_SaveText`、`1hew_LoadTxt` → `1hew_LoadText`，让 ID 与 `SaveText` / `LoadText` 类名、`Save Text` / `Load Text` 显示名以及其它 I/O 节点的完整单词写法一致；`Save Text` 现在支持 `txt` / `csv` / `md` / `json`，`Txt` 也已名不副实。显示名、端口、默认值与文件格式均未变化。
 - refactor(io)：通过 ComfyUI 的 Node replacement API 注册这两个改名（`utils/_node_replacements.py`，由 `on_load` 调用）：旧 ID 的工作流可在「缺失节点」面板一键换到新节点（连线与 widget 值一并迁移，`old_widget_ids` 负责旧 `widgets_values` 的位置映射），仍使用旧 class_type 的 API prompt 会在执行前自动改写（服务端会按 `input_mapping` 重建 `inputs`，因此映射必须显式列全）。不支持节点替换的旧版 ComfyUI 仍需手动重新添加节点。
@@ -776,7 +783,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Text Prefix Suffix | 文本前缀后缀器，支持通配符输入的灵活数据格式化，可自定义前缀和后缀 |
 | Text Custom Extract | 文本自定义提取器，从JSON中提取指定键值 |
-| Text Path Extract | 按 `[0].content`、`[-1].bbox[0]`、`[*].content` 等路径从 JSON 文本、字典或普通文本中取值，可用 `[*].bbox` 收集整组、用 `.count` / `.length` / `[#]` 计数，输出 auto/json/text/csv 文本、`value` 原值与 `count` 数量 |
+| Text Path Extract | 按 `[0].content`、`[-1].bbox[0]`、`values[*].content` 等路径从 JSON 文本、字典或普通文本中取值，用 `keys[*]` / `values[*]` 分别取对象的所有键名 / 所有值（键名未知也能取），用 `.count` / `.length` / `[#]` 计数，输出 auto/json/text/csv 文本、`value` 原值与 `count` 数量 |
 | Text System Prompt | 从 `utils/system_prompt/<模型>/[<语言>] <名称>.txt` 中选一条内置系统提示词，原样输出到 `string` 输出；内置 Qwen-Image-2.1 的 `t2i` / `edit`，新增的 `.txt` 重载后会出现在下拉中 |
 | String Ratio GPT Image 2.0 | 从输入图像推断最接近的 GPT 2.0 图像模型支持比例；未连接图像时透传所选比例 |
 | String Ratio Gemini 3.1 Flash Image | 从输入图像推断最接近的 Gemini 3.1 Flash 支持比例；未连接图像时透传所选比例 |
@@ -800,6 +807,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Multi String Join | 动态多输入字符串连接（`string_1` 为纯插槽），支持 `{input}` 变量与注释/三引号过滤，可自定义分隔符 |
+| Multi Dict | 先按端口顺序合并动态 `dict_X`，再用 `key` / `value` 添加或覆盖一个键；`value_type` 支持 `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` 转换，后出现的同名键覆盖前面的，输出 `dict` / `json` |
 | Multi Image Batch | 从动态 `image_X` 构建批次，支持 crop/pad/stretch 尺寸统一，并在任一输入带 alpha 时自动保留 RGBA |
 | Multi Image List | 从动态 `image_X` 批次或列表输入构建 `image_list`，并拆分为单张图像列表项 |
 | Multi Image Overlay | 按顺序叠加多个图像图层，支持 alpha 合成、尺寸适应，并在任一输入带 alpha 时自动保留 RGBA |
@@ -807,6 +815,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Multi Mask Batch | 从动态 `mask_X` 构建批次，支持 crop/pad/stretch 尺寸统一与灰度填充 |
 | Multi Mask Math Ops | 动态多遮罩运算（交/并/差/异或），支持批次广播与统一尺寸 |
 | Multi Video Stitch | 将动态 `video_X` 输入首尾拼接为一段视频，支持 crop/pad/stretch 尺寸统一、可选 `get_video_size` 参考尺寸，并可配置填充颜色与帧率 |
+| Multi List | 把动态 `item_X` 合并为数组；`extend` 摊平列表/元组一层，`append` 保留嵌套 |
 
 
 ### 📁 IO 节点
@@ -820,7 +829,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Load Video to Image | 将视频解码为图像帧批次、音频、fps 与帧数信息 |
 | Save Audio | 将 AUDIO 保存为 FLAC/WAV/MP3/Opus（默认 mp3），支持输出/临时目录、元数据写入、批量拆分、空输入直通与节点内播放器预览 |
 | Save Image | 保存图像批次到输出/临时目录，并输出保存后的绝对路径 |
-| Save Text | 将文本输入保存为 `txt` / `csv` / `md` / `json`（固定 UTF-8），支持自动编号、元数据与仅预览模式 |
+| Save Text | 将文本/字典/列表/数字等通配输入保存为 `txt` / `csv` / `md` / `json`（固定 UTF-8），支持自动编号、元数据与仅预览模式 |
 | Save Video by Image | 将图像批次编码为视频，支持可选音频混流与 Alpha 输出策略 |
 | Save Video | 保存 VIDEO 对象并返回路径，沿用容器扩展名并生成 Alpha 预览 |
 

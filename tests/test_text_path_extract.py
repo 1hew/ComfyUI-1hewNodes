@@ -107,7 +107,7 @@ def test_schema_starts_with_text_and_defaults_to_every_item():
     # Optional widgets are listed after required ones by ComfyUI, which
     # would push the text box below every other widget.
     assert text.get("optional", False) is False
-    assert path["default"] == "[*]"
+    assert path["default"] == "values[*]"
 
     assert schema["outputs"][0]["type"] == "STRING"
     assert schema["outputs"][1]["type"] == "*"
@@ -164,6 +164,97 @@ def test_bare_key_and_jsonpath_root():
     assert _run(text=data, path="$.data.items[0].zh")[0] == "猫"
     assert _run(text=data, path="data.items[0].zh")[0] == "猫"
     assert _run(text='{"content": "狗"}', path="content")[0] == "狗"
+
+
+def test_keys_and_values_selectors_read_both_sides():
+    data = (
+        '{"reference_image_1": {"ids": [{"label": "树"}]},'
+        ' "reference_image_2": {"ids": [{"label": "人物"}]}}'
+    )
+    assert _run(text=data, path="keys[*]")[0] == "reference_image_1\nreference_image_2"
+    assert _run(text=data, path="keys[0]")[0] == "reference_image_1"
+    assert _run(text=data, path="keys[-1]")[0] == "reference_image_2"
+    assert _run(text=data, path="values[0].ids[0].label")[0] == "树"
+    assert _run(text=data, path="values[-1].ids[0].label")[0] == "人物"
+    assert _run(text=data, path="values[*].ids[*].label", output_format="json")[0] == (
+        '["树","人物"]'
+    )
+    assert _run(text=data, path="values[*]")[2] == 2
+    assert _run(text=data, path="keys[*]")[2] == 2
+    # values[*] is the default path, and the singular spellings work too.
+    assert _run(text=data)[2] == 2
+    assert _run(text=data, path="key[0]")[0] == "reference_image_1"
+    assert _run(text=data, path="value[0].ids[0].label")[0] == "树"
+
+
+def test_list_selectors_are_positional_values_only():
+    assert _run(text=SAMPLE, path="values[0].content")[0] == "犀牛"
+    assert _run(text=SAMPLE, path="values[1].bbox[0]")[0] == "508"
+    assert _run(text=SAMPLE, path="values[*].content")[2] == 3
+    # A list has no key names: keys only exists on an object, so it misses
+    # here and the fallback comes back instead of a fake index list.
+    assert _run(text=SAMPLE, path="keys[*]", fallback="N/A")[0] == "N/A"
+    assert _run(text=SAMPLE, path="keys[0]", fallback="N/A")[0] == "N/A"
+    # Counting a miss still counts: zero keys matched, not the fallback.
+    assert _run(text=SAMPLE, path="keys[#]")[0] == "0"
+    assert _run(text=SAMPLE, path="keys[#]")[2] == 0
+    # The fields of an item are still reachable through its own keys.
+    assert _run(
+        text='[{"id": "box_001", "label": "犀牛"}]',
+        path="values[0].keys[*]",
+    )[0] == "id\nlabel"
+
+
+def test_selector_names_do_not_shadow_real_fields():
+    data = '{"values": [7, 8], "keys": "k"}'
+    assert _run(text=data, path="values[0]")[0] == "7"
+    assert _run(text=data, path="keys")[0] == "k"
+    assert _run(text=data, path="values[#]")[0] == "2"
+    assert _run(text=data, path='["values"][1]')[0] == "8"
+
+
+def test_object_index_reads_the_nth_value_without_its_key():
+    data = (
+        '{"reference_image_1": {"ids": [{"label": "树"}]},'
+        ' "reference_image_2": {"ids": [{"label": "人物"}]}}'
+    )
+    assert _run(text=data, path="[0].ids[0].label")[0] == "树"
+    assert _run(text=data, path="[-1].ids[0].label")[0] == "人物"
+    # [0] stops at one value while [*] still collects the whole set.
+    assert _run(text=data, path="[0].ids")[2] == 1
+    assert _run(text=data, path="[*].ids")[2] == 2
+
+
+def test_object_index_follows_python_rules():
+    data = '{"a": 1, "b": 2, "c": 3}'
+    assert _run(text=data, path="[0]")[0] == "1"
+    assert _run(text=data, path="[-1]")[0] == "3"
+    assert _run(text=data, path="[1]")[1] == 2
+    assert _run(text=data, path="[3]", fallback="N/A")[0] == "N/A"
+    assert _run(text=data, path="[-4]", fallback="N/A")[0] == "N/A"
+    # Objects and lists mix at any depth.
+    nested = '{"items": {"a": {"deep": [10, 20]}}}'
+    assert _run(text=nested, path="items[0].deep[-1]")[0] == "20"
+
+
+def test_object_index_never_shadows_a_real_key():
+    # A key that looks like an index wins, quoted or not, the same split as
+    # Python's d[0] vs d["0"] once the key exists.
+    data = '{"0": "zero", "1": "one"}'
+    assert _run(text=data, path="[0]")[0] == "zero"
+    assert _run(text=data, path="[1]")[0] == "one"
+    assert _run(text=data, path='["1"]')[0] == "one"
+    # Quoted keys stay literal: ["0"] is not the first value.
+    assert _run(text='{"a": "x"}', path='["0"]', fallback="N/A")[0] == "N/A"
+    # A Python literal keeps a real int key: d[0] is that key's value.
+    assert _run(text="{0: '零', 'b': 2}", path="[0]")[0] == "零"
+
+
+def test_bare_star_collects_everything_like_the_bracketed_form():
+    data = '{"a": 1, "b": 2}'
+    assert _run(text=data, path="*", output_format="json")[0] == "[1,2]"
+    assert _run(text=data, path=".*", output_format="json")[0] == "[1,2]"
+    assert _run(text=data, path="[*]", output_format="json")[0] == "[1,2]"
 
 
 def test_wildcard_collects_every_match():

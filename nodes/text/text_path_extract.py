@@ -1,10 +1,13 @@
 """Text Path Extract: pull a value out of JSON-like text by path.
 
 Everything arrives through the text widget: JSON, JSON inside a Markdown
-fence, a Python literal, relaxed JSON, or plain text. The path uses a
-JavaScript-flavoured syntax, so "[0].content", "[-1].bbox[0]",
-"data.items[0].zh" or the wildcard form "[*].content" all work; the
-default "[*]" splits the whole payload into its items.
+fence, a Python literal, relaxed JSON, or plain text. The path indexes like
+Python and reads keys like JSONPath: "[0].content", "[-1].bbox[0]" and
+"data.items[0].zh" all work, "keys[*]" / "values[*]" pick the key or value
+side of an object, and the default "values[*]" splits the payload into its
+values. "values[0].ids" therefore reads the first image whether its key is
+called reference_image_1 or image_1, and "keys[0]" tells you which one it
+was.
 """
 
 from comfy_api.latest import io
@@ -26,7 +29,7 @@ class TextPathExtract(io.ComfyNode):
                 # optional ones, so an optional text box would render below
                 # path / output_format / separator / fallback.
                 io.String.Input("text", default="", multiline=True),
-                io.String.Input("path", default="[*]"),
+                io.String.Input("path", default="values[*]"),
                 io.Combo.Input(
                     "output_format",
                     options=["auto", "json", "text", "csv"],
@@ -46,7 +49,7 @@ class TextPathExtract(io.ComfyNode):
     async def execute(
         cls,
         text: str = "",
-        path: str = "[*]",
+        path: str = "values[*]",
         output_format: str = "auto",
         separator: str = "\\n",
         fallback: str = "",

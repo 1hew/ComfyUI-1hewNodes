@@ -66,6 +66,7 @@ def _build_stubs(directory):
         Boolean=_IOType("BOOLEAN"),
         Combo=_IOType("COMBO"),
         Int=_IOType("INT"),
+        Custom=_IOType,
     )
     ui = types.SimpleNamespace(SavedResult=_SavedResult)
     latest = types.ModuleType("comfy_api.latest")
@@ -169,6 +170,8 @@ class SaveTextMetadataTests(unittest.TestCase):
         )
         filename_kwargs = dict(inputs)["filename"]
         self.assertEqual(filename_kwargs["default"], "text/ComfyUI")
+        input_types = {item[2]: item[1] for item in schema["inputs"]}
+        self.assertEqual(input_types["text"], "*")
 
     def test_node_ids_use_full_text_word(self):
         self.assertEqual(
@@ -198,7 +201,7 @@ class SaveTextMetadataTests(unittest.TestCase):
             widgets = [
                 item[2]
                 for item in schemas[new_id]["inputs"]
-                if not item[3].get("force_input")
+                if not item[3].get("force_input") and item[1] != "*"
             ]
             self.assertEqual(widget_ids, widgets, old_id)
 
@@ -288,6 +291,80 @@ class SaveTextMetadataTests(unittest.TestCase):
             workflow,
         )
         self.assertEqual(self.text_metadata.strip_metadata(content), "payload")
+
+    def test_dict_input_is_serialized_as_pretty_json(self):
+        self._attach_hidden({"nodes": [], "links": []}, {})
+        result = self._execute({"a": {"b": 1}}, format="json")
+        content = Path(result.values[0]).read_text(encoding="utf-8")
+        self.assertEqual(content, '{\n  "a": {\n    "b": 1\n  }\n}')
+        self.assertEqual(self.text_metadata.parse_metadata(content), {})
+
+    def test_list_and_scalar_inputs_follow_the_format(self):
+        self._attach_hidden({"nodes": [], "links": []}, {})
+
+        list_result = self._execute(
+            [1, {"a": 2}], format="txt", save_metadata=False
+        )
+        list_text = Path(list_result.values[0]).read_text(encoding="utf-8")
+        self.assertEqual(
+            list_text, '[\n  1,\n  {\n    "a": 2\n  }\n]'
+        )
+
+        int_result = self._execute(20, format="json")
+        self.assertEqual(
+            Path(int_result.values[0]).read_text(encoding="utf-8"), "20"
+        )
+
+        bool_result = self._execute(True, format="json")
+        self.assertEqual(
+            Path(bool_result.values[0]).read_text(encoding="utf-8"), "true"
+        )
+
+        tuple_result = self._execute((1, 2), format="json")
+        self.assertEqual(
+            Path(tuple_result.values[0]).read_text(encoding="utf-8"),
+            "[\n  1,\n  2\n]",
+        )
+
+    def test_none_inside_containers_becomes_json_null(self):
+        self._attach_hidden({"nodes": [], "links": []}, {})
+
+        json_result = self._execute({"a": None}, format="json")
+        json_text = Path(json_result.values[0]).read_text(encoding="utf-8")
+        self.assertEqual(json_text, '{\n  "a": null\n}')
+
+        txt_result = self._execute(
+            [None, {"b": None}], format="txt", save_metadata=False
+        )
+        txt_text = Path(txt_result.values[0]).read_text(encoding="utf-8")
+        self.assertEqual(
+            txt_text, '[\n  null,\n  {\n    "b": null\n  }\n]'
+        )
+
+    def test_top_level_none_still_means_unconnected(self):
+        result = self._execute(None, format="json")
+        self.assertEqual(result.values[0], "")
+
+    def test_csv_and_non_json_values_are_rejected(self):
+        self._attach_hidden({"nodes": [], "links": []}, {})
+        with self.assertRaises(ValueError):
+            self._execute({"a": 1}, format="csv")
+        with self.assertRaises(ValueError):
+            self._execute({1, 2}, format="json")
+        with self.assertRaises(ValueError):
+            self._execute(float("nan"), format="json")
+
+    def test_dict_payload_keeps_metadata_for_txt(self):
+        workflow = {"nodes": [], "links": []}
+        self._attach_hidden(workflow, {})
+        result = self._execute({"a": 1}, format="txt")
+        content = Path(result.values[0]).read_text(encoding="utf-8")
+        self.assertEqual(
+            self.text_metadata.strip_metadata(content), '{\n  "a": 1\n}'
+        )
+        self.assertEqual(
+            self.text_metadata.parse_metadata(content)["workflow"], workflow
+        )
 
     def test_front_end_markers_match_python(self):
         js = (ROOT / "web" / "js" / "core" / "text_metadata.js").read_text(

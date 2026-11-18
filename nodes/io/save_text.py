@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import os
 from typing import Optional
 
 import folder_paths
 from comfy_api.latest import io, ui
+
+from ...utils._json_ops import pretty_json_text
 
 from ...utils._text_metadata import build_metadata_block
 
@@ -68,22 +71,39 @@ def _collect_workflow_metadata(cls: type) -> dict:
     return metadata
 
 
-def _stringify_value(value) -> str:
+def _coerce_text(value, file_format: str) -> str:
+    """Turn the wildcard input into the text that is written to disk.
+
+    str/bytes pass through; JSON-safe containers become pretty JSON text;
+    scalars become their JSON or plain-text form depending on the target
+    format. Python-only values (set, complex, tensors) are rejected instead
+    of being silently stringified, so a .json file can never contain garbage.
+    """
     if value is None:
         return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
     if isinstance(value, str):
         return value
-    if isinstance(value, bytes):
-        try:
-            return value.decode("utf-8", errors="replace")
-        except Exception:
-            return str(value)
+    if isinstance(value, bool):
+        return ("true" if value else "false") if file_format == "json" else str(value)
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"Save Text 不支持非有限浮点数 {value!r}")
+        return json.dumps(value) if file_format == "json" else str(value)
     if isinstance(value, (dict, list, tuple)):
-        try:
-            return json.dumps(value, ensure_ascii=False, indent=2, default=str)
-        except Exception:
-            return str(value)
-    return str(value)
+        if file_format == "csv":
+            raise ValueError(
+                "Save Text 的 csv 格式只接受文本；dict/list 请改用 json 格式"
+            )
+        return pretty_json_text(value)
+    raise ValueError(
+        "Save Text 只接受 JSON 安全类型"
+        "（str/bytes/dict/list/int/float/bool/None），"
+        f"收到 {type(value).__name__}"
+    )
 
 
 class SaveText(io.ComfyNode):
@@ -140,11 +160,14 @@ class SaveText(io.ComfyNode):
             display_name="Save Text",
             category="1hewNodes/io",
             inputs=[
-                io.String.Input(
+                io.Custom("*").Input(
                     "text",
                     optional=True,
-                    force_input=True,
-                    tooltip="要保存的文本；不连接时为空（None），节点预览会同步清空。",
+                    tooltip=(
+                        "要保存的内容；支持 JSON 安全类型（str/dict/list/int/float/bool）。"
+                        "dict/list 会按 JSON 文本写入；csv 格式只接受文本。"
+                        "不连接时为空（None），节点预览会同步清空。"
+                    ),
                 ),
                 io.String.Input("filename", default="text/ComfyUI"),
                 io.Combo.Input(
@@ -208,7 +231,7 @@ class SaveText(io.ComfyNode):
             )
         extension = cls.FORMAT_EXTENSIONS[final_format]
 
-        text_value = _stringify_value(text)
+        text_value = _coerce_text(text, final_format)
         if not save_output:
             return io.NodeOutput("", ui=cls._preview_ui(text_value))
 
