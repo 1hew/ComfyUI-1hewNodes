@@ -49,6 +49,7 @@ define exactly one ComfyNode, so shared helpers live in utils/_*.py.
 from __future__ import annotations
 
 import ast
+import copy
 import json
 import re
 from collections.abc import Mapping, Sequence
@@ -62,6 +63,7 @@ __all__ = [
     "query_all",
     "is_count_path",
     "format_value",
+    "replace_all",
 ]
 
 
@@ -720,3 +722,151 @@ def _to_text(value) -> str:
             return str(int(value))
         return repr(value)
     return str(value)
+
+
+# ---------------------------------------------------------------------------
+# Write-back: replace the values a path matches
+# ---------------------------------------------------------------------------
+
+class _Unwritable(ValueError):
+    """The path points at something that cannot be replaced in place."""
+
+
+class _Multi:
+    """Result of a keys / values selector: (value, address) pairs, not one node."""
+
+    __slots__ = ("pairs", "side")
+
+    def __init__(self, pairs: list, side: str):
+        self.pairs = pairs
+        self.side = side
+
+
+def _children(node) -> list:
+    """(value, address) for each child; address is (container, key-or-index)."""
+    if isinstance(node, Mapping):
+        return [(value, (node, key)) for key, value in node.items()]
+    if isinstance(node, Sequence) and not isinstance(node, (str, bytes, bytearray)):
+        return [(value, (node, index)) for index, value in enumerate(node)]
+    return []
+
+
+def _pick_address(node, token):
+    """Same lookup order as _pick, but also returns where the value lives."""
+    if isinstance(node, Mapping):
+        if token in node:
+            return node[token], (node, token)
+        text = str(token)
+        if text in node:
+            return node[text], (node, text)
+        if type(token) is not _Key:
+            lowered = text.strip().lower()
+            if lowered in _KEY_TOKENS:
+                raise _Unwritable("keys 选择器只能用于读取，不能替换键名")
+            if lowered in _VALUE_TOKENS:
+                return _Multi(_children(node), "values")
+            index = _as_index(token)
+            if index is not None:
+                try:
+                    return _children(node)[index]
+                except IndexError:
+                    return _MISSING
+        return _MISSING
+
+    if isinstance(node, Sequence) and not isinstance(node, (str, bytes, bytearray)):
+        if type(token) is not _Key and str(token).strip().lower() in _VALUE_TOKENS:
+            return _Multi(_children(node), "values")
+        index = _as_index(token)
+        if index is None:
+            return _MISSING
+        try:
+            return _children(node)[index]
+        except IndexError:
+            return _MISSING
+
+    return _MISSING
+
+
+def _locate(node, tokens: list, address=None) -> list:
+    """Return (value, address) for every match of tokens below node."""
+    if not tokens:
+        return [(node, address)]
+
+    head, rest = tokens[0], tokens[1:]
+    if head is _WILDCARD:
+        matches = []
+        for value, child_address in _children(node):
+            matches.extend(_locate(value, rest, child_address))
+        return matches
+
+    picked = _pick_address(node, head)
+    if picked is _MISSING:
+        return []
+    if isinstance(picked, _Multi):
+        return _locate_multi(picked, rest)
+    value, child_address = picked
+    return _locate(value, rest, child_address)
+
+
+def _locate_multi(multi: _Multi, tokens: list) -> list:
+    if not tokens:
+        raise _Unwritable(
+            f"路径指向整组 {multi.side}，无法直接替换；请在末尾加 [*] 或索引指定位置"
+        )
+
+    head, rest = tokens[0], tokens[1:]
+    if head is _WILDCARD:
+        matches = []
+        for value, address in multi.pairs:
+            matches.extend(_locate(value, rest, address))
+        return matches
+
+    index = _as_index(head)
+    if index is None:
+        return []
+    try:
+        value, address = multi.pairs[index]
+    except IndexError:
+        return []
+    return _locate(value, rest, address)
+
+
+def replace_all(content, path, replacements) -> tuple:
+    """Write replacements into every location that path matches.
+
+    replacements is a list. One item per match is applied in order; a single
+    item is broadcast to every match. Returns (new_data, match_count); when
+    nothing matches the data comes back unchanged with a count of 0. The
+    input is never mutated: the parsed content is deep-copied first.
+    """
+    if is_count_path(path):
+        raise ValueError("count / length / size 路径只能读取，不能用于替换")
+
+    tokens = parse_path(path)
+    if not tokens:
+        raise ValueError("path 为空，无法确定替换位置")
+
+    data = copy.deepcopy(parse_content(content))
+    try:
+        matches = _locate(data, tokens)
+    except _Unwritable as exc:
+        raise ValueError(str(exc)) from None
+
+    if not matches:
+        return data, 0
+
+    items = list(replacements)
+    if len(items) == 1:
+        items = items * len(matches)
+    if len(items) != len(matches):
+        raise ValueError(
+            f"替换值数量为 {len(items)}，但路径匹配到 {len(matches)} 处；"
+            f"请提供 1 个（广播到所有位置）或 {len(matches)} 个（按顺序一一替换）"
+        )
+
+    for (_, address), new_value in zip(matches, items):
+        container, key = address
+        if not isinstance(container, (dict, list)):
+            raise ValueError("路径指向的容器不可写（需要 JSON 对象或数组）")
+        container[key] = new_value
+    return data, len(matches)
