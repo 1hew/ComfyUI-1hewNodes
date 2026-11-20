@@ -1,22 +1,23 @@
 # Multi Dict - 合并字典并追加键值
 
-**节点功能：** `Multi Dict` 先按端口顺序合并动态 `dict_1..N`，再用 `key` / `value` 添加或覆盖一个键。后出现的同名键覆盖前面的；`key` / `value` 最后应用，因此永远覆盖合并结果。`value_type` 决定 `value` 如何转换。输出 `dict` 对象和 `json` 文本。
+**节点功能：** `Multi Dict` 先按端口顺序合并动态 `dict_1..N`，再添加或覆盖一个键值对。键和值都直接输入（`key` / `value`），不需要连线；`key_type` 决定数字键如何书写，`value_type` 决定值如何转换。输出只有一个 `data`，类型由 `output_type` 决定（`dict` 或紧凑 `json`）。
 
 ## 输入
 
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
-| `value_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` | 只作用于 `value` 的类型转换；见下表。 |
 | `dict_1`、`dict_2`… | 可选 | * | - | - | 待合并的字典，按端口编号顺序合并；只接受字典，列表请拆成多个 `dict_N` 输入。 |
-| `key` | 可选 | * | - | - | 最后添加/覆盖的键；接字符串或标量，数字/布尔会转成字符串；未连接或为空时只合并字典。 |
-| `value` | 可选 | * | - | - | 最后添加/覆盖的值；先按 `value_type` 转换；`key` 为空时忽略；未连接时输出 `null`。 |
+| `key` | - | STRING | `` | - | 最后添加/覆盖的键，直接输入；为空时只合并字典。JSON 对象的键只能是字符串。 |
+| `key_type` | - | COMBO | `string` | `string` / `auto` | `string` 原样使用输入文本；`auto` 会规范化数字/布尔，`1.0` 与 `1` 落到同一个键。 |
+| `value` | - | STRING | `` | - | 最后添加/覆盖的值，按 `value_type` 转换；`key` 为空时忽略；留空则写入 `null`。 |
+| `value_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` | 作用于 `value` 的类型转换；见下表。 |
+| `output_type` | - | COMBO | `dict` | `dict` / `json` | `dict` 输出原生对象，`json` 输出紧凑 JSON 文本。 |
 
 ## 输出
 
 | 输出名称 | 数据类型 | 描述 |
 |---------|----------|------|
-| `dict` | DICT | 合并/追加后的字典，可继续接下一个 `Multi Dict` 的 `dict_1`，或接 `Save Text`。 |
-| `json` | STRING | 紧凑 JSON 文本，可接 `Save Text`、LLM 或其它文本节点。 |
+| `data` | * | 合并后的字典；`output_type=json` 时是紧凑 JSON 文本。可接下一个 `Multi Dict` 的 `dict_1`、`Save Text` 或 LLM 文本节点。 |
 
 ## `value_type` 转换
 
@@ -32,8 +33,9 @@
 | `json` | 把字符串按 JSON 解析；对象→dict、数组→list、数字/布尔/null 对应 | `'{"a":1}'` → 对象 |
 | `null` | 强制输出 `null` | 任意值 → `null` |
 
-- `value_type` 只影响 `value`；`key` 始终按字符串/标量转字符串。
-- `value` 未连接时始终输出 `null`，不受 `value_type` 影响；连接了但转换失败会直接报错。
+- `value_type` 只影响 `value`；`key` 由 `key_type` 处理。
+- `value` 为空时始终写入 `null`，不受 `value_type` 影响；填了但转换失败会直接报错。
+- `auto` 下文本就是文本（`"30"` 仍是 `"30"`）；需要数字请选 `int` / `float`。
 - `json` 是严格解析：`Alice` 这种非 JSON 文本会报错；要保留普通字符串请用 `auto` 或 `string`。
 
 ## 顺序与覆盖
@@ -55,8 +57,8 @@ key = a, value = 9
 
 - 只接受字典：`dict_N` 接字符串、数字、列表都会报错；要合并列表里的多个字典，请把每个字典接到单独的 `dict_N` 端口。
 - `key` 支持字符串、整数、浮点、布尔；接字典/列表会报错。
-- `key` 未连接或只有空白时，节点只做字典合并；此时 `value` 即使接了也会被忽略并打印提示。
-- `value` 未连接但 `key` 有效时，输出 `{key: null}`。
+- `key` 为空或只有空白时，节点只做字典合并；此时 `value` 即使填了也会被忽略并打印提示。
+- `value` 为空但 `key` 有效时，输出 `{key: null}`。
 - 字符串值不会被无辜包装：`auto` 下接一个字符串就是字符串，不会变成 `["字符串"]`；要数组请接一个真正的 list 值（例如 `Multi List` 的 `list` 输出）。
 - 只接受 JSON 安全值：set、bytes、tensor、NaN / Infinity 会带路径报错，不会被悄悄转成字符串。
 

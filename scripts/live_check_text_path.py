@@ -88,7 +88,7 @@ def check(label, actual, expected):
 
 EXTRACT_INPUTS = {
     "text": '{"layers":[{"index":1},{"index":2},{"index":3}]}',
-    "path": "layers[*].index",
+    "json_path": "layers[*].index",
 }
 
 
@@ -137,19 +137,14 @@ def main():
     results.append(check("List Math FLOAT -> ['2.0','3.0','4.0']", shown(outputs, "float"), ["2.0", "3.0", "4.0"]))
     results.append(check("List Math INT -> ['2','3','4']", shown(outputs, "int"), ["2", "3", "4"]))
 
-    # 5. Full chain: Extract -> List Math -> Replace.
+    # 5. Replace writes one typed value, broadcast to every match.
     graph = {
-        "1": {"class_type": "1hew_TextPathExtract", "inputs": dict(EXTRACT_INPUTS)},
-        "3": {
-            "class_type": "1hew_ListMathExpression",
-            "inputs": {"expression": "a + 1", "a": ["1", 0]},
-        },
         "4": {
             "class_type": "1hew_TextPathReplace",
             "inputs": {
                 "text": '{"layers":[{"index":1},{"index":2},{"index":3}]}',
-                "path": "layers[*].index",
-                "value": ["3", 1],
+                "json_path": "layers[*].index",
+                "value": "9",
                 "value_type": "int",
             },
         },
@@ -159,9 +154,9 @@ def main():
     chain = shown(outputs, "chain_value")
     results.append(
         check(
-            "Chain Extract->Math->Replace",
+            "Replace broadcasts one typed value",
             json.loads(chain[0]) if chain else None,
-            {"layers": [{"index": 2}, {"index": 3}, {"index": 4}]},
+            {"layers": [{"index": 9}, {"index": 9}, {"index": 9}]},
         )
     )
 
@@ -171,7 +166,7 @@ def main():
             "class_type": "1hew_TextPathExtract",
             "inputs": {
                 "text": '["cat","dog"]',
-                "path": "[*]",
+                "json_path": "[*]",
             },
         },
         "5": {
@@ -184,16 +179,14 @@ def main():
         check("List Text -> ['a cat!','a dog!']", shown(run(graph), "listtext"), ["a cat!", "a dog!"])
     )
 
-    # 7. Replace: one item broadcast to every match. The wildcard input takes
-    # a link, not a literal, so the constant comes from Text To Any.
+    # 7. Replace: broadcast a text value to every match.
     graph = {
-        "c": {"class_type": "1hew_TextToAny", "inputs": {"text": "X"}},
         "4": {
             "class_type": "1hew_TextPathReplace",
             "inputs": {
                 "text": '[{"content":"a"},{"content":"b"}]',
-                "path": "[*].content",
-                "value": ["c", 0],
+                "json_path": "[*].content",
+                "value": "X",
                 "value_type": "string",
             },
         },

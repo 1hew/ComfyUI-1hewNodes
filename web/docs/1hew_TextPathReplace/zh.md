@@ -1,6 +1,6 @@
 # Text Path Replace - 按路径写回替换值
 
-**节点功能：** `Text Path Replace` 把值写回 JSON 类文本中路径匹配到的位置。它是 `Text Path Extract` 的写入部分：读取时用的路径，同时也决定新值写到哪里。计算放在上游完成（`List Math Expression`、`Multi Dict`、字符串节点等），本节点只负责放置值。
+**节点功能：** `Text Path Replace` 把值写回 JSON 类文本中路径匹配到的位置。它是 `Text Path Extract` 的写入部分：读取时用的路径，同时也决定新值写到哪里。要写入的值直接填在 `value` 里，按 `value_type` 转成目标类型，本节点只负责放置。
 
 与 `Text Path Extract` 一样，本节点不做渲染：编辑后的文档通过 `value` 端口以只有一项的列表输出，排版交给下游——`Save Text` 写文件、`List Text` 加前后缀，或任意 JSON 处理节点。
 
@@ -9,9 +9,9 @@
 | 参数名称 | 插槽 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | ---- | -------- | ------ | -------- | ---- |
 | `text` | - | STRING | `` | 多行 | 要编辑的文档：JSON、代码块 JSON 或 Python 字面量 |
-| `path` | - | STRING | `values[*]` | - | 写入位置的路径，语法与 `Text Path Extract` 相同 |
-| `value` | - | *（列表） | - | - | 要写入的值。列表按顺序使用；单个值广播到所有匹配位置 |
-| `value_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` | 对 `value` 的每一项做类型转换，含义与 `Multi Dict` 相同 |
+| `json_path` | - | STRING | `values[*]` | - | 写入位置的路径，语法与 `Text Path Extract` 相同 |
+| `value` | - | STRING | `` | - | 要写入的值，直接输入，按 `value_type` 转换。单个值会广播到所有匹配位置 |
+| `value_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` | 作用于 `value`，含义与 `Multi Dict` 相同。`auto` 下文本就是文本，需要数字请选 `int` / `float` |
 
 ## 输出
 
@@ -36,9 +36,9 @@
 
 ## 典型用法
 
-- 每个索引加 1：`Text Path Extract`（`layers[*].index`）→ `List Math Expression`（`a + 1`）→ `Text Path Replace`（`path = layers[*].index`，`value` 接数学节点的输出）。
+- 把所有 content 统一改成同一个值：`path = [*].content`，`value` 填一个新值，它会广播到每一处。
 - 把所有 content 替换为同一个字符串：`path = [*].content`，`value` 只接一个值即可广播。
-- 替换嵌套的坐标：`path = [1].bbox[0]`，`value = [50]`。
+- 替换嵌套的坐标：`path = [1].bbox[0]`，`value` 填 `50`、`value_type` 选 `int`。
 - 保存结果：把 `value` 接到 `Save Text`，`format` 选 `json`。
 
 ## 注意事项

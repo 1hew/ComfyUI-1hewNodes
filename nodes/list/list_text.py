@@ -19,12 +19,16 @@ class ListText(io.ComfyNode):
             category="1hewNodes/list",
             is_input_list=True,
             inputs=[
-                io.Custom("*").Input("text", optional=True),
+                # The socket type stays "*" because the front end has no
+                # list-styled INPUT (only outputs get GRID_SHAPE), so a "*"
+                # input keeps accepting a whole list in one call. The name
+                # says text_list so it still reads as a list port.
+                io.Custom("*").Input("text_list", optional=True),
                 io.String.Input("prefix", default=""),
                 io.String.Input("suffix", default=""),
             ],
             outputs=[
-                io.String.Output(display_name="text", is_output_list=True),
+                io.String.Output(display_name="text_list", is_output_list=True),
             ],
         )
 
@@ -34,7 +38,7 @@ class ListText(io.ComfyNode):
 
     @classmethod
     async def execute(
-        cls, prefix: str, suffix: str, text=None,
+        cls, prefix: str, suffix: str, text_list=None,
     ) -> io.NodeOutput:
         # is_input_list wraps widget values in a list; unwrap the single item.
         if isinstance(prefix, (list, tuple)):
@@ -45,17 +49,17 @@ class ListText(io.ComfyNode):
         suffix = "" if suffix is None else str(suffix)
 
         # Same flattening as Text List to String: one level of nested lists.
-        if text is None:
+        if text_list is None:
             items = []
-        elif isinstance(text, (list, tuple)):
+        elif isinstance(text_list, (list, tuple)):
             items = []
-            for item in text:
+            for item in text_list:
                 if isinstance(item, (list, tuple)):
                     items.extend(item)
                 else:
                     items.append(item)
         else:
-            items = [text]
+            items = [text_list]
 
         result = [f"{prefix}{str(item)}{suffix}" for item in items]
         return io.NodeOutput(result, ui=make_ui_text(str(len(result))))

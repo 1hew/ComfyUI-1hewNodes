@@ -22,6 +22,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ## 📜 更新日志
 
 **v4.6.1**
+- refactor(data)：`Text Path Extract` 与 `Text Path Replace` 的 `path` 改名为 `json_path`，避免与文件路径混淆；`Text Path Extract` 新增 `output_type`（`list` / `json`）；`List Text` 的通配端口两侧都改名为 `text_list`，因为 ComfyUI 只在输出端口显示列表样式。
+- refactor(data)：`Multi Dict` 与 `Multi List` 改为单一 `data` 输出，由 `output_type` 切换类型；`Multi Dict` 的 `key` / `value` 改为直接输入并新增 `key_type`。
+- refactor(data)：`Text Path Replace` 改为写入直接输入的值——移除连线端口与 `is_input_list`，只留单行 `value` 输入框，该值广播到所有匹配位置。
+- refactor(data)：`Multi List` 的输入端口由 `item_X` 改名为 `any_X`，与其通配类型一致；`Multi Dict` 的文本框由 `value_text` 改为 `value`（单行）。
 - refactor(model)：把模型预设节点拆到 `nodes/model/ratio/`（分类 `1hewNodes/model/ratio`）与 `nodes/model/resolution/`（分类 `1hewNodes/model/resolution`）——`String Ratio *` 与 `String Resolution *` 离开 `nodes/text/`，该目录现在只放通用文本节点。
 - refactor(data)：把数据类节点统一到 `nodes/data/`，分类改为 `1hewNodes/data`——`Text Path Extract`、`Text Path Replace`、`Multi Dict`、`Multi List`；列表类节点（`List Math Expression`、`List Text`、`List Custom Int` / `Float` / `String` / `Seed`）统一放在 `nodes/list/`，分类为 `1hewNodes/list`。节点 ID 未变，已保存的工作流不受影响。
 - refactor(text)：`Text Path Replace` 与 `Text Path Extract` 对齐——移除 `text` 输出与 `output_format`，输入 `replace` 改名为 `value` 以对应 `value_type`，编辑后的文档通过 `value` 以只含一项的列表输出，排版交给下游。
@@ -33,7 +37,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 - docs：新增 `Text Path Replace`、`List Math Expression`、`List Text` 的中英文文档，并更新两个 README 的节点表与更新日志。
 
 **v4.6.0**
-- feat(multi)：新增 `Multi Dict`、`Multi List`——`Multi Dict` 先按端口顺序合并动态 `dict_X`，再用 `key` / `value` 添加或覆盖一个键（后出现的同名键覆盖前面的，`key` / `value` 最后应用，`value_type` 支持 `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` 转换）；`Multi List` 把动态 `item_X` 合并为数组，支持 `extend` 摊平与 `append` 嵌套；两个节点都同时输出原生 `dict` / `list` 和紧凑 `json` 文本。
+- feat(multi)：新增 `Multi Dict`、`Multi List`——`Multi Dict` 先按端口顺序合并动态 `dict_X`，再用 `key` / `value` 添加或覆盖一个键（后出现的同名键覆盖前面的，`key` / `value` 最后应用，`value_type` 支持 `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` 转换）；`Multi List` 把动态 `any_X` 合并为数组，支持 `extend` 摊平与 `append` 嵌套；两个节点都同时输出原生 `dict` / `list` 和紧凑 `json` 文本。
 - feat(io)：`Save Text` 的 `text` 改为通配输入，dict/list/数字/布尔可直接保存；`json` 对容器做缩进美化，`txt` / `md` 写美化后的 JSON 文本，`csv` 仍只接受文本；set、tensor、NaN 等非 JSON 值会带路径报错，不再被悄悄转成字符串。
 - feat(text)：`Text Path Extract` 新增 `keys[*]` / `values[*]` 分别取对象的所有键名 / 所有值（键名未知也能取），`[0]` / `[-1]` 可按位置取对象的值（与 Python 一致），`path` 默认值改为 `values[*]`；裸 `*` / `[*]` 通配保持原有语义。
 - test：补充字典合并顺序与覆盖、key/value 连线、extend 与 append 差异、Save Text 转换矩阵，以及 `keys` / `values` 选择器与对象下标的回归测试。
@@ -828,10 +832,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🗂️ 数据节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Multi Dict | 先按端口顺序合并动态 `dict_X`，再用 `key` / `value` 添加或覆盖一个键；`value_type` 支持 `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` 转换，后出现的同名键覆盖前面的，输出 `dict` / `json` |
-| Multi List | 把动态 `item_X` 合并为数组；`extend` 摊平列表/元组一层，`append` 保留嵌套 |
-| Text Path Extract | 按 `[0].content`、`[-1].bbox[0]`、`values[*].content` 等路径从 JSON 文本、字典或普通文本中取值，用 `keys[*]` / `values[*]` 分别取对象的所有键名 / 所有值（键名未知也能取），用 `.count` / `.length` / `[#]` 计数；`value` 始终是每个匹配一项的列表，排版交给 List Text / Text List to String / Save Text |
-| Text Path Replace | 按 `Text Path Extract` 的路径把值写回 JSON 文本；`value` 列表与匹配位置一一对应（单个值则广播），支持 `value_type` 类型转换；`value` 输出编辑后的文档列表，排版交给下游 |
+| Multi Dict | 先按端口顺序合并动态 `dict_X`，再添加或覆盖一个键值对（`key` / `value` 直接输入）；`key_type` 决定数字键如何书写，`value_type` 转换值；输出只有一个 `data`，类型由 `output_type` 决定（`dict` 或紧凑 `json`） |
+| Multi List | 把动态 `any_X` 合并为数组；`extend` 摊平列表/元组一层，`append` 保留嵌套；输出只有一个 `data`，类型由 `output_type` 决定（`list` 或紧凑 `json`） |
+| Text Path Extract | 按 `json_path`（如 `[0].content`、`[-1].bbox[0]`、`values[*].content`）从 JSON 文本、字典或普通文本中取值，用 `keys[*]` / `values[*]` 分别取键名 / 值，用 `.count` / `.length` / `[#]` 计数；`value` 始终是列表，`output_type` 选择原生值或紧凑 JSON |
+| Text Path Replace | 按 `Text Path Extract` 的路径把一个值写回 JSON 文本；值直接输入并由 `value_type` 转换，匹配多处时广播到所有位置；`value` 输出编辑后的文档列表 |
 
 ### 📃 列表节点
 | 节点名称 | 功能描述 |

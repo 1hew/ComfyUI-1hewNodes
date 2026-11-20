@@ -22,6 +22,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ## 📜 Changelog
 
 **v4.6.1**
+- refactor(data): `Text Path Extract` and `Text Path Replace` rename `path` to `json_path` so it does not read as a file path; `Text Path Extract` gains an `output_type` (`list` / `json`); `List Text` names its wildcard ports `text_list` on both sides, since ComfyUI only styles list sockets on outputs.
+- refactor(data): `Multi Dict` and `Multi List` expose a single `data` output switched by `output_type`; `Multi Dict` takes `key` / `value` as typed widgets with a new `key_type`.
+- refactor(data): `Text Path Replace` writes one typed value instead of a linked one — the socket and `is_input_list` are gone in favour of a single-line `value` box, and that value broadcasts to every match.
+- refactor(data): `Multi List` input sockets are renamed `item_X` → `any_X`, matching the wildcard type they accept; `Multi Dict`'s text box is now `value` (single line) instead of `value_text`.
 - refactor(model): Move the model preset nodes into `nodes/model/ratio/` (category `1hewNodes/model/ratio`) and `nodes/model/resolution/` (category `1hewNodes/model/resolution`) — `String Ratio *` and `String Resolution *` leave `nodes/text/`, which now holds only the general text nodes.
 - refactor(data): Group the data nodes under `nodes/data/` with category `1hewNodes/data` — `Text Path Extract`, `Text Path Replace`, `Multi Dict` and `Multi List`; the List nodes (`List Math Expression`, `List Text`, `List Custom Int` / `Float` / `String` / `Seed`) live under `nodes/list/` with category `1hewNodes/list`. Node IDs are unchanged, so saved workflows keep working.
 - refactor(text): `Text Path Replace` now matches `Text Path Extract` — the `text` output and `output_format` are gone, the `replace` input is renamed `value` to match `value_type`, and the edited document leaves through `value` as a one-item list for downstream rendering.
@@ -828,10 +832,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🗂️ Data Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Multi Dict | Merge dynamic `dict_X` inputs in port order, then add or overwrite one key from the `key` / `value` sockets; a `value_type` converter (`auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null`) applies to `value`, later keys win, and both `dict` / `json` outputs are provided |
-| Multi List | Combine dynamic `item_X` inputs into one array; `extend` splices list/tuple inputs one level, `append` keeps them nested |
-| Text Path Extract | Read values from JSON text, dicts or plain text by path such as `[0].content`, `[-1].bbox[0]` or `values[*].content`, pick the key or value side with `keys[*]` / `values[*]` (so an unknown key name is still addressable) and count with `.count` / `.length` / `[#]`; `value` is always a list with one entry per match, leaving rendering to List Text / Text List to String / Save Text |
-| Text Path Replace | Write values back into JSON text at a path matched by `Text Path Extract`; the `value` list is applied one-to-one per match (a single value is broadcast), with `value_type` conversion; `value` returns the edited document as a list, leaving rendering to downstream nodes |
+| Multi Dict | Merge dynamic `dict_X` inputs in port order, then add or overwrite one entry typed directly in `key` / `value`; `key_type` decides how a numeric key is written and `value_type` converts the value; a single `data` output follows `output_type` (`dict` or compact `json`) |
+| Multi List | Combine dynamic `any_X` inputs into one array; `extend` splices list/tuple inputs one level, `append` keeps them nested; a single `data` output follows `output_type` (`list` or compact `json`) |
+| Text Path Extract | Read values from JSON text, dicts or plain text by `json_path` such as `[0].content`, `[-1].bbox[0]` or `values[*].content`, pick the key or value side with `keys[*]` / `values[*]`, count with `.count` / `.length` / `[#]`; `value` is always a list, with `output_type` choosing native values or compact JSON |
+| Text Path Replace | Write a value back into JSON text at a path matched by `Text Path Extract`; the value is typed in and converted by `value_type`, and broadcasts to every match; `value` returns the edited document as a list |
 
 ### 📃 List Nodes
 | Node Name | Description |

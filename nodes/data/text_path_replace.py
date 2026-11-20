@@ -21,7 +21,7 @@ from ...utils._json_ops import (
     coerce_value,
     validate_json_value,
 )
-from ...utils._json_path import replace_all
+from ...utils._json_path import parse_content, replace_all
 
 _VALUE_TYPES = [
     "auto",
@@ -43,24 +43,35 @@ class TextPathReplace(io.ComfyNode):
             node_id="1hew_TextPathReplace",
             display_name="Text Path Replace",
             category="1hewNodes/data",
-            # Lists in, so value can hold one entry per match.
-            is_input_list=True,
+            # Lists are no longer needed on the write side: the value is typed
+            # into a single-line box and converted by value_type.
             inputs=[
                 io.String.Input("text", default="", multiline=True),
-                io.String.Input("path", default="values[*]"),
-                io.Custom("*").Input(
-                    "value",
+                io.String.Input(
+                    "json_path",
+                    default="values[*]",
                     tooltip=(
-                        "要写入的值。接入列表时按顺序一一替换匹配位置；"
-                        "只有 1 个值时广播到所有匹配位置。"
-                        "可接 Text Path Extract 的 value、List Math Expression、Multi Dict 等。"
+                        "写入位置的 JSON 路径，语法与 Text Path Extract 相同；"
+                        "空字符串或 count 类路径会被拒绝。"
+                    ),
+                ),
+                io.String.Input(
+                    "value",
+                    default="",
+                    tooltip=(
+                        "要写入的值，直接输入，按 value_type 转换。"
+                        "需要数字时选 int / float；需要字典 / 列表时选 dict / list / json。"
+                        "匹配到多处时这个值广播到所有位置。"
                     ),
                 ),
                 io.Combo.Input(
                     "value_type",
                     options=_VALUE_TYPES,
                     default="auto",
-                    tooltip="只作用于 value：与 Multi Dict 的 value_type 含义一致。",
+                    tooltip=(
+                        "作用于 value：auto 原样保留（文本就是文本），"
+                        "int / float 转数字，dict / list / json 解析 JSON 文本。"
+                    ),
                 ),
             ],
             outputs=[
@@ -79,20 +90,18 @@ class TextPathReplace(io.ComfyNode):
     async def execute(
         cls,
         text,
-        path,
-        value,
-        value_type,
+        json_path,
+        value="",
+        value_type="auto",
     ) -> io.NodeOutput:
         text = as_text(text)
-        path = as_text(path)
+        json_path = as_text(json_path)
         value_type = as_text(value_type) or "auto"
 
-        if value is None:
-            items = []
-        elif isinstance(value, (list, tuple)):
-            items = list(value)
-        else:
-            items = [value]
+        typed = as_text(value)
+        # The box holds one entry; value_type decides what it means, so a JSON
+        # array typed here becomes several entries through `list`.
+        items = [typed] if typed != "" else []
 
         new_values = []
         for item in items:
@@ -100,8 +109,14 @@ class TextPathReplace(io.ComfyNode):
             validate_json_value(converted)
             new_values.append(converted)
 
+        if not new_values:
+            # Nothing to write: return the document unchanged rather than
+            # letting replace_all raise a count mismatch for zero values.
+            data = parse_content(text)
+            return io.NodeOutput([data], 0, ui=make_ui_text("0"))
+
         try:
-            data, count = replace_all(text, path, new_values)
+            data, count = replace_all(text, json_path, new_values)
         except ValueError as exc:
             # Surface bad paths and mismatched counts instead of returning
             # the original text: a silent no-op would hide the mistake.

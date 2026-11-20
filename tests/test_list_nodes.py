@@ -63,10 +63,10 @@ def test_text_schema_uses_text_port_on_both_sides():
     assert schema["category"] == "1hewNodes/list"
     assert schema["is_input_list"] is True
     ports = {p["id"]: p for p in schema["inputs"]}
-    assert "text" in ports
+    assert "text_list" in ports
     assert ports["prefix"]["type"] == "STRING"
     assert ports["suffix"]["type"] == "STRING"
-    assert schema["outputs"][0]["display_name"] == "text"
+    assert schema["outputs"][0]["display_name"] == "text_list"
     assert schema["outputs"][0]["is_output_list"] is True
 
 
@@ -164,24 +164,24 @@ def test_huge_result_is_reported():
 
 
 def test_prefix_and_suffix_apply_per_item_and_stay_a_list():
-    out = _text(text=["cat", "dog"], prefix=["a "], suffix=[" !"])
+    out = _text(text_list=["cat", "dog"], prefix=["a "], suffix=[" !"])
     assert out[0] == ["a cat !", "a dog !"]
 
 
 def test_nested_lists_are_flattened_one_level():
-    out = _text(text=[["x", "y"], "z"], prefix=[""], suffix=[""])
+    out = _text(text_list=[["x", "y"], "z"], prefix=[""], suffix=[""])
     assert out[0] == ["x", "y", "z"]
 
 
 def test_none_input_gives_empty_list():
-    assert _text(text=None, prefix=[""], suffix=[""])[0] == []
+    assert _text(text_list=None, prefix=[""], suffix=[""])[0] == []
 
 
 def test_numbers_are_stringified():
-    out = _text(text=[1, 2], prefix=["#"], suffix=[""])
+    out = _text(text_list=[1, 2], prefix=["#"], suffix=[""])
     assert out[0] == ["#1", "#2"]
 
 
 def test_list_text_output_is_not_joined():
-    out = _text(text=["a", "b"], prefix=[""], suffix=[""])
+    out = _text(text_list=["a", "b"], prefix=[""], suffix=[""])
     assert isinstance(out[0], list) and len(out[0]) == 2

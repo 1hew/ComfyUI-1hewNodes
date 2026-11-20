@@ -1,22 +1,23 @@
 # Multi Dict - Merge dicts and add one key/value
 
-**Node purpose:** `Multi Dict` merges dynamic `dict_1..N` inputs in port order and then adds or overwrites one key from `key` / `value`. Later keys win, and `key` / `value` are applied last so they always override the merged result. `value_type` controls how `value` is converted. It outputs a `dict` object and a `json` string.
+**Node purpose:** `Multi Dict` merges dynamic `dict_1..N` inputs in port order and then adds or overwrites one entry. Key and value are typed in directly (`key` / `value`), so no socket is needed; `key_type` decides how a numeric key is written and `value_type` how the value is converted. It has a single `data` output whose type follows `output_type` (`dict` or compact `json`).
 
 ## Inputs
 
 | Parameter | Socket | Type | Default | Range | Description |
 | --------- | ------ | ---- | ------- | ----- | ----------- |
-| `value_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` | Conversion applied to `value` only; see below. |
 | `dict_1`, `dict_2`… | optional | * | - | - | Dicts merged in port order. Only dicts are accepted; connect each dict of a list to a separate `dict_N` socket. |
-| `key` | optional | * | - | - | Key added or overwritten last. Strings and scalars are accepted (numbers/booleans are stringified). Unconnected or empty means merge only. |
-| `value` | optional | * | - | - | Value added or overwritten last, after `value_type` conversion. Ignored when `key` is empty; an unconnected value becomes `null`. |
+| `key` | - | STRING | `` | - | Key added or overwritten last, typed directly. Empty means merge only. A JSON object key is always a string. |
+| `key_type` | - | COMBO | `string` | `string` / `auto` | `string` keeps the text as written; `auto` normalises a number or boolean, so `1.0` and `1` land on the same key. |
+| `value` | - | STRING | `` | - | Value added or overwritten last, converted by `value_type`. Ignored when `key` is empty; an empty box writes `null`. |
+| `value_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` | Conversion applied to `value`; see below. |
+| `output_type` | - | COMBO | `dict` | `dict` / `json` | `dict` outputs the native object, `json` outputs compact JSON text. |
 
 ## Outputs
 
 | Output | Type | Description |
 | ------ | ---- | ----------- |
-| `dict` | DICT | Merged dict for the next `Multi Dict` `dict_1` or `Save Text`. |
-| `json` | STRING | Compact JSON text for `Save Text`, LLMs and other text nodes. |
+| `data` | * | The merged dict, or compact JSON text when `output_type=json`. Feed it to the next `Multi Dict` `dict_1`, `Save Text`, or an LLM text node. |
 
 ## `value_type` conversions
 
@@ -32,8 +33,9 @@
 | `json` | Parse a string as JSON; objects→dict, arrays→list, scalars map to their JSON types | `'{"a":1}'` → object |
 | `null` | Force `null` | any value → `null` |
 
-- `value_type` affects `value` only; `key` is still converted to a string/scalar key.
-- An unconnected `value` always becomes `null`, regardless of `value_type`; a connected value that cannot be converted raises an error.
+- `value_type` affects `value` only; `key` goes through `key_type`.
+- An empty `value` always becomes `null`, regardless of `value_type`; a value that cannot be converted raises an error.
+- `auto` keeps text as text (`"30"` stays `"30"`); pick `int` / `float` when the JSON needs a number.
 - `json` is strict: plain text such as `Alice` raises; use `auto` or `string` to keep normal text.
 
 ## Order and overwrite

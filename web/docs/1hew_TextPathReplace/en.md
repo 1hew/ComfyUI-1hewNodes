@@ -1,6 +1,6 @@
 # Text Path Replace - Write values back at a path
 
-**Node purpose:** `Text Path Replace` writes values into JSON-like text at the places a path matches. It is the write half of `Text Path Extract`: the same path that reads a value also says where a new value goes. Computation stays upstream (`List Math Expression`, `Multi Dict`, string nodes); this node only places the values.
+**Node purpose:** `Text Path Replace` writes values into JSON-like text at the places a path matches. It is the write half of `Text Path Extract`: the same path that reads a value also says where a new value goes. The value is typed into `value` and converted by `value_type`; this node only places it.
 
 Like `Text Path Extract` the node does not render. The edited document leaves through the `value` port as a one-item list, and formatting is the next node's job — `Save Text` to write a file, `List Text` to decorate, or any JSON dump downstream.
 
@@ -9,9 +9,9 @@ Like `Text Path Extract` the node does not render. The edited document leaves th
 | Parameter | Socket | Type | Default | Range | Description |
 | --------- | ------ | ---- | ------- | ----- | ----------- |
 | `text` | - | STRING | `` | multiline | The document to edit: JSON, fenced JSON or a Python literal |
-| `path` | - | STRING | `values[*]` | - | Path to write to; the same syntax as `Text Path Extract` |
-| `value` | - | * (list) | - | - | Values to write. A list is applied in order; a single value is broadcast to every match |
-| `value_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` | Converts each `value` item, the same meaning as `Multi Dict` |
+| `json_path` | - | STRING | `values[*]` | - | Path to write to; the same syntax as `Text Path Extract` |
+| `value` | - | STRING | `` | - | The value to write, typed in directly and converted by `value_type`. A single value is broadcast to every match |
+| `value_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` | Converts `value`, the same meaning as `Multi Dict`. `auto` keeps text as text, so pick `int` / `float` for numbers |
 
 ## Outputs
 
@@ -36,9 +36,9 @@ Like `Text Path Extract` the node does not render. The edited document leaves th
 
 ## Typical usage
 
-- Add one to every index: `Text Path Extract` (`layers[*].index`) → `List Math Expression` (`a + 1`) → `Text Path Replace` (`path = layers[*].index`, `value` from the math output).
+- Set every content to the same value: `path = [*].content` with one `value` — it broadcasts to each match.
 - Replace every content with one string: `path = [*].content`, a single `value` item is broadcast.
-- Replace a nested coordinate: `path = [1].bbox[0]`, `value = [50]`.
+- Replace a nested coordinate: `path = [1].bbox[0]`, `value` `50` with `value_type` set to `int`.
 - Save the result: wire `value` into `Save Text` with `format` set to `json`.
 
 ## Notes

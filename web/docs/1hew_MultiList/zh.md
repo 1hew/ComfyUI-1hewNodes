@@ -1,20 +1,20 @@
 # Multi List - 把多个元素合并成列表
 
-**节点功能：** `Multi List` 按端口顺序把动态 `item_1..N` 合并成一个 JSON 数组。`extend` 对应 Python 的 `list.extend`：把列表/元组输入摊平一层；`append` 对应 `list.append`：每个输入作为一个元素，列表保持嵌套。
+**节点功能：** `Multi List` 按端口顺序把动态 `any_1..N` 合并成一个 JSON 数组。`extend` 对应 Python 的 `list.extend`：把列表/元组输入摊平一层；`append` 对应 `list.append`：每个输入作为一个元素，列表保持嵌套。输出只有一个 `data`，类型由 `output_type` 决定（`list` 或紧凑 `json`）。
 
 ## 输入
 
 | 参数名称 | 入端选择 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | -------- | ------ | -------- | ---- |
 | `mode` | - | COMBO | `extend` | `extend` / `append` | `extend` 摊平列表/元组一层；`append` 保留嵌套。 |
-| `item_1`、`item_2`… | 可选 | * | - | - | 待合并的元素，按端口编号顺序；后续通过动态端口接入。 |
+| `any_1`、`any_2`… | 可选 | * | - | - | 待合并的元素，按端口编号顺序；后续通过动态端口接入。 |
+| `output_type` | - | COMBO | `list` | `list` / `json` | `list` 输出原生数组，`json` 输出紧凑 JSON 文本。 |
 
 ## 输出
 
 | 输出名称 | 数据类型 | 描述 |
 |---------|----------|------|
-| `list` | * | 合并后的数组，可继续接入另一个 `Multi List` 或 `Multi Dict` 的 `value`。 |
-| `json` | STRING | 紧凑 JSON 数组文本。 |
+| `data` | * | 合并后的数组；`output_type=json` 时是紧凑 JSON 文本。可继续接入另一个 `Multi List` 或 `Multi Dict`。 |
 
 ## `mode` 语义
 
@@ -40,5 +40,5 @@
 
 ## 注意
 
-- `item_N` 接的是元素；要合并字典请用 `Multi Dict`，不要接 `Multi Dict` 的 `dict` 到 `item_N` 再指望合并。
+- `any_N` 接的是元素；要合并字典请用 `Multi Dict`，不要接 `Multi Dict` 的 `dict` 到 `any_N` 再指望合并。
 - 输出 `list` 是一个数组值，不是 ComfyUI 的 `OUTPUT_IS_LIST`；接 `Multi Dict` 的 `value` 会作为数组值。

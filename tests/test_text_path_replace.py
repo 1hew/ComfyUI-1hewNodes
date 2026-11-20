@@ -75,13 +75,17 @@ def test_schema_collects_a_value_list_and_reports_a_count():
     assert schema["node_id"] == "1hew_TextPathReplace"
     assert schema["display_name"] == "Text Path Replace"
     assert schema["category"] == "1hewNodes/data"
-    assert schema["is_input_list"] is True
+    # The value is typed in, so the node no longer takes lists.
+    assert not schema.get("is_input_list")
     assert [port["id"] for port in schema["inputs"]] == [
         "text",
-        "path",
+        "json_path",
         "value",
         "value_type",
     ]
+    ports = {p["id"]: p for p in schema["inputs"]}
+    assert ports["value"]["type"] == "STRING"
+    assert not ports["value"].get("multiline")
     # No rendering ports any more: value and count only.
     assert [o["display_name"] for o in schema["outputs"]] == ["value", "count"]
     # value is wrapped in a list so a root-level JSON array is not split by
@@ -201,30 +205,33 @@ def test_empty_path_raises():
 def test_node_writes_upstream_values_and_returns_a_list():
     text = '{"layers":[{"index":1},{"index":2}]}'
     value, count = _run(
-        text=[text],
-        path=["layers[*].index"],
-        value=[2, 3],
+        text=text,
+        json_path="layers[*].index",
+        value="3",
+        value_type="int",
     )
     assert count == 2
     # value is a one-item list holding the edited document.
     assert isinstance(value, list) and len(value) == 1
-    assert value[0] == {"layers": [{"index": 2}, {"index": 3}]}
+    # A single typed value broadcasts to every match.
+    assert value[0] == {"layers": [{"index": 3}, {"index": 3}]}
 
 
 def test_node_value_is_list_even_when_root_is_array():
     value, _ = _run(
-        text=['[{"n":1}]'],
-        path=["[0].n"],
-        value=[2],
+        text='[{"n":1}]',
+        json_path="[0].n",
+        value="2",
+        value_type="int",
     )
     assert value == [[{"n": 2}]]
 
 
 def test_node_value_type_converts_the_written_value():
     value, count = _run(
-        text=['[{"n":1}]'],
-        path=["[0].n"],
-        value=["5"],
+        text='[{"n":1}]',
+        json_path="[0].n",
+        value="5",
         value_type="int",
     )
     assert count == 1
@@ -233,9 +240,9 @@ def test_node_value_type_converts_the_written_value():
 
 def test_node_value_type_dict_parses_json_text():
     value, _ = _run(
-        text=['[{"n":1}]'],
-        path=["[0].n"],
-        value=['{"k": 1}'],
+        text='[{"n":1}]',
+        json_path="[0].n",
+        value='{"k": 1}',
         value_type="dict",
     )
     assert value == [[{"n": {"k": 1}}]]
@@ -243,9 +250,10 @@ def test_node_value_type_dict_parses_json_text():
 
 def test_node_keeps_integers_without_float_suffix():
     value, _ = _run(
-        text=['[{"n":1}]'],
-        path=["[0].n"],
-        value=[3],
+        text='[{"n":1}]',
+        json_path="[0].n",
+        value="3",
+        value_type="int",
     )
     assert value == [[{"n": 3}]]
 
@@ -253,27 +261,65 @@ def test_node_keeps_integers_without_float_suffix():
 def test_node_no_match_returns_the_original_document_and_zero():
     original = '{"layers":[{"index":1}]}'
     value, count = _run(
-        text=[original],
-        path=["nothing[*]"],
-        value=[9],
+        text=original,
+        json_path="nothing[*]",
+        value="9",
+        value_type="int",
     )
     assert value == [{"layers": [{"index": 1}]}]
     assert count == 0
 
 
-def test_node_raises_on_count_mismatch():
-    with pytest.raises(ValueError, match="Text Path Replace"):
-        _run(
-            text=['[{"n":1},{"n":2}]'],
-            path=["[*].n"],
-            value=[1, 2, 3],
-        )
+def test_node_broadcasts_one_value_to_every_match():
+    value, count = _run(
+        text='[{"n":1},{"n":2},{"n":3}]',
+        json_path="[*].n",
+        value="7",
+        value_type="int",
+    )
+    assert count == 3
+    assert value == [[{"n": 7}, {"n": 7}, {"n": 7}]]
 
 
-def test_node_rejects_python_only_value():
+def test_node_rejects_a_value_that_cannot_be_converted():
     with pytest.raises(ValueError):
         _run(
-            text=['[{"n":1}]'],
-            path=["[0].n"],
-            value=[{1, 2}],
+            text='[{"n":1}]',
+            json_path="[0].n",
+            value="abc",
+            value_type="int",
         )
+
+
+# ------------------------------------------------------------- typed text box
+
+
+def test_value_auto_keeps_text_as_text():
+    value, _ = _run(
+        text='{"n":1}',
+        json_path="n",
+        value="hello",
+        value_type="auto",
+    )
+    assert value == [{"n": "hello"}]
+
+
+def test_value_can_be_a_json_container():
+    value, _ = _run(
+        text='{"n":1}',
+        json_path="n",
+        value='{"k": 1}',
+        value_type="dict",
+    )
+    assert value == [{"n": {"k": 1}}]
+
+
+def test_empty_value_writes_nothing():
+    original = '{"n":1}'
+    value, count = _run(
+        text=original,
+        json_path="n",
+        value="",
+    )
+    assert count == 0
+    assert value == [{"n": 1}]

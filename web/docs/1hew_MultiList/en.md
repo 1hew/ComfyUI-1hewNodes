@@ -1,20 +1,20 @@
 # Multi List - Combine elements into an array
 
-**Node purpose:** `Multi List` combines dynamic `item_1..N` inputs into one JSON array in port order. `extend` matches Python `list.extend` and splices list/tuple inputs one level; `append` matches `list.append` and keeps each input as one element, with lists staying nested.
+**Node purpose:** `Multi List` combines dynamic `any_1..N` inputs into one JSON array in port order. `extend` matches Python `list.extend` and splices list/tuple inputs one level; `append` matches `list.append` and keeps each input as one element, with lists staying nested. It has a single `data` output whose type follows `output_type` (`list` or compact `json`).
 
 ## Inputs
 
 | Parameter | Socket | Type | Default | Range | Description |
 | --------- | ------ | ---- | ------- | ----- | ----------- |
 | `mode` | - | COMBO | `extend` | `extend` / `append` | `extend` splices list/tuple inputs; `append` keeps them nested. |
-| `item_1`, `item_2`… | optional | * | - | - | Elements combined in numeric socket order; more connect through dynamic sockets. |
+| `any_1`, `any_2`… | optional | * | - | - | Elements combined in numeric socket order; more connect through dynamic sockets. |
+| `output_type` | - | COMBO | `list` | `list` / `json` | `list` outputs the native array, `json` outputs compact JSON text. |
 
 ## Outputs
 
 | Output | Type | Description |
 | ------ | ---- | ----------- |
-| `list` | * | Combined array for another `Multi List` or a `Multi Dict` value. |
-| `json` | STRING | Compact JSON array text. |
+| `data` | * | The combined array, or compact JSON text when `output_type=json`. Feed it to another `Multi List` or `Multi Dict`. |
 
 ## `mode` semantics
 
@@ -40,5 +40,5 @@
 
 ## Notes and tips
 
-- `item_N` takes elements; to merge dicts use `Multi Dict` instead of feeding a `Multi Dict` `dict` into `item_N` and expecting a merge.
+- `any_N` takes elements; to merge dicts use `Multi Dict` instead of feeding a `Multi Dict` `dict` into `any_N` and expecting a merge.
 - The `list` output is a single array value, not `OUTPUT_IS_LIST`; feeding it to a `Multi Dict` value keeps it as an array.

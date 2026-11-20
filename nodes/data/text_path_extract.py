@@ -9,14 +9,17 @@ values. "values[0].ids" therefore reads the first image whether its key is
 called reference_image_1 or image_1, and "keys[0]" tells you which one it
 was.
 
-The node only collects values: value is always a list with one entry per
-match. Rendering that list into text is a separate step, so List Text,
-Text List to String and Save Text can each format it the way they need.
+The path is named json_path because "path" alone reads as a file path in
+ComfyUI. The node only collects values: the matches are handed over as a
+list, and output_type decides whether that list is native or JSON text.
+Rendering it item by item is a separate step (List Text, Text List to
+String, Save Text).
 """
 
 from comfy_api.latest import io
 
 from ...utils import make_ui_text
+from ...utils._json_ops import as_text, json_text
 
 from ...utils._json_path import is_count_path, query_all
 
@@ -30,7 +33,23 @@ class TextPathExtract(io.ComfyNode):
             category="1hewNodes/data",
             inputs=[
                 io.String.Input("text", default="", multiline=True),
-                io.String.Input("path", default="values[*]"),
+                io.String.Input(
+                    "json_path",
+                    default="values[*]",
+                    tooltip=(
+                        "JSON 取值路径，如 [0].content、values[*].bbox、keys[0]；"
+                        "空字符串表示整段内容本身。"
+                    ),
+                ),
+                io.Combo.Input(
+                    "output_type",
+                    options=["list", "json"],
+                    default="list",
+                    tooltip=(
+                        "list 输出原生列表（保持值的类型）；"
+                        "json 输出一个紧凑 JSON 数组文本。"
+                    ),
+                ),
             ],
             outputs=[
                 # value is always a list (one entry per match, [] when nothing
@@ -45,28 +64,37 @@ class TextPathExtract(io.ComfyNode):
     async def execute(
         cls,
         text: str = "",
-        path: str = "values[*]",
+        json_path: str = "values[*]",
+        output_type="list",
     ) -> io.NodeOutput:
         if text is None or (isinstance(text, str) and not text.strip()):
-            return io.NodeOutput([], 0, ui=make_ui_text("0"))
+            return cls._empty(output_type)
 
         try:
-            matches = query_all(text, path)
+            matches = query_all(text, json_path)
         except Exception as exc:
             print(f"text_path_extract error: {exc}")
             # value is a list output, so a failure yields an empty list rather
             # than a type the port never declares.
-            return io.NodeOutput([], 0, ui=make_ui_text("0"))
-
-        if not matches:
-            return io.NodeOutput([], 0, ui=make_ui_text("0"))
+            return cls._empty(output_type)
 
         count = len(matches)
         if (
             len(matches) == 1
-            and is_count_path(path)
+            and is_count_path(json_path)
             and isinstance(matches[0], int)
             and not isinstance(matches[0], bool)
         ):
             count = matches[0]
+
+        if str(as_text(output_type)).strip().lower() == "json":
+            return io.NodeOutput(
+                json_text(matches), count, ui=make_ui_text(str(count))
+            )
         return io.NodeOutput(matches, count, ui=make_ui_text(str(count)))
+
+    @classmethod
+    def _empty(cls, output_type) -> io.NodeOutput:
+        if str(as_text(output_type)).strip().lower() == "json":
+            return io.NodeOutput("[]", 0, ui=make_ui_text("0"))
+        return io.NodeOutput([], 0, ui=make_ui_text("0"))

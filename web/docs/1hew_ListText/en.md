@@ -6,7 +6,7 @@
 
 | Parameter | Socket | Type | Default | Range | Description |
 | --------- | ------ | ---- | ------- | ----- | ----------- |
-| `text` | optional | * | - | - | Items to decorate; a list, a single value, or nested lists (flattened one level) |
+| `text_list` | optional | * | - | - | Items to decorate; a list, a single value, or nested lists (flattened one level) |
 | `prefix` | - | STRING | `` | - | Text placed before each item |
 | `suffix` | - | STRING | `` | - | Text placed after each item |
 
@@ -14,11 +14,11 @@
 
 | Output | Type | Description |
 | ------ | ---- | ----------- |
-| `text` | STRING list | One decorated string per item, in order |
+| `text_list` | STRING list | One decorated string per item, in order |
 
 ## Example
 
-| `text` | `prefix` | `suffix` | Output |
+| `text_list` | `prefix` | `suffix` | Output |
 | ----------- | -------- | -------- | ------ |
 | `["cat", "dog"]` | `a ` | ` !` | `["a cat !", "a dog !"]` |
 | `[["x", "y"], "z"]` | `` | `` | `["x", "y", "z"]` |
@@ -29,3 +29,4 @@
 - Non-string items are converted with `str()` before the prefix and suffix are added.
 - With no items connected the output is an empty list.
 - Prefix and suffix are literal text: escape sequences are not processed here, the same as `Text List to String`.
+- The socket type is the wildcard `*`, not a dedicated list type: the ComfyUI front end only renders a list style on **output** sockets (`GRID_SHAPE`); inputs have no such marker, so the name `text_list` carries the meaning instead.
