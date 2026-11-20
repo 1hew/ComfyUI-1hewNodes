@@ -25,15 +25,16 @@ __all__ = [
 ]
 
 _LIST_MODES = ("extend", "append")
-_VALUE_TYPES = (
+# One shared list so Multi Dict and Data Path Replace stay in step.
+# `auto` keeps whatever arrives; the rest coerce to that JSON type.
+VALUE_TYPES = (
     "auto",
+    "dict",
+    "list",
     "string",
     "int",
     "float",
     "boolean",
-    "dict",
-    "list",
-    "json",
     "null",
 )
 _TRUE_TEXT = {"true", "1", "yes", "y", "on"}
@@ -80,9 +81,9 @@ def _require_finite(value: float, label: str) -> None:
 def coerce_value(value: Any, value_type: Any = "auto") -> Any:
     """Convert a connected value to the requested JSON-friendly type."""
     mode = as_text(value_type).strip().lower() or "auto"
-    if mode not in _VALUE_TYPES:
+    if mode not in VALUE_TYPES:
         raise ValueError(
-            f"value_type 仅支持 {', '.join(_VALUE_TYPES)}，收到 {mode!r}"
+            f"value_type 仅支持 {', '.join(VALUE_TYPES)}，收到 {mode!r}"
         )
     if value is None:
         return None
@@ -231,14 +232,34 @@ def collect_indexed_inputs(
     return [(name, value) for _, name, value in indexed]
 
 
+def _json_key(key: Any, path: str) -> str:
+    """A JSON object key is always a string, so stringify the scalar keys.
+
+    A Python dict accepts int / float / bool / None keys, and json.dumps would
+    silently write them as "1" / "true" / "null". Doing it here keeps the
+    check explicit and rejects the keys JSON has no form for.
+    """
+    if isinstance(key, str):
+        return key
+    if isinstance(key, bool):
+        return "true" if key else "false"
+    if key is None:
+        return "null"
+    if isinstance(key, int):
+        return str(key)
+    if isinstance(key, float):
+        _require_finite(key, f"{path} 的键")
+        return str(key)
+    raise ValueError(
+        f"{path} 的键必须是字符串或标量，收到 {type(key).__name__}"
+    )
+
+
 def validate_json_value(value: Any, path: str = "$") -> None:
     """Raise a path-aware error when value cannot be represented as JSON."""
     if isinstance(value, dict):
         for key, item in value.items():
-            if not isinstance(key, str):
-                raise ValueError(
-                    f"{path} 的键必须是字符串，收到 {type(key).__name__}"
-                )
+            _json_key(key, path)
             validate_json_value(item, f"{path}.{key}")
         return
     if isinstance(value, (list, tuple)):

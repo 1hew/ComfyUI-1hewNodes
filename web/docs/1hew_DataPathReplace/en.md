@@ -2,22 +2,22 @@
 
 **Node purpose:** `Data Path Replace` writes values into JSON-like text at the places a path matches. It is the write half of `Data Path Extract`: the same path that reads a value also says where a new value goes. The value is typed into `value` and converted by `value_type`; this node only places it.
 
-Like `Data Path Extract` the node does not render. The edited document leaves through the `value` port as a one-item list, and formatting is the next node's job — `Save Text` to write a file, `List Text` to decorate, or any JSON dump downstream.
+Like `Data Path Extract` the node does not render. The edited document leaves through the `data` port as a one-item list, and formatting is the next node's job — `Save Text` to write a file, `List Text` to decorate, or any JSON dump downstream.
 
 ## Inputs
 
 | Parameter | Socket | Type | Default | Range | Description |
 | --------- | ------ | ---- | ------- | ----- | ----------- |
-| `text` | - | STRING | `` | multiline | The document to edit: JSON, fenced JSON or a Python literal |
-| `data_path` | - | STRING | `values[*]` | - | Path to write to; the same syntax as `Data Path Extract` |
+| `data` | * (required link) | - | - | The document to edit, connected: JSON text, fenced JSON, a Python literal, or an already-parsed dict / list |
+| `data_path` | - | STRING | `[*]` | - | Path to write to; the same syntax as `Data Path Extract` |
 | `value` | - | STRING | `` | - | The value to write, typed in directly and converted by `value_type`. A single value is broadcast to every match |
-| `value_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` | Converts `value`, the same meaning as `Multi Dict`. `auto` keeps text as text, so pick `int` / `float` for numbers |
+| `value_type` | - | COMBO | `auto` | `auto` / `dict` / `list` / `string` / `int` / `float` / `boolean` / `null` | Converts `value`, the same meaning as `Multi Dict`. `auto` keeps text as text, so pick `int` / `float` for numbers |
 
 ## Outputs
 
 | Output | Type | Description |
 | ------ | ---- | ----------- |
-| `value` | ANY (list) | The edited document as a one-item list, so a root-level JSON array is not split by ComfyUI downstream |
+| `data` | ANY (list) | The edited document as a one-item list, so a root-level JSON array is not split by ComfyUI downstream |
 | `count` | INT | Number of locations written; 0 when the path matches nothing |
 
 ## Replacement rules

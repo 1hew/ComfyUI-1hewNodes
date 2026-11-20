@@ -1,39 +1,24 @@
-"""Data Path Replace: write values back into JSON-like text at a path.
+"""Data Path Replace: write values back into JSON-like data at a path.
 
 It pairs with Data Path Extract: the same path that reads a value also says
-where a new value goes. Computation stays upstream (List Math Expression,
-Multi Dict, string nodes, ...); this node only places the values.
+where a new value goes. The payload arrives on the wildcard `data` link, so
+JSON text and an already-parsed dict / list both work.
 
-`value` is a list (is_input_list). One item per match is applied in order; a
-single item is broadcast to every match. Any other count is an error, so a
-mismatch never silently drops or misplaces values.
-
-Like Data Path Extract the node does not render: the edited document leaves
-through the `value` port as a one-item list, and formatting is the next
-node's job (Save Text, List Text, or a JSON dump).
+`value` is a single typed box: one entry per call, broadcast to every match.
+Formatting is the next node's job, so the edited document leaves through the
+`data` port as a one-item list of native values.
 """
 
 from comfy_api.latest import io
 
 from ...utils import make_ui_text
 from ...utils._json_ops import (
+    VALUE_TYPES,
     as_text,
     coerce_value,
     validate_json_value,
 )
 from ...utils._json_path import parse_content, replace_all
-
-_VALUE_TYPES = [
-    "auto",
-    "string",
-    "int",
-    "float",
-    "boolean",
-    "dict",
-    "list",
-    "json",
-    "null",
-]
 
 
 class DataPathReplace(io.ComfyNode):
@@ -46,12 +31,18 @@ class DataPathReplace(io.ComfyNode):
             # Lists are no longer needed on the write side: the value is typed
             # into a single-line box and converted by value_type.
             inputs=[
-                io.String.Input("text", default="", multiline=True),
+                io.Custom("*").Input(
+                    "data",
+                    tooltip=(
+                        "要编辑的数据（连线）。JSON 文本、代码块 JSON、"
+                        "Python 字面量或已解析的 dict / list 都可以直接接。"
+                    ),
+                ),
                 io.String.Input(
                     "data_path",
-                    default="values[*]",
+                    default="[*]",
                     tooltip=(
-                        "写入位置的 JSON 路径，语法与 Data Path Extract 相同；"
+                        "写入位置的 JSON 路径，语法与 Data Path Extract 相同，默认 [*]；"
                         "空字符串或 count 类路径会被拒绝。"
                     ),
                 ),
@@ -66,7 +57,7 @@ class DataPathReplace(io.ComfyNode):
                 ),
                 io.Combo.Input(
                     "value_type",
-                    options=_VALUE_TYPES,
+                    options=VALUE_TYPES,
                     default="auto",
                     tooltip=(
                         "作用于 value：auto 原样保留（文本就是文本），"
@@ -77,7 +68,8 @@ class DataPathReplace(io.ComfyNode):
             outputs=[
                 # The edited document wrapped in a one-item list, so a
                 # root-level JSON array is not split by ComfyUI downstream.
-                io.Custom("*").Output(display_name="value", is_output_list=True),
+                # Named data to match the input port it goes back into.
+                io.Custom("*").Output(display_name="data", is_output_list=True),
                 io.Int.Output(display_name="count"),
             ],
         )
@@ -89,12 +81,13 @@ class DataPathReplace(io.ComfyNode):
     @classmethod
     async def execute(
         cls,
-        text,
-        data_path,
+        data=None,
+        data_path="[*]",
         value="",
         value_type="auto",
     ) -> io.NodeOutput:
-        text = as_text(text)
+        # data is the wildcard input: a string is parsed later by replace_all,
+        # a dict / list is used as-is, so it is never stringified here.
         data_path = as_text(data_path)
         value_type = as_text(value_type) or "auto"
 
@@ -112,14 +105,13 @@ class DataPathReplace(io.ComfyNode):
         if not new_values:
             # Nothing to write: return the document unchanged rather than
             # letting replace_all raise a count mismatch for zero values.
-            data = parse_content(text)
-            return io.NodeOutput([data], 0, ui=make_ui_text("0"))
+            return io.NodeOutput([parse_content(data)], 0, ui=make_ui_text("0"))
 
         try:
-            data, count = replace_all(text, data_path, new_values)
+            edited, count = replace_all(data, data_path, new_values)
         except ValueError as exc:
             # Surface bad paths and mismatched counts instead of returning
-            # the original text: a silent no-op would hide the mistake.
+            # the original data: a silent no-op would hide the mistake.
             raise ValueError(f"Data Path Replace: {exc}") from None
 
-        return io.NodeOutput([data], count, ui=make_ui_text(str(count)))
+        return io.NodeOutput([edited], count, ui=make_ui_text(str(count)))

@@ -6,29 +6,23 @@ from comfy_api.latest import io
 
 from ...utils import make_ui_text
 from ...utils._json_ops import (
+    VALUE_TYPES,
     as_text,
     coerce_value,
     collect_indexed_inputs,
     json_text,
     merge_dict_inputs,
-    normalize_key,
 )
-
-_VALUE_TYPES = [
-    "auto",
-    "string",
-    "int",
-    "float",
-    "boolean",
-    "dict",
-    "list",
-    "json",
-    "null",
-]
 
 # A JSON object key must be a string, so the key side only needs to decide
 # whether a typed number stays text ("1") or is normalised ("1" from "1.0").
-_KEY_TYPES = ["string", "auto"]
+# A Python dict accepts any hashable key, so the key side can produce a real
+# int / float / bool / None key. The `json` output stringifies them, because
+# JSON object keys are always strings.
+_KEY_TYPES = ["auto", "string", "int", "float", "boolean", "null"]
+
+# Marker for "no key typed", so an explicit None key stays distinguishable.
+_NO_KEY = object()
 
 
 class MultiDict(io.ComfyNode):
@@ -54,16 +48,19 @@ class MultiDict(io.ComfyNode):
                     default="",
                     tooltip=(
                         "最后添加/覆盖的键，直接输入。留空则只合并 dict_1..N。"
-                        "JSON 对象的键必须是字符串，key_type 决定数字如何书写。"
+                        "key_type 决定键的类型；json 输出的键一律写成字符串。"
                     ),
                 ),
                 io.Combo.Input(
                     "key_type",
                     options=_KEY_TYPES,
-                    default="string",
+                    default="auto",
                     tooltip=(
-                        "string：键按文本原样使用（推荐，JSON 键只能是字符串）；"
-                        "auto：数字 / 布尔按键值规范化，如 1.0 → \"1\"、true → \"true\"。"
+                        "键的类型。auto：像 Python 字面量一样推断，1→int、1.5→float、"
+                        "true/false→bool、null→None，其余保持文本；"
+                        "string：键永远按文本使用。"
+                        "其余选项强制转成该类型。"
+                        "注意 json 输出的键一律是字符串。"
                     ),
                 ),
                 io.String.Input(
@@ -77,7 +74,7 @@ class MultiDict(io.ComfyNode):
                 ),
                 io.Combo.Input(
                     "value_type",
-                    options=_VALUE_TYPES,
+                    options=VALUE_TYPES,
                     default="auto",
                     tooltip=(
                         "作用于 value：auto 原样保留（文本就是文本）；"
@@ -98,7 +95,7 @@ class MultiDict(io.ComfyNode):
         cls,
         value_type: Any = "auto",
         key: Any = "",
-        key_type: Any = "string",
+        key_type: Any = "auto",
         value: Any = "",
         dict_1: Any = None,
         **kwargs: Any,
@@ -107,7 +104,8 @@ class MultiDict(io.ComfyNode):
         payload = merge_dict_inputs(inputs)
 
         resolved_key = cls._resolve_key(key, key_type)
-        if resolved_key.strip():
+        # _NO_KEY means the box was blank; None is a real key (key_type=null).
+        if resolved_key is not _NO_KEY:
             typed = as_text(value)
             # An empty box means "no value", so the key gets JSON null, the
             # same result an unconnected value socket used to produce.
@@ -121,22 +119,47 @@ class MultiDict(io.ComfyNode):
         return io.NodeOutput(payload, text, ui=make_ui_text(text))
 
     @staticmethod
-    def _resolve_key(key: Any, key_type: Any) -> str:
-        """Return the JSON key for the typed key text."""
+    def _resolve_key(key: Any, key_type: Any) -> Any:
+        """Return the key for the typed text, typed by key_type.
+
+        A Python dict accepts any hashable key, so int / float / bool / None
+        keys are produced as real values; the json output stringifies them.
+        Returns _NO_KEY when the box is blank, which is different from an
+        explicit None key produced by key_type=null.
+        """
         raw = as_text(key)
-        if raw == "":
-            return ""
-        if str(as_text(key_type)).strip().lower() != "auto":
+        if raw.strip() == "":
+            return _NO_KEY
+        mode = str(as_text(key_type)).strip().lower() or "auto"
+        if mode not in _KEY_TYPES:
+            raise ValueError(
+                f"key_type 仅支持 {', '.join(_KEY_TYPES)}，收到 {mode!r}"
+            )
+        if mode == "string":
             return raw
-        # auto: a numeric key normalises the way a linked scalar would, so
-        # "1.0" and "1" land on the same key instead of creating two.
+
         text = raw.strip()
-        try:
-            number = float(text)
-        except ValueError:
-            number = None
-        if number is not None:
-            return normalize_key(int(number) if number.is_integer() else number)
-        if text.lower() in {"true", "false"}:
-            return normalize_key(text.lower() == "true")
+        # auto infers like a Python literal; the explicit modes force a type
+        # and let coercion raise when the text does not fit.
+        if mode in ("auto", "boolean"):
+            lowered = text.lower()
+            if lowered in {"true", "false"}:
+                return lowered == "true"
+        if mode in ("auto", "null"):
+            if text.lower() == "null":
+                return None
+        if mode in ("auto", "int"):
+            try:
+                return int(text)
+            except ValueError:
+                if mode == "int":
+                    raise ValueError(f"无法把键 {raw!r} 转成 int") from None
+        if mode in ("auto", "float"):
+            try:
+                number = float(text)
+            except ValueError:
+                if mode == "float":
+                    raise ValueError(f"无法把键 {raw!r} 转成 float") from None
+                return raw
+            return number
         return raw

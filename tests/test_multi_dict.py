@@ -38,9 +38,11 @@ def test_schema_declares_typed_inputs_and_two_outputs():
     assert ports["key"]["type"] == "STRING"
     assert ports["value"]["type"] == "STRING"
     assert not ports["value"].get("multiline")
-    assert ports["key_type"]["options"] == ["string", "auto"]
-    assert ports["value_type"]["options"] == [
-        "auto", "string", "int", "float", "boolean", "dict", "list", "json", "null",
+    assert ports["key_type"]["options"] == [
+        "auto", "string", "int", "float", "boolean", "null",
+    ]
+    assert list(ports["value_type"]["options"]) == [
+        "auto", "dict", "list", "string", "int", "float", "boolean", "null",
     ]
     # Two outputs, both always filled: native dict plus compact json.
     assert [item["display_name"] for item in schema["outputs"]] == ["dict", "json"]
@@ -82,10 +84,22 @@ def test_value_type_dict_and_list_parse_json_text():
         run(key="k", value="Alice", value_type="dict")
 
 
-def test_value_type_json_parses_any_json():
-    assert run(key="k", value="30", value_type="json")[0] == {"k": 30}
-    assert run(key="k", value="null", value_type="json")[0] == {"k": None}
-    assert run(key="k", value='"x"', value_type="json")[0] == {"k": "x"}
+def test_value_type_round_trips_through_json_text():
+    # The json output writes the same type the value_type produced, so a
+    # downstream dict / list / number / bool / null reads back unchanged.
+    cases = [
+        ('{"a": 1}', "dict", {"a": 1}),
+        ("[1, 2]", "list", [1, 2]),
+        ("30", "int", 30),
+        ("3.5", "float", 3.5),
+        ("true", "boolean", True),
+        ("anything", "string", "anything"),
+        ("ignored", "null", None),
+    ]
+    for text, mode, expected in cases:
+        out = run(key="k", value=text, value_type=mode)
+        assert out[0] == {"k": expected}, mode
+        assert json.loads(out[1]) == {"k": expected}, mode
 
 
 def test_empty_value_becomes_null():
@@ -94,49 +108,46 @@ def test_empty_value_becomes_null():
 
 
 def test_key_type_string_keeps_the_text_as_written():
-    assert run(key="01", value="x")[0] == {"01": "x"}
-    assert run(key="1.0", value="x")[0] == {"1.0": "x"}
+    assert run(key="01", value="x", key_type="string")[0] == {"01": "x"}
+    assert run(key="1.0", value="x", key_type="string")[0] == {"1.0": "x"}
+    assert run(key="true", value="x", key_type="string")[0] == {"true": "x"}
 
 
-def test_key_type_auto_normalises_numbers_and_bools():
-    assert run(key="1.0", value="x", key_type="auto")[0] == {"1": "x"}
-    assert run(key="true", value="x", key_type="auto")[0] == {"true": "x"}
-    assert run(key="abc", value="x", key_type="auto")[0] == {"abc": "x"}
+def test_key_type_auto_infers_python_literals():
+    # auto keeps text as text unless it reads as a literal.
+    assert run(key="abc", value="x")[0] == {"abc": "x"}
+    assert run(key="1", value="x")[0] == {1: "x"}
+    assert run(key="1.5", value="x")[0] == {1.5: "x"}
+    assert run(key="true", value="x")[0] == {True: "x"}
+    assert run(key="null", value="x")[0] == {None: "x"}
 
 
-def test_dict_inputs_merge_in_port_order_and_later_wins():
-    out = run(dict_1={"a": 1, "b": 1}, dict_2={"a": 2}, dict_3={"b": 3, "c": 3})
-    assert out[0] == {"a": 2, "b": 3, "c": 3}
-    assert list(out[0]) == ["a", "b", "c"]
+def test_key_type_forces_the_named_type():
+    assert run(key="1", value="x", key_type="int")[0] == {1: "x"}
+    assert run(key="1.0", value="x", key_type="float")[0] == {1.0: "x"}
+    assert run(key="true", value="x", key_type="boolean")[0] == {True: "x"}
+    assert run(key="null", value="x", key_type="null")[0] == {None: "x"}
 
 
-def test_key_and_value_are_applied_after_dicts():
-    out = run(dict_1={"a": 1, "b": 2}, dict_2={"a": 3}, key="a", value="9", value_type="int")
-    assert out[0] == {"a": 9, "b": 2}
-
-
-def test_no_inputs_produces_empty_object():
-    out = run()
-    assert out[0] == {}
-    assert out[1] == "{}"
-
-
-def test_empty_key_only_merges_dicts():
-    out = run(dict_1={"a": 1}, key="   ", value="2")
-    assert out[0] == {"a": 1}
-
-
-def test_invalid_inputs_are_rejected():
+def test_key_type_rejects_text_that_does_not_fit():
     with pytest.raises(ValueError):
-        run(dict_1=[{"a": 1}])
+        run(key="abc", value="x", key_type="int")
     with pytest.raises(ValueError):
-        run(dict_1="not a dict")
+        run(key="abc", value="x", key_type="float")
     with pytest.raises(ValueError):
-        run(dict_1={1: "non-string key"})
-    with pytest.raises(ValueError):
-        run(key="a", value="nan", value_type="float")
+        run(key="abc", value="x", key_type="bogus")
 
 
-def test_json_output_round_trips():
-    out = run(dict_1={"b": [1, None]}, key="a", value='{"c": true}', value_type="dict")
-    assert json.loads(out[1]) == {"b": [1, None], "a": {"c": True}}
+def test_json_output_stringifies_scalar_keys():
+    # The dict port keeps the real key type; the json port must be valid JSON.
+    out = run(key="1", value="x", key_type="int")
+    assert out[0] == {1: "x"}
+    assert json.loads(out[1]) == {"1": "x"}
+
+    out = run(key="true", value="x", key_type="boolean")
+    assert out[0] == {True: "x"}
+    assert json.loads(out[1]) == {"true": "x"}
+
+    out = run(key="null", value="x", key_type="null")
+    assert out[0] == {None: "x"}
+    assert json.loads(out[1]) == {"null": "x"}

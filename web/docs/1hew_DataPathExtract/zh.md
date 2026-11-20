@@ -1,6 +1,6 @@
 # Data Path Extract - 文本路径取值
 
-**节点功能：** `Data Path Extract` 按路径表达式从 `text` 输入框的内容中取值。内容可以是 JSON 文本、Markdown 代码块包裹的 JSON、Python 字面量、宽松 JSON（单引号、尾随逗号、True/False/None、无引号键）或普通文本。默认路径 `values[*]` 会把整段内容按值展开；用 `[0].content`、`[-1].bbox[0]`、`data.items[0].zh`、`values[0].ids`、`keys[*]` 这样的路径即可取到对应内容。
+**节点功能：** `Data Path Extract` 按路径表达式从连线的 `data` 输入中取值。内容可以是 JSON 文本、Markdown 代码块包裹的 JSON、Python 字面量、宽松 JSON（单引号、尾随逗号、True/False/None、无引号键）或普通文本。默认路径 `[*]` 会把整段内容按值展开；用 `[0].content`、`[-1].bbox[0]`、`data.items[0].zh`、`values[0].ids`、`keys[*]` 这样的路径即可取到对应内容。
 
 节点只负责取值：`value` 永远是一个列表，命中几项就有几项。把列表渲染成文字是下游的事，`List Text`、`Text List to String`、`Save Text` 各自按需要排版。
 
@@ -8,15 +8,14 @@
 
 | 参数名称 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | ------ | -------- | ---- |
-| `text` | STRING | `` | 多行 | 要解析的内容：JSON / 类 JSON / 普通文本 |
-| `data_path` | STRING | `values[*]` | - | JSON 取值路径；`values[*]` 表示整段内容的所有值，空字符串表示整段内容本身。命名为 `data_path` 而非 `path`，避免与文件路径混淆 |
-| `output_type` | COMBO | `list` | `list` / `json` | `list` 输出原生列表（保持值类型）；`json` 输出一个紧凑 JSON 数组文本 |
+| `data` | *（必填连线） | - | - | 要解析的数据，连线输入：JSON 文本、代码块 JSON、Python 字面量，或已解析的 dict / list |
+| `data_path` | STRING | `[*]` | - | JSON 取值路径；`[*]` 表示整段内容的所有值，空字符串表示整段内容本身。命名为 `data_path` 而非 `path`，避免与文件路径混淆 |
 
 ## 输出
 
 | 输出名称 | 数据类型 | 描述 |
 |---------|----------|------|
-| `value` | ANY（列表） | 每个匹配一项的列表；命中 1 项时也是列表，未命中或解析失败时为 `[]`。`output_type=list` 时保持原值类型，`json` 时是紧凑 JSON 数组文本 |
+| `value` | ANY（列表） | 始终是列表，每个匹配一项；未命中或解析失败时为 `[]`。值保持原类型：列表还是列表、数字还是数字 |
 | `count` | INT | 路径命中的项数；路径以 `.count` / `.length` / `[#]` 结尾时为该数量；未命中或输入为空时为 0。执行后输出名前面会显示这个数字（如 `3 count`） |
 
 ## 路径语法
@@ -27,7 +26,7 @@
 | `.content` / `content` | 字典键，开头的点可省略 |
 | `[0]["content"]` / `[0].'content'` | 带引号的键，键名含空格或点号时使用；数字键也靠引号区分（`["0"]` 是键 `"0"`，`[0]` 是位置） |
 | `keys[*]` / `keys[0]` | 对象的键名：全部 / 第 n 个；数组没有键名，取不到（要 `id` 用 `values[*].id`） |
-| `values[*]` / `values[0]` | 对象的值：全部 / 第 n 个，默认路径就是 `values[*]`；数组上就是所有元素 / 第 n 个元素 |
+| `values[*]` / `values[0]` | 对象的值：全部 / 第 n 个，默认路径就是 `[*]`（与 `values[*]` 等价）；数组上就是所有元素 / 第 n 个元素 |
 | `values[*].content` | 通配：对每个值继续取 `content` |
 | `$.data.items[0].zh` | 可选的 JSONPath 风格根 `$` |
 | `values[*].content.count` / `[0].bbox.length` / `[0].bbox[#]` | 计数：多项匹配时为匹配数量，单个匹配时为该列表 / 字典 / 字符串的长度 |

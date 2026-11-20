@@ -1,6 +1,6 @@
 # Data Path Extract - Read values by path
 
-**Node Purpose:** `Data Path Extract` reads values out of the `text` widget with a path expression. The text can be JSON, JSON inside a Markdown fence, a Python literal, relaxed JSON (single quotes, trailing commas, True/False/None, unquoted keys) or plain text. The default path `values[*]` splits the whole payload into its values; paths such as `[0].content`, `[-1].bbox[0]`, `data.items[0].zh`, `values[0].ids` and `keys[*]` pick the matching content.
+**Node Purpose:** `Data Path Extract` reads values out of the connected `data` input with a path expression. The data can be JSON text, JSON inside a Markdown fence, a Python literal, relaxed JSON (single quotes, trailing commas, True/False/None, unquoted keys), plain text, or an already-parsed dict / list. The default path `[*]` splits the whole payload into its values; paths such as `[0].content`, `[-1].bbox[0]`, `data.items[0].zh`, `values[0].ids` and `keys[*]` pick the matching content.
 
 The node only collects values: `value` is always a list with one entry per match. Rendering that list into text is the next node's job, so `List Text`, `Text List to String` and `Save Text` can each format it the way they need.
 
@@ -8,15 +8,14 @@ The node only collects values: `value` is always a list with one entry per match
 
 | Name | Type | Default | Range | Description |
 | ---- | ---- | ------- | ----- | ----------- |
-| `text` | STRING | `` | multiline | The payload: JSON / JSON-like / plain text |
-| `data_path` | STRING | `values[*]` | - | JSON path; `values[*]` means every value, an empty path means the whole payload. Named `data_path` rather than `path` so it does not read as a file path |
-| `output_type` | COMBO | `list` | `list` / `json` | `list` keeps native values, `json` emits one compact JSON array |
+| `data` | * (required link) | - | - | The payload, connected: JSON text, fenced JSON, a Python literal, or an already-parsed dict / list |
+| `data_path` | STRING | `[*]` | - | JSON path; `[*]` means every value, an empty path means the whole payload. Named `data_path` rather than `path` so it does not read as a file path |
 
 ## Outputs
 
 | Name | Type | Description |
 |------|------|-------------|
-| `value` | ANY (list) | One entry per match; still a list when only one match, and `[]` when nothing matches or parsing fails. Values keep their type: lists stay lists, numbers stay numbers |
+| `value` | ANY (list) | Always a list, one entry per match, `[]` when nothing matches or parsing fails. Values keep their type: lists stay lists, numbers stay numbers |
 | `count` | INT | Number of matches; the amount itself when the path ends with `.count` / `.length` / `[#]`; 0 when the path misses or the input is empty. After a run the port label shows the number (e.g. `3 count`) |
 
 ## Path Syntax
@@ -27,7 +26,7 @@ The node only collects values: `value` is always a list with one entry per match
 | `.content` / `content` | Dict key; the leading dot is optional |
 | `[0]["content"]` / `[0].'content'` | Quoted key, for names containing dots or spaces; quoting is also what separates the key `"0"` from position `0` |
 | `keys[*]` / `keys[0]` | An object's key names: all of them / the nth one; a list has no key names, so `keys` finds nothing there (use `values[*].id` for ids) |
-| `values[*]` / `values[0]` | An object's values: all of them / the nth one — the default path is `values[*]`; on a list it means every item / the nth item |
+| `values[*]` / `values[0]` | An object's values: all of them / the nth one — the default path is `[*]` (the same as `values[*]`); on a list it means every item / the nth item |
 | `values[*].content` | Wildcard: apply `content` to every value |
 | `$.data.items[0].zh` | Optional JSONPath-style root `$` |
 | `values[*].content.count` / `[0].bbox.length` / `[0].bbox[#]` | Count: the number of matches, or the length of the matched list / dict / string |

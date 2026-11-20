@@ -22,6 +22,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ## 📜 Changelog
 
 **v4.6.1**
+- change(data): `Data Path Extract` and `Data Path Replace` default `data_path` to `[*]` instead of `values[*]` (identical behaviour on objects and lists, shorter to type).
+- refactor(data): `Multi Dict` and `Data Path Replace` share one `value_type` list — `auto` / `dict` / `list` / `string` / `int` / `float` / `boolean` / `null`; the redundant `json` mode is gone because both outputs already carry the same type and round-trip.
+- refactor(data): `Multi Dict`'s `key_type` gains `int` / `float` / `boolean` / `null` (default `auto`), producing real Python key types while the `json` output stringifies them; `Data Path Replace`'s output is renamed `value` → `data` to match its input.
+- refactor(data): `Data Path Extract` / `Data Path Replace` take their payload on a required wildcard `data` link instead of a `text` box, so JSON text and already-parsed dict / list both go straight in.
+- refactor(data): `Data Path Extract` drops `output_type` — `value` is always a list of native values on a list-styled port, and serialising to JSON is left to `Multi List` / `Save Text`.
 - refactor(data): Rename `Text Path Extract` / `Text Path Replace` to `Data Path Extract` / `Data Path Replace` with `data_path` replacing `json_path`; the old node IDs are registered as replacements so saved workflows keep loading.
 - refactor(data): `Multi Dict` takes typed `DICT` sockets and `Multi List` keeps the list-styled `list` output; both drop `output_type` and always fill two outputs (`dict` / `list` plus `json`).
 - refactor(data): `Text Path Extract` and `Text Path Replace` rename `path` to `json_path` so it does not read as a file path; `Text Path Extract` gains an `output_type` (`list` / `json`); `List Text` names its wildcard ports `text_list` on both sides, since ComfyUI only styles list sockets on outputs.
@@ -834,10 +839,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🗂️ Data Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Multi Dict | Merge dynamic `dict_X` (typed `DICT` sockets) in port order, then add or overwrite one entry typed directly in `key` / `value`; `key_type` decides how a numeric key is written and `value_type` converts the value; outputs both the native `dict` and compact `json` |
+| Multi Dict | Merge dynamic `dict_X` (typed `DICT` sockets) in port order, then add or overwrite one entry typed directly in `key` / `value`; `key_type` types the key and `value_type` the value (`auto` / `dict` / `list` / `string` / `int` / `float` / `boolean` / `null`, shared with Data Path Replace); both `dict` and `json` outputs carry the same type |
 | Multi List | Combine dynamic `any_X` inputs into one array; `extend` splices list/tuple inputs one level, `append` keeps them nested; outputs the whole `list` (list-styled socket) plus compact `json` |
-| Data Path Extract | Read values from JSON text, dicts or plain text by `data_path` such as `[0].content`, `[-1].bbox[0]` or `values[*].content`, pick the key or value side with `keys[*]` / `values[*]`, count with `.count` / `.length` / `[#]`; `value` is always a list, with `output_type` choosing native values or compact JSON |
-| Data Path Replace | Write a value back into JSON text at a path matched by `Data Path Extract`; the value is typed in and converted by `value_type`, and broadcasts to every match; `value` returns the edited document as a list |
+| Data Path Extract | Read values from the linked `data` (JSON text, fenced JSON, a Python literal, or an already-parsed dict / list) by `data_path` such as `[0].content`, `[-1].bbox[0]` or `values[*].content`; pick the key or value side with `keys[*]` / `values[*]`, count with `.count` / `.length` / `[#]`; `value` is always a list of native values |
+| Data Path Replace | Write a value back into the linked `data` at a `data_path` matched by `Data Path Extract`; the value is typed in and converted by `value_type`, and broadcasts to every match; `data` returns the edited document as a list |
 
 ### 📃 List Nodes
 | Node Name | Description |

@@ -86,46 +86,48 @@ def check(label, actual, expected):
     return ok
 
 
-EXTRACT_INPUTS = {
-    "text": '{"layers":[{"index":1},{"index":2},{"index":3}]}',
-    "data_path": "layers[*].index",
-}
+SAMPLE = '{"layers":[{"index":1},{"index":2},{"index":3}]}'
+
+
+def extract_graph(data_source, data_path, sink_at="preview"):
+    """Data Path Extract takes its payload on a wildcard link, not a literal."""
+    graph = {
+        "src": {"class_type": "1hew_TextToAny", "inputs": {"text": data_source}},
+        "1": {
+            "class_type": "1hew_DataPathExtract",
+            "inputs": {"data": ["src", 0], "data_path": data_path},
+        },
+    }
+    sink(graph, "1", 0, sink_at)
+    return graph
 
 
 def main():
     results = []
 
     # 1. Extract: one list item per match, on the value port.
-    graph = {"1": {"class_type": "1hew_DataPathExtract", "inputs": dict(EXTRACT_INPUTS)}}
-    sink(graph, "1", 1)
+    graph = extract_graph(SAMPLE, "layers[*].index")
     results.append(
         check("Extract value -> ['1','2','3']", shown(run(graph), "preview"), ["1", "2", "3"])
     )
 
     # 2. Extract: a single match still arrives as a list.
-    graph = {
-        "1": {
-            "class_type": "1hew_DataPathExtract",
-            "inputs": dict(EXTRACT_INPUTS, path="layers[0].index"),
-        }
-    }
-    sink(graph, "1", 1)
+    graph = extract_graph(SAMPLE, "layers[0].index")
     results.append(check("Extract single value -> ['1']", shown(run(graph), "preview"), ["1"]))
 
     # 3. Extract: a miss gives an empty list and a zero count. PreviewAny
     # renders an empty list as "None", so the count port is the reliable check.
-    graph = {
-        "1": {
-            "class_type": "1hew_DataPathExtract",
-            "inputs": dict(EXTRACT_INPUTS, path="nothing[*].index"),
-        }
-    }
-    sink(graph, "1", 2, "count")
+    graph = extract_graph(SAMPLE, "nothing[*].index", "count")
+    sink(graph, "1", 1, "count")
     results.append(check("Extract miss count -> ['0']", shown(run(graph), "count"), ["0"]))
 
     # 4. List Math Expression: element-wise a + 1 on the INT port.
     graph = {
-        "1": {"class_type": "1hew_DataPathExtract", "inputs": dict(EXTRACT_INPUTS)},
+        "src": {"class_type": "1hew_TextToAny", "inputs": {"text": SAMPLE}},
+        "1": {
+            "class_type": "1hew_DataPathExtract",
+            "inputs": {"data": ["src", 0], "data_path": "layers[*].index"},
+        },
         "3": {
             "class_type": "1hew_ListMathExpression",
             "inputs": {"expression": "a + 1", "a": ["1", 0]},
@@ -139,10 +141,11 @@ def main():
 
     # 5. Replace writes one typed value, broadcast to every match.
     graph = {
+        "src": {"class_type": "1hew_TextToAny", "inputs": {"text": SAMPLE}},
         "4": {
             "class_type": "1hew_DataPathReplace",
             "inputs": {
-                "text": '{"layers":[{"index":1},{"index":2},{"index":3}]}',
+                "data": ["src", 0],
                 "data_path": "layers[*].index",
                 "value": "9",
                 "value_type": "int",
@@ -162,16 +165,14 @@ def main():
 
     # 6. List Text: prefix and suffix per item, still a list.
     graph = {
+        "src": {"class_type": "1hew_TextToAny", "inputs": {"text": '["cat","dog"]'}},
         "1": {
             "class_type": "1hew_DataPathExtract",
-            "inputs": {
-                "text": '["cat","dog"]',
-                "data_path": "[*]",
-            },
+            "inputs": {"data": ["src", 0], "data_path": "[*]"},
         },
         "5": {
             "class_type": "1hew_ListText",
-            "inputs": {"prefix": "a ", "suffix": "!", "text": ["1", 0]},
+            "inputs": {"prefix": "a ", "suffix": "!", "text_list": ["1", 0]},
         },
     }
     sink(graph, "5", 0, "listtext")
@@ -181,10 +182,14 @@ def main():
 
     # 7. Replace: broadcast a text value to every match.
     graph = {
+        "src": {
+            "class_type": "1hew_TextToAny",
+            "inputs": {"text": '[{"content":"a"},{"content":"b"}]'},
+        },
         "4": {
             "class_type": "1hew_DataPathReplace",
             "inputs": {
-                "text": '[{"content":"a"},{"content":"b"}]',
+                "data": ["src", 0],
                 "data_path": "[*].content",
                 "value": "X",
                 "value_type": "string",

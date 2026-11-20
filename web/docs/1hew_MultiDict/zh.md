@@ -1,6 +1,6 @@
 # Multi Dict - 合并字典并追加键值
 
-**节点功能：** `Multi Dict` 先按端口顺序合并动态 `dict_1..N`，再添加或覆盖一个键值对。键和值都直接输入（`key` / `value`），不需要连线；`key_type` 决定数字键如何书写，`value_type` 决定值如何转换。两个输出同时可用：`dict` 输出原生对象，`json` 输出紧凑 JSON 文本。
+**节点功能：** `Multi Dict` 先按端口顺序合并动态 `dict_1..N`，再添加或覆盖一个键值对。键和值都直接输入（`key` / `value`），不需要连线；`key_type` 决定键的类型，`value_type` 决定值如何转换。两个输出同时可用：`dict` 输出原生对象，`json` 输出紧凑 JSON 文本。
 
 ## 输入
 
@@ -8,9 +8,9 @@
 | -------- | -------- | -------- | ------ | -------- | ---- |
 | `dict_1`、`dict_2`… | 可选 | * | - | - | 待合并的字典，按端口编号顺序合并；只接受字典，列表请拆成多个 `dict_N` 输入。 |
 | `key` | - | STRING | `` | - | 最后添加/覆盖的键，直接输入；为空时只合并字典。JSON 对象的键只能是字符串。 |
-| `key_type` | - | COMBO | `string` | `string` / `auto` | `string` 原样使用输入文本；`auto` 会规范化数字/布尔，`1.0` 与 `1` 落到同一个键。 |
+| `key_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `null` | `auto` 像 Python 字面量一样推断（`1`→int、`1.5`→float、`true`→bool、`null`→None）；`string` 永远保持文本。其余选项强制该类型，转不了就报错。 |
 | `value` | - | STRING | `` | - | 最后添加/覆盖的值，按 `value_type` 转换；`key` 为空时忽略；留空则写入 `null`。 |
-| `value_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` | 作用于 `value` 的类型转换；见下表。 |
+| `value_type` | - | COMBO | `auto` | `auto` / `dict` / `list` / `string` / `int` / `float` / `boolean` / `null` | 作用于 `value` 的类型转换；见下表。两个输出都按该类型写出，便于互转。 |
 
 ## 输出
 
@@ -30,13 +30,13 @@
 | `boolean` | 转布尔；`true` / `1` / `yes` / `on` / 非零数字为真 | `"true"` → `true`；`"0"` → `false` |
 | `dict` | 解析 JSON 文本并要求是对象 | `'{"a":1}'` → 对象；`[1,2]` 报错 |
 | `list` | 解析 JSON 文本并要求是数组 | `'[1,2]'` → 数组；`{"a":1}` 报错 |
-| `json` | 把字符串按 JSON 解析；对象→dict、数组→list、数字/布尔/null 对应 | `'{"a":1}'` → 对象 |
 | `null` | 强制输出 `null` | 任意值 → `null` |
 
 - `value_type` 只影响 `value`；`key` 由 `key_type` 处理。
+- Python 字典接受任何可哈希的键，因此 `key_type` 产出的是真正的 int / float / bool / None 键。两个输出都合法：`dict` 保留这些键类型，`json` 只能写成字符串（`1` → `"1"`、`true` → `"true"`、`None` → `"null"`）。
 - `value` 为空时始终写入 `null`，不受 `value_type` 影响；填了但转换失败会直接报错。
 - `auto` 下文本就是文本（`"30"` 仍是 `"30"`）；需要数字请选 `int` / `float`。
-- `json` 是严格解析：`Alice` 这种非 JSON 文本会报错；要保留普通字符串请用 `auto` 或 `string`。
+- 两个输出始终同类型：`dict` 端口是原生 Python 值，`json` 端口是对应的 JSON 字面量；`dict` / `list` / `int` / `float` / `boolean` / `null` / `string` 都能原样互转。
 
 ## 顺序与覆盖
 
@@ -65,7 +65,7 @@ key = a, value = 9
 ## 典型用法
 
 - 单键对象：`key=<String name>`、`value=<String Alice>` → `{"name": "Alice"}`。
-- JSON 文本转字典：`value=<String '{"a":1}'>`、`value_type=json` → `{"k": {"a": 1}}`。
+- JSON 文本转字典：`value` 填 `{"a":1}`、`value_type=dict` → `{"k": {"a": 1}}`。
 - 数字文本转数字：`value=<String "30">`、`value_type=int` → `{"k": 30}`。
 - 合并对象：`dict_1=<Multi Dict A>`、`dict_2=<Multi Dict B>` → 两个字典按顺序合并。
 - 链式构建：`D2(dict_1=D1, key="b", value=2)` 得到 `{...D1, "b": 2}`。

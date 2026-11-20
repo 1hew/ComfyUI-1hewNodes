@@ -1,6 +1,6 @@
 # Multi Dict - Merge dicts and add one key/value
 
-**Node purpose:** `Multi Dict` merges dynamic `dict_1..N` inputs in port order and then adds or overwrites one entry. Key and value are typed in directly (`key` / `value`), so no socket is needed; `key_type` decides how a numeric key is written and `value_type` how the value is converted. Both outputs are always available: `dict` gives the native object and `json` the compact JSON text.
+**Node purpose:** `Multi Dict` merges dynamic `dict_1..N` inputs in port order and then adds or overwrites one entry. Key and value are typed in directly (`key` / `value`), so no socket is needed; `key_type` types the key and `value_type` converts the value. Both outputs are always available: `dict` gives the native object and `json` the compact JSON text.
 
 ## Inputs
 
@@ -8,9 +8,9 @@
 | --------- | ------ | ---- | ------- | ----- | ----------- |
 | `dict_1`, `dict_2`… | optional | * | - | - | Dicts merged in port order. Only dicts are accepted; connect each dict of a list to a separate `dict_N` socket. |
 | `key` | - | STRING | `` | - | Key added or overwritten last, typed directly. Empty means merge only. A JSON object key is always a string. |
-| `key_type` | - | COMBO | `string` | `string` / `auto` | `string` keeps the text as written; `auto` normalises a number or boolean, so `1.0` and `1` land on the same key. |
+| `key_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `null` | `auto` infers like a Python literal (`1` → int, `1.5` → float, `true` → bool, `null` → None); `string` always keeps text. The other options force their type and raise when the text does not fit. |
 | `value` | - | STRING | `` | - | Value added or overwritten last, converted by `value_type`. Ignored when `key` is empty; an empty box writes `null`. |
-| `value_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` | Conversion applied to `value`; see below. |
+| `value_type` | - | COMBO | `auto` | `auto` / `dict` / `list` / `string` / `int` / `float` / `boolean` / `null` | Conversion applied to `value`; see below. Both outputs use the resulting type, so they round-trip. |
 
 ## Outputs
 
@@ -30,13 +30,13 @@
 | `boolean` | Convert to boolean; `true` / `1` / `yes` / `on` / non-zero numbers are true | `"true"` → `true`; `"0"` → `false` |
 | `dict` | Parse JSON text and require an object | `'{"a":1}'` → object; `[1,2]` raises |
 | `list` | Parse JSON text and require an array | `'[1,2]'` → array; `{"a":1}` raises |
-| `json` | Parse a string as JSON; objects→dict, arrays→list, scalars map to their JSON types | `'{"a":1}'` → object |
 | `null` | Force `null` | any value → `null` |
 
 - `value_type` affects `value` only; `key` goes through `key_type`.
+- A Python dict accepts any hashable key, so `key_type` produces real int / float / bool / None keys. Both outputs are still valid: `dict` keeps those key types, `json` necessarily writes them as strings (`1` → `"1"`, `true` → `"true"`, `None` → `"null"`).
 - An empty `value` always becomes `null`, regardless of `value_type`; a value that cannot be converted raises an error.
 - `auto` keeps text as text (`"30"` stays `"30"`); pick `int` / `float` when the JSON needs a number.
-- `json` is strict: plain text such as `Alice` raises; use `auto` or `string` to keep normal text.
+- Both outputs always agree: the `dict` port carries native Python values and the `json` port the matching JSON literal, so `dict` / `list` / `int` / `float` / `boolean` / `null` / `string` all round-trip.
 
 ## Order and overwrite
 

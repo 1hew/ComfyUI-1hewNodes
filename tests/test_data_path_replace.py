@@ -78,7 +78,7 @@ def test_schema_collects_a_value_list_and_reports_a_count():
     # The value is typed in, so the node no longer takes lists.
     assert not schema.get("is_input_list")
     assert [port["id"] for port in schema["inputs"]] == [
-        "text",
+        "data",
         "data_path",
         "value",
         "value_type",
@@ -87,7 +87,8 @@ def test_schema_collects_a_value_list_and_reports_a_count():
     assert ports["value"]["type"] == "STRING"
     assert not ports["value"].get("multiline")
     # No rendering ports any more: value and count only.
-    assert [o["display_name"] for o in schema["outputs"]] == ["value", "count"]
+    # data, matching the input port it goes back into.
+    assert [o["display_name"] for o in schema["outputs"]] == ["data", "count"]
     # value is wrapped in a list so a root-level JSON array is not split by
     # ComfyUI downstream; the port renders as a list endpoint.
     assert schema["outputs"][0]["is_output_list"] is True
@@ -205,7 +206,7 @@ def test_empty_path_raises():
 def test_node_writes_upstream_values_and_returns_a_list():
     text = '{"layers":[{"index":1},{"index":2}]}'
     value, count = _run(
-        text=text,
+        data=text,
         data_path="layers[*].index",
         value="3",
         value_type="int",
@@ -219,7 +220,7 @@ def test_node_writes_upstream_values_and_returns_a_list():
 
 def test_node_value_is_list_even_when_root_is_array():
     value, _ = _run(
-        text='[{"n":1}]',
+        data='[{"n":1}]',
         data_path="[0].n",
         value="2",
         value_type="int",
@@ -229,7 +230,7 @@ def test_node_value_is_list_even_when_root_is_array():
 
 def test_node_value_type_converts_the_written_value():
     value, count = _run(
-        text='[{"n":1}]',
+        data='[{"n":1}]',
         data_path="[0].n",
         value="5",
         value_type="int",
@@ -240,7 +241,7 @@ def test_node_value_type_converts_the_written_value():
 
 def test_node_value_type_dict_parses_json_text():
     value, _ = _run(
-        text='[{"n":1}]',
+        data='[{"n":1}]',
         data_path="[0].n",
         value='{"k": 1}',
         value_type="dict",
@@ -250,7 +251,7 @@ def test_node_value_type_dict_parses_json_text():
 
 def test_node_keeps_integers_without_float_suffix():
     value, _ = _run(
-        text='[{"n":1}]',
+        data='[{"n":1}]',
         data_path="[0].n",
         value="3",
         value_type="int",
@@ -261,7 +262,7 @@ def test_node_keeps_integers_without_float_suffix():
 def test_node_no_match_returns_the_original_document_and_zero():
     original = '{"layers":[{"index":1}]}'
     value, count = _run(
-        text=original,
+        data=original,
         data_path="nothing[*]",
         value="9",
         value_type="int",
@@ -272,7 +273,7 @@ def test_node_no_match_returns_the_original_document_and_zero():
 
 def test_node_broadcasts_one_value_to_every_match():
     value, count = _run(
-        text='[{"n":1},{"n":2},{"n":3}]',
+        data='[{"n":1},{"n":2},{"n":3}]',
         data_path="[*].n",
         value="7",
         value_type="int",
@@ -284,7 +285,7 @@ def test_node_broadcasts_one_value_to_every_match():
 def test_node_rejects_a_value_that_cannot_be_converted():
     with pytest.raises(ValueError):
         _run(
-            text='[{"n":1}]',
+            data='[{"n":1}]',
             data_path="[0].n",
             value="abc",
             value_type="int",
@@ -296,7 +297,7 @@ def test_node_rejects_a_value_that_cannot_be_converted():
 
 def test_value_auto_keeps_text_as_text():
     value, _ = _run(
-        text='{"n":1}',
+        data='{"n":1}',
         data_path="n",
         value="hello",
         value_type="auto",
@@ -306,7 +307,7 @@ def test_value_auto_keeps_text_as_text():
 
 def test_value_can_be_a_json_container():
     value, _ = _run(
-        text='{"n":1}',
+        data='{"n":1}',
         data_path="n",
         value='{"k": 1}',
         value_type="dict",
@@ -317,9 +318,40 @@ def test_value_can_be_a_json_container():
 def test_empty_value_writes_nothing():
     original = '{"n":1}'
     value, count = _run(
-        text=original,
+        data=original,
         data_path="n",
         value="",
     )
     assert count == 0
     assert value == [{"n": 1}]
+
+
+# ------------------------------------------------------- structured data input
+
+
+def test_writes_into_an_already_parsed_dict():
+    value, count = _run(
+        data={"n": 1},
+        data_path="n",
+        value="7",
+        value_type="int",
+    )
+    assert count == 1
+    assert value == [{"n": 7}]
+
+
+def test_writes_into_an_already_parsed_list():
+    value, count = _run(
+        data=[{"n": 1}, {"n": 2}],
+        data_path="[*].n",
+        value="9",
+        value_type="int",
+    )
+    assert count == 2
+    assert value == [[{"n": 9}, {"n": 9}]]
+
+
+def test_does_not_mutate_the_linked_object():
+    original = {"n": 1}
+    _run(data=original, data_path="n", value="7", value_type="int")
+    assert original == {"n": 1}
