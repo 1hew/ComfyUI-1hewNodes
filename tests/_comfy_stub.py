@@ -20,6 +20,38 @@ class PortType:
         return {"kind": "output", "type": self.type_name, **kwargs}
 
 
+class _AutogrowTemplateNames:
+    def __init__(self, input, names, min=1):
+        self.input = input
+        self.names = list(names)
+        self.min = min
+
+    def ports(self):
+        return [
+            {"kind": "input", "type": self.input["type"], "id": name}
+            for name in self.names
+        ]
+
+
+class _Autogrow:
+    """Just enough of io.Autogrow for a schema to declare growing ports."""
+
+    TemplateNames = _AutogrowTemplateNames
+
+    class Input:
+        def __init__(self, id, template, **kwargs):
+            self.id = id
+            self.template = template
+
+        def as_port(self):
+            return {
+                "kind": "input",
+                "type": "AUTOGROW",
+                "id": self.id,
+                "template": self.template,
+            }
+
+
 def install():
     io = types.SimpleNamespace(
         ComfyNode=object,
@@ -35,6 +67,7 @@ def install():
         Mask=PortType("MASK"),
         Video=PortType("VIDEO"),
         Audio=PortType("AUDIO"),
+        Autogrow=_Autogrow,
     )
     latest = types.ModuleType("comfy_api.latest")
     latest.io = io

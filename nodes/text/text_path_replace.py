@@ -1,12 +1,16 @@
 """Text Path Replace: write values back into JSON-like text at a path.
 
 It pairs with Text Path Extract: the same path that reads a value also says
-where a new value goes. Computation stays upstream (Math Expression, Multi
-Dict, string nodes, ...); this node only places the replacement values.
+where a new value goes. Computation stays upstream (List Math Expression,
+Multi Dict, string nodes, ...); this node only places the values.
 
-replace is a list (is_input_list). One item per match is applied in
-order; a single item is broadcast to every match. Any other count is an
-error, so a mismatch never silently drops or misplaces values.
+`value` is a list (is_input_list). One item per match is applied in order; a
+single item is broadcast to every match. Any other count is an error, so a
+mismatch never silently drops or misplaces values.
+
+Like Text Path Extract the node does not render: the edited document leaves
+through the `value` port as a one-item list, and formatting is the next
+node's job (Save Text, List Text, or a JSON dump).
 """
 
 from comfy_api.latest import io
@@ -15,8 +19,6 @@ from ...utils import make_ui_text
 from ...utils._json_ops import (
     as_text,
     coerce_value,
-    json_text,
-    pretty_json_text,
     validate_json_value,
 )
 from ...utils._json_path import replace_all
@@ -41,34 +43,28 @@ class TextPathReplace(io.ComfyNode):
             node_id="1hew_TextPathReplace",
             display_name="Text Path Replace",
             category="1hewNodes/text",
-            # Lists in, so replace can hold one value per match.
+            # Lists in, so value can hold one entry per match.
             is_input_list=True,
             inputs=[
                 io.String.Input("text", default="", multiline=True),
                 io.String.Input("path", default="values[*]"),
                 io.Custom("*").Input(
-                    "replace",
+                    "value",
                     tooltip=(
                         "要写入的值。接入列表时按顺序一一替换匹配位置；"
                         "只有 1 个值时广播到所有匹配位置。"
-                        "可接 Text Path Extract 的 value、Math Expression、Multi Dict 等。"
+                        "可接 Text Path Extract 的 value、List Math Expression、Multi Dict 等。"
                     ),
                 ),
                 io.Combo.Input(
                     "value_type",
                     options=_VALUE_TYPES,
                     default="auto",
-                    tooltip="只作用于 replace：与 Multi Dict 的 value_type 含义一致。",
-                ),
-                io.Combo.Input(
-                    "output_format",
-                    options=["pretty", "compact"],
-                    default="pretty",
+                    tooltip="只作用于 value：与 Multi Dict 的 value_type 含义一致。",
                 ),
             ],
             outputs=[
-                io.String.Output(display_name="text"),
-                # value is the edited document wrapped in a one-item list, so a
+                # The edited document wrapped in a one-item list, so a
                 # root-level JSON array is not split by ComfyUI downstream.
                 io.Custom("*").Output(display_name="value", is_output_list=True),
                 io.Int.Output(display_name="count"),
@@ -84,21 +80,19 @@ class TextPathReplace(io.ComfyNode):
         cls,
         text,
         path,
-        replace,
+        value,
         value_type,
-        output_format,
     ) -> io.NodeOutput:
         text = as_text(text)
         path = as_text(path)
         value_type = as_text(value_type) or "auto"
-        output_format = as_text(output_format) or "pretty"
 
-        if replace is None:
+        if value is None:
             items = []
-        elif isinstance(replace, (list, tuple)):
-            items = list(replace)
+        elif isinstance(value, (list, tuple)):
+            items = list(value)
         else:
-            items = [replace]
+            items = [value]
 
         new_values = []
         for item in items:
@@ -113,11 +107,4 @@ class TextPathReplace(io.ComfyNode):
             # the original text: a silent no-op would hide the mistake.
             raise ValueError(f"Text Path Replace: {exc}") from None
 
-        if count == 0:
-            return io.NodeOutput(text, [data], 0, ui=make_ui_text("0"))
-
-        if output_format == "compact":
-            rendered = json_text(data)
-        else:
-            rendered = pretty_json_text(data)
-        return io.NodeOutput(rendered, [data], count, ui=make_ui_text(str(count)))
+        return io.NodeOutput([data], count, ui=make_ui_text(str(count)))

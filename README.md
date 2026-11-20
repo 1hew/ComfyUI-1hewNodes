@@ -22,6 +22,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ## 📜 Changelog
 
 **v4.6.1**
+- refactor(text): `Text Path Replace` now matches `Text Path Extract` — the `text` output and `output_format` are gone, the `replace` input is renamed `value` to match `value_type`, and the edited document leaves through `value` as a one-item list for downstream rendering.
+- refactor(text): `Text Path Extract` now only collects values — the `text` / `output_format` / `separator` / `fallback` inputs are gone, `value` is always a list with one entry per match, and rendering moves to `List Text` / `Text List to String` / `Save Text`.
 - feat(text): Add `Text Path Replace` — the write half of `Text Path Extract`: the same path that reads a value says where the new one goes. A `replace` list is applied one-to-one per match and a single value is broadcast; counts that do not match raise instead of writing somewhere else. `value_type` reuses the `Multi Dict` converter, `keys` / `count` paths are read-only, and the `value` output is a one-item list so a root-level array is not split downstream.
 - feat(text): `Text Path Extract`'s `value` port is now a declared list output and always returns a list (one item per match, `[]` when nothing matches), so a single list-valued match is no longer split by ComfyUI's per-item execution.
 - feat(list): Add `List Math Expression` and `List Text` — core `Math Expression` applied element-wise: same grammar, functions and result checks, but lists in and lists out, with length-1 inputs broadcasting and misaligned lengths raising. `List Text` applies the `Text List to String` prefix / suffix per item and keeps a list.
@@ -790,8 +792,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Text Prefix Suffix | Text prefix suffix formatter with wildcard input support for flexible data formatting with custom prefix and suffix |
 | Text Custom Extract | Text custom extractor for extracting specified key values from JSON |
-| Text Path Extract | Read values from JSON text, dicts or plain text by path such as `[0].content`, `[-1].bbox[0]` or `values[*].content`, pick the key or value side with `keys[*]` / `values[*]` (so an unknown key name is still addressable), count with `.count` / `.length` / `[#]`, and emit auto/json/text/csv text plus a raw `value` and a `count` output |
-| Text Path Replace | Write values back into JSON text at a path matched by `Text Path Extract`; the `replace` list is applied one-to-one per match (a single value is broadcast), with `value_type` conversion and a list-wrapped `value` output |
+| Text Path Extract | Read values from JSON text, dicts or plain text by path such as `[0].content`, `[-1].bbox[0]` or `values[*].content`, pick the key or value side with `keys[*]` / `values[*]` (so an unknown key name is still addressable) and count with `.count` / `.length` / `[#]`; `value` is always a list with one entry per match, leaving rendering to List Text / Text List to String / Save Text |
+| Text Path Replace | Write values back into JSON text at a path matched by `Text Path Extract`; the `value` list is applied one-to-one per match (a single value is broadcast), with `value_type` conversion; `value` returns the edited document as a list, leaving rendering to downstream nodes |
 | Text System Prompt | Pick one builtin system prompt from `utils/system_prompt/<model>/[<lang>] <name>.txt` and output its body verbatim on a single `string` output; bundled Qwen-Image-2.1 `t2i` / `edit` prompts, and any new `.txt` you drop in shows up after a reload |
 | String Ratio GPT Image 2.0 | Infer the nearest GPT 2.0 image supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
 | String Ratio Gemini 3.1 Flash Image | Infer the nearest Gemini 3.1 Flash supported aspect ratio from input images, or pass through the selected ratio when no image is connected |

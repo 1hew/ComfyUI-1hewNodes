@@ -22,6 +22,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ## 📜 更新日志
 
 **v4.6.1**
+- refactor(text)：`Text Path Replace` 与 `Text Path Extract` 对齐——移除 `text` 输出与 `output_format`，输入 `replace` 改名为 `value` 以对应 `value_type`，编辑后的文档通过 `value` 以只含一项的列表输出，排版交给下游。
+- refactor(text)：`Text Path Extract` 只负责取值——移除 `text` / `output_format` / `separator` / `fallback` 四个参数，`value` 始终是每个匹配一项的列表，排版交给 `List Text` / `Text List to String` / `Save Text`。
 - feat(text)：新增 `Text Path Replace`——`Text Path Extract` 的写入部分：读取时用的路径同时决定新值写到哪里。`replace` 列表与匹配位置一一对应，单个值广播到所有位置；数量不一致直接报错，不会写到别处。`value_type` 复用 `Multi Dict` 的转换，`keys` / `count` 类路径只读，`value` 输出为只含一项的列表，根节点是数组时也不会被下游拆开。
 - feat(text)：`Text Path Extract` 的 `value` 输出改为声明式列表输出并始终返回列表（每项一个匹配，未命中为 `[]`），单个列表值不再被 ComfyUI 的逐项执行拆开。
 - feat(list)：新增 `List Math Expression` 与 `List Text`——把核心 `Math Expression` 逐项应用：语法、函数与结果检查相同，但输入输出均为列表，长度为 1 的输入广播，长度不一致时报错；`List Text` 按 `Text List to String` 的前后缀逐项处理并保持列表。
@@ -790,8 +792,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Text Prefix Suffix | 文本前缀后缀器，支持通配符输入的灵活数据格式化，可自定义前缀和后缀 |
 | Text Custom Extract | 文本自定义提取器，从JSON中提取指定键值 |
-| Text Path Extract | 按 `[0].content`、`[-1].bbox[0]`、`values[*].content` 等路径从 JSON 文本、字典或普通文本中取值，用 `keys[*]` / `values[*]` 分别取对象的所有键名 / 所有值（键名未知也能取），用 `.count` / `.length` / `[#]` 计数，输出 auto/json/text/csv 文本、`value` 原值与 `count` 数量 |
-| Text Path Replace | 按 `Text Path Extract` 的路径把值写回 JSON 文本；`replace` 列表与匹配位置一一对应（单个值则广播），支持 `value_type` 类型转换，`value` 输出为列表 |
+| Text Path Extract | 按 `[0].content`、`[-1].bbox[0]`、`values[*].content` 等路径从 JSON 文本、字典或普通文本中取值，用 `keys[*]` / `values[*]` 分别取对象的所有键名 / 所有值（键名未知也能取），用 `.count` / `.length` / `[#]` 计数；`value` 始终是每个匹配一项的列表，排版交给 List Text / Text List to String / Save Text |
+| Text Path Replace | 按 `Text Path Extract` 的路径把值写回 JSON 文本；`value` 列表与匹配位置一一对应（单个值则广播），支持 `value_type` 类型转换；`value` 输出编辑后的文档列表，排版交给下游 |
 | Text System Prompt | 从 `utils/system_prompt/<模型>/[<语言>] <名称>.txt` 中选一条内置系统提示词，原样输出到 `string` 输出；内置 Qwen-Image-2.1 的 `t2i` / `edit`，新增的 `.txt` 重载后会出现在下拉中 |
 | String Ratio GPT Image 2.0 | 从输入图像推断最接近的 GPT 2.0 图像模型支持比例；未连接图像时透传所选比例 |
 | String Ratio Gemini 3.1 Flash Image | 从输入图像推断最接近的 Gemini 3.1 Flash 支持比例；未连接图像时透传所选比例 |

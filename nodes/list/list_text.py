@@ -19,12 +19,12 @@ class ListText(io.ComfyNode):
             category="1hewNodes/list",
             is_input_list=True,
             inputs=[
-                io.Custom("*").Input("text_list", optional=True),
+                io.Custom("*").Input("text", optional=True),
                 io.String.Input("prefix", default=""),
                 io.String.Input("suffix", default=""),
             ],
             outputs=[
-                io.String.Output(display_name="text_list", is_output_list=True),
+                io.String.Output(display_name="text", is_output_list=True),
             ],
         )
 
@@ -34,7 +34,7 @@ class ListText(io.ComfyNode):
 
     @classmethod
     async def execute(
-        cls, prefix: str, suffix: str, text_list=None,
+        cls, prefix: str, suffix: str, text=None,
     ) -> io.NodeOutput:
         # is_input_list wraps widget values in a list; unwrap the single item.
         if isinstance(prefix, (list, tuple)):
@@ -45,17 +45,17 @@ class ListText(io.ComfyNode):
         suffix = "" if suffix is None else str(suffix)
 
         # Same flattening as Text List to String: one level of nested lists.
-        if text_list is None:
+        if text is None:
             items = []
-        elif isinstance(text_list, (list, tuple)):
+        elif isinstance(text, (list, tuple)):
             items = []
-            for item in text_list:
+            for item in text:
                 if isinstance(item, (list, tuple)):
                     items.extend(item)
                 else:
                     items.append(item)
         else:
-            items = [text_list]
+            items = [text]
 
         result = [f"{prefix}{str(item)}{suffix}" for item in items]
         return io.NodeOutput(result, ui=make_ui_text(str(len(result))))

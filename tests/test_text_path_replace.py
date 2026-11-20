@@ -1,9 +1,10 @@
 """Text Path Replace: write values back at the locations a path matches.
 
 These tests pin the write-back contract: the path that Text Path Extract
-reads is the same path this node writes; one replacement per match or a
-single value broadcast to all; mismatches and read-only paths raise instead
-of silently changing the wrong place; the input content is never mutated.
+reads is the same path this node writes; one value per match or a single
+value broadcast to all; mismatches and read-only paths raise instead of
+silently changing the wrong place; the input content is never mutated; and
+the node does not render, it hands the edited document back as a value.
 """
 
 import asyncio
@@ -63,14 +64,13 @@ replace_all = JSON_PATH.replace_all
 
 def _run(**kwargs):
     kwargs.setdefault("value_type", "auto")
-    kwargs.setdefault("output_format", "compact")
     return asyncio.run(NODE.execute(**kwargs))
 
 
 # --------------------------------------------------------------------- schema
 
 
-def test_schema_declares_list_input_and_list_value_output():
+def test_schema_collects_a_value_list_and_reports_a_count():
     schema = NODE.define_schema()
     assert schema["node_id"] == "1hew_TextPathReplace"
     assert schema["display_name"] == "Text Path Replace"
@@ -79,15 +79,15 @@ def test_schema_declares_list_input_and_list_value_output():
     assert [port["id"] for port in schema["inputs"]] == [
         "text",
         "path",
-        "replace",
+        "value",
         "value_type",
-        "output_format",
     ]
-    # value is wrapped in a list so a root-level JSON array is not split
-    # by ComfyUI downstream; the port renders as a list endpoint.
-    value_output = schema["outputs"][1]
-    assert value_output["display_name"] == "value"
-    assert value_output["is_output_list"] is True
+    # No rendering ports any more: value and count only.
+    assert [o["display_name"] for o in schema["outputs"]] == ["value", "count"]
+    # value is wrapped in a list so a root-level JSON array is not split by
+    # ComfyUI downstream; the port renders as a list endpoint.
+    assert schema["outputs"][0]["is_output_list"] is True
+    assert schema["outputs"][1]["type"] == "INT"
 
 
 # ------------------------------------------------------------- core behaviour
@@ -136,7 +136,7 @@ def test_values_index_on_object_writes_by_position():
     assert new["reference_image_1"]["ids"] == [1]
 
 
-def test_replacement_can_be_a_container():
+def test_value_can_be_a_container():
     data = '[{"bbox":[1,2,3,4]},{"bbox":[5,6,7,8]}]'
     new, count = replace_all(data, "[*].bbox", [{"k": 1}])
     assert count == 2
@@ -169,7 +169,7 @@ def test_fenced_json_input_is_parsed_then_rewritten():
 # ------------------------------------------------------------ error handling
 
 
-def test_mismatched_replacement_count_raises():
+def test_mismatched_value_count_raises():
     data = '[{"n":1},{"n":2},{"n":3}]'
     with pytest.raises(ValueError, match="匹配到 3 处"):
         replace_all(data, "[*].n", [1, 2])
@@ -198,77 +198,66 @@ def test_empty_path_raises():
 # ------------------------------------------------------------------ node level
 
 
-def test_node_writes_index_plus_upstream_values():
+def test_node_writes_upstream_values_and_returns_a_list():
     text = '{"layers":[{"index":1},{"index":2}]}'
-    rendered, value, count = _run(
+    value, count = _run(
         text=[text],
         path=["layers[*].index"],
-        replace=[2, 3],
+        value=[2, 3],
     )
-    assert rendered == '{"layers":[{"index":2},{"index":3}]}'
     assert count == 2
     # value is a one-item list holding the edited document.
     assert isinstance(value, list) and len(value) == 1
-    assert value[0]["layers"][1]["index"] == 3
+    assert value[0] == {"layers": [{"index": 2}, {"index": 3}]}
 
 
 def test_node_value_is_list_even_when_root_is_array():
-    _, value, _ = _run(
+    value, _ = _run(
         text=['[{"n":1}]'],
         path=["[0].n"],
-        replace=[2],
+        value=[2],
     )
     assert value == [[{"n": 2}]]
 
 
-def test_node_value_type_converts_replacement():
-    rendered, _, count = _run(
+def test_node_value_type_converts_the_written_value():
+    value, count = _run(
         text=['[{"n":1}]'],
         path=["[0].n"],
-        replace=["5"],
+        value=["5"],
         value_type="int",
     )
     assert count == 1
-    assert rendered == '[{"n":5}]'
+    assert value == [[{"n": 5}]]
 
 
 def test_node_value_type_dict_parses_json_text():
-    rendered, _, _ = _run(
+    value, _ = _run(
         text=['[{"n":1}]'],
         path=["[0].n"],
-        replace=['{"k": 1}'],
+        value=['{"k": 1}'],
         value_type="dict",
     )
-    assert rendered == '[{"n":{"k":1}}]'
+    assert value == [[{"n": {"k": 1}}]]
 
 
 def test_node_keeps_integers_without_float_suffix():
-    rendered, _, _ = _run(
+    value, _ = _run(
         text=['[{"n":1}]'],
         path=["[0].n"],
-        replace=[3],
+        value=[3],
     )
-    assert rendered == '[{"n":3}]'
+    assert value == [[{"n": 3}]]
 
 
-def test_node_pretty_output_is_indented():
-    rendered, _, _ = _run(
-        text=['[{"n":1}]'],
-        path=["[0].n"],
-        replace=[2],
-        output_format="pretty",
-    )
-    assert rendered == '[\n  {\n    "n": 2\n  }\n]'
-
-
-def test_node_no_match_returns_original_text_and_zero():
+def test_node_no_match_returns_the_original_document_and_zero():
     original = '{"layers":[{"index":1}]}'
-    rendered, _, count = _run(
+    value, count = _run(
         text=[original],
         path=["nothing[*]"],
-        replace=[9],
+        value=[9],
     )
-    assert rendered == original
+    assert value == [{"layers": [{"index": 1}]}]
     assert count == 0
 
 
@@ -277,14 +266,14 @@ def test_node_raises_on_count_mismatch():
         _run(
             text=['[{"n":1},{"n":2}]'],
             path=["[*].n"],
-            replace=[1, 2, 3],
+            value=[1, 2, 3],
         )
 
 
-def test_node_rejects_python_only_replacement():
+def test_node_rejects_python_only_value():
     with pytest.raises(ValueError):
         _run(
             text=['[{"n":1}]'],
             path=["[0].n"],
-            replace=[{1, 2}],
+            value=[{1, 2}],
         )

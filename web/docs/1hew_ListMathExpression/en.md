@@ -7,7 +7,7 @@
 | Parameter | Socket | Type | Default | Range | Description |
 | --------- | ------ | ---- | ------- | ----- | ----------- |
 | `expression` | - | STRING | `a + b` | multiline | The formula, evaluated once per position |
-| `item_1`, `item_2`… | optional | * | - | - | Lists (or single values) in port order. Aliases: `item_1` = `a`, `item_2` = `b`, `item_3` = `c`… |
+| `a`, `b`, `c`… | optional | * | - | - | Lists (or single values); the front end grows one port per letter as they are connected. The port name is the name used in the expression. |
 
 ## Outputs
 
@@ -38,11 +38,11 @@
 ## Typical usage
 
 - Add one to every index: `Text Path Extract` (`layers[*].index`) → `a + 1` → `Text Path Replace` (`layers[*].index`).
-- Add two lists elementwise: `item_1 = [1, 2, 3]`, `item_2 = [10, 20, 30]`, `a + b` gives `[11, 22, 33]`.
-- Scale a list by a single value: `item_2` with one item, `a * b` multiplies every element by it.
+- Add two lists elementwise: `a = [1, 2, 3]`, `b = [10, 20, 30]`, `a + b` gives `[11, 22, 33]`.
+- Scale a list by a single value: `b` with one item, `a * b` multiplies every element by it.
 
 ## Notes
 
-- Aliases follow the port number, not the order of connection: if `item_2` is unconnected, `item_3` is still `c`.
+- Each port keeps its own letter: if `b` is unconnected, `c` is still `c`, so the expression needs no change.
 - The node receives each whole list once (`is_input_list`), so ComfyUI does not run it per element.
 - The expression runs without a sandbox beyond `simpleeval`; keep formulas to arithmetic.

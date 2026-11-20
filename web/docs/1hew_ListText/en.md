@@ -6,7 +6,7 @@
 
 | Parameter | Socket | Type | Default | Range | Description |
 | --------- | ------ | ---- | ------- | ----- | ----------- |
-| `text_list` | optional | * | - | - | Items to decorate; a list, a single value, or nested lists (flattened one level) |
+| `text` | optional | * | - | - | Items to decorate; a list, a single value, or nested lists (flattened one level) |
 | `prefix` | - | STRING | `` | - | Text placed before each item |
 | `suffix` | - | STRING | `` | - | Text placed after each item |
 
@@ -14,11 +14,11 @@
 
 | Output | Type | Description |
 | ------ | ---- | ----------- |
-| `text_list` | STRING list | One decorated string per item, in order |
+| `text` | STRING list | One decorated string per item, in order |
 
 ## Example
 
-| `text_list` | `prefix` | `suffix` | Output |
+| `text` | `prefix` | `suffix` | Output |
 | ----------- | -------- | -------- | ------ |
 | `["cat", "dog"]` | `a ` | ` !` | `["a cat !", "a dog !"]` |
 | `[["x", "y"], "z"]` | `` | `` | `["x", "y", "z"]` |

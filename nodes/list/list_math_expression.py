@@ -5,9 +5,9 @@ ComfyUI's core Math Expression (simpleeval, no arbitrary code). The difference
 is the data: every input is a list, the expression runs once per position, and
 the outputs are lists.
 
-Inputs are named item_1, item_2, ... (the front end adds them on demand). In
-the expression they are addressable as a, b, c, ... in the same order, and
-values is the list of all inputs at the current position.
+Inputs are the letters a, b, c, ... added on demand by Autogrow, exactly as in
+the core node: each letter is the name used in the expression, and values is
+the list of all inputs at the current position.
 
 Alignment, per position:
   * a scalar input is a list of length 1;
@@ -27,8 +27,6 @@ from simpleeval import simple_eval
 from ...utils import make_ui_text
 
 MAX_EXPONENT = 4000
-MAX_INPUTS = 26
-INPUT_PREFIX = "item_"
 
 
 def _variadic_sum(*args):
@@ -112,6 +110,14 @@ def _check_result(result: Any, expression: str) -> float:
 class ListMathExpression(io.ComfyNode):
     @classmethod
     def define_schema(cls) -> io.Schema:
+        # Autogrow with TemplateNames, the same mechanism as the core Math
+        # Expression: the front end grows a, b, c, ... as they are connected,
+        # and each letter is directly the name used in the expression.
+        autogrow = io.Autogrow.TemplateNames(
+            input=io.Custom("*").Input("value"),
+            names=list(string.ascii_lowercase),
+            min=1,
+        )
         return io.Schema(
             node_id="1hew_ListMathExpression",
             display_name="List Math Expression",
@@ -119,14 +125,9 @@ class ListMathExpression(io.ComfyNode):
             # Lists in, lists out: the node receives each whole input list once,
             # so ComfyUI does not run it per element.
             is_input_list=True,
-            accept_all_inputs=True,
             inputs=[
                 io.String.Input("expression", default="a + b", multiline=True),
-                io.Custom("*").Input(
-                    "item_1",
-                    optional=True,
-                    tooltip="第一个列表（别名 a）；后续通过动态端口 item_2、item_3… 接入（别名 b、c…）。",
-                ),
+                io.Autogrow.Input("values", template=autogrow),
             ],
             outputs=[
                 io.Float.Output(display_name="FLOAT", is_output_list=True),
@@ -143,27 +144,23 @@ class ListMathExpression(io.ComfyNode):
     async def execute(
         cls,
         expression,
+        values=None,
         **kwargs: Any,
     ) -> io.NodeOutput:
         expr = _first(expression)
         if not str(expr or "").strip():
             raise ValueError("Expression cannot be empty.")
 
-        names = [key for key in kwargs if key.startswith(INPUT_PREFIX)]
-        names.sort(key=lambda key: int(key[len(INPUT_PREFIX):]))
-        if any(int(key[len(INPUT_PREFIX):]) > MAX_INPUTS for key in names):
-            raise ValueError(f"最多支持 {MAX_INPUTS} 个输入（item_1 … item_{MAX_INPUTS}）")
-
-        # Alias follows the port number (item_3 -> c), so an unconnected port
-        # in the middle never shifts the letters of the ports after it.
+        # Autogrow hands the built inputs over as one mapping (letter -> item).
+        # A plain port, if one ever arrives instead of the mapping, is ignored.
         columns: list[list] = []
         aliases: list[str] = []
-        for name in names:
-            if kwargs[name] is None:
-                continue
-            number = int(name[len(INPUT_PREFIX):])
-            aliases.append(string.ascii_lowercase[number - 1])
-            columns.append(_as_list(kwargs[name]))
+        if isinstance(values, dict):
+            for name in sorted(values):
+                if values[name] is None:
+                    continue
+                aliases.append(name)
+                columns.append(_as_list(values[name]))
         if not columns:
             return io.NodeOutput([], [], [], ui=make_ui_text("0"))
 
