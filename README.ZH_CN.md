@@ -21,6 +21,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 更新日志
 
+**v4.6.1**
+- feat(text)：新增 `Text Path Replace`——`Text Path Extract` 的写入部分：读取时用的路径同时决定新值写到哪里。`replace` 列表与匹配位置一一对应，单个值广播到所有位置；数量不一致直接报错，不会写到别处。`value_type` 复用 `Multi Dict` 的转换，`keys` / `count` 类路径只读，`value` 输出为只含一项的列表，根节点是数组时也不会被下游拆开。
+- feat(text)：`Text Path Extract` 的 `value` 输出改为声明式列表输出并始终返回列表（每项一个匹配，未命中为 `[]`），单个列表值不再被 ComfyUI 的逐项执行拆开。
+- feat(list)：新增 `List Math Expression` 与 `List Text`——把核心 `Math Expression` 逐项应用：语法、函数与结果检查相同，但输入输出均为列表，长度为 1 的输入广播，长度不一致时报错；`List Text` 按 `Text List to String` 的前后缀逐项处理并保持列表。
+- test：覆盖写回路径及其错误情况、列表对齐规则、端口编号别名，以及两个节点的列表输入输出约定。
+- docs：新增 `Text Path Replace`、`List Math Expression`、`List Text` 的中英文文档，并更新两个 README 的节点表与更新日志。
+
 **v4.6.0**
 - feat(multi)：新增 `Multi Dict`、`Multi List`——`Multi Dict` 先按端口顺序合并动态 `dict_X`，再用 `key` / `value` 添加或覆盖一个键（后出现的同名键覆盖前面的，`key` / `value` 最后应用，`value_type` 支持 `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` 转换）；`Multi List` 把动态 `item_X` 合并为数组，支持 `extend` 摊平与 `append` 嵌套；两个节点都同时输出原生 `dict` / `list` 和紧凑 `json` 文本。
 - feat(io)：`Save Text` 的 `text` 改为通配输入，dict/list/数字/布尔可直接保存；`json` 对容器做缩进美化，`txt` / `md` 写美化后的 JSON 文本，`csv` 仍只接受文本；set、tensor、NaN 等非 JSON 值会带路径报错，不再被悄悄转成字符串。
@@ -784,6 +791,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Text Prefix Suffix | 文本前缀后缀器，支持通配符输入的灵活数据格式化，可自定义前缀和后缀 |
 | Text Custom Extract | 文本自定义提取器，从JSON中提取指定键值 |
 | Text Path Extract | 按 `[0].content`、`[-1].bbox[0]`、`values[*].content` 等路径从 JSON 文本、字典或普通文本中取值，用 `keys[*]` / `values[*]` 分别取对象的所有键名 / 所有值（键名未知也能取），用 `.count` / `.length` / `[#]` 计数，输出 auto/json/text/csv 文本、`value` 原值与 `count` 数量 |
+| Text Path Replace | 按 `Text Path Extract` 的路径把值写回 JSON 文本；`replace` 列表与匹配位置一一对应（单个值则广播），支持 `value_type` 类型转换，`value` 输出为列表 |
 | Text System Prompt | 从 `utils/system_prompt/<模型>/[<语言>] <名称>.txt` 中选一条内置系统提示词，原样输出到 `string` 输出；内置 Qwen-Image-2.1 的 `t2i` / `edit`，新增的 `.txt` 重载后会出现在下拉中 |
 | String Ratio GPT Image 2.0 | 从输入图像推断最接近的 GPT 2.0 图像模型支持比例；未连接图像时透传所选比例 |
 | String Ratio Gemini 3.1 Flash Image | 从输入图像推断最接近的 Gemini 3.1 Flash 支持比例；未连接图像时透传所选比例 |
@@ -816,6 +824,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Multi Mask Math Ops | 动态多遮罩运算（交/并/差/异或），支持批次广播与统一尺寸 |
 | Multi Video Stitch | 将动态 `video_X` 输入首尾拼接为一段视频，支持 crop/pad/stretch 尺寸统一、可选 `get_video_size` 参考尺寸，并可配置填充颜色与帧率 |
 | Multi List | 把动态 `item_X` 合并为数组；`extend` 摊平列表/元组一层，`append` 保留嵌套 |
+
+### 📃 列表节点
+| 节点名称 | 功能描述 |
+|---------|----------|
+| List Math Expression | 把核心 Math Expression 逐项应用到列表输入：语法与函数相同，输入输出均为列表（`FLOAT` / `INT` / `BOOL`），长度为 1 的列表广播 |
+| List Text | 为列表每一项添加前后缀并保持列表输出（输入与 `Text List to String` 一致） |
 
 
 ### 📁 IO 节点

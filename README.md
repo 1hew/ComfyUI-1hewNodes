@@ -21,6 +21,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 ## 📜 Changelog
 
+**v4.6.1**
+- feat(text): Add `Text Path Replace` — the write half of `Text Path Extract`: the same path that reads a value says where the new one goes. A `replace` list is applied one-to-one per match and a single value is broadcast; counts that do not match raise instead of writing somewhere else. `value_type` reuses the `Multi Dict` converter, `keys` / `count` paths are read-only, and the `value` output is a one-item list so a root-level array is not split downstream.
+- feat(text): `Text Path Extract`'s `value` port is now a declared list output and always returns a list (one item per match, `[]` when nothing matches), so a single list-valued match is no longer split by ComfyUI's per-item execution.
+- feat(list): Add `List Math Expression` and `List Text` — core `Math Expression` applied element-wise: same grammar, functions and result checks, but lists in and lists out, with length-1 inputs broadcasting and misaligned lengths raising. `List Text` applies the `Text List to String` prefix / suffix per item and keeps a list.
+- test: Cover write-back paths and their error cases, the list alignment rules, port-number aliases, and both nodes' list-in / list-out contracts.
+- docs: Add bilingual docs for `Text Path Replace`, `List Math Expression` and `List Text`, and update both README node tables and changelogs.
+
 **v4.6.0**
 - feat(multi): Add `Multi Dict` and `Multi List` — `Multi Dict` merges dynamic `dict_X` inputs in port order and then adds or overwrites one key from the `key` / `value` sockets (later keys win, the key/value pair is applied last, and a `value_type` converter handles `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null`), while `Multi List` combines dynamic items into an array with `extend` / `append` modes; both nodes expose native `dict` / `list` and compact `json` outputs.
 - feat(io): `Save Text` now accepts a wildcard `text` input, so dicts, lists, numbers and booleans can be saved directly; `json` pretty-prints containers, `txt` / `md` write pretty JSON text, `csv` stays text-only, and non-JSON values raise path-aware errors instead of being silently stringified.
@@ -784,6 +791,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Text Prefix Suffix | Text prefix suffix formatter with wildcard input support for flexible data formatting with custom prefix and suffix |
 | Text Custom Extract | Text custom extractor for extracting specified key values from JSON |
 | Text Path Extract | Read values from JSON text, dicts or plain text by path such as `[0].content`, `[-1].bbox[0]` or `values[*].content`, pick the key or value side with `keys[*]` / `values[*]` (so an unknown key name is still addressable), count with `.count` / `.length` / `[#]`, and emit auto/json/text/csv text plus a raw `value` and a `count` output |
+| Text Path Replace | Write values back into JSON text at a path matched by `Text Path Extract`; the `replace` list is applied one-to-one per match (a single value is broadcast), with `value_type` conversion and a list-wrapped `value` output |
 | Text System Prompt | Pick one builtin system prompt from `utils/system_prompt/<model>/[<lang>] <name>.txt` and output its body verbatim on a single `string` output; bundled Qwen-Image-2.1 `t2i` / `edit` prompts, and any new `.txt` you drop in shows up after a reload |
 | String Ratio GPT Image 2.0 | Infer the nearest GPT 2.0 image supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
 | String Ratio Gemini 3.1 Flash Image | Infer the nearest Gemini 3.1 Flash supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
@@ -816,6 +824,12 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Multi Mask Math Ops | Dynamic multi-mask operations (union/intersection/difference/XOR) with batch broadcasting and size alignment |
 | Multi Video Stitch | Stitch dynamic `video_X` inputs end-to-end into one video with crop/pad/stretch size unification, optional `get_video_size` reference size, and configurable pad color / fps |
 | Multi List | Combine dynamic `item_X` inputs into one array; `extend` splices list/tuple inputs one level, `append` keeps them nested |
+
+### 📃 List Nodes
+| Node Name | Description |
+|-----------|-------------|
+| List Math Expression | Core Math Expression applied element-wise to list inputs: same grammar and functions, lists in and lists out (`FLOAT` / `INT` / `BOOL`), length-1 lists broadcast |
+| List Text | Add prefix / suffix to every list item, keeping a list output (same inputs as `Text List to String`) |
 
 
 ### 📁 IO Nodes

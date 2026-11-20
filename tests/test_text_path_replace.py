@@ -70,7 +70,7 @@ def _run(**kwargs):
 # --------------------------------------------------------------------- schema
 
 
-def test_schema_declares_list_input_and_port_order():
+def test_schema_declares_list_input_and_list_value_output():
     schema = NODE.define_schema()
     assert schema["node_id"] == "1hew_TextPathReplace"
     assert schema["display_name"] == "Text Path Replace"
@@ -79,10 +79,15 @@ def test_schema_declares_list_input_and_port_order():
     assert [port["id"] for port in schema["inputs"]] == [
         "text",
         "path",
-        "replacement",
+        "replace",
         "value_type",
         "output_format",
     ]
+    # value is wrapped in a list so a root-level JSON array is not split
+    # by ComfyUI downstream; the port renders as a list endpoint.
+    value_output = schema["outputs"][1]
+    assert value_output["display_name"] == "value"
+    assert value_output["is_output_list"] is True
 
 
 # ------------------------------------------------------------- core behaviour
@@ -195,21 +200,32 @@ def test_empty_path_raises():
 
 def test_node_writes_index_plus_upstream_values():
     text = '{"layers":[{"index":1},{"index":2}]}'
-    rendered, data, count = _run(
+    rendered, value, count = _run(
         text=[text],
         path=["layers[*].index"],
-        replacement=[2, 3],
+        replace=[2, 3],
     )
     assert rendered == '{"layers":[{"index":2},{"index":3}]}'
     assert count == 2
-    assert data["layers"][1]["index"] == 3
+    # value is a one-item list holding the edited document.
+    assert isinstance(value, list) and len(value) == 1
+    assert value[0]["layers"][1]["index"] == 3
+
+
+def test_node_value_is_list_even_when_root_is_array():
+    _, value, _ = _run(
+        text=['[{"n":1}]'],
+        path=["[0].n"],
+        replace=[2],
+    )
+    assert value == [[{"n": 2}]]
 
 
 def test_node_value_type_converts_replacement():
     rendered, _, count = _run(
         text=['[{"n":1}]'],
         path=["[0].n"],
-        replacement=["5"],
+        replace=["5"],
         value_type="int",
     )
     assert count == 1
@@ -220,7 +236,7 @@ def test_node_value_type_dict_parses_json_text():
     rendered, _, _ = _run(
         text=['[{"n":1}]'],
         path=["[0].n"],
-        replacement=['{"k": 1}'],
+        replace=['{"k": 1}'],
         value_type="dict",
     )
     assert rendered == '[{"n":{"k":1}}]'
@@ -230,7 +246,7 @@ def test_node_keeps_integers_without_float_suffix():
     rendered, _, _ = _run(
         text=['[{"n":1}]'],
         path=["[0].n"],
-        replacement=[3],
+        replace=[3],
     )
     assert rendered == '[{"n":3}]'
 
@@ -239,7 +255,7 @@ def test_node_pretty_output_is_indented():
     rendered, _, _ = _run(
         text=['[{"n":1}]'],
         path=["[0].n"],
-        replacement=[2],
+        replace=[2],
         output_format="pretty",
     )
     assert rendered == '[\n  {\n    "n": 2\n  }\n]'
@@ -250,7 +266,7 @@ def test_node_no_match_returns_original_text_and_zero():
     rendered, _, count = _run(
         text=[original],
         path=["nothing[*]"],
-        replacement=[9],
+        replace=[9],
     )
     assert rendered == original
     assert count == 0
@@ -261,7 +277,7 @@ def test_node_raises_on_count_mismatch():
         _run(
             text=['[{"n":1},{"n":2}]'],
             path=["[*].n"],
-            replacement=[1, 2, 3],
+            replace=[1, 2, 3],
         )
 
 
@@ -270,5 +286,5 @@ def test_node_rejects_python_only_replacement():
         _run(
             text=['[{"n":1}]'],
             path=["[0].n"],
-            replacement=[{1, 2}],
+            replace=[{1, 2}],
         )

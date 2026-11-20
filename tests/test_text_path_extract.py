@@ -111,6 +111,8 @@ def test_schema_starts_with_text_and_defaults_to_every_item():
 
     assert schema["outputs"][0]["type"] == "STRING"
     assert schema["outputs"][1]["type"] == "*"
+    # value is always a list output, so the port renders as a list endpoint.
+    assert schema["outputs"][1]["is_output_list"] is True
     assert schema["outputs"][2]["type"] == "INT"
     assert schema["outputs"][2]["display_name"] == "count"
 
@@ -121,7 +123,7 @@ def test_schema_starts_with_text_and_defaults_to_every_item():
 def test_index_then_key():
     output = _run(text=SAMPLE, path="[0].content")
     assert output[0] == "犀牛"
-    assert output[1] == "犀牛"
+    assert output[1] == ["犀牛"]
 
 
 def test_negative_index_and_nested_index():
@@ -132,7 +134,7 @@ def test_negative_index_and_nested_index():
 def test_bbox_renders_as_json_by_default():
     output = _run(text=SAMPLE, path="[1].bbox")
     assert output[0] == "[508,679,1000,953]"
-    assert output[1] == [508, 679, 1000, 953]
+    assert output[1] == [[508, 679, 1000, 953]]
 
 
 def test_output_formats():
@@ -229,7 +231,7 @@ def test_object_index_follows_python_rules():
     data = '{"a": 1, "b": 2, "c": 3}'
     assert _run(text=data, path="[0]")[0] == "1"
     assert _run(text=data, path="[-1]")[0] == "3"
-    assert _run(text=data, path="[1]")[1] == 2
+    assert _run(text=data, path="[1]")[1] == [2]
     assert _run(text=data, path="[3]", fallback="N/A")[0] == "N/A"
     assert _run(text=data, path="[-4]", fallback="N/A")[0] == "N/A"
     # Objects and lists mix at any depth.
@@ -324,7 +326,7 @@ def test_count_operator_paths():
     assert _run(text=SAMPLE, path="[*].content.count")[0] == "3"
     assert _run(text=SAMPLE, path="[*].content.length")[0] == "3"
     assert _run(text=SAMPLE, path="[0].bbox[#]")[0] == "4"
-    assert _run(text=SAMPLE, path="[0].bbox.count")[1] == 4
+    assert _run(text=SAMPLE, path="[0].bbox.count")[1] == [4]
     assert _run(text='{"a": [1, 2, 3]}', path="a.size")[0] == "3"
 
 
@@ -399,13 +401,13 @@ def test_double_encoded_json_string_is_unwrapped():
 
 def test_plain_text_passes_through_with_an_empty_path():
     assert _run(text="你好，世界", path="")[0] == "你好，世界"
-    assert _run(text="你好", path="")[1] == "你好"
+    assert _run(text="你好", path="")[1] == ["你好"]
 
 
 def test_missing_path_returns_fallback():
     output = _run(text=SAMPLE, path="[9].content", fallback="N/A")
     assert output[0] == "N/A"
-    assert output[1] == "N/A"
+    assert output[1] == []
 
 
 def test_empty_input_returns_fallback():
@@ -414,7 +416,7 @@ def test_empty_input_returns_fallback():
     assert _run(text="   ", path="[0].content", fallback="none")[0] == "none"
 
 
-def test_parser_exception_returns_fallback_on_both_outputs(monkeypatch):
+def test_parser_exception_returns_fallback_text_and_empty_value(monkeypatch):
     node_module = sys.modules[NODE.__module__]
 
     def boom(*_args, **_kwargs):
@@ -423,7 +425,7 @@ def test_parser_exception_returns_fallback_on_both_outputs(monkeypatch):
     monkeypatch.setattr(node_module, "query_all", boom)
     output = _run(text=SAMPLE, path="[*].content", fallback="N/A")
     assert output[0] == "N/A"
-    assert output[1] == "N/A"
+    assert output[1] == []
     assert output[2] == 0
 
 

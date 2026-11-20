@@ -40,7 +40,10 @@ class TextPathExtract(io.ComfyNode):
             ],
             outputs=[
                 io.String.Output(display_name="text"),
-                io.Custom("*").Output(display_name="value"),
+                # value is always a list (one item per match, [] when nothing
+                # matches) so the port shows as a list and a single list-valued
+                # match is never split by ComfyUI's per-item execution.
+                io.Custom("*").Output(display_name="value", is_output_list=True),
                 io.Int.Output(display_name="count"),
             ],
         )
@@ -57,19 +60,18 @@ class TextPathExtract(io.ComfyNode):
         fallback = "" if fallback is None else str(fallback)
 
         if text is None or (isinstance(text, str) and not text.strip()):
-            return io.NodeOutput(fallback, fallback, 0, ui=make_ui_text("0"))
+            return io.NodeOutput(fallback, [], 0, ui=make_ui_text("0"))
 
         try:
             matches = query_all(text, path)
         except Exception as exc:
             print(f"text_path_extract error: {exc}")
-            # Keep both outputs on the declared fallback. Returning None on the
-            # value port made downstream nodes receive an unexpected type while
-            # the text port already reported the fallback.
-            return io.NodeOutput(fallback, fallback, 0, ui=make_ui_text("0"))
+            # The text port reports the declared fallback; the value port is an
+            # empty list because the value port is a list output.
+            return io.NodeOutput(fallback, [], 0, ui=make_ui_text("0"))
 
         if not matches:
-            return io.NodeOutput(fallback, fallback, 0, ui=make_ui_text("0"))
+            return io.NodeOutput(fallback, [], 0, ui=make_ui_text("0"))
 
         if len(matches) == 1:
             value = matches[0]
@@ -80,7 +82,7 @@ class TextPathExtract(io.ComfyNode):
                 count = value
             return io.NodeOutput(
                 format_value(value, output_format),
-                value,
+                [value],
                 count,
                 ui=make_ui_text(str(count)),
             )

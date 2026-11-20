@@ -7,6 +7,7 @@ app.registerExtension({
             "1hew_MultiStringJoin": { base: "string_", addType: "STRING", select: null, initial: 1 },
             "1hew_MultiDict": { base: "dict_", addType: "*", select: null, initial: 1, trailing: ["key", "value"] },
             "1hew_MultiList": { base: "item_", addType: "*", select: null, initial: 1 },
+            "1hew_ListMathExpression": { base: "item_", addType: "*", select: null, initial: 1, max: 26 },
             "1hew_MultiImageBatch": { base: "image_", addType: "IMAGE", select: null, initial: 1 },
             "1hew_MultiImageList": { base: "image_", addType: "IMAGE", select: null, initial: 1 },
             "1hew_MultiImageOverlay": { base: "image_", addType: "IMAGE", select: null, initial: 1 },
