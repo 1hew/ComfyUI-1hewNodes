@@ -18,7 +18,7 @@ def run(**kwargs):
     return asyncio.run(Node.execute(**kwargs))
 
 
-def test_schema_declares_typed_text_inputs_and_one_output():
+def test_schema_declares_typed_inputs_and_two_outputs():
     schema = Node.define_schema()
     assert schema["node_id"] == "1hew_MultiDict"
     assert schema["display_name"] == "Multi Dict"
@@ -29,9 +29,10 @@ def test_schema_declares_typed_text_inputs_and_one_output():
 
     ports = {item["id"]: item for item in schema["inputs"]}
     assert set(ports) == {
-        "dict_1", "key", "key_type", "value", "value_type", "output_type"
+        "dict_1", "key", "key_type", "value", "value_type"
     }
-    assert ports["dict_1"]["type"] == "*"
+    # dict sockets are typed DICT, not the wildcard.
+    assert ports["dict_1"]["type"] == "DICT"
     assert ports["dict_1"]["optional"] is True
     # key / value are typed widgets, not sockets; value is single-line.
     assert ports["key"]["type"] == "STRING"
@@ -41,20 +42,16 @@ def test_schema_declares_typed_text_inputs_and_one_output():
     assert ports["value_type"]["options"] == [
         "auto", "string", "int", "float", "boolean", "dict", "list", "json", "null",
     ]
-    assert ports["output_type"]["options"] == ["dict", "json"]
-    assert ports["output_type"]["default"] == "dict"
-
-    # Single data output, its value chosen by output_type.
-    assert [item["display_name"] for item in schema["outputs"]] == ["data"]
-    assert schema["outputs"][0]["type"] == "*"
+    # Two outputs, both always filled: native dict plus compact json.
+    assert [item["display_name"] for item in schema["outputs"]] == ["dict", "json"]
+    assert [item["type"] for item in schema["outputs"]] == ["DICT", "STRING"]
 
 
-def test_output_type_switches_between_dict_and_json():
-    out = run(dict_1={"a": 1}, output_type="dict")
+def test_both_outputs_are_filled():
+    out = run(dict_1={"a": 1})
     assert out[0] == {"a": 1}
-    out = run(dict_1={"a": 1}, output_type="json")
-    assert out[0] == '{"a":1}'
-    assert json.loads(out[0]) == {"a": 1}
+    assert out[1] == '{"a":1}'
+    assert json.loads(out[1]) == out[0]
 
 
 def test_auto_keeps_text_as_text():
@@ -119,8 +116,9 @@ def test_key_and_value_are_applied_after_dicts():
 
 
 def test_no_inputs_produces_empty_object():
-    assert run(output_type="dict")[0] == {}
-    assert run(output_type="json")[0] == "{}"
+    out = run()
+    assert out[0] == {}
+    assert out[1] == "{}"
 
 
 def test_empty_key_only_merges_dicts():
@@ -140,5 +138,5 @@ def test_invalid_inputs_are_rejected():
 
 
 def test_json_output_round_trips():
-    out = run(dict_1={"b": [1, None]}, key="a", value='{"c": true}', value_type="dict", output_type="json")
-    assert json.loads(out[0]) == {"b": [1, None], "a": {"c": True}}
+    out = run(dict_1={"b": [1, None]}, key="a", value='{"c": true}', value_type="dict")
+    assert json.loads(out[1]) == {"b": [1, None], "a": {"c": True}}

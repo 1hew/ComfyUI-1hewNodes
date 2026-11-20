@@ -33,12 +33,14 @@ def test_schema_declares_mode_and_dynamic_items():
     assert ports["any_1"]["type"] == "*"
     assert ports["any_1"]["optional"] is True
 
-    # Single data output, its value chosen by output_type.
-    assert [item["display_name"] for item in schema["outputs"]] == ["data"]
+    # Two outputs: the whole array plus its compact JSON text. The list port
+    # is a declared list output, so it renders with the list-styled socket.
+    assert [item["display_name"] for item in schema["outputs"]] == ["list", "json"]
     assert schema["outputs"][0]["type"] == "*"
+    assert schema["outputs"][0]["is_output_list"] is True
+    assert schema["outputs"][1]["type"] == "STRING"
     ports = {item["id"]: item for item in schema["inputs"]}
-    assert ports["output_type"]["options"] == ["list", "json"]
-    assert ports["output_type"]["default"] == "list"
+    assert "output_type" not in ports
 
 
 def test_extend_splices_list_inputs_one_level():
@@ -67,7 +69,7 @@ def test_extend_is_one_level_only():
 def test_none_inputs_are_skipped():
     assert run(any_1=None, any_2=1)[0] == [1]
     assert run()[0] == []
-    assert run(output_type="json")[0] == "[]"
+    assert run()[1] == "[]"
 
 
 def test_invalid_mode_is_rejected():
@@ -75,9 +77,8 @@ def test_invalid_mode_is_rejected():
         run(mode="add", any_1=1)
 
 
-def test_output_type_switches_between_list_and_json():
-    values = run(any_1=[1, None], any_2={"a": [2]})
-    assert values[0] == [1, None, {"a": [2]}]
-    text = run(any_1=[1, None], any_2={"a": [2]}, output_type="json")
-    assert isinstance(text[0], str)
-    assert json.loads(text[0]) == values[0]
+def test_both_outputs_are_filled():
+    out = run(any_1=[1, None], any_2={"a": [2]})
+    assert out[0] == [1, None, {"a": [2]}]
+    assert isinstance(out[1], str)
+    assert json.loads(out[1]) == out[0]

@@ -41,7 +41,7 @@ class MultiDict(io.ComfyNode):
             # Dynamic dict_2..N sockets are not declared in the schema.
             accept_all_inputs=True,
             inputs=[
-                io.Custom("*").Input(
+                io.Custom("DICT").Input(
                     "dict_1",
                     optional=True,
                     tooltip=(
@@ -86,15 +86,10 @@ class MultiDict(io.ComfyNode):
                         "json 解析任意 JSON 值；null 强制输出 null。"
                     ),
                 ),
-                io.Combo.Input(
-                    "output_type",
-                    options=["dict", "json"],
-                    default="dict",
-                    tooltip="dict 输出原生字典，json 输出紧凑 JSON 文本。",
-                ),
             ],
             outputs=[
-                io.Custom("*").Output(display_name="data"),
+                io.Custom("DICT").Output(display_name="dict"),
+                io.String.Output(display_name="json"),
             ],
         )
 
@@ -102,7 +97,6 @@ class MultiDict(io.ComfyNode):
     async def execute(
         cls,
         value_type: Any = "auto",
-        output_type: Any = "dict",
         key: Any = "",
         key_type: Any = "string",
         value: Any = "",
@@ -124,9 +118,7 @@ class MultiDict(io.ComfyNode):
             print("[1hewNodes][Multi Dict] key 为空，value 已忽略")
 
         text = json_text(payload)
-        if str(as_text(output_type)).strip().lower() == "json":
-            return io.NodeOutput(text, ui=make_ui_text(text))
-        return io.NodeOutput(payload, ui=make_ui_text(text))
+        return io.NodeOutput(payload, text, ui=make_ui_text(text))
 
     @staticmethod
     def _resolve_key(key: Any, key_type: Any) -> str:

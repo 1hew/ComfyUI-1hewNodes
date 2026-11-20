@@ -22,6 +22,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ## 📜 更新日志
 
 **v4.6.1**
+- refactor(data)：`Text Path Extract` / `Text Path Replace` 改名为 `Data Path Extract` / `Data Path Replace`，路径参数 `json_path` 改为 `data_path`；旧 node_id 已登记替换映射，旧工作流可正常加载。
+- refactor(data)：`Multi Dict` 的输入改为 `DICT` 类型端口，`Multi List` 的输出 `list` 使用列表样式端口；两者都取消 `output_type`，改为同时输出两个端口（`dict` / `list` 与 `json`）。
 - refactor(data)：`Text Path Extract` 与 `Text Path Replace` 的 `path` 改名为 `json_path`，避免与文件路径混淆；`Text Path Extract` 新增 `output_type`（`list` / `json`）；`List Text` 的通配端口两侧都改名为 `text_list`，因为 ComfyUI 只在输出端口显示列表样式。
 - refactor(data)：`Multi Dict` 与 `Multi List` 改为单一 `data` 输出，由 `output_type` 切换类型；`Multi Dict` 的 `key` / `value` 改为直接输入并新增 `key_type`。
 - refactor(data)：`Text Path Replace` 改为写入直接输入的值——移除连线端口与 `is_input_list`，只留单行 `value` 输入框，该值广播到所有匹配位置。
@@ -832,10 +834,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🗂️ 数据节点
 | 节点名称 | 功能描述 |
 |---------|----------|
-| Multi Dict | 先按端口顺序合并动态 `dict_X`，再添加或覆盖一个键值对（`key` / `value` 直接输入）；`key_type` 决定数字键如何书写，`value_type` 转换值；输出只有一个 `data`，类型由 `output_type` 决定（`dict` 或紧凑 `json`） |
-| Multi List | 把动态 `any_X` 合并为数组；`extend` 摊平列表/元组一层，`append` 保留嵌套；输出只有一个 `data`，类型由 `output_type` 决定（`list` 或紧凑 `json`） |
-| Text Path Extract | 按 `json_path`（如 `[0].content`、`[-1].bbox[0]`、`values[*].content`）从 JSON 文本、字典或普通文本中取值，用 `keys[*]` / `values[*]` 分别取键名 / 值，用 `.count` / `.length` / `[#]` 计数；`value` 始终是列表，`output_type` 选择原生值或紧凑 JSON |
-| Text Path Replace | 按 `Text Path Extract` 的路径把一个值写回 JSON 文本；值直接输入并由 `value_type` 转换，匹配多处时广播到所有位置；`value` 输出编辑后的文档列表 |
+| Multi Dict | 先按端口顺序合并动态 `dict_X`（`DICT` 类型端口），再添加或覆盖一个键值对（`key` / `value` 直接输入）；`key_type` 决定数字键如何书写，`value_type` 转换值；同时输出原生 `dict` 与紧凑 `json` |
+| Multi List | 把动态 `any_X` 合并为数组；`extend` 摊平列表/元组一层，`append` 保留嵌套；同时输出整个 `list`（列表样式端口）与紧凑 `json` |
+| Data Path Extract | 按 `data_path`（如 `[0].content`、`[-1].bbox[0]`、`values[*].content`）从 JSON 文本、字典或普通文本中取值，用 `keys[*]` / `values[*]` 分别取键名 / 值，用 `.count` / `.length` / `[#]` 计数；`value` 始终是列表，`output_type` 选择原生值或紧凑 JSON |
+| Data Path Replace | 按 `Data Path Extract` 的路径把一个值写回 JSON 文本；值直接输入并由 `value_type` 转换，匹配多处时广播到所有位置；`value` 输出编辑后的文档列表 |
 
 ### 📃 列表节点
 | 节点名称 | 功能描述 |

@@ -22,6 +22,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ## 📜 Changelog
 
 **v4.6.1**
+- refactor(data): Rename `Text Path Extract` / `Text Path Replace` to `Data Path Extract` / `Data Path Replace` with `data_path` replacing `json_path`; the old node IDs are registered as replacements so saved workflows keep loading.
+- refactor(data): `Multi Dict` takes typed `DICT` sockets and `Multi List` keeps the list-styled `list` output; both drop `output_type` and always fill two outputs (`dict` / `list` plus `json`).
 - refactor(data): `Text Path Extract` and `Text Path Replace` rename `path` to `json_path` so it does not read as a file path; `Text Path Extract` gains an `output_type` (`list` / `json`); `List Text` names its wildcard ports `text_list` on both sides, since ComfyUI only styles list sockets on outputs.
 - refactor(data): `Multi Dict` and `Multi List` expose a single `data` output switched by `output_type`; `Multi Dict` takes `key` / `value` as typed widgets with a new `key_type`.
 - refactor(data): `Text Path Replace` writes one typed value instead of a linked one — the socket and `is_input_list` are gone in favour of a single-line `value` box, and that value broadcasts to every match.
@@ -832,10 +834,10 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ### 🗂️ Data Nodes
 | Node Name | Description |
 |-----------|-------------|
-| Multi Dict | Merge dynamic `dict_X` inputs in port order, then add or overwrite one entry typed directly in `key` / `value`; `key_type` decides how a numeric key is written and `value_type` converts the value; a single `data` output follows `output_type` (`dict` or compact `json`) |
-| Multi List | Combine dynamic `any_X` inputs into one array; `extend` splices list/tuple inputs one level, `append` keeps them nested; a single `data` output follows `output_type` (`list` or compact `json`) |
-| Text Path Extract | Read values from JSON text, dicts or plain text by `json_path` such as `[0].content`, `[-1].bbox[0]` or `values[*].content`, pick the key or value side with `keys[*]` / `values[*]`, count with `.count` / `.length` / `[#]`; `value` is always a list, with `output_type` choosing native values or compact JSON |
-| Text Path Replace | Write a value back into JSON text at a path matched by `Text Path Extract`; the value is typed in and converted by `value_type`, and broadcasts to every match; `value` returns the edited document as a list |
+| Multi Dict | Merge dynamic `dict_X` (typed `DICT` sockets) in port order, then add or overwrite one entry typed directly in `key` / `value`; `key_type` decides how a numeric key is written and `value_type` converts the value; outputs both the native `dict` and compact `json` |
+| Multi List | Combine dynamic `any_X` inputs into one array; `extend` splices list/tuple inputs one level, `append` keeps them nested; outputs the whole `list` (list-styled socket) plus compact `json` |
+| Data Path Extract | Read values from JSON text, dicts or plain text by `data_path` such as `[0].content`, `[-1].bbox[0]` or `values[*].content`, pick the key or value side with `keys[*]` / `values[*]`, count with `.count` / `.length` / `[#]`; `value` is always a list, with `output_type` choosing native values or compact JSON |
+| Data Path Replace | Write a value back into JSON text at a path matched by `Data Path Extract`; the value is typed in and converted by `value_type`, and broadcasts to every match; `value` returns the edited document as a list |
 
 ### 📃 List Nodes
 | Node Name | Description |

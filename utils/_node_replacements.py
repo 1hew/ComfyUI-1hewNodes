@@ -17,8 +17,10 @@ from __future__ import annotations
 
 import logging
 
-# old_node_id -> (new_node_id, widget_ids, input_ids)
-LEGACY_NODE_REPLACEMENTS: dict[str, tuple[str, list[str], list[str]]] = {
+# old_node_id -> (new_node_id, old_widget_ids, input_ids)
+# input_ids entries are either a plain id (same name on both sides) or a
+# (new_id, old_id) tuple when the rename also changed the port name.
+LEGACY_NODE_REPLACEMENTS: dict[str, tuple[str, list[str], list]] = {
     # v4.5.0：缩写 Txt 改为完整单词 Text，与类名 / display_name 一致。
     "1hew_SaveTxt": (
         "1hew_SaveText",
@@ -37,6 +39,18 @@ LEGACY_NODE_REPLACEMENTS: dict[str, tuple[str, list[str], list[str]]] = {
         "1hew_LoadText",
         ["file", "index", "include_subdir"],
         ["file", "index", "include_subdir"],
+    ),
+    # 数据节点改名：Text Path → Data Path，路径参数 json_path → data_path。
+    # (new_id, old_id) 表示端口同时也改了名。
+    "1hew_TextPathExtract": (
+        "1hew_DataPathExtract",
+        ["text", "json_path", "output_type"],
+        ["text", ("data_path", "json_path"), "output_type"],
+    ),
+    "1hew_TextPathReplace": (
+        "1hew_DataPathReplace",
+        ["text", "json_path", "value", "value_type"],
+        ["text", ("data_path", "json_path"), "value", "value_type"],
     ),
 }
 
@@ -70,7 +84,11 @@ async def register_legacy_node_replacements() -> None:
                     old_node_id=old_node_id,
                     old_widget_ids=list(widget_ids),
                     input_mapping=[
-                        {"new_id": input_id, "old_id": input_id}
+                        (
+                            {"new_id": input_id, "old_id": input_id}
+                            if isinstance(input_id, str)
+                            else {"new_id": input_id[0], "old_id": input_id[1]}
+                        )
                         for input_id in input_ids
                     ],
                 )

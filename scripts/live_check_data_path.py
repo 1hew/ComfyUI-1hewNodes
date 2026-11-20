@@ -4,7 +4,7 @@ Submits small prompts through the HTTP API and compares the executed outputs
 with what the nodes promise in their docs. PreviewAny is used as the sink so
 the outputs show up in /history without writing files.
 
-    python scripts/live_check_text_path.py [base_url]
+    python scripts/live_check_data_path.py [base_url]
 """
 
 import json
@@ -88,7 +88,7 @@ def check(label, actual, expected):
 
 EXTRACT_INPUTS = {
     "text": '{"layers":[{"index":1},{"index":2},{"index":3}]}',
-    "json_path": "layers[*].index",
+    "data_path": "layers[*].index",
 }
 
 
@@ -96,7 +96,7 @@ def main():
     results = []
 
     # 1. Extract: one list item per match, on the value port.
-    graph = {"1": {"class_type": "1hew_TextPathExtract", "inputs": dict(EXTRACT_INPUTS)}}
+    graph = {"1": {"class_type": "1hew_DataPathExtract", "inputs": dict(EXTRACT_INPUTS)}}
     sink(graph, "1", 1)
     results.append(
         check("Extract value -> ['1','2','3']", shown(run(graph), "preview"), ["1", "2", "3"])
@@ -105,7 +105,7 @@ def main():
     # 2. Extract: a single match still arrives as a list.
     graph = {
         "1": {
-            "class_type": "1hew_TextPathExtract",
+            "class_type": "1hew_DataPathExtract",
             "inputs": dict(EXTRACT_INPUTS, path="layers[0].index"),
         }
     }
@@ -116,7 +116,7 @@ def main():
     # renders an empty list as "None", so the count port is the reliable check.
     graph = {
         "1": {
-            "class_type": "1hew_TextPathExtract",
+            "class_type": "1hew_DataPathExtract",
             "inputs": dict(EXTRACT_INPUTS, path="nothing[*].index"),
         }
     }
@@ -125,7 +125,7 @@ def main():
 
     # 4. List Math Expression: element-wise a + 1 on the INT port.
     graph = {
-        "1": {"class_type": "1hew_TextPathExtract", "inputs": dict(EXTRACT_INPUTS)},
+        "1": {"class_type": "1hew_DataPathExtract", "inputs": dict(EXTRACT_INPUTS)},
         "3": {
             "class_type": "1hew_ListMathExpression",
             "inputs": {"expression": "a + 1", "a": ["1", 0]},
@@ -140,10 +140,10 @@ def main():
     # 5. Replace writes one typed value, broadcast to every match.
     graph = {
         "4": {
-            "class_type": "1hew_TextPathReplace",
+            "class_type": "1hew_DataPathReplace",
             "inputs": {
                 "text": '{"layers":[{"index":1},{"index":2},{"index":3}]}',
-                "json_path": "layers[*].index",
+                "data_path": "layers[*].index",
                 "value": "9",
                 "value_type": "int",
             },
@@ -163,10 +163,10 @@ def main():
     # 6. List Text: prefix and suffix per item, still a list.
     graph = {
         "1": {
-            "class_type": "1hew_TextPathExtract",
+            "class_type": "1hew_DataPathExtract",
             "inputs": {
                 "text": '["cat","dog"]',
-                "json_path": "[*]",
+                "data_path": "[*]",
             },
         },
         "5": {
@@ -182,10 +182,10 @@ def main():
     # 7. Replace: broadcast a text value to every match.
     graph = {
         "4": {
-            "class_type": "1hew_TextPathReplace",
+            "class_type": "1hew_DataPathReplace",
             "inputs": {
                 "text": '[{"content":"a"},{"content":"b"}]',
-                "json_path": "[*].content",
+                "data_path": "[*].content",
                 "value": "X",
                 "value_type": "string",
             },

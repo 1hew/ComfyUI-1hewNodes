@@ -1,6 +1,6 @@
 # Multi List - Combine elements into an array
 
-**Node purpose:** `Multi List` combines dynamic `any_1..N` inputs into one JSON array in port order. `extend` matches Python `list.extend` and splices list/tuple inputs one level; `append` matches `list.append` and keeps each input as one element, with lists staying nested. It has a single `data` output whose type follows `output_type` (`list` or compact `json`).
+**Node purpose:** `Multi List` combines dynamic `any_1..N` inputs into one JSON array in port order. `extend` matches Python `list.extend` and splices list/tuple inputs one level; `append` matches `list.append` and keeps each input as one element, with lists staying nested. Both outputs are always available: `list` gives the whole array (list-styled socket) and `json` the compact JSON text.
 
 ## Inputs
 
@@ -8,13 +8,13 @@
 | --------- | ------ | ---- | ------- | ----- | ----------- |
 | `mode` | - | COMBO | `extend` | `extend` / `append` | `extend` splices list/tuple inputs; `append` keeps them nested. |
 | `any_1`, `any_2`… | optional | * | - | - | Elements combined in numeric socket order; more connect through dynamic sockets. |
-| `output_type` | - | COMBO | `list` | `list` / `json` | `list` outputs the native array, `json` outputs compact JSON text. |
 
 ## Outputs
 
 | Output | Type | Description |
 | ------ | ---- | ----------- |
-| `data` | * | The combined array, or compact JSON text when `output_type=json`. Feed it to another `Multi List` or `Multi Dict`. |
+| `list` | * (list) | The combined array, ready for another `Multi List`. |
+| `json` | STRING | Compact JSON array text. |
 
 ## `mode` semantics
 

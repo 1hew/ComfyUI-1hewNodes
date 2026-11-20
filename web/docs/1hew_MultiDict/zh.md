@@ -1,6 +1,6 @@
 # Multi Dict - 合并字典并追加键值
 
-**节点功能：** `Multi Dict` 先按端口顺序合并动态 `dict_1..N`，再添加或覆盖一个键值对。键和值都直接输入（`key` / `value`），不需要连线；`key_type` 决定数字键如何书写，`value_type` 决定值如何转换。输出只有一个 `data`，类型由 `output_type` 决定（`dict` 或紧凑 `json`）。
+**节点功能：** `Multi Dict` 先按端口顺序合并动态 `dict_1..N`，再添加或覆盖一个键值对。键和值都直接输入（`key` / `value`），不需要连线；`key_type` 决定数字键如何书写，`value_type` 决定值如何转换。两个输出同时可用：`dict` 输出原生对象，`json` 输出紧凑 JSON 文本。
 
 ## 输入
 
@@ -11,13 +11,13 @@
 | `key_type` | - | COMBO | `string` | `string` / `auto` | `string` 原样使用输入文本；`auto` 会规范化数字/布尔，`1.0` 与 `1` 落到同一个键。 |
 | `value` | - | STRING | `` | - | 最后添加/覆盖的值，按 `value_type` 转换；`key` 为空时忽略；留空则写入 `null`。 |
 | `value_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` | 作用于 `value` 的类型转换；见下表。 |
-| `output_type` | - | COMBO | `dict` | `dict` / `json` | `dict` 输出原生对象，`json` 输出紧凑 JSON 文本。 |
 
 ## 输出
 
 | 输出名称 | 数据类型 | 描述 |
 |---------|----------|------|
-| `data` | * | 合并后的字典；`output_type=json` 时是紧凑 JSON 文本。可接下一个 `Multi Dict` 的 `dict_1`、`Save Text` 或 LLM 文本节点。 |
+| `dict` | DICT | 合并后的字典，可接下一个 `Multi Dict` 的 `dict_1`。 |
+| `json` | STRING | 紧凑 JSON 文本，可接 `Save Text` 或 LLM 文本节点。 |
 
 ## `value_type` 转换
 

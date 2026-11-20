@@ -1,15 +1,15 @@
-# Text Path Replace - 按路径写回替换值
+# Data Path Replace - 按路径写回替换值
 
-**节点功能：** `Text Path Replace` 把值写回 JSON 类文本中路径匹配到的位置。它是 `Text Path Extract` 的写入部分：读取时用的路径，同时也决定新值写到哪里。要写入的值直接填在 `value` 里，按 `value_type` 转成目标类型，本节点只负责放置。
+**节点功能：** `Data Path Replace` 把值写回 JSON 类文本中路径匹配到的位置。它是 `Data Path Extract` 的写入部分：读取时用的路径，同时也决定新值写到哪里。要写入的值直接填在 `value` 里，按 `value_type` 转成目标类型，本节点只负责放置。
 
-与 `Text Path Extract` 一样，本节点不做渲染：编辑后的文档通过 `value` 端口以只有一项的列表输出，排版交给下游——`Save Text` 写文件、`List Text` 加前后缀，或任意 JSON 处理节点。
+与 `Data Path Extract` 一样，本节点不做渲染：编辑后的文档通过 `value` 端口以只有一项的列表输出，排版交给下游——`Save Text` 写文件、`List Text` 加前后缀，或任意 JSON 处理节点。
 
 ## 输入
 
 | 参数名称 | 插槽 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | ---- | -------- | ------ | -------- | ---- |
 | `text` | - | STRING | `` | 多行 | 要编辑的文档：JSON、代码块 JSON 或 Python 字面量 |
-| `json_path` | - | STRING | `values[*]` | - | 写入位置的路径，语法与 `Text Path Extract` 相同 |
+| `data_path` | - | STRING | `values[*]` | - | 写入位置的路径，语法与 `Data Path Extract` 相同 |
 | `value` | - | STRING | `` | - | 要写入的值，直接输入，按 `value_type` 转换。单个值会广播到所有匹配位置 |
 | `value_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` | 作用于 `value`，含义与 `Multi Dict` 相同。`auto` 下文本就是文本，需要数字请选 `int` / `float` |
 

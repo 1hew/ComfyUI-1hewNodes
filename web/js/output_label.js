@@ -108,7 +108,7 @@ const CONFIGS = {
         delimiter: null,
         slots: [{ out: 0, value: 0, suffix: "count" }],
     },
-    "1hew_TextPathExtract": {
+    "1hew_DataPathExtract": {
         base: ["value", "count"],
         delimiter: null,
         slots: [{ out: 1, value: 0, suffix: "count" }],

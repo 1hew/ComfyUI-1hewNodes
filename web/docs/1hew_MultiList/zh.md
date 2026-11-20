@@ -1,6 +1,6 @@
 # Multi List - 把多个元素合并成列表
 
-**节点功能：** `Multi List` 按端口顺序把动态 `any_1..N` 合并成一个 JSON 数组。`extend` 对应 Python 的 `list.extend`：把列表/元组输入摊平一层；`append` 对应 `list.append`：每个输入作为一个元素，列表保持嵌套。输出只有一个 `data`，类型由 `output_type` 决定（`list` 或紧凑 `json`）。
+**节点功能：** `Multi List` 按端口顺序把动态 `any_1..N` 合并成一个 JSON 数组。`extend` 对应 Python 的 `list.extend`：把列表/元组输入摊平一层；`append` 对应 `list.append`：每个输入作为一个元素，列表保持嵌套。两个输出同时可用：`list` 输出整个数组（列表样式端口），`json` 输出紧凑 JSON 文本。
 
 ## 输入
 
@@ -8,13 +8,13 @@
 | -------- | -------- | -------- | ------ | -------- | ---- |
 | `mode` | - | COMBO | `extend` | `extend` / `append` | `extend` 摊平列表/元组一层；`append` 保留嵌套。 |
 | `any_1`、`any_2`… | 可选 | * | - | - | 待合并的元素，按端口编号顺序；后续通过动态端口接入。 |
-| `output_type` | - | COMBO | `list` | `list` / `json` | `list` 输出原生数组，`json` 输出紧凑 JSON 文本。 |
 
 ## 输出
 
 | 输出名称 | 数据类型 | 描述 |
 |---------|----------|------|
-| `data` | * | 合并后的数组；`output_type=json` 时是紧凑 JSON 文本。可继续接入另一个 `Multi List` 或 `Multi Dict`。 |
+| `list` | *（列表） | 合并后的整个数组，可继续接入另一个 `Multi List`。 |
+| `json` | STRING | 紧凑 JSON 数组文本。 |
 
 ## `mode` 语义
 

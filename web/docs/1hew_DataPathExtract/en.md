@@ -1,6 +1,6 @@
-# Text Path Extract - Read values by path
+# Data Path Extract - Read values by path
 
-**Node Purpose:** `Text Path Extract` reads values out of the `text` widget with a path expression. The text can be JSON, JSON inside a Markdown fence, a Python literal, relaxed JSON (single quotes, trailing commas, True/False/None, unquoted keys) or plain text. The default path `values[*]` splits the whole payload into its values; paths such as `[0].content`, `[-1].bbox[0]`, `data.items[0].zh`, `values[0].ids` and `keys[*]` pick the matching content.
+**Node Purpose:** `Data Path Extract` reads values out of the `text` widget with a path expression. The text can be JSON, JSON inside a Markdown fence, a Python literal, relaxed JSON (single quotes, trailing commas, True/False/None, unquoted keys) or plain text. The default path `values[*]` splits the whole payload into its values; paths such as `[0].content`, `[-1].bbox[0]`, `data.items[0].zh`, `values[0].ids` and `keys[*]` pick the matching content.
 
 The node only collects values: `value` is always a list with one entry per match. Rendering that list into text is the next node's job, so `List Text`, `Text List to String` and `Save Text` can each format it the way they need.
 
@@ -9,7 +9,7 @@ The node only collects values: `value` is always a list with one entry per match
 | Name | Type | Default | Range | Description |
 | ---- | ---- | ------- | ----- | ----------- |
 | `text` | STRING | `` | multiline | The payload: JSON / JSON-like / plain text |
-| `json_path` | STRING | `values[*]` | - | JSON path; `values[*]` means every value, an empty path means the whole payload. Named `json_path` rather than `path` so it does not read as a file path |
+| `data_path` | STRING | `values[*]` | - | JSON path; `values[*]` means every value, an empty path means the whole payload. Named `data_path` rather than `path` so it does not read as a file path |
 | `output_type` | COMBO | `list` | `list` / `json` | `list` keeps native values, `json` emits one compact JSON array |
 
 ## Outputs
@@ -55,7 +55,7 @@ Full-width `【】`, `“”` and `‘’` are normalised, so a Chinese IME typi
 - Every bbox: `json_path=values[*].bbox` gives `[[184,410,845,716],[508,679,1000,953],[690,264,992,588]]`.
 - The amount: wire the `count` output, or use the path `values[*].content.count`.
 - Read a reference image whose key name varies (`reference_image_1` or `image_1`): `json_path=values[0].ids` takes the first image's ids; with several images `values[0]` / `values[-1]` take the first / last, `values[*].ids` takes all of them, and `keys[0]` shows which key was hit.
-- Add one to every index and write it back: `value` → `List Math Expression` (`a + 1`) → `Text Path Replace`.
+- Add one to every index and write it back: `value` → `List Math Expression` (`a + 1`) → `Data Path Replace`.
 - Render the list as text: feed `List Text` (prefix / suffix per item) or `Text List to String` (join with a separator).
 - Save it as a JSON file: feed `Save Text` with `format` set to `json`.
 
@@ -64,7 +64,7 @@ Full-width `【】`, `“”` and `‘’` are normalised, so a Chinese IME typi
 - Blank `text` returns an empty list with `count` 0 and never raises.
 - A missing path also returns an empty list; let downstream handle the empty list.
 - If the parser raises on an unexpected payload, the result is an empty list and `count` 0 (the error is printed to the console), so downstream nodes never receive a type the port does not declare.
-- Plain text has no items to walk, so `values[*]` finds nothing; leave `json_path` empty to pass plain text through unchanged.
+- Plain text has no items to walk, so `values[*]` finds nothing; leave `data_path` empty to pass plain text through unchanged.
 - A single match still arrives as a list (`[value]`), not a bare value; take the first item downstream, or use `List Text`.
 - A real `count` key is not shadowed: if the object has that key its value wins; write `["count"]` to force literal key access. `keys` / `values` (singular too) follow the same rule — a payload that really has a `values` field returns it, and only `["values"]` is guaranteed to be the literal key.
 - An index on an object reads the value at that position, but a real key wins: in `{"0": …}` `[0]` returns the key `"0"`. For a pure position write `values[0]`: the selector produces the value list first, so the index can no longer be intercepted by a key name.

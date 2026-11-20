@@ -1,6 +1,6 @@
-# Text Path Extract - 文本路径取值
+# Data Path Extract - 文本路径取值
 
-**节点功能：** `Text Path Extract` 按路径表达式从 `text` 输入框的内容中取值。内容可以是 JSON 文本、Markdown 代码块包裹的 JSON、Python 字面量、宽松 JSON（单引号、尾随逗号、True/False/None、无引号键）或普通文本。默认路径 `values[*]` 会把整段内容按值展开；用 `[0].content`、`[-1].bbox[0]`、`data.items[0].zh`、`values[0].ids`、`keys[*]` 这样的路径即可取到对应内容。
+**节点功能：** `Data Path Extract` 按路径表达式从 `text` 输入框的内容中取值。内容可以是 JSON 文本、Markdown 代码块包裹的 JSON、Python 字面量、宽松 JSON（单引号、尾随逗号、True/False/None、无引号键）或普通文本。默认路径 `values[*]` 会把整段内容按值展开；用 `[0].content`、`[-1].bbox[0]`、`data.items[0].zh`、`values[0].ids`、`keys[*]` 这样的路径即可取到对应内容。
 
 节点只负责取值：`value` 永远是一个列表，命中几项就有几项。把列表渲染成文字是下游的事，`List Text`、`Text List to String`、`Save Text` 各自按需要排版。
 
@@ -9,7 +9,7 @@
 | 参数名称 | 数据类型 | 默认值 | 取值范围 | 描述 |
 | -------- | -------- | ------ | -------- | ---- |
 | `text` | STRING | `` | 多行 | 要解析的内容：JSON / 类 JSON / 普通文本 |
-| `json_path` | STRING | `values[*]` | - | JSON 取值路径；`values[*]` 表示整段内容的所有值，空字符串表示整段内容本身。命名为 `json_path` 而非 `path`，避免与文件路径混淆 |
+| `data_path` | STRING | `values[*]` | - | JSON 取值路径；`values[*]` 表示整段内容的所有值，空字符串表示整段内容本身。命名为 `data_path` 而非 `path`，避免与文件路径混淆 |
 | `output_type` | COMBO | `list` | `list` / `json` | `list` 输出原生列表（保持值类型）；`json` 输出一个紧凑 JSON 数组文本 |
 
 ## 输出
@@ -55,7 +55,7 @@
 - 取所有 bbox：`json_path=values[*].bbox`，`value` 是 `[[184,410,845,716],[508,679,1000,953],[690,264,992,588]]`。
 - 取数量：直接连 `count` 输出，或把路径写成 `values[*].content.count`。
 - 参考图的键名不确定（可能是 `reference_image_1`，也可能是 `image_1`）：`json_path=values[0].ids` 直接取第一张图的标注；多张并存时 `values[0]` / `values[-1]` 取第一 / 最后一张，`values[*].ids` 取全部，`keys[0]` 能看出命中的是哪个键。
-- 每个索引加 1 再写回：`value` → `List Math Expression`（`a + 1`）→ `Text Path Replace`。
+- 每个索引加 1 再写回：`value` → `List Math Expression`（`a + 1`）→ `Data Path Replace`。
 - 把列表渲染成文字：接 `List Text`（逐项加前后缀）或 `Text List to String`（按分隔符拼接）。
 - 存成 JSON 文件：接 `Save Text`，`format` 选 `json`。
 
@@ -64,7 +64,7 @@
 - `text` 为空或全是空白时返回空列表，`count` 为 0，不会报错。
 - 路径未命中同样返回空列表；下游按空列表处理即可。
 - 解析器遇到无法处理的负载而抛错时返回空列表、`count` 为 0（错误打印到控制台），下游不会收到端口未声明的类型。
-- 普通文本（不是 JSON）没有“项”可遍历，`values[*]` 取不到东西；这时把 `json_path` 留空即可原样取到整段文本。
+- 普通文本（不是 JSON）没有“项”可遍历，`values[*]` 取不到东西；这时把 `data_path` 留空即可原样取到整段文本。
 - 命中 1 项时 `value` 也是列表（`[值]`），不是裸值；需要单个值就用 `List Text` 或索引取第一项。
 - 键名本身叫 `count` 时不会冲突：对象里确实存在该键则优先返回键值；想强制按字面键取值就写成 `["count"]`。`keys` / `values`（含单数写法）同理，payload 里真有 `values` 字段时以字段为准，写 `["values"]` 才是字面键。
 - `[0]` 在对象上取第 n 个值，但真实键优先：`{"0": …}` 里 `[0]` 拿到的是键 `"0"`；要纯按位置取就写 `values[0]`，它先取值列表、再做列表下标，不会再被键名干扰。

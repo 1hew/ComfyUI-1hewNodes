@@ -1,6 +1,6 @@
 # Multi Dict - Merge dicts and add one key/value
 
-**Node purpose:** `Multi Dict` merges dynamic `dict_1..N` inputs in port order and then adds or overwrites one entry. Key and value are typed in directly (`key` / `value`), so no socket is needed; `key_type` decides how a numeric key is written and `value_type` how the value is converted. It has a single `data` output whose type follows `output_type` (`dict` or compact `json`).
+**Node purpose:** `Multi Dict` merges dynamic `dict_1..N` inputs in port order and then adds or overwrites one entry. Key and value are typed in directly (`key` / `value`), so no socket is needed; `key_type` decides how a numeric key is written and `value_type` how the value is converted. Both outputs are always available: `dict` gives the native object and `json` the compact JSON text.
 
 ## Inputs
 
@@ -11,13 +11,13 @@
 | `key_type` | - | COMBO | `string` | `string` / `auto` | `string` keeps the text as written; `auto` normalises a number or boolean, so `1.0` and `1` land on the same key. |
 | `value` | - | STRING | `` | - | Value added or overwritten last, converted by `value_type`. Ignored when `key` is empty; an empty box writes `null`. |
 | `value_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` | Conversion applied to `value`; see below. |
-| `output_type` | - | COMBO | `dict` | `dict` / `json` | `dict` outputs the native object, `json` outputs compact JSON text. |
 
 ## Outputs
 
 | Output | Type | Description |
 | ------ | ---- | ----------- |
-| `data` | * | The merged dict, or compact JSON text when `output_type=json`. Feed it to the next `Multi Dict` `dict_1`, `Save Text`, or an LLM text node. |
+| `dict` | DICT | The merged dict, ready for the next `Multi Dict` `dict_1`. |
+| `json` | STRING | Compact JSON text for `Save Text` or an LLM text node. |
 
 ## `value_type` conversions
 

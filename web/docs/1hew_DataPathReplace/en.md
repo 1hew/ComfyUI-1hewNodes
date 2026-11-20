@@ -1,15 +1,15 @@
-# Text Path Replace - Write values back at a path
+# Data Path Replace - Write values back at a path
 
-**Node purpose:** `Text Path Replace` writes values into JSON-like text at the places a path matches. It is the write half of `Text Path Extract`: the same path that reads a value also says where a new value goes. The value is typed into `value` and converted by `value_type`; this node only places it.
+**Node purpose:** `Data Path Replace` writes values into JSON-like text at the places a path matches. It is the write half of `Data Path Extract`: the same path that reads a value also says where a new value goes. The value is typed into `value` and converted by `value_type`; this node only places it.
 
-Like `Text Path Extract` the node does not render. The edited document leaves through the `value` port as a one-item list, and formatting is the next node's job — `Save Text` to write a file, `List Text` to decorate, or any JSON dump downstream.
+Like `Data Path Extract` the node does not render. The edited document leaves through the `value` port as a one-item list, and formatting is the next node's job — `Save Text` to write a file, `List Text` to decorate, or any JSON dump downstream.
 
 ## Inputs
 
 | Parameter | Socket | Type | Default | Range | Description |
 | --------- | ------ | ---- | ------- | ----- | ----------- |
 | `text` | - | STRING | `` | multiline | The document to edit: JSON, fenced JSON or a Python literal |
-| `json_path` | - | STRING | `values[*]` | - | Path to write to; the same syntax as `Text Path Extract` |
+| `data_path` | - | STRING | `values[*]` | - | Path to write to; the same syntax as `Data Path Extract` |
 | `value` | - | STRING | `` | - | The value to write, typed in directly and converted by `value_type`. A single value is broadcast to every match |
 | `value_type` | - | COMBO | `auto` | `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` | Converts `value`, the same meaning as `Multi Dict`. `auto` keeps text as text, so pick `int` / `float` for numbers |
 

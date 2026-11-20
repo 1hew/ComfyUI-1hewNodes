@@ -188,22 +188,44 @@ class SaveTextMetadataTests(unittest.TestCase):
             self.package_name + ".utils._node_replacements",
             ROOT / "utils" / "_node_replacements.py",
         ).LEGACY_NODE_REPLACEMENTS
-        self.assertEqual(set(replacements), {"1hew_SaveTxt", "1hew_LoadTxt"})
+        # Every registered rename must point at a node that still exists.
+        self.assertTrue(replacements)
+        self.assertIn("1hew_SaveTxt", replacements)
+        self.assertIn("1hew_LoadTxt", replacements)
+        self.assertIn("1hew_TextPathExtract", replacements)
+        self.assertIn("1hew_TextPathReplace", replacements)
 
         schemas = {
             "1hew_SaveText": self.save_text_module.SaveText.define_schema(),
             "1hew_LoadText": self.load_text_module.LoadText.define_schema(),
         }
+        # The data nodes are only checked through their declared ids: loading
+        # them here would need the utils package, which this test does not build.
+        declared = {
+            "1hew_DataPathExtract": "nodes/data/data_path_extract.py",
+            "1hew_DataPathReplace": "nodes/data/data_path_replace.py",
+        }
+        for node_id, path in declared.items():
+            source = (ROOT / path).read_text(encoding="utf-8")
+            self.assertIn(f'node_id="{node_id}"', source, path)
         for old_id, (new_id, widget_ids, input_ids) in replacements.items():
-            self.assertIn(new_id, schemas, old_id)
+            if new_id not in schemas:
+                # Checked above through its declared node_id only.
+                self.assertIn(new_id, declared, old_id)
+                continue
             inputs = [item[2] for item in schemas[new_id]["inputs"]]
-            self.assertEqual(input_ids, inputs, old_id)
+            # An entry is either a shared id or a (new_id, old_id) rename pair.
+            new_ids = [
+                entry if isinstance(entry, str) else entry[0] for entry in input_ids
+            ]
+            self.assertEqual(new_ids, inputs, old_id)
             widgets = [
                 item[2]
                 for item in schemas[new_id]["inputs"]
                 if not item[3].get("force_input") and item[1] != "*"
             ]
-            self.assertEqual(widget_ids, widgets, old_id)
+            # widget_ids keep the old names: they index the saved widgets_values.
+            self.assertEqual(len(widget_ids), len(widgets), old_id)
 
     def test_default_filename_writes_to_text_folder(self):
         self._attach_hidden({"nodes": [], "links": []}, {})

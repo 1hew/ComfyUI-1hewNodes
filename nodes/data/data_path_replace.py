@@ -1,6 +1,6 @@
-"""Text Path Replace: write values back into JSON-like text at a path.
+"""Data Path Replace: write values back into JSON-like text at a path.
 
-It pairs with Text Path Extract: the same path that reads a value also says
+It pairs with Data Path Extract: the same path that reads a value also says
 where a new value goes. Computation stays upstream (List Math Expression,
 Multi Dict, string nodes, ...); this node only places the values.
 
@@ -8,7 +8,7 @@ Multi Dict, string nodes, ...); this node only places the values.
 single item is broadcast to every match. Any other count is an error, so a
 mismatch never silently drops or misplaces values.
 
-Like Text Path Extract the node does not render: the edited document leaves
+Like Data Path Extract the node does not render: the edited document leaves
 through the `value` port as a one-item list, and formatting is the next
 node's job (Save Text, List Text, or a JSON dump).
 """
@@ -36,22 +36,22 @@ _VALUE_TYPES = [
 ]
 
 
-class TextPathReplace(io.ComfyNode):
+class DataPathReplace(io.ComfyNode):
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
-            node_id="1hew_TextPathReplace",
-            display_name="Text Path Replace",
+            node_id="1hew_DataPathReplace",
+            display_name="Data Path Replace",
             category="1hewNodes/data",
             # Lists are no longer needed on the write side: the value is typed
             # into a single-line box and converted by value_type.
             inputs=[
                 io.String.Input("text", default="", multiline=True),
                 io.String.Input(
-                    "json_path",
+                    "data_path",
                     default="values[*]",
                     tooltip=(
-                        "写入位置的 JSON 路径，语法与 Text Path Extract 相同；"
+                        "写入位置的 JSON 路径，语法与 Data Path Extract 相同；"
                         "空字符串或 count 类路径会被拒绝。"
                     ),
                 ),
@@ -90,12 +90,12 @@ class TextPathReplace(io.ComfyNode):
     async def execute(
         cls,
         text,
-        json_path,
+        data_path,
         value="",
         value_type="auto",
     ) -> io.NodeOutput:
         text = as_text(text)
-        json_path = as_text(json_path)
+        data_path = as_text(data_path)
         value_type = as_text(value_type) or "auto"
 
         typed = as_text(value)
@@ -116,10 +116,10 @@ class TextPathReplace(io.ComfyNode):
             return io.NodeOutput([data], 0, ui=make_ui_text("0"))
 
         try:
-            data, count = replace_all(text, json_path, new_values)
+            data, count = replace_all(text, data_path, new_values)
         except ValueError as exc:
             # Surface bad paths and mismatched counts instead of returning
             # the original text: a silent no-op would hide the mistake.
-            raise ValueError(f"Text Path Replace: {exc}") from None
+            raise ValueError(f"Data Path Replace: {exc}") from None
 
         return io.NodeOutput([data], count, ui=make_ui_text(str(count)))

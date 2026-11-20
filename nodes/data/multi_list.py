@@ -5,7 +5,7 @@ from typing import Any
 from comfy_api.latest import io
 
 from ...utils import make_ui_text
-from ...utils._json_ops import as_text, collect_indexed_inputs, extend_values, json_text
+from ...utils._json_ops import collect_indexed_inputs, extend_values, json_text
 
 
 class MultiList(io.ComfyNode):
@@ -32,15 +32,12 @@ class MultiList(io.ComfyNode):
                     optional=True,
                     tooltip="第一个输入，任意类型；后续通过动态端口 any_2、any_3… 接入。",
                 ),
-                io.Combo.Input(
-                    "output_type",
-                    options=["list", "json"],
-                    default="list",
-                    tooltip="list 输出原生列表，json 输出紧凑 JSON 文本。",
-                ),
             ],
             outputs=[
-                io.Custom("*").Output(display_name="data"),
+                # is_output_list draws the list-styled socket: this port is
+                # always the whole array.
+                io.Custom("*").Output(display_name="list", is_output_list=True),
+                io.String.Output(display_name="json"),
             ],
         )
 
@@ -49,12 +46,9 @@ class MultiList(io.ComfyNode):
         cls,
         mode: str = "extend",
         any_1: Any = None,
-        output_type: Any = "list",
         **kwargs: Any,
     ) -> io.NodeOutput:
         inputs = collect_indexed_inputs("any_", any_1, kwargs)
         values = extend_values(inputs, mode)
         text = json_text(values)
-        if str(as_text(output_type)).strip().lower() == "json":
-            return io.NodeOutput(text, ui=make_ui_text(text))
-        return io.NodeOutput(values, ui=make_ui_text(text))
+        return io.NodeOutput(values, text, ui=make_ui_text(text))

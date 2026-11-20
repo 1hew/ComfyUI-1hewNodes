@@ -56,9 +56,9 @@ def _install_comfy_stub():
 _install_comfy_stub()
 
 NODE = load_node(
-    "text_path_replace_under_test", "nodes/data/text_path_replace.py"
-).TextPathReplace
-JSON_PATH = importlib.import_module("text_path_replace_under_test.utils._json_path")
+    "data_path_replace_under_test", "nodes/data/data_path_replace.py"
+).DataPathReplace
+JSON_PATH = importlib.import_module("data_path_replace_under_test.utils._json_path")
 replace_all = JSON_PATH.replace_all
 
 
@@ -72,14 +72,14 @@ def _run(**kwargs):
 
 def test_schema_collects_a_value_list_and_reports_a_count():
     schema = NODE.define_schema()
-    assert schema["node_id"] == "1hew_TextPathReplace"
-    assert schema["display_name"] == "Text Path Replace"
+    assert schema["node_id"] == "1hew_DataPathReplace"
+    assert schema["display_name"] == "Data Path Replace"
     assert schema["category"] == "1hewNodes/data"
     # The value is typed in, so the node no longer takes lists.
     assert not schema.get("is_input_list")
     assert [port["id"] for port in schema["inputs"]] == [
         "text",
-        "json_path",
+        "data_path",
         "value",
         "value_type",
     ]
@@ -206,7 +206,7 @@ def test_node_writes_upstream_values_and_returns_a_list():
     text = '{"layers":[{"index":1},{"index":2}]}'
     value, count = _run(
         text=text,
-        json_path="layers[*].index",
+        data_path="layers[*].index",
         value="3",
         value_type="int",
     )
@@ -220,7 +220,7 @@ def test_node_writes_upstream_values_and_returns_a_list():
 def test_node_value_is_list_even_when_root_is_array():
     value, _ = _run(
         text='[{"n":1}]',
-        json_path="[0].n",
+        data_path="[0].n",
         value="2",
         value_type="int",
     )
@@ -230,7 +230,7 @@ def test_node_value_is_list_even_when_root_is_array():
 def test_node_value_type_converts_the_written_value():
     value, count = _run(
         text='[{"n":1}]',
-        json_path="[0].n",
+        data_path="[0].n",
         value="5",
         value_type="int",
     )
@@ -241,7 +241,7 @@ def test_node_value_type_converts_the_written_value():
 def test_node_value_type_dict_parses_json_text():
     value, _ = _run(
         text='[{"n":1}]',
-        json_path="[0].n",
+        data_path="[0].n",
         value='{"k": 1}',
         value_type="dict",
     )
@@ -251,7 +251,7 @@ def test_node_value_type_dict_parses_json_text():
 def test_node_keeps_integers_without_float_suffix():
     value, _ = _run(
         text='[{"n":1}]',
-        json_path="[0].n",
+        data_path="[0].n",
         value="3",
         value_type="int",
     )
@@ -262,7 +262,7 @@ def test_node_no_match_returns_the_original_document_and_zero():
     original = '{"layers":[{"index":1}]}'
     value, count = _run(
         text=original,
-        json_path="nothing[*]",
+        data_path="nothing[*]",
         value="9",
         value_type="int",
     )
@@ -273,7 +273,7 @@ def test_node_no_match_returns_the_original_document_and_zero():
 def test_node_broadcasts_one_value_to_every_match():
     value, count = _run(
         text='[{"n":1},{"n":2},{"n":3}]',
-        json_path="[*].n",
+        data_path="[*].n",
         value="7",
         value_type="int",
     )
@@ -285,7 +285,7 @@ def test_node_rejects_a_value_that_cannot_be_converted():
     with pytest.raises(ValueError):
         _run(
             text='[{"n":1}]',
-            json_path="[0].n",
+            data_path="[0].n",
             value="abc",
             value_type="int",
         )
@@ -297,7 +297,7 @@ def test_node_rejects_a_value_that_cannot_be_converted():
 def test_value_auto_keeps_text_as_text():
     value, _ = _run(
         text='{"n":1}',
-        json_path="n",
+        data_path="n",
         value="hello",
         value_type="auto",
     )
@@ -307,7 +307,7 @@ def test_value_auto_keeps_text_as_text():
 def test_value_can_be_a_json_container():
     value, _ = _run(
         text='{"n":1}',
-        json_path="n",
+        data_path="n",
         value='{"k": 1}',
         value_type="dict",
     )
@@ -318,7 +318,7 @@ def test_empty_value_writes_nothing():
     original = '{"n":1}'
     value, count = _run(
         text=original,
-        json_path="n",
+        data_path="n",
         value="",
     )
     assert count == 0
