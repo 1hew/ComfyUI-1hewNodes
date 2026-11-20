@@ -126,7 +126,9 @@ class ListMathExpression(io.ComfyNode):
             # so ComfyUI does not run it per element.
             is_input_list=True,
             inputs=[
-                io.String.Input("expression", default="a + b", multiline=True),
+                # Defaults to a single letter so the node works with the first
+                # input alone; add b / c as more sockets are connected.
+                io.String.Input("expression", default="a", multiline=True),
                 io.Autogrow.Input("values", template=autogrow),
             ],
             outputs=[

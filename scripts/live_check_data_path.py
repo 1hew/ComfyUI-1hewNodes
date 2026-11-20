@@ -155,6 +155,7 @@ def main():
     sink(graph, "4", 0, "chain_value")
     outputs = run(graph)
     chain = shown(outputs, "chain_value")
+    # The data port keeps the input shape, so PreviewAny shows the object here.
     results.append(
         check(
             "Replace broadcasts one typed value",

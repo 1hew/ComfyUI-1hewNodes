@@ -6,7 +6,7 @@
 
 | Parameter | Socket | Type | Default | Range | Description |
 | --------- | ------ | ---- | ------- | ----- | ----------- |
-| `expression` | - | STRING | `a + b` | multiline | The formula, evaluated once per position |
+| `expression` | - | STRING | `a` | multiline | The formula, evaluated once per position. Defaults to `a`, the first input, so it works before a second socket is connected |
 | `a`, `b`, `c`… | optional | * | - | - | Lists (or single values); the front end grows one port per letter as they are connected. The port name is the name used in the expression. |
 
 ## Outputs

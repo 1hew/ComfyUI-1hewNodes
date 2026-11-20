@@ -5,8 +5,8 @@ where a new value goes. The payload arrives on the wildcard `data` link, so
 JSON text and an already-parsed dict / list both work.
 
 `value` is a single typed box: one entry per call, broadcast to every match.
-Formatting is the next node's job, so the edited document leaves through the
-`data` port as a one-item list of native values.
+The edited document leaves through the `data` port with the same shape it
+arrived with: a dict stays a dict, a list stays a list.
 """
 
 from comfy_api.latest import io
@@ -51,8 +51,9 @@ class DataPathReplace(io.ComfyNode):
                     default="",
                     tooltip=(
                         "要写入的值，直接输入，按 value_type 转换。"
-                        "需要数字时选 int / float；需要字典 / 列表时选 dict / list / json。"
-                        "匹配到多处时这个值广播到所有位置。"
+                        "填单个值会广播到所有匹配位置；"
+                        "填 JSON 数组（如 [1,2,3]）则按顺序一一写入各匹配位置。"
+                        "需要数字时选 int / float；需要字典 / 列表时选 dict / list。"
                     ),
                 ),
                 io.Combo.Input(
@@ -60,16 +61,16 @@ class DataPathReplace(io.ComfyNode):
                     options=VALUE_TYPES,
                     default="auto",
                     tooltip=(
-                        "作用于 value：auto 原样保留（文本就是文本），"
-                        "int / float 转数字，dict / list / json 解析 JSON 文本。"
+                        "作用于 value 的每一项：auto 原样保留（文本就是文本），"
+                        "int / float 转数字，dict / list 解析 JSON 文本。"
                     ),
                 ),
             ],
             outputs=[
-                # The edited document wrapped in a one-item list, so a
-                # root-level JSON array is not split by ComfyUI downstream.
-                # Named data to match the input port it goes back into.
-                io.Custom("*").Output(display_name="data", is_output_list=True),
+                # The edited document keeps the shape of the input: a dict
+                # stays a dict, a list stays a list. No wrapper, so the port
+                # never claims to be a list when the data is an object.
+                io.Custom("*").Output(display_name="data"),
                 io.Int.Output(display_name="count"),
             ],
         )
@@ -91,10 +92,7 @@ class DataPathReplace(io.ComfyNode):
         data_path = as_text(data_path)
         value_type = as_text(value_type) or "auto"
 
-        typed = as_text(value)
-        # The box holds one entry; value_type decides what it means, so a JSON
-        # array typed here becomes several entries through `list`.
-        items = [typed] if typed != "" else []
+        items = cls._value_items(as_text(value), value_type)
 
         new_values = []
         for item in items:
@@ -105,7 +103,7 @@ class DataPathReplace(io.ComfyNode):
         if not new_values:
             # Nothing to write: return the document unchanged rather than
             # letting replace_all raise a count mismatch for zero values.
-            return io.NodeOutput([parse_content(data)], 0, ui=make_ui_text("0"))
+            return io.NodeOutput(parse_content(data), 0, ui=make_ui_text("0"))
 
         try:
             edited, count = replace_all(data, data_path, new_values)
@@ -114,4 +112,22 @@ class DataPathReplace(io.ComfyNode):
             # the original data: a silent no-op would hide the mistake.
             raise ValueError(f"Data Path Replace: {exc}") from None
 
-        return io.NodeOutput([edited], count, ui=make_ui_text(str(count)))
+        return io.NodeOutput(edited, count, ui=make_ui_text(str(count)))
+
+    @staticmethod
+    def _value_items(text: str, value_type: str) -> list:
+        """Split the value box into the items to write.
+
+        A blank box writes nothing. A JSON array gives one item per element,
+        so several matches can each get their own value; anything else is a
+        single item and replace_all broadcasts it to every match.
+        """
+        if text == "":
+            return []
+        # Only look for a list when the caller did not ask for a list value:
+        # value_type=list means "this whole text is one array to write".
+        if value_type != "list" and text.strip()[:1] == "[":
+            parsed = parse_content(text.strip())
+            if isinstance(parsed, list):
+                return list(parsed)
+        return [text]
