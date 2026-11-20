@@ -22,6 +22,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ## 📜 Changelog
 
 **v4.6.1**
+- fix(data): `Data Path Replace`'s `value` is a linked wildcard input instead of a string box — with a string socket ComfyUI split a list upstream into one value per call, so a list could never reach the node intact.
 - change(data): `List Math Expression` defaults its expression to `a`; `Data Path Replace`'s `value` accepts a JSON array so each match gets its own value, while a single value still broadcasts.
 - fix(data): `Data Path Replace` drops the one-item-list wrapper — the `data` port now matches the input shape (an object stays an object), instead of always claiming to be a list.
 - change(data): `Data Path Extract` and `Data Path Replace` default `data_path` to `[*]` instead of `values[*]` (identical behaviour on objects and lists, shorter to type).
@@ -844,7 +845,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Multi Dict | Merge dynamic `dict_X` (typed `DICT` sockets) in port order, then add or overwrite one entry typed directly in `key` / `value`; `key_type` types the key and `value_type` the value (`auto` / `dict` / `list` / `string` / `int` / `float` / `boolean` / `null`, shared with Data Path Replace); both `dict` and `json` outputs carry the same type |
 | Multi List | Combine dynamic `any_X` inputs into one array; `extend` splices list/tuple inputs one level, `append` keeps them nested; outputs the whole `list` (list-styled socket) plus compact `json` |
 | Data Path Extract | Read values from the linked `data` (JSON text, fenced JSON, a Python literal, or an already-parsed dict / list) by `data_path` such as `[0].content`, `[-1].bbox[0]` or `values[*].content`; pick the key or value side with `keys[*]` / `values[*]`, count with `.count` / `.length` / `[#]`; `value` is always a list of native values |
-| Data Path Replace | Write values back into the linked `data` at a `data_path` matched by `Data Path Extract`; `value` takes one value (broadcast to every match) or a JSON array (one per match), converted by `value_type`; `data` returns the edited document with the same shape it arrived with |
+| Data Path Replace | Write values back into the linked `data` at a `data_path` matched by `Data Path Extract`; `value` is linked too (`*`), so one value broadcasts to every match while a list writes one value per match, converted by `value_type`; `data` returns the edited document with the same shape it arrived with |
 
 ### 📃 List Nodes
 | Node Name | Description |

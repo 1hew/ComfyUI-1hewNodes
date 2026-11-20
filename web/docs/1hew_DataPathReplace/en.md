@@ -10,7 +10,7 @@ Like `Data Path Extract` the node does not render. The edited document leaves th
 | --------- | ------ | ---- | ------- | ----- | ----------- |
 | `data` | * (required link) | - | - | The document to edit, connected: JSON text, fenced JSON, a Python literal, or an already-parsed dict / list |
 | `data_path` | - | STRING | `[*]` | - | Path to write to; the same syntax as `Data Path Extract` |
-| `value` | - | STRING | `` | - | The value to write, typed in directly and converted by `value_type`. A single value broadcasts to every match; a JSON array such as `[1,2,3]` writes one value per match, in order |
+| `value` | - | * (link) | - | The value to write, linked from upstream and converted by `value_type`. A single value broadcasts to every match; a list writes one value per match, in order. Build the list with `Multi List`, `List Custom Int`, etc |
 | `value_type` | - | COMBO | `auto` | `auto` / `dict` / `list` / `string` / `int` / `float` / `boolean` / `null` | Converts `value`, the same meaning as `Multi Dict`. `auto` keeps text as text, so pick `int` / `float` for numbers |
 
 ## Outputs
@@ -37,7 +37,7 @@ Like `Data Path Extract` the node does not render. The edited document leaves th
 ## Typical usage
 
 - Set every content to the same value: `path = [*].content` with one `value` — it broadcasts to each match.
-- Write a different value per match: `path = layers[*].index` with `value` `[1, 2, 3]` and `value_type` `int`.
+- Write a different value per match: `path = layers[*].index` with `value` linked to `[1, 2, 3]` (e.g. from `Multi List`) and `value_type` `int`.
 - Replace a nested coordinate: `path = [1].bbox[0]`, `value` `50` with `value_type` set to `int`.
 - Save the result: wire `data` into `Save Text` with `format` set to `json`.
 

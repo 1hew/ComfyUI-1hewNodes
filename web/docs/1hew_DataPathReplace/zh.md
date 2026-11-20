@@ -10,7 +10,7 @@
 | -------- | ---- | -------- | ------ | -------- | ---- |
 | `data` | *（必填连线） | - | - | 要编辑的文档，连线输入：JSON 文本、代码块 JSON、Python 字面量，或已解析的 dict / list |
 | `data_path` | - | STRING | `[*]` | - | 写入位置的路径，语法与 `Data Path Extract` 相同 |
-| `value` | - | STRING | `` | - | 要写入的值，直接输入，按 `value_type` 转换。填单个值会广播到所有匹配位置；填 JSON 数组（如 `[1,2,3]`）则按顺序一一写入 |
+| `value` | - | *（连线） | - | 要写入的值，连线上游，按 `value_type` 转换。接单个值时广播到所有匹配位置；接列表时按顺序一一写入。列表可用 `Multi List`、`List Custom Int` 等构造 |
 | `value_type` | - | COMBO | `auto` | `auto` / `dict` / `list` / `string` / `int` / `float` / `boolean` / `null` | 作用于 `value`，含义与 `Multi Dict` 相同。`auto` 下文本就是文本，需要数字请选 `int` / `float` |
 
 ## 输出
@@ -37,7 +37,7 @@
 ## 典型用法
 
 - 把所有 content 统一改成同一个值：`path = [*].content`，`value` 填一个新值，它会广播到每一处。
-- 逐个写入不同的值：`path = layers[*].index`，`value` 填 `[1, 2, 3]`、`value_type` 选 `int`，三个位置依次写入。
+- 逐个写入不同的值：`path = layers[*].index`，`value` 接 `Multi List` 构造的 `[1, 2, 3]`、`value_type` 选 `int`，三个位置依次写入。
 - 替换嵌套的坐标：`path = [1].bbox[0]`，`value` 填 `50`、`value_type` 选 `int`。
 - 保存结果：把 `data` 接到 `Save Text`，`format` 选 `json`。
 

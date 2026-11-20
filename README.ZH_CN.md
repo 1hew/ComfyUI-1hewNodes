@@ -22,6 +22,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ## 📜 更新日志
 
 **v4.6.1**
+- fix(data)：`Data Path Replace` 的 `value` 改为连线通配输入，不再是文本框——string 端口会让 ComfyUI 把上游列表按元素逐次传入，导致整列表无法完整到达节点。
 - change(data)：`List Math Expression` 的默认表达式改为 `a`；`Data Path Replace` 的 `value` 支持 JSON 数组，每个匹配位置可写入不同的值，单个值仍然广播。
 - fix(data)：`Data Path Replace` 去掉单元素列表包装——`data` 输出与输入形状一致（字典还是字典），不再无条件宣称自己是列表。
 - change(data)：`Data Path Extract` 与 `Data Path Replace` 的 `data_path` 默认值改为 `[*]`（此前为 `values[*]`，两者在对象和数组上行为一致，写法更短）。
@@ -844,7 +845,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Multi Dict | 先按端口顺序合并动态 `dict_X`（`DICT` 类型端口），再添加或覆盖一个键值对（`key` / `value` 直接输入）；`key_type` 决定键的类型，`value_type` 决定值的类型（`auto` / `dict` / `list` / `string` / `int` / `float` / `boolean` / `null`，与 Data Path Replace 共用）；`dict` 与 `json` 两个输出同类型 |
 | Multi List | 把动态 `any_X` 合并为数组；`extend` 摊平列表/元组一层，`append` 保留嵌套；同时输出整个 `list`（列表样式端口）与紧凑 `json` |
 | Data Path Extract | 从连线的 `data`（JSON 文本、代码块 JSON、Python 字面量或已解析的 dict / list）按 `data_path`（如 `[0].content`、`[-1].bbox[0]`、`values[*].content`）取值，用 `keys[*]` / `values[*]` 分别取键名 / 值，用 `.count` / `.length` / `[#]` 计数；`value` 始终是原生值列表 |
-| Data Path Replace | 按 `Data Path Extract` 的路径把值写回连线的 `data`；`value` 可填单个值（广播到所有匹配位置）或 JSON 数组（每项对应一个位置），由 `value_type` 转换；`data` 输出的形状与输入一致 |
+| Data Path Replace | 按 `Data Path Extract` 的路径把值写回连线的 `data`；`value` 同样是连线输入（`*`），接单个值时广播到所有匹配位置，接列表时每项对应一个位置，由 `value_type` 转换；`data` 输出的形状与输入一致 |
 
 ### 📃 列表节点
 | 节点名称 | 功能描述 |

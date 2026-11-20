@@ -28,8 +28,10 @@ class DataPathReplace(io.ComfyNode):
             node_id="1hew_DataPathReplace",
             display_name="Data Path Replace",
             category="1hewNodes/data",
-            # Lists are no longer needed on the write side: the value is typed
-            # into a single-line box and converted by value_type.
+            # value arrives as a wildcard link and must be received whole: with
+            # INPUT_IS_LIST off ComfyUI slices one item per call, so a list
+            # upstream would never reach the node intact.
+            is_input_list=True,
             inputs=[
                 io.Custom("*").Input(
                     "data",
@@ -46,14 +48,13 @@ class DataPathReplace(io.ComfyNode):
                         "空字符串或 count 类路径会被拒绝。"
                     ),
                 ),
-                io.String.Input(
+                io.Custom("*").Input(
                     "value",
-                    default="",
                     tooltip=(
-                        "要写入的值，直接输入，按 value_type 转换。"
-                        "填单个值会广播到所有匹配位置；"
-                        "填 JSON 数组（如 [1,2,3]）则按顺序一一写入各匹配位置。"
-                        "需要数字时选 int / float；需要字典 / 列表时选 dict / list。"
+                        "要写入的值，连线输入，按 value_type 转换。"
+                        "接单个值时广播到所有匹配位置；"
+                        "接列表时按顺序一一写入各匹配位置。"
+                        "上游可用 Multi List / List Custom 等构造列表。"
                     ),
                 ),
                 io.Combo.Input(
@@ -84,15 +85,16 @@ class DataPathReplace(io.ComfyNode):
         cls,
         data=None,
         data_path="[*]",
-        value="",
+        value=None,
         value_type="auto",
     ) -> io.NodeOutput:
-        # data is the wildcard input: a string is parsed later by replace_all,
-        # a dict / list is used as-is, so it is never stringified here.
-        data_path = as_text(data_path)
-        value_type = as_text(value_type) or "auto"
+        # is_input_list wraps every input in a list; the widgets carry one
+        # item and the wildcard `value` keeps whatever the upstream sent.
+        data = cls._first(data)
+        data_path = as_text(cls._first(data_path))
+        value_type = as_text(cls._first(value_type)) or "auto"
 
-        items = cls._value_items(as_text(value), value_type)
+        items = cls._value_items(value)
 
         new_values = []
         for item in items:
@@ -115,19 +117,20 @@ class DataPathReplace(io.ComfyNode):
         return io.NodeOutput(edited, count, ui=make_ui_text(str(count)))
 
     @staticmethod
-    def _value_items(text: str, value_type: str) -> list:
-        """Split the value box into the items to write.
+    def _first(wrapped):
+        """Unwrap an is_input_list value: the node needs the single item."""
+        if isinstance(wrapped, (list, tuple)):
+            return wrapped[0] if wrapped else None
+        return wrapped
 
-        A blank box writes nothing. A JSON array gives one item per element,
-        so several matches can each get their own value; anything else is a
-        single item and replace_all broadcasts it to every match.
+    @classmethod
+    def _value_items(cls, value) -> list:
+        """Return the items to write, one per match or one to broadcast.
+
+        A list arrives whole (is_input_list) and its items are written in
+        order; anything else is a single value that replace_all broadcasts.
+        An empty box / empty text writes nothing at all.
         """
-        if text == "":
-            return []
-        # Only look for a list when the caller did not ask for a list value:
-        # value_type=list means "this whole text is one array to write".
-        if value_type != "list" and text.strip()[:1] == "[":
-            parsed = parse_content(text.strip())
-            if isinstance(parsed, list):
-                return list(parsed)
-        return [text]
+        items = list(value) if isinstance(value, (list, tuple)) else [value]
+        items = [item for item in items if item is not None and item != ""]
+        return items

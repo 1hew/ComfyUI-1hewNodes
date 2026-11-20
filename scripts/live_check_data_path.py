@@ -142,12 +142,13 @@ def main():
     # 5. Replace writes one typed value, broadcast to every match.
     graph = {
         "src": {"class_type": "1hew_TextToAny", "inputs": {"text": SAMPLE}},
+        "val": {"class_type": "1hew_TextToAny", "inputs": {"text": "9"}},
         "4": {
             "class_type": "1hew_DataPathReplace",
             "inputs": {
                 "data": ["src", 0],
                 "data_path": "layers[*].index",
-                "value": "9",
+                "value": ["val", 0],
                 "value_type": "int",
             },
         },
@@ -187,12 +188,13 @@ def main():
             "class_type": "1hew_TextToAny",
             "inputs": {"text": '[{"content":"a"},{"content":"b"}]'},
         },
+        "val": {"class_type": "1hew_TextToAny", "inputs": {"text": "X"}},
         "4": {
             "class_type": "1hew_DataPathReplace",
             "inputs": {
                 "data": ["src", 0],
                 "data_path": "[*].content",
-                "value": "X",
+                "value": ["val", 0],
                 "value_type": "string",
             },
         },

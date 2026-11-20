@@ -63,8 +63,22 @@ replace_all = JSON_PATH.replace_all
 
 
 def _run(**kwargs):
+    """Call execute the way ComfyUI does with is_input_list on.
+
+    Every input arrives wrapped in a list; the widgets carry one item and the
+    wildcard value keeps whatever list the upstream produced.
+    """
     kwargs.setdefault("value_type", "auto")
-    return asyncio.run(NODE.execute(**kwargs))
+    kwargs.setdefault("data_path", "[*]")
+    wrapped = {}
+    for key, item in kwargs.items():
+        if key in ("data_path", "value_type"):
+            wrapped[key] = [item]
+        elif key == "value":
+            wrapped[key] = item if isinstance(item, list) else [item]
+        else:
+            wrapped[key] = [item]
+    return asyncio.run(NODE.execute(**wrapped))
 
 
 # --------------------------------------------------------------------- schema
@@ -75,8 +89,8 @@ def test_schema_collects_a_value_list_and_reports_a_count():
     assert schema["node_id"] == "1hew_DataPathReplace"
     assert schema["display_name"] == "Data Path Replace"
     assert schema["category"] == "1hewNodes/data"
-    # The value is typed in, so the node no longer takes lists.
-    assert not schema.get("is_input_list")
+    # value is a wildcard link and must arrive whole, so the node takes lists.
+    assert schema.get("is_input_list") is True
     assert [port["id"] for port in schema["inputs"]] == [
         "data",
         "data_path",
@@ -84,8 +98,8 @@ def test_schema_collects_a_value_list_and_reports_a_count():
         "value_type",
     ]
     ports = {p["id"]: p for p in schema["inputs"]}
-    assert ports["value"]["type"] == "STRING"
-    assert not ports["value"].get("multiline")
+    # value is a wildcard link now, so a whole list reaches the node.
+    assert ports["value"]["type"] == "*"
     # No rendering ports any more: value and count only.
     # data, matching the input port it goes back into.
     assert [o["display_name"] for o in schema["outputs"]] == ["data", "count"]
@@ -364,7 +378,7 @@ def test_a_json_array_writes_one_value_per_match():
     value, count = _run(
         data='[{"n":1},{"n":2},{"n":3}]',
         data_path="[*].n",
-        value="[10, 20, 30]",
+        value=[10, 20, 30],
         value_type="int",
     )
     assert count == 3
@@ -375,7 +389,7 @@ def test_a_array_of_mixed_types_follows_value_type():
     value, _ = _run(
         data='{"a":1,"b":"x"}',
         data_path="[*]",
-        value='[true, "hello"]',
+        value=[True, "hello"],
         value_type="auto",
     )
     # Object in, object out; the two values land in insertion order.
@@ -393,12 +407,13 @@ def test_a_single_value_still_broadcasts():
     assert value == [{"n": 7}, {"n": 7}]
 
 
-def test_value_type_list_writes_the_whole_array_as_one_value():
-    # value_type=list means the text IS one array to write into one slot.
+def test_a_list_upstream_can_be_broadcast_as_one_value():
+    # A wildcard list is written per match; wrap it in another list to write
+    # the whole array into one slot.
     value, count = _run(
         data='{"x":1}',
         data_path="x",
-        value="[1, 2]",
+        value=[[1, 2]],
         value_type="list",
     )
     assert count == 1
@@ -410,6 +425,6 @@ def test_array_value_count_mismatch_raises():
         _run(
             data='[{"n":1},{"n":2},{"n":3}]',
             data_path="[*].n",
-            value="[10, 20]",
+            value=[10, 20],
             value_type="int",
         )
