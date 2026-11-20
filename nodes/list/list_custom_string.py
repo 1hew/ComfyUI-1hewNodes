@@ -14,7 +14,7 @@ class ListCustomString(io.ComfyNode):
         return io.Schema(
             node_id="1hew_ListCustomString",
             display_name="List Custom String",
-            category="1hewNodes/text",
+            category="1hewNodes/list",
             inputs=[
                 io.String.Input("custom_text", default="", multiline=True),
             ],

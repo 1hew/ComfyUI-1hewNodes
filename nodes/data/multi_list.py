@@ -14,7 +14,7 @@ class MultiList(io.ComfyNode):
         return io.Schema(
             node_id="1hew_MultiList",
             display_name="Multi List",
-            category="1hewNodes/multi",
+            category="1hewNodes/data",
             accept_all_inputs=True,
             inputs=[
                 io.Combo.Input(

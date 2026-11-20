@@ -2,16 +2,16 @@
 import torch
 from comfy_api.latest import io
 
-from ...utils._text_ops import (
+from ....utils._text_ops import (
     match_ratio,
 )
 
 
-class StringRatioGpt20Image(io.ComfyNode):
+class StringRatioGemini31FlashImage(io.ComfyNode):
     RATIO_OPTIONS = [
-        ("3:1", 3, 1),
+        ("8:1", 8, 1),
+        ("4:1", 4, 1),
         ("21:9", 21, 9),
-        ("2:1", 2, 1),
         ("16:9", 16, 9),
         ("3:2", 3, 2),
         ("4:3", 4, 3),
@@ -21,18 +21,17 @@ class StringRatioGpt20Image(io.ComfyNode):
         ("3:4", 3, 4),
         ("2:3", 2, 3),
         ("9:16", 9, 16),
-        ("1:2", 1, 2),
-        ("9:21", 9, 21),
-        ("1:3", 1, 3),
+        ("1:4", 1, 4),
+        ("1:8", 1, 8),
     ]
     RATIO_LABELS = [label for label, _, _ in RATIO_OPTIONS]
 
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
-            node_id="1hew_StringRatioGpt20Image",
-            display_name="String Ratio GPT Image 2.0",
-            category="1hewNodes/text",
+            node_id="1hew_StringRatioGemini31FlashImage",
+            display_name="String Ratio Gemini 3.1 Flash Image",
+            category="1hewNodes/model/ratio",
             inputs=[
                 io.Combo.Input("selection", options=cls.RATIO_LABELS, default="1:1"),
                 io.Image.Input("image", optional=True),

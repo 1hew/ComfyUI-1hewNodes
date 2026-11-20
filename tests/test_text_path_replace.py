@@ -56,7 +56,7 @@ def _install_comfy_stub():
 _install_comfy_stub()
 
 NODE = load_node(
-    "text_path_replace_under_test", "nodes/text/text_path_replace.py"
+    "text_path_replace_under_test", "nodes/data/text_path_replace.py"
 ).TextPathReplace
 JSON_PATH = importlib.import_module("text_path_replace_under_test.utils._json_path")
 replace_all = JSON_PATH.replace_all
@@ -74,7 +74,7 @@ def test_schema_collects_a_value_list_and_reports_a_count():
     schema = NODE.define_schema()
     assert schema["node_id"] == "1hew_TextPathReplace"
     assert schema["display_name"] == "Text Path Replace"
-    assert schema["category"] == "1hewNodes/text"
+    assert schema["category"] == "1hewNodes/data"
     assert schema["is_input_list"] is True
     assert [port["id"] for port in schema["inputs"]] == [
         "text",

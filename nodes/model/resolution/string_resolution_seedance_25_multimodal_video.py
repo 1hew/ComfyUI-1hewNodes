@@ -16,7 +16,7 @@ from typing import Any, Optional
 
 from comfy_api.latest import io
 
-from ...utils._text_ops import (
+from ....utils._text_ops import (
     match_resolution,
 )
 
@@ -37,7 +37,7 @@ class StringResolutionSeedance25MultimodalVideo(io.ComfyNode):
         return io.Schema(
             node_id="1hew_StringResolutionSeedance25MultimodalVideo",
             display_name="String Resolution Seedance 2.5 Multimodal Video",
-            category="1hewNodes/text",
+            category="1hewNodes/model/resolution",
             description=(
                 "从输入视频推断最接近的 Seedance 2.5 分辨率档位（480p / 720p / 1080p / 2k / 4k）；"
                 "未连接视频时透传所选标签。与 1hewOffice 的 RunningHub Seedance 2.5 多模态视频节点成对使用。"

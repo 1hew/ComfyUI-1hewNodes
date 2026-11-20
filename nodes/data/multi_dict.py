@@ -20,7 +20,7 @@ class MultiDict(io.ComfyNode):
         return io.Schema(
             node_id="1hew_MultiDict",
             display_name="Multi Dict",
-            category="1hewNodes/multi",
+            category="1hewNodes/data",
             # Dynamic dict_2..N sockets are not declared in the schema.
             accept_all_inputs=True,
             inputs=[

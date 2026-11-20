@@ -57,7 +57,7 @@ def _install_comfy_stub():
 _install_comfy_stub()
 
 NODE = load_node(
-    "text_path_under_test", "nodes/text/text_path_extract.py"
+    "text_path_under_test", "nodes/data/text_path_extract.py"
 ).TextPathExtract
 CUSTOM_EXTRACT = load_node(
     "text_path_under_test", "nodes/text/text_custom_extract.py"
@@ -93,7 +93,7 @@ def test_schema_collects_values_and_reports_a_count():
     schema = NODE.define_schema()
     assert schema["node_id"] == "1hew_TextPathExtract"
     assert schema["display_name"] == "Text Path Extract"
-    assert schema["category"] == "1hewNodes/text"
+    assert schema["category"] == "1hewNodes/data"
 
     assert [port["id"] for port in schema["inputs"]] == ["text", "path"]
     text, path = schema["inputs"]

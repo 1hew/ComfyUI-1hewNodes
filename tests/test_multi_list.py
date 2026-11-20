@@ -11,7 +11,7 @@ install()
 
 from _node_loader import load_node
 
-Node = load_node("multi_list_under_test", "nodes/multi/multi_list.py").MultiList
+Node = load_node("multi_list_under_test", "nodes/data/multi_list.py").MultiList
 
 
 def run(**kwargs):
@@ -22,7 +22,7 @@ def test_schema_declares_mode_and_dynamic_items():
     schema = Node.define_schema()
     assert schema["node_id"] == "1hew_MultiList"
     assert schema["display_name"] == "Multi List"
-    assert schema["category"] == "1hewNodes/multi"
+    assert schema["category"] == "1hewNodes/data"
     assert schema["accept_all_inputs"] is True
     assert not schema.get("is_input_list")
 

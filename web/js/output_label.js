@@ -109,9 +109,9 @@ const CONFIGS = {
         slots: [{ out: 0, value: 0, suffix: "count" }],
     },
     "1hew_TextPathExtract": {
-        base: ["text", "value", "count"],
+        base: ["value", "count"],
         delimiter: null,
-        slots: [{ out: 2, value: 0, suffix: "count" }],
+        slots: [{ out: 1, value: 0, suffix: "count" }],
     },
     "1hew_ListCustomFloat": {
         base: ["float_list", "count"],

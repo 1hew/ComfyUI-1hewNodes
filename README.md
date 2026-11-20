@@ -22,6 +22,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ## 📜 Changelog
 
 **v4.6.1**
+- refactor(model): Move the model preset nodes into `nodes/model/ratio/` (category `1hewNodes/model/ratio`) and `nodes/model/resolution/` (category `1hewNodes/model/resolution`) — `String Ratio *` and `String Resolution *` leave `nodes/text/`, which now holds only the general text nodes.
+- refactor(data): Group the data nodes under `nodes/data/` with category `1hewNodes/data` — `Text Path Extract`, `Text Path Replace`, `Multi Dict` and `Multi List`; the List nodes (`List Math Expression`, `List Text`, `List Custom Int` / `Float` / `String` / `Seed`) live under `nodes/list/` with category `1hewNodes/list`. Node IDs are unchanged, so saved workflows keep working.
 - refactor(text): `Text Path Replace` now matches `Text Path Extract` — the `text` output and `output_format` are gone, the `replace` input is renamed `value` to match `value_type`, and the edited document leaves through `value` as a one-item list for downstream rendering.
 - refactor(text): `Text Path Extract` now only collects values — the `text` / `output_format` / `separator` / `fallback` inputs are gone, `value` is always a list with one entry per match, and rendering moves to `List Text` / `Text List to String` / `Save Text`.
 - feat(text): Add `Text Path Replace` — the write half of `Text Path Extract`: the same path that reads a value says where the new one goes. A `replace` list is applied one-to-one per match and a single value is broadcast; counts that do not match raise instead of writing somewhere else. `value_type` reuses the `Multi Dict` converter, `keys` / `count` paths are read-only, and the `value` output is a one-item list so a root-level array is not split downstream.
@@ -792,9 +794,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |-----------|-------------|
 | Text Prefix Suffix | Text prefix suffix formatter with wildcard input support for flexible data formatting with custom prefix and suffix |
 | Text Custom Extract | Text custom extractor for extracting specified key values from JSON |
-| Text Path Extract | Read values from JSON text, dicts or plain text by path such as `[0].content`, `[-1].bbox[0]` or `values[*].content`, pick the key or value side with `keys[*]` / `values[*]` (so an unknown key name is still addressable) and count with `.count` / `.length` / `[#]`; `value` is always a list with one entry per match, leaving rendering to List Text / Text List to String / Save Text |
-| Text Path Replace | Write values back into JSON text at a path matched by `Text Path Extract`; the `value` list is applied one-to-one per match (a single value is broadcast), with `value_type` conversion; `value` returns the edited document as a list, leaving rendering to downstream nodes |
 | Text System Prompt | Pick one builtin system prompt from `utils/system_prompt/<model>/[<lang>] <name>.txt` and output its body verbatim on a single `string` output; bundled Qwen-Image-2.1 `t2i` / `edit` prompts, and any new `.txt` you drop in shows up after a reload |
+| String Filter | Text cleaner supporting `{input}` / `{n}` substitution from the `input` value, comment filtering (# and triple quotes), and optional empty-line removal |
+| String Join Multi | Join up to 5 text blocks with `{input}` substitution, comment/empty-line filtering, and composite separators |
+
+### 🎯 Model Preset Nodes
+| Node Name | Description |
+|-----------|-------------|
 | String Ratio GPT Image 2.0 | Infer the nearest GPT 2.0 image supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
 | String Ratio Gemini 3.1 Flash Image | Infer the nearest Gemini 3.1 Flash supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
 | String Ratio Jimeng | Infer the nearest Jimeng supported aspect ratio from input images, or pass through the selected ratio when no image is connected |
@@ -806,18 +812,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | String Resolution Doubao Seedream 5.0 Pro | Infer the nearest Doubao Seedream 5.0 Pro resolution tier (`1k` / `1.5k` / `2k`) from input images, or pass through the selected label when no image is connected |
 | String Resolution Qwen Image 3.0 Pro | Infer the nearest Qwen Image 3.0 Pro resolution tier (`1k` / `2k`) from input images, or pass through the selected label when no image is connected |
 | String Resolution Seedance 2.5 Multimodal Video | Infer the nearest Seedance 2.5 video resolution tier (`480p` / `720p` / `1080p` / `2k` / `4k`) from the input video, or pass through the selected label when no video is connected |
-| String Filter | Text cleaner supporting `{input}` / `{n}` substitution from the `input` value, comment filtering (# and triple quotes), and optional empty-line removal |
-| String Join Multi | Join up to 5 text blocks with `{input}` substitution, comment/empty-line filtering, and composite separators |
-| List Custom Int | Build integer lists from flexible multiline value/range/stride text with reverse-order and mixed punctuation support |
-| List Custom Float | Build float lists from flexible multiline value/range/stride text with reverse-order and mixed punctuation support |
-| List Custom String | Custom string list generator with dash separator and multiple delimiter support |
-| List Custom Seed | Custom seed list generator for creating unique random seed lists with control after generate functionality |
 
 ### 🔗 Multi Nodes
 | Node Name | Description |
 |-----------|-------------|
 | Multi String Join | Concatenate dynamic `string_X` sockets (`string_1` is socket-only) with `{input}` variable support and comment/triple-quote filtering; customizable separator |
-| Multi Dict | Merge dynamic `dict_X` inputs in port order, then add or overwrite one key from the `key` / `value` sockets; a `value_type` converter (`auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null`) applies to `value`, later keys win, and both `dict` / `json` outputs are provided |
 | Multi Image Batch | Build image batches from dynamic `image_X` with crop/pad/stretch size unification and automatic RGBA preservation when any input has alpha |
 | Multi Image List | Build `image_list` from dynamic `image_X` batch or list inputs, splitting them into single-image list items |
 | Multi Image Overlay | Overlay multiple image layers sequentially with alpha compositing, fit modes, and automatic RGBA preservation when any input has alpha |
@@ -825,13 +824,24 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Multi Mask Batch | Build mask batch from dynamic `mask_X` with crop/pad/stretch size unification and configurable gray padding |
 | Multi Mask Math Ops | Dynamic multi-mask operations (union/intersection/difference/XOR) with batch broadcasting and size alignment |
 | Multi Video Stitch | Stitch dynamic `video_X` inputs end-to-end into one video with crop/pad/stretch size unification, optional `get_video_size` reference size, and configurable pad color / fps |
+
+### 🗂️ Data Nodes
+| Node Name | Description |
+|-----------|-------------|
+| Multi Dict | Merge dynamic `dict_X` inputs in port order, then add or overwrite one key from the `key` / `value` sockets; a `value_type` converter (`auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null`) applies to `value`, later keys win, and both `dict` / `json` outputs are provided |
 | Multi List | Combine dynamic `item_X` inputs into one array; `extend` splices list/tuple inputs one level, `append` keeps them nested |
+| Text Path Extract | Read values from JSON text, dicts or plain text by path such as `[0].content`, `[-1].bbox[0]` or `values[*].content`, pick the key or value side with `keys[*]` / `values[*]` (so an unknown key name is still addressable) and count with `.count` / `.length` / `[#]`; `value` is always a list with one entry per match, leaving rendering to List Text / Text List to String / Save Text |
+| Text Path Replace | Write values back into JSON text at a path matched by `Text Path Extract`; the `value` list is applied one-to-one per match (a single value is broadcast), with `value_type` conversion; `value` returns the edited document as a list, leaving rendering to downstream nodes |
 
 ### 📃 List Nodes
 | Node Name | Description |
 |-----------|-------------|
 | List Math Expression | Core Math Expression applied element-wise to list inputs: same grammar and functions, lists in and lists out (`FLOAT` / `INT` / `BOOL`), length-1 lists broadcast |
 | List Text | Add prefix / suffix to every list item, keeping a list output (same inputs as `Text List to String`) |
+| List Custom Int | Build integer lists from flexible multiline value/range/stride text with reverse-order and mixed punctuation support |
+| List Custom Float | Build float lists from flexible multiline value/range/stride text with reverse-order and mixed punctuation support |
+| List Custom String | Custom string list generator with dash separator and multiple delimiter support |
+| List Custom Seed | Custom seed list generator for creating unique random seed lists with control after generate functionality |
 
 
 ### 📁 IO Nodes

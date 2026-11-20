@@ -11,7 +11,7 @@ install()
 
 from _node_loader import load_node
 
-Node = load_node("multi_dict_under_test", "nodes/multi/multi_dict.py").MultiDict
+Node = load_node("multi_dict_under_test", "nodes/data/multi_dict.py").MultiDict
 
 
 def run(**kwargs):
@@ -22,7 +22,7 @@ def test_schema_declares_value_type_and_sockets():
     schema = Node.define_schema()
     assert schema["node_id"] == "1hew_MultiDict"
     assert schema["display_name"] == "Multi Dict"
-    assert schema["category"] == "1hewNodes/multi"
+    assert schema["category"] == "1hewNodes/data"
     assert schema["accept_all_inputs"] is True
     # INPUT_IS_LIST would wrap every linked scalar into a single-item list,
     # turning a string value into ["string"].

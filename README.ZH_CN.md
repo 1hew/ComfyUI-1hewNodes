@@ -22,6 +22,8 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ## 📜 更新日志
 
 **v4.6.1**
+- refactor(model)：把模型预设节点拆到 `nodes/model/ratio/`（分类 `1hewNodes/model/ratio`）与 `nodes/model/resolution/`（分类 `1hewNodes/model/resolution`）——`String Ratio *` 与 `String Resolution *` 离开 `nodes/text/`，该目录现在只放通用文本节点。
+- refactor(data)：把数据类节点统一到 `nodes/data/`，分类改为 `1hewNodes/data`——`Text Path Extract`、`Text Path Replace`、`Multi Dict`、`Multi List`；列表类节点（`List Math Expression`、`List Text`、`List Custom Int` / `Float` / `String` / `Seed`）统一放在 `nodes/list/`，分类为 `1hewNodes/list`。节点 ID 未变，已保存的工作流不受影响。
 - refactor(text)：`Text Path Replace` 与 `Text Path Extract` 对齐——移除 `text` 输出与 `output_format`，输入 `replace` 改名为 `value` 以对应 `value_type`，编辑后的文档通过 `value` 以只含一项的列表输出，排版交给下游。
 - refactor(text)：`Text Path Extract` 只负责取值——移除 `text` / `output_format` / `separator` / `fallback` 四个参数，`value` 始终是每个匹配一项的列表，排版交给 `List Text` / `Text List to String` / `Save Text`。
 - feat(text)：新增 `Text Path Replace`——`Text Path Extract` 的写入部分：读取时用的路径同时决定新值写到哪里。`replace` 列表与匹配位置一一对应，单个值广播到所有位置；数量不一致直接报错，不会写到别处。`value_type` 复用 `Multi Dict` 的转换，`keys` / `count` 类路径只读，`value` 输出为只含一项的列表，根节点是数组时也不会被下游拆开。
@@ -792,9 +794,13 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 |---------|----------|
 | Text Prefix Suffix | 文本前缀后缀器，支持通配符输入的灵活数据格式化，可自定义前缀和后缀 |
 | Text Custom Extract | 文本自定义提取器，从JSON中提取指定键值 |
-| Text Path Extract | 按 `[0].content`、`[-1].bbox[0]`、`values[*].content` 等路径从 JSON 文本、字典或普通文本中取值，用 `keys[*]` / `values[*]` 分别取对象的所有键名 / 所有值（键名未知也能取），用 `.count` / `.length` / `[#]` 计数；`value` 始终是每个匹配一项的列表，排版交给 List Text / Text List to String / Save Text |
-| Text Path Replace | 按 `Text Path Extract` 的路径把值写回 JSON 文本；`value` 列表与匹配位置一一对应（单个值则广播），支持 `value_type` 类型转换；`value` 输出编辑后的文档列表，排版交给下游 |
 | Text System Prompt | 从 `utils/system_prompt/<模型>/[<语言>] <名称>.txt` 中选一条内置系统提示词，原样输出到 `string` 输出；内置 Qwen-Image-2.1 的 `t2i` / `edit`，新增的 `.txt` 重载后会出现在下拉中 |
+| String Filter | 文本过滤器，支持用 `input` 值替换 `{input}` / `{n}`、注释过滤（# 与三引号）、可选空行移除 |
+| String Join Multi | 多段文本拼接，支持 `{input}` 占位符、注释/空行过滤与复合分隔符 |
+
+### 🎯 模型预设节点
+| 节点名称 | 功能描述 |
+|---------|----------|
 | String Ratio GPT Image 2.0 | 从输入图像推断最接近的 GPT 2.0 图像模型支持比例；未连接图像时透传所选比例 |
 | String Ratio Gemini 3.1 Flash Image | 从输入图像推断最接近的 Gemini 3.1 Flash 支持比例；未连接图像时透传所选比例 |
 | String Ratio Jimeng | 从输入图像推断最接近的 Jimeng 支持比例；未连接图像时透传所选比例 |
@@ -806,18 +812,11 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | String Resolution Doubao Seedream 5.0 Pro | 从输入图像推断最接近的 Doubao Seedream 5.0 Pro 分辨率档位（`1k` / `1.5k` / `2k`）；未连接图像时透传所选标签 |
 | String Resolution Qwen Image 3.0 Pro | 从输入图像推断最接近的 Qwen Image 3.0 Pro 分辨率档位（`1k` / `2k`）；未连接图像时透传所选标签 |
 | String Resolution Seedance 2.5 Multimodal Video | 从输入视频推断最接近的 Seedance 2.5 分辨率档位（`480p` / `720p` / `1080p` / `2k` / `4k`）；未连接视频时透传所选标签 |
-| String Filter | 文本过滤器，支持用 `input` 值替换 `{input}` / `{n}`、注释过滤（# 与三引号）、可选空行移除 |
-| String Join Multi | 多段文本拼接，支持 `{input}` 占位符、注释/空行过滤与复合分隔符 |
-| List Custom Int | 使用灵活的多行数值/区间/步长文本构建整数列表，支持倒序与中英文符号混合输入 |
-| List Custom Float | 使用灵活的多行数值/区间/步长文本构建浮点列表，支持倒序与中英文符号混合输入 |
-| List Custom String | 自定义字符串列表生成器，支持连字符分割和多种分隔符 |
-| List Custom Seed | 自定义种子列表生成器，支持生成唯一随机种子列表和control after generate功能 |
 
 ### 🔗 多输入节点
 | 节点名称 | 功能描述 |
 |---------|----------|
 | Multi String Join | 动态多输入字符串连接（`string_1` 为纯插槽），支持 `{input}` 变量与注释/三引号过滤，可自定义分隔符 |
-| Multi Dict | 先按端口顺序合并动态 `dict_X`，再用 `key` / `value` 添加或覆盖一个键；`value_type` 支持 `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` 转换，后出现的同名键覆盖前面的，输出 `dict` / `json` |
 | Multi Image Batch | 从动态 `image_X` 构建批次，支持 crop/pad/stretch 尺寸统一，并在任一输入带 alpha 时自动保留 RGBA |
 | Multi Image List | 从动态 `image_X` 批次或列表输入构建 `image_list`，并拆分为单张图像列表项 |
 | Multi Image Overlay | 按顺序叠加多个图像图层，支持 alpha 合成、尺寸适应，并在任一输入带 alpha 时自动保留 RGBA |
@@ -825,13 +824,24 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Multi Mask Batch | 从动态 `mask_X` 构建批次，支持 crop/pad/stretch 尺寸统一与灰度填充 |
 | Multi Mask Math Ops | 动态多遮罩运算（交/并/差/异或），支持批次广播与统一尺寸 |
 | Multi Video Stitch | 将动态 `video_X` 输入首尾拼接为一段视频，支持 crop/pad/stretch 尺寸统一、可选 `get_video_size` 参考尺寸，并可配置填充颜色与帧率 |
+
+### 🗂️ 数据节点
+| 节点名称 | 功能描述 |
+|---------|----------|
+| Multi Dict | 先按端口顺序合并动态 `dict_X`，再用 `key` / `value` 添加或覆盖一个键；`value_type` 支持 `auto` / `string` / `int` / `float` / `boolean` / `dict` / `list` / `json` / `null` 转换，后出现的同名键覆盖前面的，输出 `dict` / `json` |
 | Multi List | 把动态 `item_X` 合并为数组；`extend` 摊平列表/元组一层，`append` 保留嵌套 |
+| Text Path Extract | 按 `[0].content`、`[-1].bbox[0]`、`values[*].content` 等路径从 JSON 文本、字典或普通文本中取值，用 `keys[*]` / `values[*]` 分别取对象的所有键名 / 所有值（键名未知也能取），用 `.count` / `.length` / `[#]` 计数；`value` 始终是每个匹配一项的列表，排版交给 List Text / Text List to String / Save Text |
+| Text Path Replace | 按 `Text Path Extract` 的路径把值写回 JSON 文本；`value` 列表与匹配位置一一对应（单个值则广播），支持 `value_type` 类型转换；`value` 输出编辑后的文档列表，排版交给下游 |
 
 ### 📃 列表节点
 | 节点名称 | 功能描述 |
 |---------|----------|
 | List Math Expression | 把核心 Math Expression 逐项应用到列表输入：语法与函数相同，输入输出均为列表（`FLOAT` / `INT` / `BOOL`），长度为 1 的列表广播 |
 | List Text | 为列表每一项添加前后缀并保持列表输出（输入与 `Text List to String` 一致） |
+| List Custom Int | 使用灵活的多行数值/区间/步长文本构建整数列表，支持倒序与中英文符号混合输入 |
+| List Custom Float | 使用灵活的多行数值/区间/步长文本构建浮点列表，支持倒序与中英文符号混合输入 |
+| List Custom String | 自定义字符串列表生成器，支持连字符分割和多种分隔符 |
+| List Custom Seed | 自定义种子列表生成器，支持生成唯一随机种子列表和control after generate功能 |
 
 
 ### 📁 IO 节点

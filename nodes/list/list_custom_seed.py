@@ -11,7 +11,7 @@ class ListCustomSeed(io.ComfyNode):
         return io.Schema(
             node_id="1hew_ListCustomSeed",
             display_name="List Custom Seed",
-            category="1hewNodes/text",
+            category="1hewNodes/list",
             inputs=[
                 io.Int.Input("seed", default=42, min=0, max=1125899906842624, step=1, display_mode=io.NumberDisplay.number),
                 io.Int.Input("count", default=3, min=1, max=1000, step=1),

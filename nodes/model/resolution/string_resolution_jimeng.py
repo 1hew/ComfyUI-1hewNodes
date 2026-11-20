@@ -1,38 +1,38 @@
-"""GPT Image 2.0 专用分辨率标签节点。
+"""即梦（Jimeng）专用分辨率标签节点。
 
-与 1hewOffice 的 1hewOffice_GPTImage20 成对使用：按图像面积推断出 API 节点
-resolution 支持的档位之一（1k / 2k / 4k），未连接图像时直接透传手动选择的标签。
+与即梦系列节点（jimeng_image_30 等）及本仓库的 Image Resize Jimeng 成对使用：
+按图像面积推断出档位之一（1k / 2k / 4k），未连接图像时直接透传手动选择的标签。
 
-目标面积取自 GPTImage20.MAX_PIXELS_BY_RESOLUTION（该文件属于 1hewOffice，不在本仓库内）：
-1k = 1024x1024，2k = 2048x2048，4k = 3840x2160（与 4k 的 1:1 尺寸 2880x2880 同面积）。
+目标面积取自即梦各档 1:1 官方尺寸：1k = 1328x1328，2k = 2048x2048，4k = 4096x4096。
+2.0_pro 档位（1024 基准）不在本节点范围内，与 Image Resize Jimeng 的 auto 行为一致。
 """
 
 
 import torch
 from comfy_api.latest import io
 
-from ...utils._text_ops import (
+from ....utils._text_ops import (
     match_resolution,
 )
 
 
-class StringResolutionGpt20Image(io.ComfyNode):
+class StringResolutionJimeng(io.ComfyNode):
     # 各档位目标面积取该模型 1:1 官方尺寸的面积，与 API 节点的分辨率档位一一对应。
     RESOLUTION_OPTIONS = [
-        ("1k", 1024 * 1024),
+        ("1k", 1328 * 1328),
         ("2k", 2048 * 2048),
-        ("4k", 3840 * 2160),
+        ("4k", 4096 * 4096),
     ]
     RESOLUTION_LABELS = [label for label, _ in RESOLUTION_OPTIONS]
 
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
-            node_id="1hew_StringResolutionGpt20Image",
-            display_name="String Resolution GPT Image 2.0",
-            category="1hewNodes/text",
+            node_id="1hew_StringResolutionJimeng",
+            display_name="String Resolution Jimeng",
+            category="1hewNodes/model/resolution",
             description=(
-                "从输入图像推断最接近的 GPT Image 2.0 分辨率档位（1k / 2k / 4k）；未连接图像时透传所选标签。与 1hewOffice 的 GPT Image 2.0 节点成对使用。"
+                "从输入图像推断最接近的即梦分辨率档位（1k / 2k / 4k）；未连接图像时透传所选标签。与即梦系列节点及 Image Resize Jimeng 成对使用。"
             ),
             inputs=[
                 io.Combo.Input("selection", options=cls.RESOLUTION_LABELS, default="1k"),

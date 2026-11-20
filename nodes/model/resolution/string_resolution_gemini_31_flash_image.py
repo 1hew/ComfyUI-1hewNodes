@@ -11,7 +11,7 @@ resolution 支持的档位之一（0.5k / 1k / 2k / 4k），未连接图像时�
 import torch
 from comfy_api.latest import io
 
-from ...utils._text_ops import (
+from ....utils._text_ops import (
     match_resolution,
 )
 
@@ -31,7 +31,7 @@ class StringResolutionGemini31FlashImage(io.ComfyNode):
         return io.Schema(
             node_id="1hew_StringResolutionGemini31FlashImage",
             display_name="String Resolution Gemini 3.1 Flash Image",
-            category="1hewNodes/text",
+            category="1hewNodes/model/resolution",
             description=(
                 "从输入图像推断最接近的 Gemini 3.1 Flash Image 分辨率档位（0.5k / 1k / 2k / 4k）；未连接图像时透传所选标签。与 1hewOffice 的 Gemini 3.1 Flash Image 节点成对使用。"
             ),

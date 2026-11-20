@@ -42,7 +42,7 @@ class TextPathReplace(io.ComfyNode):
         return io.Schema(
             node_id="1hew_TextPathReplace",
             display_name="Text Path Replace",
-            category="1hewNodes/text",
+            category="1hewNodes/data",
             # Lists in, so value can hold one entry per match.
             is_input_list=True,
             inputs=[

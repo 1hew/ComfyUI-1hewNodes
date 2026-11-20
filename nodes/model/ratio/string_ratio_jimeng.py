@@ -2,7 +2,7 @@
 import torch
 from comfy_api.latest import io
 
-from ...utils._text_ops import (
+from ....utils._text_ops import (
     match_ratio,
 )
 
@@ -25,7 +25,7 @@ class StringRatioJimeng(io.ComfyNode):
         return io.Schema(
             node_id="1hew_StringRatioJimeng",
             display_name="String Ratio Jimeng",
-            category="1hewNodes/text",
+            category="1hewNodes/model/ratio",
             inputs=[
                 io.Combo.Input("selection", options=cls.RATIO_LABELS, default="1:1"),
                 io.Image.Input("image", optional=True),

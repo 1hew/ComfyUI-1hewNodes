@@ -27,7 +27,7 @@ class TextPathExtract(io.ComfyNode):
         return io.Schema(
             node_id="1hew_TextPathExtract",
             display_name="Text Path Extract",
-            category="1hewNodes/text",
+            category="1hewNodes/data",
             inputs=[
                 io.String.Input("text", default="", multiline=True),
                 io.String.Input("path", default="values[*]"),
