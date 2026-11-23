@@ -23,6 +23,7 @@ class MaskFillHole(io.ComfyNode):
                     min=0.0,
                     max=1.0,
                     step=0.01,
+                    optional=True,
                 ),
             ],
             outputs=[io.Mask.Output(display_name="mask")],
