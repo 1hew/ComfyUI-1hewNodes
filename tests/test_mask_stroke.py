@@ -76,9 +76,33 @@ def test_stroke_mode_keeps_the_frame_stroke():
     assert float(out[1, 5]) == 1.0  # the frame is stroked like real content
 
 
-def test_schema_exposes_border_mode():
+def test_schema_exposes_border_mode_and_close_border():
     schema = NODE.define_schema()
-    mode = schema["inputs"][-1]
+    mode = schema["inputs"][-2]
     assert mode["id"] == "border_mode"
     assert mode["default"] == "auto"
     assert mode["options"] == ["auto", "stroke", "ignore"]
+
+    close = schema["inputs"][-1]
+    assert close["id"] == "close_border"
+    assert close["default"] is False
+
+
+def test_close_border_folds_the_clipped_stroke_back_inside():
+    mask = torch.zeros(40, 40)
+    mask[10:31, 30:38] = 1.0  # block whose right side is 2px from the edge
+    open_out = NODE._stroke_single_mask(mask, False, 5.0, False)
+    closed_out = NODE._stroke_single_mask(mask, False, 5.0, False, "auto", True)
+    assert float(open_out[20, 37]) == 0.0  # 37 is base, clipped stroke ends at 38
+    assert float(open_out[20, 39]) == 1.0  # partial stroke on the edge
+    assert float(closed_out[20, 37]) == 1.0  # folded band restores the width
+    assert float(closed_out[20, 34]) == 0.0  # no over-folding into the middle
+    assert float(closed_out[0, 0]) == 0.0  # far from the shape stays untouched
+
+
+def test_close_border_leaves_a_centered_shape_unchanged():
+    mask = torch.zeros(60, 60)
+    mask[25:35, 25:35] = 1.0
+    without = NODE._stroke_single_mask(mask, False, 4.0, False)
+    with_close = NODE._stroke_single_mask(mask, False, 4.0, False, "auto", True)
+    assert bool((without == with_close).all())

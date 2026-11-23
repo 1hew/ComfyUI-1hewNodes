@@ -23,6 +23,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 **v4.6.1**
 - feat(text)：恢复 `Text Path Extract (legacy)` 兼容节点——旧工作流里的 `1hew_TextPathExtract` 继续可加载，接口保持改名前的 `text` / `path` / `output_format` / `separator` / `fallback` 与 `text` / `value` / `count` 三输出，便于封装的运行时同时服务旧发布与已迁移工作流；新工作仍建议使用 `Data Path Extract`。
+- feat(mask)：`Mask Stroke` 新增 `close_border`（默认 `False`）——开启后把溢出画布外的那段描边按原宽度沿最近的边镜像折回图内，贴边轮廓在画布内闭合；关闭时保持裁切效果。
 - feat(mask)：`Mask Stroke` 新增 `border_mode`（`auto` / `stroke` / `ignore`）——`auto` 只忽略整圈 1px 白框这类导出伪影，真实贴边内容照常描边，靠墙的线条由膨胀内半圈闭合；`stroke` 始终描边最外 1px，`ignore` 完全不在画布边缘生成描边。
 - fix(mask)：`Mask Fill Hole` 自动识别整圈 1px 白框并在判定孔洞时忽略——遮罩自带 1px 白边（或沿边沿的前景线）时，轮廓外的整片背景不再被误判成孔洞、把整张图填白；原始前景（包括贴边内容）保持不变。
 - feat(mask)：`Mask Fill Hole` 新增 `threshold`（`0.00–1.00`，默认 `0.20`，步长 `0.01`）二值化阈值——大于该值的像素视为前景，低于它的封闭区域才被填充；软边或整体偏暗的遮罩不再被固定切在 0.5，`Mask Stroke` 的 `fill_hole` 复用同一默认阈值。
