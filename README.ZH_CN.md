@@ -22,6 +22,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ## 📜 更新日志
 
 **v4.6.1**
+- feat(text)：恢复 `Text Path Extract (legacy)` 兼容节点——旧工作流里的 `1hew_TextPathExtract` 继续可加载，接口保持改名前的 `text` / `path` / `output_format` / `separator` / `fallback` 与 `text` / `value` / `count` 三输出，便于封装的运行时同时服务旧发布与已迁移工作流；新工作仍建议使用 `Data Path Extract`。
 - feat(mask)：`Mask Fill Hole` 新增 `threshold`（`0.00–1.00`，默认 `0.20`，步长 `0.01`）二值化阈值——大于该值的像素视为前景，低于它的封闭区域才被填充；软边或整体偏暗的遮罩不再被固定切在 0.5，`Mask Stroke` 的 `fill_hole` 复用同一默认阈值。
 - fix(data)：`Data Path Replace` 的 `value` 改为连线通配输入，不再是文本框——string 端口会让 ComfyUI 把上游列表按元素逐次传入，导致整列表无法完整到达节点。
 - change(data)：`List Math Expression` 的默认表达式改为 `a`；`Data Path Replace` 的 `value` 支持 JSON 数组，每个匹配位置可写入不同的值，单个值仍然广播。
@@ -847,6 +848,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 | Multi List | 把动态 `any_X` 合并为数组；`extend` 摊平列表/元组一层，`append` 保留嵌套；同时输出整个 `list`（列表样式端口）与紧凑 `json` |
 | Data Path Extract | 从连线的 `data`（JSON 文本、代码块 JSON、Python 字面量或已解析的 dict / list）按 `data_path`（如 `[0].content`、`[-1].bbox[0]`、`values[*].content`）取值，用 `keys[*]` / `values[*]` 分别取键名 / 值，用 `.count` / `.length` / `[#]` 计数；`value` 始终是原生值列表 |
 | Data Path Replace | 按 `Data Path Extract` 的路径把值写回连线的 `data`；`value` 同样是连线输入（`*`），接单个值时广播到所有匹配位置，接列表时每项对应一个位置，由 `value_type` 转换；`data` 输出的形状与输入一致 |
+| Text Path Extract (legacy) | 兼容改名前的旧工作流：保留 `text` / `path` / `output_format` / `separator` / `fallback` 输入与 `text` / `value` / `count` 三输出，node_id 仍是 `1hew_TextPathExtract`；新工作请用 `Data Path Extract` |
 
 ### 📃 列表节点
 | 节点名称 | 功能描述 |
