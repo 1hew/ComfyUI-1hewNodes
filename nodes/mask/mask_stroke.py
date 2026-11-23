@@ -139,11 +139,15 @@ class MaskStroke(io.ComfyNode):
             # when content sits one pixel inside it.
             stroke_np = MaskFillHole._mask_without_border(stroke_np)
         if close_border and mode != "ignore":
-            # The outward stroke is clipped by the canvas. Fold the clipped
-            # part back along the nearest edge so the band keeps its width and
-            # the outline reads as closed inside the frame.
-            folded = cls._fold_stroke_to_edge(stroke_source, stroke_width_px)
-            stroke_np = np.maximum(stroke_np, folded)
+            # The outward stroke is clipped by the canvas. Complete the cut
+            # segment with a band of the same width along the nearest edge so
+            # the outline closes with a consistent thickness inside the frame.
+            closing = cls._close_stroke_on_edge(
+                stroke_source,
+                stroke_np,
+                stroke_width_px,
+            )
+            stroke_np = np.maximum(stroke_np, closing)
 
         if include_mask:
             output_np = np.maximum(base_np, stroke_np)
@@ -155,53 +159,38 @@ class MaskStroke(io.ComfyNode):
             device=mask_2d.device,
         )
 
-    @staticmethod
-    def _fold_coordinates(values: np.ndarray, size: int) -> np.ndarray:
-        """Mirror coordinates outside [0, size) back across the nearest edge."""
-        folded = values.copy()
-        low = values < 0
-        folded[low] = -values[low] - 1
-        high = values >= size
-        folded[high] = 2 * size - 1 - values[high]
-        return folded
-
     @classmethod
-    def _fold_stroke_to_edge(
+    def _close_stroke_on_edge(
         cls,
-        mask_np: np.ndarray,
+        stroke_source: np.ndarray,
+        stroke_np: np.ndarray,
         stroke_width_px: int,
     ) -> np.ndarray:
-        """Fold the stroke drawn outside the canvas back along the nearest edge.
+        """Complete a stroke cut by the canvas with a same-width edge band.
 
-        The outward stroke is clipped where it leaves the canvas. Rebuilding it
-        on a padded canvas and mirroring the outside part inward keeps the same
-        stroke width on edge-touching sides, which closes the outline.
+        Where the mask or its stroke meets the canvas border, the outward part
+        of the stroke is clipped. Drawing that cut segment as a stroke of the
+        same width along the edge closes the outline; a per-pixel mirror would
+        overlap the existing band unevenly and thin out at curved corners.
         """
-        height, width = mask_np.shape
-        pad = min(int(stroke_width_px), max(height, width))
-        if pad <= 0 or mask_np.size == 0:
-            return np.zeros_like(mask_np)
+        if stroke_width_px <= 0 or stroke_np.size == 0:
+            return np.zeros_like(stroke_np)
 
-        padded = np.pad(mask_np, pad, mode="constant", constant_values=0)
-        kernel_size = int(stroke_width_px) * 2 + 1
+        contact = (stroke_source > 0) | (stroke_np > 0)
+        border_line = np.zeros_like(stroke_np)
+        border_line[0, :] = np.where(contact[0, :], 255, 0)
+        border_line[-1, :] = np.where(contact[-1, :], 255, 0)
+        border_line[:, 0] = np.where(contact[:, 0], 255, 0)
+        border_line[:, -1] = np.where(contact[:, -1], 255, 0)
+        if not border_line.any():
+            return border_line
+
+        kernel_size = max(1, int(stroke_width_px) * 2 - 1)
         kernel = cv2.getStructuringElement(
             cv2.MORPH_ELLIPSE,
             (kernel_size, kernel_size),
         )
-        padded_stroke = cv2.subtract(
-            cv2.dilate(padded, kernel, iterations=1),
-            padded,
-        )
-
-        ys, xs = np.nonzero(padded_stroke)
-        if ys.size == 0:
-            return np.zeros_like(mask_np)
-
-        folded_y = cls._fold_coordinates(ys.astype(np.int64) - pad, height)
-        folded_x = cls._fold_coordinates(xs.astype(np.int64) - pad, width)
-        folded = np.zeros_like(mask_np)
-        folded[folded_y, folded_x] = 255
-        return folded
+        return cv2.dilate(border_line, kernel, iterations=1)
 
     @staticmethod
     def _resolve_stroke_width(

@@ -88,16 +88,26 @@ def test_schema_exposes_border_mode_and_close_border():
     assert close["default"] is False
 
 
-def test_close_border_folds_the_clipped_stroke_back_inside():
+def test_close_border_completes_the_clipped_side():
     mask = torch.zeros(40, 40)
     mask[10:31, 30:38] = 1.0  # block whose right side is 2px from the edge
     open_out = NODE._stroke_single_mask(mask, False, 5.0, False)
     closed_out = NODE._stroke_single_mask(mask, False, 5.0, False, "auto", True)
     assert float(open_out[20, 37]) == 0.0  # 37 is base, clipped stroke ends at 38
     assert float(open_out[20, 39]) == 1.0  # partial stroke on the edge
-    assert float(closed_out[20, 37]) == 1.0  # folded band restores the width
-    assert float(closed_out[20, 34]) == 0.0  # no over-folding into the middle
+    assert float(closed_out[20, 37]) == 1.0  # edge band restores the width
+    assert float(closed_out[20, 34]) == 0.0  # no band beyond the edge stroke
     assert float(closed_out[0, 0]) == 0.0  # far from the shape stays untouched
+
+
+def test_close_border_keeps_edge_thickness_uniform():
+    mask = torch.zeros(40, 40)
+    mask[10:30, 30:40] = 1.0  # filled block touching the right edge
+    out = NODE._stroke_single_mask(mask, False, 6.0, False, "auto", True)
+    for y in (12, 20, 27):
+        assert float(out[y, 39]) == 1.0  # edge pixel
+        assert float(out[y, 34]) == 1.0  # 6px band (34..39)
+        assert float(out[y, 33]) == 0.0  # nothing beyond the band
 
 
 def test_close_border_leaves_a_centered_shape_unchanged():
