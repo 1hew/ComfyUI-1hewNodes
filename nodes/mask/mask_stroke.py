@@ -30,12 +30,7 @@ class MaskStroke(io.ComfyNode):
                     max=cls.MAX_RESOLUTION,
                     step=0.01,
                 ),
-                io.Boolean.Input("include_mask", default=True),
-                io.Combo.Input(
-                    "border_mode",
-                    options=["auto", "stroke", "ignore"],
-                    default="auto",
-                ),
+                io.Boolean.Input("include_mask", default=False),
                 io.Boolean.Input("close_border", default=False),
             ],
             outputs=[io.Mask.Output(display_name="mask")],
@@ -47,8 +42,7 @@ class MaskStroke(io.ComfyNode):
         mask: torch.Tensor,
         fill_hole: bool = False,
         stroke_width: float = 20.0,
-        include_mask: bool = True,
-        border_mode: str = "auto",
+        include_mask: bool = False,
         close_border: bool = False,
     ) -> io.NodeOutput:
         if not isinstance(mask, torch.Tensor):
@@ -77,7 +71,6 @@ class MaskStroke(io.ComfyNode):
                         bool(fill_hole),
                         float(stroke_width),
                         bool(include_mask),
-                        str(border_mode),
                         bool(close_border),
                     )
 
@@ -105,7 +98,6 @@ class MaskStroke(io.ComfyNode):
         fill_hole: bool,
         stroke_width: float,
         include_mask: bool,
-        border_mode: str = "auto",
         close_border: bool = False,
     ) -> torch.Tensor:
         base_mask = mask_2d
@@ -122,23 +114,12 @@ class MaskStroke(io.ComfyNode):
             0.0,
             255.0,
         ).astype(np.uint8)
-        # Border handling: real content touching the canvas edge should still
-        # get its stroke (the inward half of the dilation closes the outline),
-        # but a 1px frame baked into the mask - which would otherwise become a
-        # ring around the whole canvas - is an artifact and is ignored.
-        mode = str(border_mode or "auto").strip().lower()
-        if mode == "ignore":
-            stroke_source = MaskFillHole._mask_without_border(base_np)
-        elif mode == "auto":
-            stroke_source = MaskFillHole._mask_ignoring_frame(base_np)
-        else:
-            stroke_source = base_np
+        # A full 1px frame around the canvas is an export artifact: ignore it so
+        # it does not dilate into a ring around the whole image. Real content
+        # touching the edge still gets its stroke.
+        stroke_source = MaskFillHole._mask_ignoring_frame(base_np)
         stroke_np = cls._create_stroke_mask(stroke_source, stroke_width_px)
-        if mode == "ignore":
-            # "ignore" also refuses to draw on the canvas edge itself, even
-            # when content sits one pixel inside it.
-            stroke_np = MaskFillHole._mask_without_border(stroke_np)
-        if close_border and mode != "ignore":
+        if close_border:
             # The outward stroke is clipped by the canvas. Complete it from
             # the mask's own inner band near the edge so the band follows the
             # contour through curved corners instead of meeting a straight

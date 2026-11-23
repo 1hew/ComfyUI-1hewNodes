@@ -23,9 +23,9 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 
 **v4.6.1**
 - feat(text)：恢复 `Text Path Extract (legacy)` 兼容节点——旧工作流里的 `1hew_TextPathExtract` 继续可加载，接口保持改名前的 `text` / `path` / `output_format` / `separator` / `fallback` 与 `text` / `value` / `count` 三输出，便于封装的运行时同时服务旧发布与已迁移工作流；新工作仍建议使用 `Data Path Extract`。
+- change(mask)：`Mask Stroke` 的 `include_mask` 默认改为 `False`——默认只输出描边环；需要“原遮罩 + 描边”的并集时手动打开。
 - feat(mask)：`Mask Stroke` 新增 `close_border`（默认 `False`）——开启后用遮罩自身的内侧描边带补全被画布裁掉的一侧，补出的部分沿原轮廓圆角走、与已有描边连成一条完整的线；关闭时保持裁切效果。
-- feat(mask)：`Mask Stroke` 新增 `border_mode`（`auto` / `stroke` / `ignore`）——`auto` 只忽略整圈 1px 白框这类导出伪影，真实贴边内容照常描边，靠墙的线条由膨胀内半圈闭合；`stroke` 始终描边最外 1px，`ignore` 完全不在画布边缘生成描边。
-- fix(mask)：`Mask Fill Hole` 自动识别整圈 1px 白框并在判定孔洞时忽略——遮罩自带 1px 白边（或沿边沿的前景线）时，轮廓外的整片背景不再被误判成孔洞、把整张图填白；原始前景（包括贴边内容）保持不变。
+- fix(mask)：`Mask Fill Hole` 与 `Mask Stroke` 自动识别整圈 1px 白框并在补洞/描边时忽略——白框不再把轮廓外背景误判成孔洞或膨胀成环绕画布的一圈描边，真实贴边内容不受影响。
 - feat(mask)：`Mask Fill Hole` 新增 `threshold`（`0.00–1.00`，默认 `0.20`，步长 `0.01`）二值化阈值——大于该值的像素视为前景，低于它的封闭区域才被填充；软边或整体偏暗的遮罩不再被固定切在 0.5，`Mask Stroke` 的 `fill_hole` 复用同一默认阈值。
 - fix(data)：`Data Path Replace` 的 `value` 改为连线通配输入，不再是文本框——string 端口会让 ComfyUI 把上游列表按元素逐次传入，导致整列表无法完整到达节点。
 - change(data)：`List Math Expression` 的默认表达式改为 `a`；`Data Path Replace` 的 `value` 支持 JSON 数组，每个匹配位置可写入不同的值，单个值仍然广播。
