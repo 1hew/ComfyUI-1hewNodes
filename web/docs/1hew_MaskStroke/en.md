@@ -11,7 +11,7 @@
 | `stroke_width` | - | FLOAT | 20.0 | 0–8192; `0<x<1` treated as percentage | Stroke width; values below `1` are converted from a ratio of the mask short side into pixels |
 | `include_mask` | - | BOOLEAN | True | - | When `True`, output the union of the stroke and the base mask; when `False`, output only the stroke ring |
 | `border_mode` | - | COMBO | `auto` | `auto` / `stroke` / `ignore` | Border handling: `auto` ignores only a full 1px export frame while real edge content is still stroked; `stroke` always treats the outermost 1px as content; `ignore` never draws on the outermost 1px |
-| `close_border` | - | BOOLEAN | False | - | When `True`, the span where the stroke meets the canvas edge is completed with a stroke of the same width (the part that would fall outside is drawn inside), so an edge-touching outline closes inside the frame; `False` keeps the clipped result |
+| `close_border` | - | BOOLEAN | False | - | When `True`, the edge side is completed from the mask's own inner band (the part that would fall outside is drawn inside), so an edge-touching outline closes inside the frame and joins the rounded corners continuously; `False` keeps the clipped result |
 
 ## Outputs
 
@@ -23,7 +23,7 @@
 
 - Shared hole-fill source of truth: `fill_hole=True` reuses `Mask Fill Hole` internals so the preprocessing result stays consistent.
 - Border handling: `auto` (default) ignores only a full 1px export frame, so the frame does not dilate into a ring around the canvas, while real edge content is still stroked — a line or outline touching the wall is closed by the inward half of the dilation. `stroke` always treats the outermost 1px as content; `ignore` never draws on the outermost 1px at all.
-- Edge closing: `close_border=True` completes the span where the stroke meets the canvas edge with a same-width stroke along that edge, so the part that would be outside is drawn inside and an edge-touching outline closes with consistent thickness; `False` keeps the clipped result.
+- Edge closing: `close_border=True` completes the clipped side from the mask's own inner band — the added part follows the original rounded contour and joins the existing stroke as one continuous line, instead of a straight bar butted against the edge; `False` keeps the clipped result.
 - Stroke generation: uses elliptical dilation on the base mask and subtracts the base mask to isolate the outer stroke band.
 - Percentage width: when `stroke_width` is less than `1`, it is resolved against the mask short side.
 - Batch support: processes masks item by item with bounded concurrency for standard `[B,H,W]` batches.

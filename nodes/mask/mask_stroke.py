@@ -139,15 +139,15 @@ class MaskStroke(io.ComfyNode):
             # when content sits one pixel inside it.
             stroke_np = MaskFillHole._mask_without_border(stroke_np)
         if close_border and mode != "ignore":
-            # The outward stroke is clipped by the canvas. Complete the cut
-            # segment with a band of the same width along the nearest edge so
-            # the outline closes with a consistent thickness inside the frame.
-            closing = cls._close_stroke_on_edge(
+            # The outward stroke is clipped by the canvas. Complete it from
+            # the mask's own inner band near the edge so the band follows the
+            # contour through curved corners instead of meeting a straight
+            # added segment with a visible step.
+            stroke_np = cls._close_stroke_on_edge(
                 stroke_source,
                 stroke_np,
                 stroke_width_px,
             )
-            stroke_np = np.maximum(stroke_np, closing)
 
         if include_mask:
             output_np = np.maximum(base_np, stroke_np)
@@ -162,35 +162,44 @@ class MaskStroke(io.ComfyNode):
     @classmethod
     def _close_stroke_on_edge(
         cls,
-        stroke_source: np.ndarray,
+        mask_np: np.ndarray,
         stroke_np: np.ndarray,
         stroke_width_px: int,
     ) -> np.ndarray:
-        """Complete a stroke cut by the canvas with a same-width edge band.
+        """Complete a stroke cut by the canvas so it reads as one continuous line.
 
-        Where the mask or its stroke meets the canvas border, the outward part
-        of the stroke is clipped. Drawing that cut segment as a stroke of the
-        same width along the edge closes the outline; a per-pixel mirror would
-        overlap the existing band unevenly and thin out at curved corners.
+        Along a canvas edge the outward half of the stroke has nowhere to go.
+        The mask's own inner band near that edge is used instead: it follows the
+        contour through curved corners, whereas a separately drawn straight band
+        would show a step where it meets them.
         """
-        if stroke_width_px <= 0 or stroke_np.size == 0:
-            return np.zeros_like(stroke_np)
+        width = int(stroke_width_px)
+        if width <= 0 or mask_np.size == 0:
+            return stroke_np
 
-        contact = (stroke_source > 0) | (stroke_np > 0)
-        border_line = np.zeros_like(stroke_np)
-        border_line[0, :] = np.where(contact[0, :], 255, 0)
-        border_line[-1, :] = np.where(contact[-1, :], 255, 0)
-        border_line[:, 0] = np.where(contact[:, 0], 255, 0)
-        border_line[:, -1] = np.where(contact[:, -1], 255, 0)
-        if not border_line.any():
-            return border_line
-
-        kernel_size = max(1, int(stroke_width_px) * 2 - 1)
         kernel = cv2.getStructuringElement(
             cv2.MORPH_ELLIPSE,
-            (kernel_size, kernel_size),
+            (width * 2 + 1, width * 2 + 1),
         )
-        return cv2.dilate(border_line, kernel, iterations=1)
+        inner = cv2.subtract(
+            mask_np,
+            cv2.erode(
+                mask_np,
+                kernel,
+                borderType=cv2.BORDER_CONSTANT,
+                borderValue=0,
+            ),
+        )
+        if not inner.any():
+            return stroke_np
+
+        edge_zone = np.zeros_like(mask_np)
+        edge_zone[:width, :] = 255
+        edge_zone[-width:, :] = 255
+        edge_zone[:, :width] = 255
+        edge_zone[:, -width:] = 255
+        cut = cv2.bitwise_and(inner, edge_zone)
+        return cv2.bitwise_or(stroke_np, cut)
 
     @staticmethod
     def _resolve_stroke_width(
