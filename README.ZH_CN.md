@@ -22,6 +22,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ## 📜 更新日志
 
 **v4.6.1**
+- feat(mask)：`Mask Fill Hole` 新增 `threshold`（`0.00–1.00`，默认 `0.20`，步长 `0.01`）二值化阈值——大于该值的像素视为前景，低于它的封闭区域才被填充；软边或整体偏暗的遮罩不再被固定切在 0.5，`Mask Stroke` 的 `fill_hole` 复用同一默认阈值。
 - fix(data)：`Data Path Replace` 的 `value` 改为连线通配输入，不再是文本框——string 端口会让 ComfyUI 把上游列表按元素逐次传入，导致整列表无法完整到达节点。
 - change(data)：`List Math Expression` 的默认表达式改为 `a`；`Data Path Replace` 的 `value` 支持 JSON 数组，每个匹配位置可写入不同的值，单个值仍然广播。
 - fix(data)：`Data Path Replace` 去掉单元素列表包装——`data` 输出与输入形状一致（字典还是字典），不再无条件宣称自己是列表。

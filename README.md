@@ -22,6 +22,7 @@ git clone https://github.com/1hew/ComfyUI-1hewNodes
 ## 📜 Changelog
 
 **v4.6.1**
+- feat(mask): `Mask Fill Hole` gains a `threshold` input (`0.00–1.00`, default `0.20`, step `0.01`) for binarization — pixels above it are foreground and only enclosed regions below it get filled, so soft or low-value masks are no longer hard-cut at 0.5; `Mask Stroke`'s `fill_hole` reuses the same default.
 - fix(data): `Data Path Replace`'s `value` is a linked wildcard input instead of a string box — with a string socket ComfyUI split a list upstream into one value per call, so a list could never reach the node intact.
 - change(data): `List Math Expression` defaults its expression to `a`; `Data Path Replace`'s `value` accepts a JSON array so each match gets its own value, while a single value still broadcasts.
 - fix(data): `Data Path Replace` drops the one-item-list wrapper — the `data` port now matches the input shape (an object stays an object), instead of always claiming to be a list.
