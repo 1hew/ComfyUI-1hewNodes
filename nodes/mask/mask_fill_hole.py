@@ -58,8 +58,19 @@ class MaskFillHole(io.ComfyNode):
         mask_array = np.array(mask_pil)
         cutoff = min(1.0, max(0.0, float(threshold))) * 255.0
         binary_mask = mask_array > cutoff
+        # A foreground line drawn along the image border (for example a 1px
+        # white frame) would seal the outer background, so binary_fill_holes
+        # treats that whole region as an enclosed hole and fills the canvas.
+        # Judge holes with the border treated as background, then keep the
+        # original foreground so real border content survives.
+        fill_input = binary_mask.copy()
+        fill_input[0, :] = False
+        fill_input[-1, :] = False
+        fill_input[:, 0] = False
+        fill_input[:, -1] = False
         structure = ndimage.generate_binary_structure(2, 2)
-        filled_mask = ndimage.binary_fill_holes(binary_mask, structure=structure)
+        filled_mask = ndimage.binary_fill_holes(fill_input, structure=structure)
+        filled_mask |= binary_mask
         if invert_mask:
             filled_mask = ~filled_mask
         filled_array = (filled_mask * 255).astype(np.uint8)

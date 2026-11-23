@@ -136,3 +136,33 @@ def test_out_of_range_threshold_is_clamped():
     mask = _hole_mask(0.3)
     assert float(_run(mask, threshold=2.0)[0, 7, 7]) == 0.0
     assert float(_run(mask, threshold=-1.0)[0, 7, 7]) == 1.0
+
+
+def _framed_ring_mask():
+    """1px white frame with a closed ring inside it."""
+    mask = torch.zeros(1, 20, 20)
+    mask[0, 0, :] = 1.0
+    mask[0, -1, :] = 1.0
+    mask[0, :, 0] = 1.0
+    mask[0, :, -1] = 1.0
+    mask[0, 5, 5:15] = 1.0
+    mask[0, 14, 5:15] = 1.0
+    mask[0, 5:15, 5] = 1.0
+    mask[0, 5:15, 14] = 1.0
+    return mask
+
+
+def test_border_frame_does_not_turn_outer_background_into_a_hole():
+    out = _run(_framed_ring_mask(), threshold=0.2)
+    assert float(out[0, 9, 9]) == 1.0  # ring interior is filled
+    assert float(out[0, 2, 2]) == 0.0  # background between frame and ring stays
+    assert float(out[0, 10, 2]) == 0.0
+    assert float(out[0, 0, 10]) == 1.0  # the frame itself is preserved
+
+
+def test_foreground_touching_the_border_is_preserved():
+    mask = _hole_mask(0.1)
+    mask[0, 0:2, 7] = 1.0  # bar reaching the top border
+    out = _run(mask, threshold=0.2)
+    assert float(out[0, 0, 7]) == 1.0
+    assert float(out[0, 7, 7]) == 1.0

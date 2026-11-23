@@ -30,4 +30,5 @@
 ## Notes & Tips
 
 - Input masks are binarized with `threshold` (default 0.20): values above it are foreground, the rest background. Soft or low-opacity masks get hard-cut, so feather downstream if needed.
+- Hole detection treats the outermost 1px of the image as background, so a 1px frame baked into the mask (or a foreground line along the edge) cannot turn the outer background into a hole; the original foreground, including border content, is preserved in the output.
 - Requires SciPy; ensure the environment includes `scipy.ndimage` for hole filling.
