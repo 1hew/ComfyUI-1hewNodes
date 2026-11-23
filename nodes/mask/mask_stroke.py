@@ -31,6 +31,11 @@ class MaskStroke(io.ComfyNode):
                     step=0.01,
                 ),
                 io.Boolean.Input("include_mask", default=True),
+                io.Combo.Input(
+                    "border_mode",
+                    options=["auto", "stroke", "ignore"],
+                    default="auto",
+                ),
             ],
             outputs=[io.Mask.Output(display_name="mask")],
         )
@@ -42,6 +47,7 @@ class MaskStroke(io.ComfyNode):
         fill_hole: bool = False,
         stroke_width: float = 20.0,
         include_mask: bool = True,
+        border_mode: str = "auto",
     ) -> io.NodeOutput:
         if not isinstance(mask, torch.Tensor):
             empty = torch.zeros((0, 64, 64), dtype=torch.float32)
@@ -69,6 +75,7 @@ class MaskStroke(io.ComfyNode):
                         bool(fill_hole),
                         float(stroke_width),
                         bool(include_mask),
+                        str(border_mode),
                     )
 
             tasks.append(run_one())
@@ -95,6 +102,7 @@ class MaskStroke(io.ComfyNode):
         fill_hole: bool,
         stroke_width: float,
         include_mask: bool,
+        border_mode: str = "auto",
     ) -> torch.Tensor:
         base_mask = mask_2d
         if fill_hole:
@@ -110,7 +118,22 @@ class MaskStroke(io.ComfyNode):
             0.0,
             255.0,
         ).astype(np.uint8)
-        stroke_np = cls._create_stroke_mask(base_np, stroke_width_px)
+        # Border handling: real content touching the canvas edge should still
+        # get its stroke (the inward half of the dilation closes the outline),
+        # but a 1px frame baked into the mask - which would otherwise become a
+        # ring around the whole canvas - is an artifact and is ignored.
+        mode = str(border_mode or "auto").strip().lower()
+        if mode == "ignore":
+            stroke_source = MaskFillHole._mask_without_border(base_np)
+        elif mode == "auto":
+            stroke_source = MaskFillHole._mask_ignoring_frame(base_np)
+        else:
+            stroke_source = base_np
+        stroke_np = cls._create_stroke_mask(stroke_source, stroke_width_px)
+        if mode == "ignore":
+            # "ignore" also refuses to draw on the canvas edge itself, even
+            # when content sits one pixel inside it.
+            stroke_np = MaskFillHole._mask_without_border(stroke_np)
 
         if include_mask:
             output_np = np.maximum(base_np, stroke_np)

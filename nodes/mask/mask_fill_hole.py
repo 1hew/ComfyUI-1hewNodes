@@ -54,20 +54,59 @@ class MaskFillHole(io.ComfyNode):
         return io.NodeOutput(output_tensor)
 
     @staticmethod
+    def _mask_without_border(mask_array):
+        """Treat the outermost 1px as background."""
+        cleared = mask_array.copy()
+        cleared[0, :] = 0
+        cleared[-1, :] = 0
+        cleared[:, 0] = 0
+        cleared[:, -1] = 0
+        return cleared
+
+    @staticmethod
+    def _is_border_frame(mask_array):
+        """True when the outermost 1px is a closed frame around the canvas.
+
+        A full 1px frame is an export artifact, unlike real content that only
+        touches part of an edge; both nodes ignore the artifact but keep
+        genuine border content.
+        """
+        height, width = mask_array.shape
+        if height < 3 or width < 3:
+            return False
+        border = np.concatenate(
+            [
+                mask_array[0, :],
+                mask_array[-1, :],
+                mask_array[1:-1, 0],
+                mask_array[1:-1, -1],
+            ]
+        )
+        if np.count_nonzero(border) < 0.98 * border.size:
+            return False
+        inner = np.concatenate(
+            [
+                mask_array[1, :],
+                mask_array[-2, :],
+                mask_array[1:-1, 1],
+                mask_array[1:-1, -2],
+            ]
+        )
+        return np.count_nonzero(inner) < 0.5 * inner.size
+
+    @classmethod
+    def _mask_ignoring_frame(cls, mask_array):
+        """Drop a detected 1px frame; leave every other border pixel alone."""
+        if cls._is_border_frame(mask_array):
+            return cls._mask_without_border(mask_array)
+        return mask_array.copy()
+
+    @staticmethod
     def _fill_holes_internal(mask_pil, invert_mask, threshold=0.2):
         mask_array = np.array(mask_pil)
         cutoff = min(1.0, max(0.0, float(threshold))) * 255.0
         binary_mask = mask_array > cutoff
-        # A foreground line drawn along the image border (for example a 1px
-        # white frame) would seal the outer background, so binary_fill_holes
-        # treats that whole region as an enclosed hole and fills the canvas.
-        # Judge holes with the border treated as background, then keep the
-        # original foreground so real border content survives.
-        fill_input = binary_mask.copy()
-        fill_input[0, :] = False
-        fill_input[-1, :] = False
-        fill_input[:, 0] = False
-        fill_input[:, -1] = False
+        fill_input = MaskFillHole._mask_ignoring_frame(binary_mask)
         structure = ndimage.generate_binary_structure(2, 2)
         filled_mask = ndimage.binary_fill_holes(fill_input, structure=structure)
         filled_mask |= binary_mask
